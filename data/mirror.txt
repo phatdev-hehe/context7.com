@@ -1,0 +1,1773 @@
+TITLE: Implementing Custom NetworkManager Extension in C#
+DESCRIPTION: A complete NetworkManager extension class that implements all the standard Mirror networking callbacks and adds a flexible event-driven system for customization. It allows external systems to subscribe to network events without modifying the core manager code.
+
+LANGUAGE: C#
+CODE:
+using System;
+using UnityEngine;
+using UnityEngine.SceneManagement;
+using Mirror;
+
+/*
+	Documentation: https://mirror-networking.gitbook.io/docs/components/network-manager
+	API Reference: https://mirror-networking.com/docs/api/Mirror.NetworkManager.html
+*/
+
+public class #SCRIPTNAME# : NetworkManager
+{
+    // You can adjust the parameters of the Actions below to suit your needs and pass the values through the Invoke() method.
+
+    public event Action OnStartAction;
+    public event Action OnDestroyAction;
+
+    public event Action OnApplicationQuitAction;
+
+    public event Action<string> ServerChangeSceneAction;
+    public event Action<string> OnServerChangeSceneAction;
+    public event Action<string> OnServerSceneChangedAction;
+    public event Action<string, SceneOperation, bool> OnClientChangeSceneAction;
+    public event Action OnClientSceneChangedAction;
+
+    public event Action<NetworkConnectionToClient> OnServerConnectAction;
+    public event Action<NetworkConnectionToClient> OnServerReadyAction;
+    public event Action<NetworkConnectionToClient> OnServerAddPlayerAction;
+    public event Action<NetworkConnectionToClient> OnServerDisconnectAction;
+    public event Action<NetworkConnectionToClient, TransportError, string> OnServerErrorAction;
+    public event Action<NetworkConnectionToClient, Exception> OnServerTransportExceptionAction;
+
+    public event Action OnClientConnectAction;
+    public event Action OnClientDisconnectAction;
+    public event Action OnClientNotReadyAction;
+    public event Action<TransportError, string> OnClientErrorAction;
+    public event Action<Exception> OnClientTransportExceptionAction;
+
+    public event Action OnStartServerAction;
+    public event Action OnStopServerAction;
+    public event Action OnStartHostAction;
+    public event Action OnStopHostAction;
+    public event Action OnStartClientAction;
+    public event Action OnStopClientAction;
+
+    // Overrides the base singleton so we don't have to cast to this type everywhere.
+    public static new #SCRIPTNAME# singleton => (#SCRIPTNAME#)NetworkManager.singleton;
+
+    /// <summary>
+    /// Runs on both Server and Client
+    /// Networking is NOT initialized when this fires
+    /// </summary>
+    public override void Awake()
+    {
+        base.Awake();
+
+        // Example of adding a handler for the OnStartAction
+        // Multiple handlers can be added for actions
+        // Use -= to remove handlers
+        // Set the action to null to remove all handlers
+        OnStartAction += OnStartedActionHandler;
+    }
+
+    /// <summary>
+    /// Example handler for OnStartAction
+    /// </summary>
+    /// <remarks>Handlers can be assigned from, and exist, in any script</remarks>
+    public void OnStartedActionHandler()
+    {
+        Debug.Log("#SCRIPTNAME#.OnStartAction invoked");
+    }
+
+    #region Unity Callbacks
+
+    public override void OnValidate()
+    {
+        base.OnValidate();
+    }
+
+    /// <summary>
+    /// Runs on both Server and Client
+    /// Networking is NOT initialized when this fires
+    /// </summary>
+    public override void Start()
+    {
+        OnStartAction?.Invoke();
+        base.Start();
+    }
+
+    /// <summary>
+    /// Runs on both Server and Client
+    /// </summary>
+    public override void LateUpdate()
+    {
+        base.LateUpdate();
+    }
+
+    /// <summary>
+    /// Runs on both Server and Client
+    /// </summary>
+    public override void OnDestroy()
+    {
+        OnDestroyAction?.Invoke();
+        base.OnDestroy();
+    }
+
+    #endregion
+
+    #region Start & Stop
+
+    /// <summary>
+    /// Set the frame rate for a headless server.
+    /// <para>Override if you wish to disable the behavior or set your own tick rate.</para>
+    /// </summary>
+    public override void ConfigureHeadlessFrameRate()
+    {
+        base.ConfigureHeadlessFrameRate();
+    }
+
+    /// <summary>
+    /// called when quitting the application by closing the window / pressing stop in the editor
+    /// </summary>
+    public override void OnApplicationQuit()
+    {
+        OnApplicationQuitAction?.Invoke();
+        base.OnApplicationQuit();
+    }
+
+    #endregion
+
+    #region Scene Management
+
+    /// <summary>
+    /// This causes the server to switch scenes and sets the networkSceneName.
+    /// <para>Clients that connect to this server will automatically switch to this scene. This is called automatically if onlineScene or offlineScene are set, but it can be called from user code to switch scenes again while the game is in progress. This automatically sets clients to be not-ready. The clients must call NetworkClient.Ready() again to participate in the new scene.</para>
+    /// </summary>
+    /// <param name="newSceneName"></param>
+    public override void ServerChangeScene(string newSceneName)
+    {
+        ServerChangeSceneAction?.Invoke(newSceneName);
+        base.ServerChangeScene(newSceneName);
+    }
+
+    /// <summary>
+    /// Called from ServerChangeScene immediately before SceneManager.LoadSceneAsync is executed
+    /// <para>This allows server to do work / cleanup / prep before the scene changes.</para>
+    /// </summary>
+    /// <param name="newSceneName">Name of the scene that's about to be loaded</param>
+    public override void OnServerChangeScene(string newSceneName)
+    {
+        OnServerChangeSceneAction?.Invoke(newSceneName);
+    }
+
+    /// <summary>
+    /// Called on the server when a scene is completed loaded, when the scene load was initiated by the server with ServerChangeScene().
+    /// </summary>
+    /// <param name="sceneName">The name of the new scene.</param>
+    public override void OnServerSceneChanged(string sceneName)
+    {
+        OnServerSceneChangedAction?.Invoke(sceneName);
+    }
+
+    /// <summary>
+    /// Called from ClientChangeScene immediately before SceneManager.LoadSceneAsync is executed
+    /// <para>This allows client to do work / cleanup / prep before the scene changes.</para>
+    /// </summary>
+    /// <param name="newSceneName">Name of the scene that's about to be loaded</param>
+    /// <param name="sceneOperation">Scene operation that's about to happen</param>
+    /// <param name="customHandling">true to indicate that scene loading will be handled through overrides</param>
+    public override void OnClientChangeScene(string newSceneName, SceneOperation sceneOperation, bool customHandling)
+    {
+        OnClientChangeSceneAction?.Invoke(newSceneName, sceneOperation, customHandling);
+    }
+
+    /// <summary>
+    /// Called on clients when a scene has completed loaded, when the scene load was initiated by the server.
+    /// <para>Scene changes can cause player objects to be destroyed. The default implementation of OnClientSceneChanged in the NetworkManager is to add a player object for the connection if no player object exists.</para>
+    /// </summary>
+    public override void OnClientSceneChanged()
+    {
+        OnClientSceneChangedAction?.Invoke();
+        base.OnClientSceneChanged();
+    }
+
+    #endregion
+
+    #region Server System Callbacks
+
+    /// <summary>
+    /// Called on the server when a new client connects.
+    /// <para>Unity calls this on the Server when a Client connects to the Server. Use an override to tell the NetworkManager what to do when a client connects to the server.</para>
+    /// </summary>
+    /// <param name="conn">Connection from client.</param>
+    public override void OnServerConnect(NetworkConnectionToClient conn)
+    {
+        OnServerConnectAction?.Invoke(conn);
+    }
+
+    /// <summary>
+    /// Called on the server when a client is ready.
+    /// <para>The default implementation of this function calls NetworkServer.SetClientReady() to continue the network setup process.</para>
+    /// </summary>
+    /// <param name="conn">Connection from client.</param>
+    public override void OnServerReady(NetworkConnectionToClient conn)
+    {
+        OnServerReadyAction?.Invoke(conn);
+        base.OnServerReady(conn);
+    }
+
+    /// <summary>
+    /// Called on the server when a client adds a new player with ClientScene.AddPlayer.
+    /// <para>The default implementation for this function creates a new player object from the playerPrefab.</para>
+    /// </summary>
+    /// <param name="conn">Connection from client.</param>
+    public override void OnServerAddPlayer(NetworkConnectionToClient conn)
+    {
+        OnServerAddPlayerAction?.Invoke(conn);
+        base.OnServerAddPlayer(conn);
+    }
+
+    /// <summary>
+    /// Called on the server when a client disconnects.
+    /// <para>This is called on the Server when a Client disconnects from the Server. Use an override to decide what should happen when a disconnection is detected.</para>
+    /// </summary>
+    /// <param name="conn">Connection from client.</param>
+    public override void OnServerDisconnect(NetworkConnectionToClient conn)
+    {
+        OnServerDisconnectAction?.Invoke(conn);
+        base.OnServerDisconnect(conn);
+    }
+
+    /// <summary>
+    /// Called on server when transport raises an error.
+    /// <para>NetworkConnection may be null.</para>
+    /// </summary>
+    /// <param name="conn">Connection of the client...may be null</param>
+    /// <param name="transportError">TransportError enum</param>
+    /// <param name="message">String message of the error.</param>
+    public override void OnServerError(NetworkConnectionToClient conn, TransportError transportError, string message)
+    {
+        OnServerErrorAction?.Invoke(conn, transportError, message);
+    }
+
+    /// <summary>
+    /// Called on server when transport raises an exception.
+    /// <para>NetworkConnection may be null.</para>
+    /// </summary>
+    /// <param name="conn">Connection of the client...may be null</param>
+    /// <param name="exception">Exception thrown from the Transport.</param>
+    public override void OnServerTransportException(NetworkConnectionToClient conn, Exception exception)
+    {
+        OnServerTransportExceptionAction?.Invoke(conn, exception);
+    }
+
+    #endregion
+
+    #region Client System Callbacks
+
+    /// <summary>
+    /// Called on the client when connected to a server.
+    /// <para>The default implementation of this function sets the client as ready and adds a player. Override the function to dictate what happens when the client connects.</para>
+    /// </summary>
+    public override void OnClientConnect()
+    {
+        OnClientConnectAction?.Invoke();
+        base.OnClientConnect();
+    }
+
+    /// <summary>
+    /// Called on clients when disconnected from a server.
+    /// <para>This is called on the client when it disconnects from the server. Override this function to decide what happens when the client disconnects.</para>
+    /// </summary>
+    public override void OnClientDisconnect()
+    {
+        OnClientDisconnectAction?.Invoke();
+    }
+
+    /// <summary>
+    /// Called on clients when a servers tells the client it is no longer ready.
+    /// <para>This is commonly used when switching scenes.</para>
+    /// </summary>
+    public override void OnClientNotReady()
+    {
+        OnClientNotReadyAction?.Invoke();
+    }
+
+    /// <summary>
+    /// Called on client when transport raises an error.</summary>
+    /// </summary>
+    /// <param name="transportError">TransportError enum.</param>
+    /// <param name="message">String message of the error.</param>
+    public override void OnClientError(TransportError transportError, string message)
+    {
+        OnClientErrorAction?.Invoke(transportError, message);
+    }
+
+    /// <summary>
+    /// Called on client when transport raises an exception.</summary>
+    /// </summary>
+    /// <param name="exception">Exception thrown from the Transport.</param>
+    public override void OnClientTransportException(Exception exception)
+    {
+        OnClientTransportExceptionAction?.Invoke(exception);
+    }
+
+    #endregion
+
+    #region Start & Stop Callbacks
+
+----------------------------------------
+
+TITLE: Implementing NetworkAuthenticator Class Template in Mirror for Unity
+DESCRIPTION: A complete template for implementing a custom NetworkAuthenticator in Mirror networking. This class handles the authentication workflow between client and server with message registration, request/response handling, and proper cleanup. It includes all the necessary overridden methods from the base NetworkAuthenticator class with documentation comments.
+
+LANGUAGE: C#
+CODE:
+using System;
+using System.Collections;
+using System.Collections.Generic;
+using Mirror;
+using UnityEngine;
+
+/*
+    Documentation: https://mirror-networking.gitbook.io/docs/components/network-authenticators
+    API Reference: https://mirror-networking.com/docs/api/Mirror.NetworkAuthenticator.html
+*/
+
+public class #SCRIPTNAME# : NetworkAuthenticator
+{
+    #region Messages
+
+    public struct AuthRequestMessage : NetworkMessage { }
+
+    public struct AuthResponseMessage : NetworkMessage { }
+
+    #endregion
+
+    #region Server
+
+    /// <summary>
+    /// Called on server from StartServer to initialize the Authenticator
+    /// <para>Server message handlers should be registered in this method.</para>
+    /// </summary>
+    public override void OnStartServer()
+    {
+        // register a handler for the authentication request we expect from client
+        NetworkServer.RegisterHandler<AuthRequestMessage>(OnAuthRequestMessage, false);
+    }
+
+    /// <summary>
+    /// Called on server from OnServerConnectInternal when a client needs to authenticate
+    /// </summary>
+    /// <param name="conn">Connection to client.</param>
+    public override void OnServerAuthenticate(NetworkConnectionToClient conn) { }
+
+    /// <summary>
+    /// Called on server when the client's AuthRequestMessage arrives
+    /// </summary>
+    /// <param name="conn">Connection to client.</param>
+    /// <param name="msg">The message payload</param>
+    public void OnAuthRequestMessage(NetworkConnectionToClient conn, AuthRequestMessage msg)
+    {
+        AuthResponseMessage authResponseMessage = new AuthResponseMessage();
+        conn.Send(authResponseMessage);
+
+        // Accept the successful authentication
+        ServerAccept(conn);
+    }
+
+    /// <summary>
+    /// Called when server stops, used to unregister message handlers if needed.
+    /// </summary>
+    public override void OnStopServer()
+    {
+        // Unregister the handler for the authentication request
+        NetworkServer.UnregisterHandler<AuthRequestMessage>();
+    }
+
+    #endregion
+
+    #region Client
+
+    /// <summary>
+    /// Called on client from StartClient to initialize the Authenticator
+    /// <para>Client message handlers should be registered in this method.</para>
+    /// </summary>
+    public override void OnStartClient()
+    {
+        // register a handler for the authentication response we expect from server
+        NetworkClient.RegisterHandler<AuthResponseMessage>(OnAuthResponseMessage, false);
+    }
+
+    /// <summary>
+    /// Called on client from OnClientConnectInternal when a client needs to authenticate
+    /// </summary>
+    public override void OnClientAuthenticate()
+    {
+        AuthRequestMessage authRequestMessage = new AuthRequestMessage();
+        NetworkClient.Send(authRequestMessage);
+    }
+
+    /// <summary>
+    /// Called on client when the server's AuthResponseMessage arrives
+    /// </summary>
+    /// <param name="msg">The message payload</param>
+    public void OnAuthResponseMessage(AuthResponseMessage msg)
+    {
+        // Authentication has been accepted
+        ClientAccept();
+    }
+
+    /// <summary>
+    /// Called when client stops, used to unregister message handlers if needed.
+    /// </summary>
+    public override void OnStopClient()
+    {
+        // Unregister the handler for the authentication response
+        NetworkClient.UnregisterHandler<AuthResponseMessage>();
+    }
+
+    #endregion
+}
+
+----------------------------------------
+
+TITLE: Implementing NetworkBehaviour Template in C# with Mirror
+DESCRIPTION: A comprehensive template for implementing Mirror's NetworkBehaviour with event callbacks for all network lifecycle events. It includes regions for Unity callbacks and Mirror's network start/stop callbacks along with documentation for each method. Events are exposed to allow other components to respond to network lifecycle changes.
+
+LANGUAGE: csharp
+CODE:
+using System;
+using System.Collections.Generic;
+using UnityEngine;
+using Mirror;
+
+/*
+	Documentation: https://mirror-networking.gitbook.io/docs/guides/networkbehaviour
+	API Reference: https://mirror-networking.com/docs/api/Mirror.NetworkBehaviour.html
+*/
+
+public class #SCRIPTNAME# : NetworkBehaviour
+{
+    // You can adjust the parameters of the Actions below to suit your needs and pass the values through the Invoke() method.
+
+    public event Action<NetworkIdentity> OnStartServerAction;
+    public event Action<NetworkIdentity> OnStopServerAction;
+    public event Action OnStartClientAction;
+    public event Action OnStopClientAction;
+    public event Action OnStartLocalPlayerAction;
+    public event Action OnStopLocalPlayerAction;
+    public event Action OnStartAuthorityAction;
+    public event Action OnStopAuthorityAction;
+
+    #region Unity Callbacks
+
+    /// <summary>
+    /// Add your validation code here after the base.OnValidate(); call.
+    /// </summary>
+    protected override void OnValidate()
+    {
+        base.OnValidate();
+    }
+
+    // NOTE: Do not put objects in DontDestroyOnLoad (DDOL) in Awake.  You can do that in Start instead.
+    void Awake()
+    {
+        // Example of adding a handler for OnStartServerAction
+        // Multiple handlers can be added for actions
+        // Use -= to remove handlers
+        // Set the action to null to remove all handlers
+        OnStartServerAction += OnStartServerHandler;
+    }
+
+    void Start()
+    {
+    }
+
+    /// <summary>
+    /// Example handler for OnStartServerAction
+    /// </summary>
+    /// <remarks>Handlers can be assigned from, and exist, in any script</remarks>
+    public void OnStartServerHandler(NetworkIdentity identity)
+    {
+        Debug.Log($"#SCRIPTNAME#.OnStartServerAction invoked for {identity}");
+    }
+
+    #endregion
+
+    #region Start & Stop Callbacks
+
+    /// <summary>
+    /// This is invoked for NetworkBehaviour objects when they become active on the server.
+    /// <para>This could be triggered by NetworkServer.Listen() for objects in the scene, or by NetworkServer.Spawn() for objects that are dynamically created.</para>
+    /// <para>This will be called for objects on a "host" as well as for object on a dedicated server.</para>
+    /// </summary>
+    public override void OnStartServer()
+    {
+        OnStartServerAction?.Invoke(netIdentity);
+    }
+
+    /// <summary>
+    /// Invoked on the server when the object is unspawned
+    /// <para>Useful for saving object data in persistent storage</para>
+    /// </summary>
+    public override void OnStopServer()
+    {
+        OnStopServerAction?.Invoke(netIdentity);
+    }
+
+    /// <summary>
+    /// Called on every NetworkBehaviour when it is activated on a client.
+    /// <para>Objects on the host have this function called, as there is a local client on the host. The values of SyncVars on object are guaranteed to be initialized correctly with the latest state from the server when this function is called on the client.</para>
+    /// </summary>
+    public override void OnStartClient()
+    {
+        OnStartClientAction?.Invoke();
+    }
+
+    /// <summary>
+    /// This is invoked on clients when the server has caused this object to be destroyed.
+    /// <para>This can be used as a hook to invoke effects or do client specific cleanup.</para>
+    /// </summary>
+    public override void OnStopClient()
+    {
+        OnStopClientAction?.Invoke();
+    }
+
+    /// <summary>
+    /// Called when the local player object has been set up.
+    /// <para>This happens after OnStartClient(), as it is triggered by an ownership message from the server. This is an appropriate place to activate components or functionality that should only be active for the local player, such as cameras and input.</para>
+    /// </summary>
+    public override void OnStartLocalPlayer()
+    {
+        OnStartLocalPlayerAction?.Invoke();
+    }
+
+    /// <summary>
+    /// Called when the local player object is being stopped.
+    /// <para>This happens before OnStopClient(), as it may be triggered by an ownership message from the server, or because the player object is being destroyed. This is an appropriate place to deactivate components or functionality that should only be active for the local player, such as cameras and input.</para>
+    /// </summary>
+    public override void OnStopLocalPlayer()
+    {
+        OnStopLocalPlayerAction?.Invoke();
+    }
+
+    /// <summary>
+    /// This is invoked on behaviours that have authority, based on context and <see cref="NetworkIdentity.hasAuthority">NetworkIdentity.hasAuthority</see>.
+    /// <para>This is called after <see cref="OnStartServer">OnStartServer</see> and before <see cref="OnStartClient">OnStartClient.</see></para>
+    /// <para>When <see cref="NetworkIdentity.AssignClientAuthority">AssignClientAuthority</see> is called on the server, this will be called on the client that owns the object. When an object is spawned with <see cref="NetworkServer.Spawn">NetworkServer.Spawn</see> with a NetworkConnectionToClient parameter included, this will be called on the client that owns the object.</para>
+    /// </summary>
+    public override void OnStartAuthority()
+    {
+        OnStartAuthorityAction?.Invoke();
+    }
+
+    /// <summary>
+    /// This is invoked on behaviours when authority is removed.
+    /// <para>When NetworkIdentity.RemoveClientAuthority is called on the server, this will be called on the client that owns the object.</para>
+    /// </summary>
+    public override void OnStopAuthority()
+    {
+        OnStopAuthorityAction?.Invoke();
+    }
+
+    #endregion
+}
+
+----------------------------------------
+
+TITLE: Custom NetworkManager Class Template for Mirror Networking in C#
+DESCRIPTION: This template allows developers to create a custom NetworkManager by extending Mirror's base NetworkManager class. It includes all overridable methods properly organized by functionality with XML documentation. Developers can implement custom networking behavior by adding code to these method overrides.
+
+LANGUAGE: C#
+CODE:
+using System;
+using UnityEngine;
+using UnityEngine.SceneManagement;
+using Mirror;
+
+/*
+	Documentation: https://mirror-networking.gitbook.io/docs/components/network-manager
+	API Reference: https://mirror-networking.com/docs/api/Mirror.NetworkManager.html
+*/
+
+public class #SCRIPTNAME# : NetworkManager
+{
+    // Overrides the base singleton so we don't
+    // have to cast to this type everywhere.
+    public static new #SCRIPTNAME# singleton => (#SCRIPTNAME#)NetworkManager.singleton;
+
+    /// <summary>
+    /// Runs on both Server and Client
+    /// Networking is NOT initialized when this fires
+    /// </summary>
+    public override void Awake()
+    {
+        base.Awake();
+    }
+
+    #region Unity Callbacks
+
+    public override void OnValidate()
+    {
+        base.OnValidate();
+    }
+
+    /// <summary>
+    /// Runs on both Server and Client
+    /// Networking is NOT initialized when this fires
+    /// </summary>
+    public override void Start()
+    {
+        base.Start();
+    }
+
+    /// <summary>
+    /// Runs on both Server and Client
+    /// </summary>
+    public override void LateUpdate()
+    {
+        base.LateUpdate();
+    }
+
+    /// <summary>
+    /// Runs on both Server and Client
+    /// </summary>
+    public override void OnDestroy()
+    {
+        base.OnDestroy();
+    }
+
+    #endregion
+
+    #region Start & Stop
+
+    /// <summary>
+    /// Set the frame rate for a headless server.
+    /// <para>Override if you wish to disable the behavior or set your own tick rate.</para>
+    /// </summary>
+    public override void ConfigureHeadlessFrameRate()
+    {
+        base.ConfigureHeadlessFrameRate();
+    }
+
+    /// <summary>
+    /// called when quitting the application by closing the window / pressing stop in the editor
+    /// </summary>
+    public override void OnApplicationQuit()
+    {
+        base.OnApplicationQuit();
+    }
+
+    #endregion
+
+    #region Scene Management
+
+    /// <summary>
+    /// This causes the server to switch scenes and sets the networkSceneName.
+    /// <para>Clients that connect to this server will automatically switch to this scene. This is called automatically if onlineScene or offlineScene are set, but it can be called from user code to switch scenes again while the game is in progress. This automatically sets clients to be not-ready. The clients must call NetworkClient.Ready() again to participate in the new scene.</para>
+    /// </summary>
+    /// <param name="newSceneName"></param>
+    public override void ServerChangeScene(string newSceneName)
+    {
+        base.ServerChangeScene(newSceneName);
+    }
+
+    /// <summary>
+    /// Called from ServerChangeScene immediately before SceneManager.LoadSceneAsync is executed
+    /// <para>This allows server to do work / cleanup / prep before the scene changes.</para>
+    /// </summary>
+    /// <param name="newSceneName">Name of the scene that's about to be loaded</param>
+    public override void OnServerChangeScene(string newSceneName) { }
+
+    /// <summary>
+    /// Called on the server when a scene is completed loaded, when the scene load was initiated by the server with ServerChangeScene().
+    /// </summary>
+    /// <param name="sceneName">The name of the new scene.</param>
+    public override void OnServerSceneChanged(string sceneName) { }
+
+    /// <summary>
+    /// Called from ClientChangeScene immediately before SceneManager.LoadSceneAsync is executed
+    /// <para>This allows client to do work / cleanup / prep before the scene changes.</para>
+    /// </summary>
+    /// <param name="newSceneName">Name of the scene that's about to be loaded</param>
+    /// <param name="sceneOperation">Scene operation that's about to happen</param>
+    /// <param name="customHandling">true to indicate that scene loading will be handled through overrides</param>
+    public override void OnClientChangeScene(string newSceneName, SceneOperation sceneOperation, bool customHandling) { }
+
+    /// <summary>
+    /// Called on clients when a scene has completed loaded, when the scene load was initiated by the server.
+    /// <para>Scene changes can cause player objects to be destroyed. The default implementation of OnClientSceneChanged in the NetworkManager is to add a player object for the connection if no player object exists.</para>
+    /// </summary>
+    public override void OnClientSceneChanged()
+    {
+        base.OnClientSceneChanged();
+    }
+
+    #endregion
+
+    #region Server System Callbacks
+
+    /// <summary>
+    /// Called on the server when a new client connects.
+    /// <para>Unity calls this on the Server when a Client connects to the Server. Use an override to tell the NetworkManager what to do when a client connects to the server.</para>
+    /// </summary>
+    /// <param name="conn">Connection from client.</param>
+    public override void OnServerConnect(NetworkConnectionToClient conn) { }
+
+    /// <summary>
+    /// Called on the server when a client is ready.
+    /// <para>The default implementation of this function calls NetworkServer.SetClientReady() to continue the network setup process.</para>
+    /// </summary>
+    /// <param name="conn">Connection from client.</param>
+    public override void OnServerReady(NetworkConnectionToClient conn)
+    {
+        base.OnServerReady(conn);
+    }
+
+    /// <summary>
+    /// Called on the server when a client adds a new player with ClientScene.AddPlayer.
+    /// <para>The default implementation for this function creates a new player object from the playerPrefab.</para>
+    /// </summary>
+    /// <param name="conn">Connection from client.</param>
+    public override void OnServerAddPlayer(NetworkConnectionToClient conn)
+    {
+        base.OnServerAddPlayer(conn);
+    }
+
+    /// <summary>
+    /// Called on the server when a client disconnects.
+    /// <para>This is called on the Server when a Client disconnects from the Server. Use an override to decide what should happen when a disconnection is detected.</para>
+    /// </summary>
+    /// <param name="conn">Connection from client.</param>
+    public override void OnServerDisconnect(NetworkConnectionToClient conn)
+    {
+        base.OnServerDisconnect(conn);
+    }
+
+    /// <summary>
+    /// Called on server when transport raises an error.
+    /// <para>NetworkConnection may be null.</para>
+    /// </summary>
+    /// <param name="conn">Connection of the client...may be null</param>
+    /// <param name="transportError">TransportError enum</param>
+    /// <param name="message">String message of the error.</param>
+    public override void OnServerError(NetworkConnectionToClient conn, TransportError transportError, string message) { }
+
+    /// <summary>
+    /// Called on server when transport raises an exception.
+    /// <para>NetworkConnection may be null.</para>
+    /// </summary>
+    /// <param name="conn">Connection of the client...may be null</param>
+    /// <param name="exception">Exception thrown from the Transport.</param>
+    public override void OnServerTransportException(NetworkConnectionToClient conn, Exception exception) { }
+
+    #endregion
+
+    #region Client System Callbacks
+
+    /// <summary>
+    /// Called on the client when connected to a server.
+    /// <para>The default implementation of this function sets the client as ready and adds a player. Override the function to dictate what happens when the client connects.</para>
+    /// </summary>
+    public override void OnClientConnect()
+    {
+        base.OnClientConnect();
+    }
+
+    /// <summary>
+    /// Called on clients when disconnected from a server.
+    /// <para>This is called on the client when it disconnects from the server. Override this function to decide what happens when the client disconnects.</para>
+    /// </summary>
+    public override void OnClientDisconnect() { }
+
+    /// <summary>
+    /// Called on clients when a servers tells the client it is no longer ready.
+    /// <para>This is commonly used when switching scenes.</para>
+    /// </summary>
+    public override void OnClientNotReady() { }
+
+    /// <summary>
+    /// Called on client when transport raises an error.</summary>
+    /// </summary>
+    /// <param name="transportError">TransportError enum.</param>
+    /// <param name="message">String message of the error.</param>
+    public override void OnClientError(TransportError transportError, string message) { }
+
+    /// <summary>
+    /// Called on client when transport raises an exception.</summary>
+    /// </summary>
+    /// <param name="exception">Exception thrown from the Transport.</param>
+    public override void OnClientTransportException(Exception exception) { }
+
+    #endregion
+
+    #region Start & Stop Callbacks
+
+    // Since there are multiple versions of StartServer, StartClient and StartHost, to reliably customize
+    // their functionality, users would need override all the versions. Instead these callbacks are invoked
+    // from all versions, so users only need to implement this one case.
+
+    /// <summary>
+    /// This is invoked when a host is started.
+    /// <para>StartHost has multiple signatures, but they all cause this hook to be called.</para>
+    /// </summary>
+    public override void OnStartHost() { }
+
+    /// <summary>
+    /// This is invoked when a server is started - including when a host is started.
+    /// <para>StartServer has multiple signatures, but they all cause this hook to be called.</para>
+    /// </summary>
+    public override void OnStartServer() { }
+
+    /// <summary>
+    /// This is invoked when the client is started.
+    /// </summary>
+    public override void OnStartClient() { }
+
+    /// <summary>
+    /// This is called when a host is stopped.
+    /// </summary>
+    public override void OnStopHost() { }
+
+    /// <summary>
+    /// This is called when a server is stopped - including when a host is stopped.
+    /// </summary>
+    public override void OnStopServer() { }
+
+    /// <summary>
+    /// This is called when a client is stopped.
+    /// </summary>
+    public override void OnStopClient() { }
+
+    #endregion
+}
+
+----------------------------------------
+
+TITLE: Implementing a Networked Player in C# with Mirror
+DESCRIPTION: This snippet demonstrates the basic structure of a networked player class using Mirror. It shows how to synchronize variables, use SyncLists for collections, implement authority-specific methods, and utilize remote procedure calls for client-server communication.
+
+LANGUAGE: C#
+CODE:
+public class Player : NetworkBehaviour
+{
+    // Synced automatically
+    [SyncVar] public int health = 100;
+    
+    // Lists, Dictionaries, Sets too
+    SyncList<Item> inventory = new SyncList<Item>();
+    
+    // Server/Client-only code
+    [Server] void LevelUp() {}
+    [Client] void Animate() {}
+    
+    void Update()
+    {
+        // isServer/isClient for runtime checks
+        if (isServer) Heal();
+        if (isClient) Move();
+    }
+    
+    // Zero overhead remote calls
+    [Command]   void CmdUseItem(int slot) {} // Client to Server
+    [ClientRpc] void RpcRespawn() {}         // Server to all Clients
+    [TargetRpc] void Hello() {}              // Server to one Client
+}
+
+----------------------------------------
+
+TITLE: Implementing NetworkRoomManager in Mirror Networking for Unity
+DESCRIPTION: This template class extends NetworkRoomManager to implement a networked room system in Mirror. It provides all the necessary server and client callbacks that can be customized, allowing for room player creation, game player substitution, scene transitions, and connection handling. The class is designed to enforce player count limits and manage the room state.
+
+LANGUAGE: C#
+CODE:
+using UnityEngine;
+using Mirror;
+
+/*
+	Documentation: https://mirror-networking.gitbook.io/docs/components/network-room-manager
+	API Reference: https://mirror-networking.com/docs/api/Mirror.NetworkRoomManager.html
+
+	See Also: NetworkManager
+	Documentation: https://mirror-networking.gitbook.io/docs/components/network-manager
+	API Reference: https://mirror-networking.com/docs/api/Mirror.NetworkManager.html
+*/
+
+/// <summary>
+/// This is a specialized NetworkManager that includes a networked room.
+/// The room has slots that track the joined players, and a maximum player count that is enforced.
+/// It requires that the NetworkRoomPlayer component be on the room player objects.
+/// NetworkRoomManager is derived from NetworkManager, and so it implements many of the virtual functions provided by the NetworkManager class.
+/// </summary>
+public class #SCRIPTNAME# : NetworkRoomManager
+{
+    // Overrides the base singleton so we don't
+    // have to cast to this type everywhere.
+    public static new #SCRIPTNAME# singleton => (#SCRIPTNAME#)NetworkRoomManager.singleton;
+
+    #region Server Callbacks
+
+    /// <summary>
+    /// This is called on the server when the server is started - including when a host is started.
+    /// </summary>
+    public override void OnRoomStartServer() { }
+
+    /// <summary>
+    /// This is called on the server when the server is stopped - including when a host is stopped.
+    /// </summary>
+    public override void OnRoomStopServer() { }
+
+    /// <summary>
+    /// This is called on the host when a host is started.
+    /// </summary>
+    public override void OnRoomStartHost() { }
+
+    /// <summary>
+    /// This is called on the host when the host is stopped.
+    /// </summary>
+    public override void OnRoomStopHost() { }
+
+    /// <summary>
+    /// This is called on the server when a new client connects to the server.
+    /// </summary>
+    /// <param name="conn">The new connection.</param>
+    public override void OnRoomServerConnect(NetworkConnectionToClient conn) { }
+
+    /// <summary>
+    /// This is called on the server when a client disconnects.
+    /// </summary>
+    /// <param name="conn">The connection that disconnected.</param>
+    public override void OnRoomServerDisconnect(NetworkConnectionToClient conn) { }
+
+    /// <summary>
+    /// This is called on the server when a networked scene finishes loading.
+    /// </summary>
+    /// <param name="sceneName">Name of the new scene.</param>
+    public override void OnRoomServerSceneChanged(string sceneName) { }
+
+    /// <summary>
+    /// This allows customization of the creation of the room-player object on the server.
+    /// <para>By default the roomPlayerPrefab is used to create the room-player, but this function allows that behaviour to be customized.</para>
+    /// </summary>
+    /// <param name="conn">The connection the player object is for.</param>
+    /// <returns>The new room-player object.</returns>
+    public override GameObject OnRoomServerCreateRoomPlayer(NetworkConnectionToClient conn)
+    {
+        return base.OnRoomServerCreateRoomPlayer(conn);
+    }
+
+    /// <summary>
+    /// This allows customization of the creation of the GamePlayer object on the server.
+    /// <para>By default the gamePlayerPrefab is used to create the game-player, but this function allows that behaviour to be customized. The object returned from the function will be used to replace the room-player on the connection.</para>
+    /// </summary>
+    /// <param name="conn">The connection the player object is for.</param>
+    /// <param name="roomPlayer">The room player object for this connection.</param>
+    /// <returns>A new GamePlayer object.</returns>
+    public override GameObject OnRoomServerCreateGamePlayer(NetworkConnectionToClient conn, GameObject roomPlayer)
+    {
+        return base.OnRoomServerCreateGamePlayer(conn, roomPlayer);
+    }
+
+    /// <summary>
+    /// This allows customization of the creation of the GamePlayer object on the server.
+    /// <para>This is only called for subsequent GamePlay scenes after the first one.</para>
+    /// <para>See OnRoomServerCreateGamePlayer to customize the player object for the initial GamePlay scene.</para>
+    /// </summary>
+    /// <param name="conn">The connection the player object is for.</param>
+    public override void OnRoomServerAddPlayer(NetworkConnectionToClient conn)
+    {
+        base.OnRoomServerAddPlayer(conn);
+    }
+
+    /// <summary>
+    /// This is called on the server when it is told that a client has finished switching from the room scene to a game player scene.
+    /// <para>When switching from the room, the room-player is replaced with a game-player object. This callback function gives an opportunity to apply state from the room-player to the game-player object.</para>
+    /// </summary>
+    /// <param name="conn">The connection of the player</param>
+    /// <param name="roomPlayer">The room player object.</param>
+    /// <param name="gamePlayer">The game player object.</param>
+    /// <returns>False to not allow this player to replace the room player.</returns>
+    public override bool OnRoomServerSceneLoadedForPlayer(NetworkConnectionToClient conn, GameObject roomPlayer, GameObject gamePlayer)
+    {
+        return base.OnRoomServerSceneLoadedForPlayer(conn, roomPlayer, gamePlayer);
+    }
+
+    /// <summary>
+    /// This is called on server from NetworkRoomPlayer.CmdChangeReadyState when client indicates change in Ready status.
+    /// </summary>
+    public override void ReadyStatusChanged()
+    {
+        base.ReadyStatusChanged();
+    }
+
+    /// <summary>
+    /// This is called on the server when all the players in the room are ready.
+    /// <para>The default implementation of this function uses ServerChangeScene() to switch to the game player scene. By implementing this callback you can customize what happens when all the players in the room are ready, such as adding a countdown or a confirmation for a group leader.</para>
+    /// </summary>
+    public override void OnRoomServerPlayersReady()
+    {
+        base.OnRoomServerPlayersReady();
+    }
+
+    /// <summary>
+    /// This is called on the server when CheckReadyToBegin finds that players are not ready
+    /// <para>May be called multiple times while not ready players are joining</para>
+    /// </summary>
+    public override void OnRoomServerPlayersNotReady() { }
+
+    #endregion
+
+    #region Client Callbacks
+
+    /// <summary>
+    /// This is a hook to allow custom behaviour when the game client enters the room.
+    /// </summary>
+    public override void OnRoomClientEnter() { }
+
+    /// <summary>
+    /// This is a hook to allow custom behaviour when the game client exits the room.
+    /// </summary>
+    public override void OnRoomClientExit() { }
+
+    /// <summary>
+    /// This is called on the client when it connects to server.
+    /// </summary>
+    public override void OnRoomClientConnect() { }
+
+    /// <summary>
+    /// This is called on the client when disconnected from a server.
+    /// </summary>
+    public override void OnRoomClientDisconnect() { }
+
+    /// <summary>
+    /// This is called on the client when a client is started.
+    /// </summary>
+    public override void OnRoomStartClient() { }
+
+    /// <summary>
+    /// This is called on the client when the client stops.
+    /// </summary>
+    public override void OnRoomStopClient() { }
+
+    /// <summary>
+    /// This is called on the client when the client is finished loading a new networked scene.
+    /// </summary>
+    public override void OnRoomClientSceneChanged() { }
+
+    #endregion
+
+    #region Optional UI
+
+    public override void OnGUI()
+    {
+        base.OnGUI();
+    }
+
+    #endregion
+}
+
+----------------------------------------
+
+TITLE: Creating a NetworkRoomPlayer Subclass in C# for Mirror Networking
+DESCRIPTION: Complete template for extending Mirror's NetworkRoomPlayer class with all overridable lifecycle methods. This script connects to Mirror's multiplayer room system and handles basic player functionality in a networked room environment, including server/client lifecycle events, room entry/exit events, and synchronization variable hooks.
+
+LANGUAGE: C#
+CODE:
+using UnityEngine;
+using Mirror;
+
+/*
+	Documentation: https://mirror-networking.gitbook.io/docs/components/network-room-player
+	API Reference: https://mirror-networking.com/docs/api/Mirror.NetworkRoomPlayer.html
+*/
+
+/// <summary>
+/// This component works in conjunction with the NetworkRoomManager to make up the multiplayer room system.
+/// The RoomPrefab object of the NetworkRoomManager must have this component on it.
+/// This component holds basic room player data required for the room to function.
+/// Game specific data for room players can be put in other components on the RoomPrefab or in scripts derived from NetworkRoomPlayer.
+/// </summary>
+public class #SCRIPTNAME# : NetworkRoomPlayer
+{
+    #region Start & Stop Callbacks
+
+    /// <summary>
+    /// This is invoked for NetworkBehaviour objects when they become active on the server.
+    /// <para>This could be triggered by NetworkServer.Listen() for objects in the scene, or by NetworkServer.Spawn() for objects that are dynamically created.</para>
+    /// <para>This will be called for objects on a "host" as well as for object on a dedicated server.</para>
+    /// </summary>
+    public override void OnStartServer() { }
+
+    /// <summary>
+    /// Invoked on the server when the object is unspawned
+    /// <para>Useful for saving object data in persistent storage</para>
+    /// </summary>
+    public override void OnStopServer() { }
+
+    /// <summary>
+    /// Called on every NetworkBehaviour when it is activated on a client.
+    /// <para>Objects on the host have this function called, as there is a local client on the host. The values of SyncVars on object are guaranteed to be initialized correctly with the latest state from the server when this function is called on the client.</para>
+    /// </summary>
+    public override void OnStartClient() { }
+
+    /// <summary>
+    /// This is invoked on clients when the server has caused this object to be destroyed.
+    /// <para>This can be used as a hook to invoke effects or do client specific cleanup.</para>
+    /// </summary>
+    public override void OnStopClient() { }
+
+    /// <summary>
+    /// Called when the local player object has been set up.
+    /// <para>This happens after OnStartClient(), as it is triggered by an ownership message from the server. This is an appropriate place to activate components or functionality that should only be active for the local player, such as cameras and input.</para>
+    /// </summary>
+    public override void OnStartLocalPlayer() { }
+
+    /// <summary>
+    /// This is invoked on behaviours that have authority, based on context and <see cref="NetworkIdentity.hasAuthority">NetworkIdentity.hasAuthority</see>.
+    /// <para>This is called after <see cref="OnStartServer">OnStartServer</see> and before <see cref="OnStartClient">OnStartClient.</see></para>
+    /// <para>When <see cref="NetworkIdentity.AssignClientAuthority"/> is called on the server, this will be called on the client that owns the object. When an object is spawned with <see cref="NetworkServer.Spawn">NetworkServer.Spawn</see> with a NetworkConnectionToClient parameter included, this will be called on the client that owns the object.</para>
+    /// </summary>
+    public override void OnStartAuthority() { }
+
+    /// <summary>
+    /// This is invoked on behaviours when authority is removed.
+    /// <para>When NetworkIdentity.RemoveClientAuthority is called on the server, this will be called on the client that owns the object.</para>
+    /// </summary>
+    public override void OnStopAuthority() { }
+
+    #endregion
+
+    #region Room Client Callbacks
+
+    /// <summary>
+    /// This is a hook that is invoked on all player objects when entering the room.
+    /// <para>Note: isLocalPlayer is not guaranteed to be set until OnStartLocalPlayer is called.</para>
+    /// </summary>
+    public override void OnClientEnterRoom() { }
+
+    /// <summary>
+    /// This is a hook that is invoked on all player objects when exiting the room.
+    /// </summary>
+    public override void OnClientExitRoom() { }
+
+    #endregion
+
+    #region SyncVar Hooks
+
+    /// <summary>
+    /// This is a hook that is invoked on clients when the index changes.
+    /// </summary>
+    /// <param name="oldIndex">The old index value</param>
+    /// <param name="newIndex">The new index value</param>
+    public override void IndexChanged(int oldIndex, int newIndex) { }
+
+    /// <summary>
+    /// This is a hook that is invoked on clients when a RoomPlayer switches between ready or not ready.
+    /// <para>This function is called when the a client player calls SendReadyToBeginMessage() or SendNotReadyToBeginMessage().</para>
+    /// </summary>
+    /// <param name="oldReadyState">The old readyState value</param>
+    /// <param name="newReadyState">The new readyState value</param>
+    public override void ReadyStateChanged(bool oldReadyState, bool newReadyState) { }
+
+    #endregion
+
+    #region Optional UI
+
+    public override void OnGUI()
+    {
+        base.OnGUI();
+    }
+
+    #endregion
+}
+
+----------------------------------------
+
+TITLE: Implementing Custom Interest Management for Mirror Networking in C#
+DESCRIPTION: A template class that inherits from Mirror's InterestManagement to control object visibility across the network. It provides placeholder methods for determining which clients can see which objects, handling object spawning and destruction, and managing host visibility. Developers should replace the default implementations with custom logic appropriate for their game.
+
+LANGUAGE: C#
+CODE:
+using System.Collections.Generic;
+using UnityEngine;
+using Mirror;
+
+/*
+	Documentation: https://mirror-networking.gitbook.io/docs/guides/interest-management
+	API Reference: https://mirror-networking.com/docs/api/Mirror.InterestManagement.html
+*/
+
+// NOTE: Attach this component to the same object as your Network Manager.
+
+public class #SCRIPTNAME# : InterestManagement
+{
+    /// <summary>
+    /// Callback used by the visibility system to determine if an observer (client) can see the NetworkIdentity.
+    /// If this function returns true, the network connection will be added as an observer.
+    /// </summary>
+    /// <param name="identity">Object to be observed (or not) by a client</param>
+    /// <param name="newObserver">Network Connection of a client.</param>
+    /// <returns>True if the client can see this object.</returns>
+    [ServerCallback]
+    public override bool OnCheckObserver(NetworkIdentity identity, NetworkConnectionToClient newObserver)
+    {
+        // Default behaviour of making the identity object visible to all clients.
+        // Replace this code with your own logic as appropriate.
+        return true;
+    }
+
+    /// <summary>
+    /// Callback used by the visibility system to determine if an observer (client) can see the NetworkIdentity.
+    /// Add connections to newObservers that should see the identity object.
+    /// </summary>
+    /// <param name="identity">Object to be observed (or not) by clients</param>
+    /// <param name="newObservers">cached hashset to put the result into</param>
+    [ServerCallback]
+    public override void OnRebuildObservers(NetworkIdentity identity, HashSet<NetworkConnectionToClient> newObservers)
+    {
+        // Default behaviour of making the identity object visible to all clients.
+        // Replace this code with your own logic as appropriate.
+        foreach (NetworkConnectionToClient conn in NetworkServer.connections.Values)
+            newObservers.Add(conn);
+    }
+
+    /// <summary>
+    /// Called on the server when a new networked object is spawned.
+    /// </summary>
+    /// <param name="identity">NetworkIdentity of the object being spawned</param>
+    [ServerCallback]
+    public override void OnSpawned(NetworkIdentity identity) { }
+
+    /// <summary>
+    /// Called on the server when a networked object is destroyed.
+    /// </summary>
+    /// <param name="identity">NetworkIdentity of the object being destroyed</param>
+    [ServerCallback]
+    public override void OnDestroyed(NetworkIdentity identity) { }
+
+    /// <summary>
+    /// Callback used by the visibility system for objects on a host.
+    /// Objects on a host (with a local client) cannot be disabled or destroyed when
+    /// they are not visible to the local client, so this function is called to allow
+    /// custom code to hide these objects.
+    /// A typical implementation will disable renderer components on the object.
+    /// This is only called on local clients on a host.
+    /// </summary>
+    /// <param name="identity">NetworkIdentity of the object being considered for visibility</param>
+    /// <param name="visible">True if the identity object should be visible to the host client</param>
+    [ServerCallback]
+    public override void SetHostVisibility(NetworkIdentity identity, bool visible)
+    {
+        base.SetHostVisibility(identity, visible);
+    }
+
+    /// <summary>
+    /// Called by NetworkServer in Initialize and Shutdown
+    /// </summary>
+    [ServerCallback]
+    public override void ResetState() { }
+
+    [ServerCallback]
+    void Update()
+    {
+        // Here is where you'd need to evaluate if observers need to be rebuilt,
+        // either for a specific object, a subset of objects, or all objects.
+
+        // Review the code in the various Interest Management components
+        // included with Mirror for inspiration:
+        // - Distance Interest Management
+        // - Spatial Hash Interest Management
+        // - Scene Interest Management
+        // - Match Interest Management
+        // - Team Interest Management
+    }
+}
+
+----------------------------------------
+
+TITLE: NetworkBehaviour Template Class Structure in C#
+DESCRIPTION: A complete template for a Mirror NetworkBehaviour class with all networking callbacks implemented. This includes lifecycle methods for server, client, local player, and authority events with detailed XML documentation comments explaining when each method is called.
+
+LANGUAGE: C#
+CODE:
+using System.Collections.Generic;
+using UnityEngine;
+using Mirror;
+
+/*
+	Documentation: https://mirror-networking.gitbook.io/docs/guides/networkbehaviour
+	API Reference: https://mirror-networking.com/docs/api/Mirror.NetworkBehaviour.html
+*/
+
+public class #SCRIPTNAME# : NetworkBehaviour
+{
+    #region Unity Callbacks
+
+    /// <summary>
+    /// Add your validation code here after the base.OnValidate(); call.
+    /// </summary>
+    protected override void OnValidate()
+    {
+        base.OnValidate();
+    }
+
+    // NOTE: Do not put objects in DontDestroyOnLoad (DDOL) in Awake.  You can do that in Start instead.
+    void Awake()
+    {
+    }
+
+    void Start()
+    {
+    }
+
+    #endregion
+
+    #region Start & Stop Callbacks
+
+    /// <summary>
+    /// This is invoked for NetworkBehaviour objects when they become active on the server.
+    /// <para>This could be triggered by NetworkServer.Listen() for objects in the scene, or by NetworkServer.Spawn() for objects that are dynamically created.</para>
+    /// <para>This will be called for objects on a "host" as well as for object on a dedicated server.</para>
+    /// </summary>
+    public override void OnStartServer() { }
+
+    /// <summary>
+    /// Invoked on the server when the object is unspawned
+    /// <para>Useful for saving object data in persistent storage</para>
+    /// </summary>
+    public override void OnStopServer() { }
+
+    /// <summary>
+    /// Called on every NetworkBehaviour when it is activated on a client.
+    /// <para>Objects on the host have this function called, as there is a local client on the host. The values of SyncVars on object are guaranteed to be initialized correctly with the latest state from the server when this function is called on the client.</para>
+    /// </summary>
+    public override void OnStartClient() { }
+
+    /// <summary>
+    /// This is invoked on clients when the server has caused this object to be destroyed.
+    /// <para>This can be used as a hook to invoke effects or do client specific cleanup.</para>
+    /// </summary>
+    public override void OnStopClient() { }
+
+    /// <summary>
+    /// Called when the local player object has been set up.
+    /// <para>This happens after OnStartClient(), as it is triggered by an ownership message from the server. This is an appropriate place to activate components or functionality that should only be active for the local player, such as cameras and input.</para>
+    /// </summary>
+    public override void OnStartLocalPlayer() { }
+
+    /// <summary>
+    /// Called when the local player object is being stopped.
+    /// <para>This happens before OnStopClient(), as it may be triggered by an ownership message from the server, or because the player object is being destroyed. This is an appropriate place to deactivate components or functionality that should only be active for the local player, such as cameras and input.</para>
+    /// </summary>
+    public override void OnStopLocalPlayer() {}
+
+    /// <summary>
+    /// This is invoked on behaviours that have authority, based on context and <see cref="NetworkIdentity.hasAuthority">NetworkIdentity.hasAuthority</see>.
+    /// <para>This is called after <see cref="OnStartServer">OnStartServer</see> and before <see cref="OnStartClient">OnStartClient.</see></para>
+    /// <para>When <see cref="NetworkIdentity.AssignClientAuthority">AssignClientAuthority</see> is called on the server, this will be called on the client that owns the object. When an object is spawned with <see cref="NetworkServer.Spawn">NetworkServer.Spawn</see> with a NetworkConnectionToClient parameter included, this will be called on the client that owns the object.</para>
+    /// </summary>
+    public override void OnStartAuthority() { }
+
+    /// <summary>
+    /// This is invoked on behaviours when authority is removed.
+    /// <para>When NetworkIdentity.RemoveClientAuthority is called on the server, this will be called on the client that owns the object.</para>
+    /// </summary>
+    public override void OnStopAuthority() { }
+
+    #endregion
+}
+
+----------------------------------------
+
+TITLE: Defining Network Transform Template Class for Mirror Networking in C#
+DESCRIPTION: A comprehensive template class that extends NetworkTransformBase to handle network transform synchronization. It includes overridable methods for position, rotation, and scale handling, teleportation support, state management, and debugging utilities with conditional compilation for editor and development builds.
+
+LANGUAGE: C#
+CODE:
+#define onlySyncOnChange_BANDWIDTH_SAVING
+using System.Collections.Generic;
+using UnityEngine;
+using Mirror;
+
+/*
+    Documentation: https://mirror-networking.gitbook.io/docs/components/network-transform
+    API Reference: https://mirror-networking.com/docs/api/Mirror.NetworkTransformBase.html
+*/
+
+public class #SCRIPTNAME# : NetworkTransformBase
+{
+    #region Unity Callbacks
+
+    protected override void Awake() { }
+
+    protected override void OnValidate()
+    {
+        base.OnValidate();
+    }
+
+    /// <summary>
+    /// This calls Reset()
+    /// </summary>
+    protected override void OnEnable()
+    {
+        base.OnEnable();
+    }
+
+    /// <summary>
+    /// This calls Reset()
+    /// </summary>
+    protected override void OnDisable()
+    {
+        base.OnDisable();
+    }
+
+    #endregion
+
+    #region NT Base Callbacks
+
+    /// <summary>
+    /// NTSnapshot struct is created here
+    /// </summary>
+    protected override TransformSnapshot Construct()
+    {
+        return base.Construct();
+    }
+
+    protected override Vector3 GetPosition()
+    {
+        return base.GetPosition();
+    }
+
+    protected override Quaternion GetRotation()
+    {
+        return base.GetRotation();
+    }
+
+    protected override Vector3 GetScale()
+    {
+        return base.GetScale();
+    }
+
+    protected override void SetPosition(Vector3 position)
+    {
+        base.SetPosition(position);
+    }
+
+    protected override void SetRotation(Quaternion rotation)
+    {
+        base.SetRotation(rotation);
+    }
+
+    protected override void SetScale(Vector3 scale)
+    {
+        base.SetScale(scale);
+    }
+
+    /// <summary>
+    /// localPosition, localRotation, and localScale are set here:
+    /// interpolated values are used if interpolation is enabled.
+    /// goal values are used if interpolation is disabled.
+    /// </summary>
+    protected override void Apply(TransformSnapshot interpolated, TransformSnapshot endGoal)
+    {
+        base.Apply(interpolated, endGoal);
+    }
+
+    /// <summary>
+    /// Called by both CmdTeleport and RpcTeleport on server and clients, respectively.
+    /// Here you can disable a Character Controller before calling the base method,
+    /// and re-enable it after the base method call to avoid conflicting with it.
+    /// </summary>
+    protected override void OnTeleport(Vector3 destination)
+    {
+        base.OnTeleport(destination);
+    }
+
+    /// <summary>
+    /// Called by both CmdTeleport and RpcTeleport on server and clients, respectively.
+    /// Here you can disable a Character Controller before calling the base method,
+    /// and re-enable it after the base method call to avoid conflicting with it.
+    /// </summary>
+    protected override void OnTeleport(Vector3 destination, Quaternion rotation)
+    {
+        base.OnTeleport(destination, rotation);
+    }
+
+    /// <summary>
+    /// Buffers are cleared and interpolation times are reset to zero here.
+    /// This may be called when you are implementing some system of not sending
+    /// if nothing changed, or just plain resetting if you have not received data
+    /// for some time, as this will prevent a long interpolation period between old
+    /// and just received data, as it will look like a lag. Reset() should also be
+    /// called when authority is changed to another client or server, to prevent
+    /// old buffers bugging out the interpolation if authority is changed back.
+    /// </summary>
+    public override void ResetState()
+    {
+        base.ResetState();
+    }
+
+    #endregion
+
+    #region GUI
+
+    // OnGUI allocates even if it does nothing. avoid in release.
+#if UNITY_EDITOR || DEVELOPMENT_BUILD
+
+    protected override void OnGUI()
+    {
+        base.OnGUI();
+    }
+
+    protected override void DrawGizmos(SortedList<double, TransformSnapshot> buffer)
+    {
+        base.DrawGizmos(buffer);
+    }
+
+    protected override void OnDrawGizmos()
+    {
+        base.OnDrawGizmos();
+    }
+
+#endif
+
+    #endregion
+}
+
+----------------------------------------
+
+TITLE: Describing Character Selection Approaches in Mirror Networking
+DESCRIPTION: Documentation outlining three different methods for implementing character selection in a Mirror networking project. The approaches range from offline pre-selection to in-game character switching with different initial states.
+
+LANGUAGE: markdown
+CODE:
+# Character Selection Example
+
+Three scenes, each provide a slightly different approach towards selecting characters and customisations.
+
+1: MirrorCharacterSelectionPreScene
+This is an offline scene, allows players to select data, which is then saved and passed across to other scenes using static variables.
+Once selected, the map loads "MirrorCharacterSelection", press Start Host, or Client to play. (remember to add scenes to build settings)
+
+2: MirrorCharacterSelection
+This scene spawns with a character (randomised), and players have an option using the UI to change this.
+
+3: MirrorCharacterSelectionNoCharacter
+Spawns an empty player prefab, then players chose which character using the UI.
+
+----------------------------------------
+
+TITLE: Creating Network Discovery Base Class Implementation in Mirror
+DESCRIPTION: Template for a NetworkDiscoveryBase implementation that handles the discovery process. This class includes Unity callbacks, server-side request processing, and client-side response handling, all properly organized into regions.
+
+LANGUAGE: C#
+CODE:
+public class #SCRIPTNAME# : NetworkDiscoveryBase<DiscoveryRequest, DiscoveryResponse>
+{
+    #region Unity Callbacks
+
+#if UNITY_EDITOR
+    public override void OnValidate()
+    {
+        base.OnValidate();
+    }
+#endif
+
+    public override void Start()
+    {
+        base.Start();
+    }
+
+    #endregion
+
+    #region Server
+
+    /// <summary>
+    /// Reply to the client to inform it of this server
+    /// </summary>
+    /// <remarks>
+    /// Override if you wish to ignore server requests based on
+    /// custom criteria such as language, full server game mode or difficulty
+    /// </remarks>
+    /// <param name="request">Request coming from client</param>
+    /// <param name="endpoint">Address of the client that sent the request</param>
+    protected override void ProcessClientRequest(DiscoveryRequest request, IPEndPoint endpoint)
+    {
+        base.ProcessClientRequest(request, endpoint);
+    }
+
+    /// <summary>
+    /// Process the request from a client
+    /// </summary>
+    /// <remarks>
+    /// Override if you wish to provide more information to the clients
+    /// such as the name of the host player
+    /// </remarks>
+    /// <param name="request">Request coming from client</param>
+    /// <param name="endpoint">Address of the client that sent the request</param>
+    /// <returns>A message containing information about this server</returns>
+    protected override DiscoveryResponse ProcessRequest(DiscoveryRequest request, IPEndPoint endpoint) 
+    {
+        return new DiscoveryResponse();
+    }
+
+    #endregion
+
+    #region Client
+
+    /// <summary>
+    /// Create a message that will be broadcasted on the network to discover servers
+    /// </summary>
+    /// <remarks>
+    /// Override if you wish to include additional data in the discovery message
+    /// such as desired game mode, language, difficulty, etc... </remarks>
+    /// <returns>An instance of ServerRequest with data to be broadcasted</returns>
+    protected override DiscoveryRequest GetRequest()
+    {
+        return new DiscoveryRequest();
+    }
+
+    /// <summary>
+    /// Process the answer from a server
+    /// </summary>
+    /// <remarks>
+    /// A client receives a reply from a server, this method processes the
+    /// reply and raises an event
+    /// </remarks>
+    /// <param name="response">Response that came from the server</param>
+    /// <param name="endpoint">Address of the server that replied</param>
+    protected override void ProcessResponse(DiscoveryResponse response, IPEndPoint endpoint) { }
+
+    #endregion
+}
+
+----------------------------------------
+
+TITLE: Implementing Discovery Message Structures for Mirror Networking in C#
+DESCRIPTION: Defines the basic data structures used for network discovery in Mirror. DiscoveryRequest is sent by clients to discover servers, while DiscoveryResponse is sent by servers back to clients with connection information.
+
+LANGUAGE: C#
+CODE:
+public struct DiscoveryRequest : NetworkMessage
+{
+    // Add public fields (not properties) for whatever information you want
+    // sent by clients in their broadcast messages that servers will use.
+}
+
+public struct DiscoveryResponse : NetworkMessage
+{
+    // Add public fields (not properties) for whatever information you want the server
+    // to return to clients for them to display or use for establishing a connection.
+}
+
+----------------------------------------
+
+TITLE: Benchmark Setup and Results for Mirror's PredictedRigidbody
+DESCRIPTION: Documentation of benchmark setup parameters and historical performance results of Mirror's PredictedRigidbody component. The benchmark was run on Unity 2021.3 LTS with IL2CPP builds on an M1 Macbook Pro with vsync disabled, testing 1000 objects without ghosts.
+
+LANGUAGE: markdown
+CODE:
+# Benchmark Setup
+- Unity 2021.3 LTS
+- IL2CPP Builds
+- M1 Macbook Pro
+- vsync disabled in NetworkManagerPredictionBenchmark.cs
+
+# Benchmark Results History for 1000 objects without ghosts:
+Not Predicted:    1000 FPS Client,   2500 FPS Server
+Predicted:         
+  2024-03-13:      500 FPS Client,   1700 FPS Server
+  2024-03-13:      580 FPS Client,   1700 FPS Server // micro optimizations
+  2024-03-14:      590 FPS Client,   1700 FPS Server // UpdateGhosting() every 4th frame
+  2024-03-14:      615 FPS Client,   1700 FPS Server // predictedRigidbodyTransform.GetPositionAndRotation()
+  2024-03-15:      625 FPS Client,   1700 FPS Server // Vector3.MoveTowardsCustom()
+  2024-03-18:      628 FPS Client,   1700 FPS Server // removed O(N) insertion from CorrectHistory()
+  2024-03-28:      800 FPS Client,   1700 FPS Server // FAST mode prediction
+
+----------------------------------------
+
+TITLE: Implementing PauseableSimulationTimer in Unity
+DESCRIPTION: This snippet showcases the implementation of a pauseable timer that can be toggled between paused and running states. It creates a timer in Start(), provides methods to toggle its state, and checks for expiration in Update().
+
+LANGUAGE: csharp
+CODE:
+private PauseableSimulationTimer _timer;
+
+public PauseableSimulationTimer Timer => _timer;
+
+private void Start()
+{
+    _timer = PauseableSimulationTimer.CreateFromSeconds(_delay);
+}
+
+public void TogglePause()
+{
+    if(!_timer.IsPaused)
+    {
+        _timer.Pause();
+        return;
+    }
+
+    _timer.Resume();
+}
+
+private void Update()
+{
+    if(_timer.IsExpired())
+    {
+        _gameObject.SetActive(false);
+        _timer = PauseableSimulationTimer.None;
+    }
+}
+
+----------------------------------------
+
+TITLE: Implementing Basic SimulationTimer in Unity
+DESCRIPTION: This snippet demonstrates how to create and use a basic SimulationTimer to disable a GameObject after a specified delay. The timer is initialized in Start() and checked for expiration in Update().
+
+LANGUAGE: csharp
+CODE:
+private SimulationTimer _disableTimer;
+
+private void Start()
+{
+    _disableTimer = SimulationTimer.CreateFromSeconds(_delay);
+}
+
+private void Update()
+{
+    if(_disableTimer.IsExpired())
+    {
+        _gameObject.SetActive(false);
+        _disableTimer = SimulationTimer.None;
+    }
+}
+
+----------------------------------------
+
+TITLE: Detecting Edgegap Plugin Using Compiler Symbol in Unity
+DESCRIPTION: This code snippet demonstrates how to detect the presence of the Edgegap Unity plugin in a Unity project using a compiler directive. The code within the directive will only execute if the EDGEGAP_PLUGIN_SERVERS symbol is defined.
+
+LANGUAGE: csharp
+CODE:
+#if EDGEGAP_PLUGIN_SERVERS
+{...your code...}
+#endif
+
+----------------------------------------
+
+TITLE: Writing Clear Git Commit Messages in Shell
+DESCRIPTION: Example of how to write a good Git commit message with a brief summary in the first line followed by a more detailed paragraph that describes the changes and their impact.
+
+LANGUAGE: sh
+CODE:
+$ git commit -m "A brief summary of the commit"
+> 
+> A paragraph describing what changed and its impact.
+
+----------------------------------------
+
+TITLE: Defining Unity Editor Version for Project
+DESCRIPTION: Specifies the Unity Editor version used for this project. The file shows the project is using Unity 2021.3.35f1 with revision 157b46ce122a.
+
+LANGUAGE: yaml
+CODE:
+m_EditorVersion: 2021.3.35f1
+m_EditorVersionWithRevision: 2021.3.35f1 (157b46ce122a)

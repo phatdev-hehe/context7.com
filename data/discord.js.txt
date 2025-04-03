@@ -1,0 +1,5385 @@
+TITLE: Initializing Discord.js Bot Client
+DESCRIPTION: Sets up a basic Discord.js bot client with the necessary configuration to connect to Discord's API. Includes client initialization with Guilds intent, event handling for ready state, and bot login using a token from config file.
+
+LANGUAGE: javascript
+CODE:
+// Require the necessary discord.js classes
+const { Client, Events, GatewayIntentBits } = require('discord.js');
+const { token } = require('./config.json');
+
+// Create a new client instance
+const client = new Client({ intents: [GatewayIntentBits.Guilds] });
+
+// When the client is ready, run this code (only once).
+// The distinction between `client: Client<boolean>` and `readyClient: Client<true>` is important for TypeScript developers.
+// It makes some properties non-nullable.
+client.once(Events.ClientReady, readyClient => {
+	console.log(`Ready! Logged in as ${readyClient.user.tag}`);
+});
+
+// Log in to Discord with your client's token
+client.login(token);
+
+----------------------------------------
+
+TITLE: Handling Command Interactions
+DESCRIPTION: Implementation of the interaction handling system that processes incoming slash commands and executes the corresponding command logic with error handling.
+
+LANGUAGE: javascript
+CODE:
+client.on(Events.InteractionCreate, async interaction => {
+	if (!interaction.isChatInputCommand()) return;
+
+	const command = interaction.client.commands.get(interaction.commandName);
+
+	if (!command) {
+		console.error(`No command matching ${interaction.commandName} was found.`);
+		return;
+	}
+
+	try {
+		await command.execute(interaction);
+	} catch (error) {
+		console.error(error);
+		if (interaction.replied || interaction.deferred) {
+			await interaction.followUp({ content: 'There was an error while executing this command!', flags: MessageFlags.Ephemeral });
+		} else {
+			await interaction.reply({ content: 'There was an error while executing this command!', flags: MessageFlags.Ephemeral });
+		}
+	}
+});
+
+----------------------------------------
+
+TITLE: Loading Command Files Dynamically
+DESCRIPTION: Code that dynamically loads command files from the commands directory, validates their structure, and stores them in the client.commands Collection.
+
+LANGUAGE: javascript
+CODE:
+client.commands = new Collection();
+
+const foldersPath = path.join(__dirname, 'commands');
+const commandFolders = fs.readdirSync(foldersPath);
+
+for (const folder of commandFolders) {
+	const commandsPath = path.join(foldersPath, folder);
+	const commandFiles = fs.readdirSync(commandsPath).filter(file => file.endsWith('.js'));
+	for (const file of commandFiles) {
+		const filePath = path.join(commandsPath, file);
+		const command = require(filePath);
+		if ('data' in command && 'execute' in command) {
+			client.commands.set(command.data.name, command);
+		} else {
+			console.log(`[WARNING] The command at ${filePath} is missing a required "data" or "execute" property.`);
+		}
+	}
+}
+
+----------------------------------------
+
+TITLE: Checking Role Permissions in Discord.js
+DESCRIPTION: Demonstrates how to check if a member has a specific role or a role with a particular name using discord.js.
+
+LANGUAGE: javascript
+CODE:
+member.roles.cache.has('role-id-here');
+// returns true if the member has the role
+
+member.roles.cache.some(role => role.name === 'Mod');
+// returns true if any of the member's roles is exactly named "Mod"
+
+----------------------------------------
+
+TITLE: Example Ping Command Implementation
+DESCRIPTION: Sample implementation of a ping command showing the required structure for command files with data and execute properties.
+
+LANGUAGE: javascript
+CODE:
+module.exports = {
+	data: new SlashCommandBuilder()
+		.setName('ping')
+		.setDescription('Replies with Pong!'),
+	async execute(interaction) {
+		await interaction.reply('Pong!');
+	},
+};
+
+----------------------------------------
+
+TITLE: Setting up Discord.js Client with Dynamic Event Loading
+DESCRIPTION: Initializes the Discord.js client and implements dynamic loading of commands and events from separate files. Includes error handling for malformed command files.
+
+LANGUAGE: javascript
+CODE:
+const fs = require('node:fs');
+const path = require('node:path');
+const { Client, Collection, GatewayIntentBits } = require('discord.js');
+const { token } = require('./config.json');
+
+const client = new Client({ intents: [GatewayIntentBits.Guilds] });
+
+client.commands = new Collection();
+const foldersPath = path.join(__dirname, 'commands');
+const commandFolders = fs.readdirSync(foldersPath);
+
+for (const folder of commandFolders) {
+	const commandsPath = path.join(foldersPath, folder);
+	const commandFiles = fs.readdirSync(commandsPath).filter(file => file.endsWith('.js'));
+	for (const file of commandFiles) {
+		const filePath = path.join(commandsPath, file);
+		const command = require(filePath);
+		if ('data' in command && 'execute' in command) {
+			client.commands.set(command.data.name, command);
+		} else {
+			console.log(`[WARNING] The command at ${filePath} is missing a required "data" or "execute" property.`);
+		}
+	}
+}
+
+const eventsPath = path.join(__dirname, 'events');
+const eventFiles = fs.readdirSync(eventsPath).filter(file => file.endsWith('.js'));
+
+for (const file of eventFiles) {
+	const filePath = path.join(eventsPath, file);
+	const event = require(filePath);
+	if (event.once) {
+		client.once(event.name, (...args) => event.execute(...args));
+	} else {
+		client.on(event.name, (...args) => event.execute(...args));
+	}
+}
+
+client.login(token);
+
+----------------------------------------
+
+TITLE: Implementing dotenv for Discord.js Bot Configuration
+DESCRIPTION: This snippet demonstrates how to use the dotenv package to load environment variables from a .env file for a Discord.js bot. It includes the installation command, .env file structure, and JavaScript usage.
+
+LANGUAGE: shell
+CODE:
+npm install dotenv
+
+LANGUAGE: plaintext
+CODE:
+A=123
+B=456
+DISCORD_TOKEN=your-token-goes-here
+
+LANGUAGE: javascript
+CODE:
+const dotenv = require('dotenv');
+
+dotenv.config();
+
+console.log(process.env.A);
+console.log(process.env.B);
+console.log(process.env.DISCORD_TOKEN);
+
+----------------------------------------
+
+TITLE: Storing Bot Token in config.json for Discord.js
+DESCRIPTION: This snippet demonstrates how to store a Discord bot token in a config.json file and access it in your JavaScript code. It's a common method for keeping sensitive values secure.
+
+LANGUAGE: json
+CODE:
+{
+	"token": "your-token-goes-here"
+}
+
+LANGUAGE: javascript
+CODE:
+const { token } = require('./config.json');
+
+console.log(token);
+
+----------------------------------------
+
+TITLE: Creating Server Info Command in Discord.js
+DESCRIPTION: Implementation of a server information command that displays the server name and member count.
+
+LANGUAGE: javascript
+CODE:
+const { SlashCommandBuilder } = require('discord.js');
+
+module.exports = {
+	data: new SlashCommandBuilder()
+		.setName('server')
+		.setDescription('Provides information about the server.'),
+	async execute(interaction) {
+		await interaction.reply(`This server is ${interaction.guild.name} and has ${interaction.guild.memberCount} members.`);
+	},
+};
+
+----------------------------------------
+
+TITLE: Creating Basic Ping Command in Discord.js
+DESCRIPTION: Implementation of a simple ping command using Discord.js SlashCommandBuilder. The command responds with 'Pong!' when invoked.
+
+LANGUAGE: javascript
+CODE:
+const { SlashCommandBuilder } = require('discord.js');
+
+module.exports = {
+	data: new SlashCommandBuilder()
+		.setName('ping')
+		.setDescription('Replies with Pong!'),
+	async execute(interaction) {
+		await interaction.reply('Pong!');
+	},
+};
+
+----------------------------------------
+
+TITLE: Basic Command Response in Discord.js
+DESCRIPTION: Simple implementation of a ping command using ChatInputCommandInteraction#reply() method to respond to a slash command.
+
+LANGUAGE: javascript
+CODE:
+module.exports = {
+	data: new SlashCommandBuilder()
+		.setName('ping')
+		.setDescription('Replies with Pong!'),
+	async execute(interaction) {
+		await interaction.reply('Pong!');
+	},
+};
+
+----------------------------------------
+
+TITLE: Implementing ClientReady Event Handler
+DESCRIPTION: Sets up an event listener for when the Discord client becomes ready. Logs a confirmation message with the bot's user tag when initialized.
+
+LANGUAGE: javascript
+CODE:
+const { Events } = require('discord.js');
+
+module.exports = {
+	name: Events.ClientReady,
+	once: true,
+	execute(client) {
+		console.log(`Ready! Logged in as ${client.user.tag}`);
+	},
+};
+
+----------------------------------------
+
+TITLE: Defining Command Cooldown Property in Discord.js
+DESCRIPTION: Demonstrates how to add a cooldown property to a Discord.js slash command. The cooldown value is specified in seconds and determines how long users must wait between command uses.
+
+LANGUAGE: javascript
+CODE:
+const { SlashCommandBuilder } = require('discord.js');
+
+module.exports = {
+	cooldown: 5,
+	data: new SlashCommandBuilder()
+		.setName('ping')
+		.setDescription('Replies with Pong!'),
+	async execute(interaction) {
+		// ...
+	},
+};
+
+----------------------------------------
+
+TITLE: Initializing Discord.js Command Handler Setup
+DESCRIPTION: Initial setup code for the command handler, including required imports and client configuration with Collection initialization.
+
+LANGUAGE: javascript
+CODE:
+const fs = require('node:fs');
+const path = require('node:path');
+const { Client, Collection, Events, GatewayIntentBits } = require('discord.js');
+const { token } = require('./config.json');
+
+const client = new Client({ intents: [GatewayIntentBits.Guilds] });
+
+client.commands = new Collection();
+
+----------------------------------------
+
+TITLE: Modifying Discord.js Script for Global Command Deployment
+DESCRIPTION: This code snippet shows how to modify the deployment script to register commands globally instead of for a specific guild.
+
+LANGUAGE: javascript
+CODE:
+await rest.put(
+	Routes.applicationCommands(clientId),
+	{ body: commands },
+);
+
+----------------------------------------
+
+TITLE: Using Environment Variables for Discord.js Bot Configuration
+DESCRIPTION: This snippet shows how to use environment variables to store and access sensitive data like a Discord bot token. It demonstrates setting variables via command line and accessing them in JavaScript code.
+
+LANGUAGE: shell
+CODE:
+A=123 B=456 DISCORD_TOKEN=your-token-goes-here node index.js
+
+LANGUAGE: javascript
+CODE:
+console.log(process.env.A);
+console.log(process.env.B);
+console.log(process.env.DISCORD_TOKEN);
+
+----------------------------------------
+
+TITLE: Handling Multiple Interaction Types in Discord.js
+DESCRIPTION: This snippet demonstrates how to handle different types of interactions (commands, buttons, and select menus) in the interactionCreate event. It uses conditional statements to determine the interaction type and respond accordingly.
+
+LANGUAGE: javascript
+CODE:
+const { Events } = require('discord.js');
+
+module.exports = {
+	name: Events.InteractionCreate,
+	async execute(interaction) {
+		if (interaction.isChatInputCommand()) {
+			const command = interaction.client.commands.get(interaction.commandName);
+
+			if (!command) {
+				console.error(`No command matching ${interaction.commandName} was found.`);
+				return;
+			}
+
+			try {
+				await command.execute(interaction);
+			} catch (error) {
+				console.error(`Error executing ${interaction.commandName}`);
+				console.error(error);
+			}
+		} else if (interaction.isButton()) {
+			// respond to the button
+		} else if (interaction.isStringSelectMenu()) {
+			// respond to the select menu
+		}
+	},
+};
+
+----------------------------------------
+
+TITLE: Deploying Discord Slash Commands with Node.js
+DESCRIPTION: This script reads command files from a directory structure, prepares them for deployment, and uses the Discord REST API to register them as slash commands for a specific guild.
+
+LANGUAGE: javascript
+CODE:
+const { REST, Routes } = require('discord.js');
+const { clientId, guildId, token } = require('./config.json');
+const fs = require('node:fs');
+const path = require('node:path');
+
+const commands = [];
+// Grab all the command folders from the commands directory you created earlier
+const foldersPath = path.join(__dirname, 'commands');
+const commandFolders = fs.readdirSync(foldersPath);
+
+for (const folder of commandFolders) {
+	// Grab all the command files from the commands directory you created earlier
+	const commandsPath = path.join(foldersPath, folder);
+	const commandFiles = fs.readdirSync(commandsPath).filter(file => file.endsWith('.js'));
+	// Grab the SlashCommandBuilder#toJSON() output of each command's data for deployment
+	for (const file of commandFiles) {
+		const filePath = path.join(commandsPath, file);
+		const command = require(filePath);
+		if ('data' in command && 'execute' in command) {
+			commands.push(command.data.toJSON());
+		} else {
+			console.log(`[WARNING] The command at ${filePath} is missing a required "data" or "execute" property.`);
+		}
+	}
+}
+
+// Construct and prepare an instance of the REST module
+const rest = new REST().setToken(token);
+
+// and deploy your commands!
+(async () => {
+	try {
+		console.log(`Started refreshing ${commands.length} application (/) commands.`);
+
+		// The put method is used to fully refresh all commands in the guild with the current set
+		const data = await rest.put(
+			Routes.applicationGuildCommands(clientId, guildId),
+			{ body: commands },
+		);
+
+		console.log(`Successfully reloaded ${data.length} application (/) commands.`);
+	} catch (error) {
+		// And of course, make sure you catch and log any errors!
+		console.error(error);
+	}
+})();
+
+----------------------------------------
+
+TITLE: Creating a Thread from a Message in Discord.js
+DESCRIPTION: This code demonstrates how to create a thread from an existing message using the startThread() method.
+
+LANGUAGE: javascript
+CODE:
+const thread = await message.startThread({
+	name: 'food-talk',
+	autoArchiveDuration: ThreadAutoArchiveDuration.OneHour,
+	reason: 'Needed a separate thread for food',
+});
+
+console.log(`Created thread: ${thread.name}`);
+
+----------------------------------------
+
+TITLE: Initializing Discord Client with Gateway Intents in JavaScript
+DESCRIPTION: This snippet demonstrates how to create a Discord client instance with specific Gateway Intents. It includes intents for Guilds, Guild Messages, Message Content, and Guild Members.
+
+LANGUAGE: javascript
+CODE:
+const { Client, GatewayIntentBits } = require('discord.js');
+
+const client = new Client({
+	intents: [
+		GatewayIntentBits.Guilds,
+		GatewayIntentBits.GuildMessages,
+		GatewayIntentBits.MessageContent,
+		GatewayIntentBits.GuildMembers,
+	],
+});
+
+----------------------------------------
+
+TITLE: Creating Subcommands in discord.js Slash Commands
+DESCRIPTION: Demonstrates how to create subcommands within a slash command using addSubcommand(). This example creates an 'info' command with 'user' and 'server' subcommands.
+
+LANGUAGE: javascript
+CODE:
+const { SlashCommandBuilder } = require('discord.js');
+
+const data = new SlashCommandBuilder()
+	.setName('info')
+	.setDescription('Get info about a user or a server!')
+	.addSubcommand(subcommand =>
+		subcommand
+			.setName('user')
+			.setDescription('Info about a user')
+			.addUserOption(option => option.setName('target').setDescription('The user')))
+	.addSubcommand(subcommand =>
+		subcommand
+			.setName('server')
+			.setDescription('Info about the server'));
+
+----------------------------------------
+
+TITLE: Handling Unhandled Promise Rejections
+DESCRIPTION: Process-level event listener for catching and logging unhandled promise rejections, useful for debugging API errors.
+
+LANGUAGE: javascript
+CODE:
+process.on('unhandledRejection', error => {
+	console.error('Unhandled promise rejection:', error);
+});
+
+----------------------------------------
+
+TITLE: Administrative Member Management in Discord.js
+DESCRIPTION: Basic administrative commands for banning, kicking and managing guild members using Discord.js. Includes member timeout and role management functionality.
+
+LANGUAGE: javascript
+CODE:
+const user = interaction.options.getUser('target');
+guild.members.ban(user);
+
+LANGUAGE: javascript
+CODE:
+const member = interaction.options.getMember('target');
+member.timeout(60_000); // Timeout for one minute
+
+LANGUAGE: javascript
+CODE:
+const role = interaction.options.getRole('role');
+const member = interaction.options.getMember('target');
+member.roles.add(role);
+
+----------------------------------------
+
+TITLE: Setting Base Permissions for Roles in Discord.js
+DESCRIPTION: Shows how to set base permissions for roles, including the @everyone role, using the setPermissions method in discord.js.
+
+LANGUAGE: javascript
+CODE:
+const { PermissionsBitField } = require('discord.js');
+
+guild.roles.everyone.setPermissions([PermissionsBitField.Flags.SendMessages, PermissionsBitField.Flags.ViewChannel]);
+
+----------------------------------------
+
+TITLE: Handling WebSocket Errors in discord.js
+DESCRIPTION: Event listener for handling WebSocket connection errors in discord.js v12+. Logs any errors encountered during WebSocket operations.
+
+LANGUAGE: javascript
+CODE:
+client.on(Events.ShardError, error => {
+	console.error('A websocket connection encountered an error:', error);
+});
+
+----------------------------------------
+
+TITLE: Handling Voice Connection Disconnects in discord.js
+DESCRIPTION: Demonstrates a method to handle voice connection disconnects, particularly for the case where the bot might be moving between voice channels. It uses a race condition to determine if the connection is truly disconnected or just transitioning.
+
+LANGUAGE: javascript
+CODE:
+const { VoiceConnectionStatus, entersState } = require('@discordjs/voice');
+
+connection.on(VoiceConnectionStatus.Disconnected, async (oldState, newState) => {
+	try {
+		await Promise.race([
+			entersState(connection, VoiceConnectionStatus.Signalling, 5_000),
+			entersState(connection, VoiceConnectionStatus.Connecting, 5_000),
+		]);
+		// Seems to be reconnecting to a new channel - ignore disconnect
+	} catch {
+		// Seems to be a real disconnect which SHOULDN'T be recovered from
+		connection.destroy();
+	}
+});
+
+----------------------------------------
+
+TITLE: Creating Embed Messages with EmbedBuilder in Discord.js
+DESCRIPTION: Demonstrates how to create a rich embed message using the EmbedBuilder class with various properties like color, title, fields, and images.
+
+LANGUAGE: javascript
+CODE:
+const { EmbedBuilder } = require('discord.js');
+
+const exampleEmbed = new EmbedBuilder()
+	.setColor(0x0099FF)
+	.setTitle('Some title')
+	.setURL('https://discord.js.org/')
+	.setAuthor({ name: 'Some name', iconURL: 'https://i.imgur.com/AfFp7pu.png', url: 'https://discord.js.org' })
+	.setDescription('Some description here')
+	.setThumbnail('https://i.imgur.com/AfFp7pu.png')
+	.addFields(
+		{ name: 'Regular field title', value: 'Some value here' },
+		{ name: '\u200B', value: '\u200B' },
+		{ name: 'Inline field title', value: 'Some value here', inline: true },
+		{ name: 'Inline field title', value: 'Some value here', inline: true },
+	)
+	.addFields({ name: 'Inline field title', value: 'Some value here', inline: true })
+	.setImage('https://i.imgur.com/AfFp7pu.png')
+	.setTimestamp()
+	.setFooter({ text: 'Some footer text here', iconURL: 'https://i.imgur.com/AfFp7pu.png' });
+
+channel.send({ embeds: [exampleEmbed] });
+
+----------------------------------------
+
+TITLE: Implementing InteractionCreate Event Handler
+DESCRIPTION: Handles incoming chat command interactions, including command validation and error handling. Provides ephemeral error messages when command execution fails.
+
+LANGUAGE: javascript
+CODE:
+const { Events, MessageFlags } = require('discord.js');
+
+module.exports = {
+	name: Events.InteractionCreate,
+	async execute(interaction) {
+		if (!interaction.isChatInputCommand()) return;
+
+		const command = interaction.client.commands.get(interaction.commandName);
+
+		if (!command) {
+			console.error(`No command matching ${interaction.commandName} was found.`);
+			return;
+		}
+
+		try {
+			await command.execute(interaction);
+		} catch (error) {
+			console.error(error);
+			if (interaction.replied || interaction.deferred) {
+				await interaction.followUp({ content: 'There was an error while executing this command!', flags: MessageFlags.Ephemeral });
+			} else {
+				await interaction.reply({ content: 'There was an error while executing this command!', flags: MessageFlags.Ephemeral });
+			}
+		}
+	},
+};
+
+----------------------------------------
+
+TITLE: API Error Response Example
+DESCRIPTION: Example of a Discord API error response structure showing various error properties including name, message, path, code, and method.
+
+LANGUAGE: json
+CODE:
+{
+  "name": "DiscordAPIError",
+  "message": "Invalid Form Body\nmessage_id: Value \"[object Object]\" is not snowflake.",
+  "path": "/api/v10/channels/638200642359525387/messages/[object%20Object]",
+  "code": 50035,
+  "method": "GET"
+}
+
+----------------------------------------
+
+TITLE: Defining Discord.js Slash Command with Options
+DESCRIPTION: Creates a ban command with user and reason options using SlashCommandBuilder. Includes permission requirements and guild context setting.
+
+LANGUAGE: javascript
+CODE:
+const { InteractionContextType, PermissionFlagsBits, SlashCommandBuilder } = require('discord.js');
+
+module.exports = {
+	data: new SlashCommandBuilder()
+		.setName('ban')
+		.setDescription('Select a member and ban them.')
+		.addUserOption(option =>
+			option
+				.setName('target')
+				.setDescription('The member to ban')
+				.setRequired(true))
+		.addStringOption(option =>
+			option
+				.setName('reason')
+				.setDescription('The reason for banning'))
+		.setDefaultMemberPermissions(PermissionFlagsBits.BanMembers)
+		.setContexts(InteractionContextType.Guild),
+};
+
+----------------------------------------
+
+TITLE: Basic Promise Implementation Example
+DESCRIPTION: Demonstrates a basic Promise implementation for message deletion with timeout handling and error checking.
+
+LANGUAGE: javascript
+CODE:
+function deleteMessages(amount) {
+	return new Promise((resolve, reject) => {
+		if (amount > 10) return reject(new Error('You can\'t delete more than 10 Messages at a time.'));
+		setTimeout(() => resolve('Deleted 10 messages.'), 2_000);
+	});
+}
+
+deleteMessages(5).then(value => {
+	// `deleteMessages` is complete and has not encountered any errors
+	// the resolved value will be the string "Deleted 10 messages"
+}).catch(error => {
+	// `deleteMessages` encountered an error
+	// the error will be an Error Object
+});
+
+----------------------------------------
+
+TITLE: Follow-up Messages Implementation
+DESCRIPTION: Example of sending follow-up messages after an initial response using ChatInputCommandInteraction#followUp().
+
+LANGUAGE: javascript
+CODE:
+client.on(Events.InteractionCreate, async interaction => {
+	if (!interaction.isChatInputCommand()) return;
+
+	if (interaction.commandName === 'ping') {
+		await interaction.reply('Pong!');
+		await interaction.followUp('Pong again!');
+	}
+});
+
+----------------------------------------
+
+TITLE: Initializing Button Components in discord.js
+DESCRIPTION: This snippet demonstrates how to create button components using the ButtonBuilder class. It shows the creation of 'confirm' and 'cancel' buttons with different styles.
+
+LANGUAGE: javascript
+CODE:
+const { ButtonBuilder, ButtonStyle, SlashCommandBuilder } = require('discord.js');
+
+module.exports = {
+	// data: new SlashCommandBuilder()...
+	async execute(interaction) {
+		const target = interaction.options.getUser('target');
+		const reason = interaction.options.getString('reason') ?? 'No reason provided';
+
+		const confirm = new ButtonBuilder()
+			.setCustomId('confirm')
+			.setLabel('Confirm Ban')
+			.setStyle(ButtonStyle.Danger);
+
+		const cancel = new ButtonBuilder()
+			.setCustomId('cancel')
+			.setLabel('Cancel')
+			.setStyle(ButtonStyle.Secondary);
+	},
+};
+
+----------------------------------------
+
+TITLE: Discord.js Subcommand Handling Implementation
+DESCRIPTION: Demonstrates how to handle different subcommands using getSubcommand() and implement different logic flows for each subcommand.
+
+LANGUAGE: javascript
+CODE:
+module.exports = {
+	// data: new SlashCommandBuilder()...
+	async execute(interaction) {
+		if (interaction.options.getSubcommand() === 'user') {
+			const user = interaction.options.getUser('target');
+
+			if (user) {
+				await interaction.reply(`Username: ${user.username}\nID: ${user.id}`);
+			} else {
+				await interaction.reply(`Your username: ${interaction.user.username}\nYour ID: ${interaction.user.id}`);
+			}
+		} else if (interaction.options.getSubcommand() === 'server') {
+			await interaction.reply(`Server name: ${interaction.guild.name}\nTotal members: ${interaction.guild.memberCount}`);
+		}
+	},
+};
+
+----------------------------------------
+
+TITLE: Sending Messages via Webhook in discord.js Bot
+DESCRIPTION: This code demonstrates how to find an existing webhook in a channel and use it to send a message with an embed from a discord.js bot.
+
+LANGUAGE: javascript
+CODE:
+const { Client, EmbedBuilder, Events, GatewayIntentBits } = require('discord.js');
+const { token } = require('./config.json');
+
+const client = new Client({ intents: [GatewayIntentBits.Guilds] });
+
+const embed = new EmbedBuilder()
+	.setTitle('Some Title')
+	.setColor(0x00FFFF);
+
+client.once(Events.ClientReady, async () => {
+	const channel = client.channels.cache.get('123456789012345678');
+	try {
+		const webhooks = await channel.fetchWebhooks();
+		const webhook = webhooks.find(wh => wh.token);
+
+		if (!webhook) {
+			return console.log('No webhook was found that I can use!');
+		}
+
+		await webhook.send({
+			content: 'Webhook test',
+			username: 'some-username',
+			avatarURL: 'https://i.imgur.com/AfFp7pu.png',
+			embeds: [embed],
+		});
+	} catch (error) {
+		console.error('Error trying to send a message: ', error);
+	}
+});
+
+client.login(token);
+
+----------------------------------------
+
+TITLE: Adding Channel Permission Overwrites in Discord.js
+DESCRIPTION: Demonstrates how to add permission overwrites for roles or members in a specific channel using discord.js.
+
+LANGUAGE: javascript
+CODE:
+channel.permissionOverwrites.create(channel.guild.roles.everyone, { ViewChannel: false });
+
+----------------------------------------
+
+TITLE: Playing Audio Resources in Discord.js
+DESCRIPTION: Shows how to create and play audio resources across multiple voice connections using a single audio player.
+
+LANGUAGE: javascript
+CODE:
+const resource = createAudioResource('/home/user/voice/track.mp3');
+player.play(resource);
+
+// Play "track.mp3" across two voice connections
+connection1.subscribe(player);
+connection2.subscribe(player);
+
+----------------------------------------
+
+TITLE: Setting Default Member Permissions for Ban Command in discord.js
+DESCRIPTION: This snippet demonstrates how to create a slash command for banning members, setting the default permission to require the BanMembers flag.
+
+LANGUAGE: javascript
+CODE:
+const { SlashCommandBuilder, PermissionFlagsBits } = require('discord.js');
+
+const data = new SlashCommandBuilder()
+	.setName('ban')
+	.setDescription('Select a member and ban them.')
+	.addUserOption(option =>
+		option
+			.setName('target')
+			.setDescription('The member to ban')
+			.setRequired(true))
+	.setDefaultMemberPermissions(PermissionFlagsBits.BanMembers);
+
+----------------------------------------
+
+TITLE: Configuring Discord Bot Settings in JSON
+DESCRIPTION: This JSON configuration file stores essential bot settings including the token, client ID, and guild ID for development purposes.
+
+LANGUAGE: json
+CODE:
+{
+	"token": "your-token-goes-here",
+	"clientId": "your-application-id-goes-here",
+	"guildId": "your-server-id-goes-here"
+}
+
+----------------------------------------
+
+TITLE: Initializing ShardingManager in discord.js
+DESCRIPTION: This snippet demonstrates how to set up a ShardingManager to spawn and manage shards for a discord.js bot. It initializes the manager, sets up an event listener for shard creation, and spawns the shards.
+
+LANGUAGE: javascript
+CODE:
+const { ShardingManager } = require('discord.js');
+
+const manager = new ShardingManager('./bot.js', { token: 'your-token-goes-here' });
+
+manager.on('shardCreate', shard => console.log(`Launched shard ${shard.id}`));
+
+manager.spawn();
+
+----------------------------------------
+
+TITLE: Monitoring Voice Connection State Changes in discord.js
+DESCRIPTION: Shows how to listen for state changes in a voice connection, specifically when it enters the Ready state. This is useful for executing code when the connection is fully established.
+
+LANGUAGE: javascript
+CODE:
+const { VoiceConnectionStatus } = require('@discordjs/voice');
+
+connection.on(VoiceConnectionStatus.Ready, () => {
+	console.log('The connection has entered the Ready state - ready to play audio!');
+});
+
+----------------------------------------
+
+TITLE: Adding String Option to Slash Command in discord.js
+DESCRIPTION: Demonstrates how to add a string option to a slash command using the SlashCommandBuilder. The 'echo' command is created with an 'input' option for users to provide text.
+
+LANGUAGE: javascript
+CODE:
+const { SlashCommandBuilder } = require('discord.js');
+
+const data = new SlashCommandBuilder()
+	.setName('echo')
+	.setDescription('Replies with your input!')
+	.addStringOption(option =>
+		option.setName('input')
+			.setDescription('The input to echo back'));
+
+----------------------------------------
+
+TITLE: Creating a Private Thread in Discord.js
+DESCRIPTION: This snippet shows how to create a private thread by specifying the ChannelType.PrivateThread as the type in the threads.create() method.
+
+LANGUAGE: javascript
+CODE:
+const { ChannelType, ThreadAutoArchiveDuration } = require('discord.js');
+
+const thread = await channel.threads.create({
+	name: 'mod-talk',
+	autoArchiveDuration: ThreadAutoArchiveDuration.OneHour,
+	type: ChannelType.PrivateThread,
+	reason: 'Needed a separate thread for moderation',
+});
+
+console.log(`Created thread: ${thread.name}`);
+
+----------------------------------------
+
+TITLE: Implementing Discord Bot with Currency System
+DESCRIPTION: Sets up a Discord bot using discord.js, implements currency-related commands, and manages user balances and inventories.
+
+LANGUAGE: javascript
+CODE:
+const { Op } = require('sequelize');
+const { Client, codeBlock, Collection, Events, GatewayIntentBits } = require('discord.js');
+const { Users, CurrencyShop } = require('./dbObjects.js');
+
+const client = new Client({ intents: [GatewayIntentBits.Guilds, GatewayIntentBits.GuildMessages] });
+const currency = new Collection();
+
+async function addBalance(id, amount) {
+	const user = currency.get(id);
+
+	if (user) {
+		user.balance += Number(amount);
+		return user.save();
+	}
+
+	const newUser = await Users.create({ user_id: id, balance: amount });
+	currency.set(id, newUser);
+
+	return newUser;
+}
+
+function getBalance(id) {
+	const user = currency.get(id);
+	return user ? user.balance : 0;
+}
+
+client.once(Events.ClientReady, async readyClient => {
+	const storedBalances = await Users.findAll();
+	storedBalances.forEach(b => currency.set(b.user_id, b));
+
+	console.log(`Logged in as ${readyClient.user.tag}!`);
+});
+
+client.on(Events.MessageCreate, async message => {
+	if (message.author.bot) return;
+	addBalance(message.author.id, 1);
+});
+
+client.on(Events.InteractionCreate, async interaction => {
+	if (!interaction.isChatInputCommand()) return;
+
+	const { commandName } = interaction;
+
+	if (commandName === 'balance') {
+		const target = interaction.options.getUser('user') ?? interaction.user;
+
+		return interaction.reply(`${target.tag} has ${getBalance(target.id)}💰`);
+	}
+	else if (commandName === 'inventory') {
+		const target = interaction.options.getUser('user') ?? interaction.user;
+		const user = await Users.findOne({ where: { user_id: target.id } });
+		const items = await user.getItems();
+
+		if (!items.length) return interaction.reply(`${target.tag} has nothing!`);
+
+		return interaction.reply(`${target.tag} currently has ${items.map(i => `${i.amount} ${i.item.name}`).join(', ')}`);
+	}
+	else if (commandName === 'transfer') {
+		const currentAmount = getBalance(interaction.user.id);
+		const transferAmount = interaction.options.getInteger('amount');
+		const transferTarget = interaction.options.getUser('user');
+
+		if (transferAmount > currentAmount) return interaction.reply(`Sorry ${interaction.user}, you only have ${currentAmount}.`);
+		if (transferAmount <= 0) return interaction.reply(`Please enter an amount greater than zero, ${interaction.user}.`);
+
+		addBalance(interaction.user.id, -transferAmount);
+		addBalance(transferTarget.id, transferAmount);
+
+		return interaction.reply(`Successfully transferred ${transferAmount}💰 to ${transferTarget.tag}. Your current balance is ${getBalance(interaction.user.id)}💰`);
+	}
+	else if (commandName === 'buy') {
+		const itemName = interaction.options.getString('item');
+		const item = await CurrencyShop.findOne({ where: { name: { [Op.like]: itemName } } });
+
+		if (!item) return interaction.reply(`That item doesn't exist.`);
+		if (item.cost > getBalance(interaction.user.id)) {
+			return interaction.reply(`You currently have ${getBalance(interaction.user.id)}, but the ${item.name} costs ${item.cost}!`);
+		}
+
+		const user = await Users.findOne({ where: { user_id: interaction.user.id } });
+		addBalance(interaction.user.id, -item.cost);
+		await user.addItem(item);
+
+		return interaction.reply(`You've bought: ${item.name}.`);
+	}
+	else if (commandName === 'shop') {
+		const items = await CurrencyShop.findAll();
+		return interaction.reply(codeBlock(items.map(i => `${i.name}: ${i.cost}💰`).join('\n')));
+	}
+	else if (commandName === 'leaderboard') {
+		return interaction.reply(
+			codeBlock(
+				currency.sort((a, b) => b.balance - a.balance)
+					.filter(user => client.users.cache.has(user.user_id))
+					.first(10)
+					.map((user, position) => `(${position + 1}) ${(client.users.cache.get(user.user_id).tag)}: ${user.balance}💰`)
+					.join('\n'),
+			),
+		);
+	}
+});
+
+client.login('your-token-goes-here');
+
+----------------------------------------
+
+TITLE: Creating a Voice Connection in discord.js
+DESCRIPTION: Demonstrates how to create a voice connection using the joinVoiceChannel function from @discordjs/voice. This snippet shows the basic setup required to establish a connection to a voice channel.
+
+LANGUAGE: javascript
+CODE:
+const { joinVoiceChannel } = require('@discordjs/voice');
+
+const connection = joinVoiceChannel({
+	channelId: channel.id,
+	guildId: channel.guild.id,
+	adapterCreator: channel.guild.voiceAdapterCreator,
+});
+
+----------------------------------------
+
+TITLE: Adding Boolean Option to Slash Command in discord.js
+DESCRIPTION: Demonstrates adding a boolean option to the 'echo' command, allowing users to control whether the response should be ephemeral.
+
+LANGUAGE: javascript
+CODE:
+const { SlashCommandBuilder } = require('discord.js');
+
+const data = new SlashCommandBuilder()
+	.setName('echo')
+	.setDescription('Replies with your input!')
+	.addStringOption(option =>
+		option.setName('input')
+			.setDescription('The input to echo back'))
+	.addBooleanOption(option =>
+		option.setName('ephemeral')
+			.setDescription('Whether or not the echo should be ephemeral'));
+
+----------------------------------------
+
+TITLE: Accessing an Existing Voice Connection in discord.js
+DESCRIPTION: Shows how to retrieve an existing voice connection using the getVoiceConnection function. This method is recommended to avoid memory leaks caused by manually tracking connections.
+
+LANGUAGE: javascript
+CODE:
+const { getVoiceConnection } = require('@discordjs/voice');
+
+const connection = getVoiceConnection(myVoiceChannel.guild.id);
+
+----------------------------------------
+
+TITLE: Implementing a Quiz using awaitMessages in discord.js
+DESCRIPTION: Shows how to implement a quiz command using the awaitMessages method. It randomly selects a question, filters answers, and handles correct and incorrect responses.
+
+LANGUAGE: javascript
+CODE:
+const quiz = require('./quiz.json');
+// ...
+const item = quiz[Math.floor(Math.random() * quiz.length)];
+const collectorFilter = response => {
+	return item.answers.some(answer => answer.toLowerCase() === response.content.toLowerCase());
+};
+
+interaction.reply({ content: item.question, withResponse: true })
+	.then(response => {
+		response.resource.message.channel.awaitMessages({ filter: collectorFilter, max: 1, time: 30_000, errors: ['time'] })
+			.then(collected => {
+				interaction.followUp(`${collected.first().author} got the correct answer!`);
+			})
+			.catch(collected => {
+				interaction.followUp('Looks like nobody got the answer this time.');
+			});
+	});
+
+----------------------------------------
+
+TITLE: Creating a Message Component Collector in discord.js
+DESCRIPTION: Demonstrates how to create a collector for button interactions, checking if the user clicking the button is the same as the command initiator.
+
+LANGUAGE: javascript
+CODE:
+const { ComponentType } = require('discord.js');
+
+const collector = message.createMessageComponentCollector({ componentType: ComponentType.Button, time: 15_000 });
+
+collector.on('collect', i => {
+	if (i.user.id === interaction.user.id) {
+		i.reply(`${i.user.id} clicked on the ${i.customId} button.`);
+	} else {
+		i.reply({ content: `These buttons aren't for you!`, flags: MessageFlags.Ephemeral });
+	}
+});
+
+collector.on('end', collected => {
+	console.log(`Collected ${collected.size} interactions.`);
+});
+
+----------------------------------------
+
+TITLE: Customizing Text Input Properties in Discord.js
+DESCRIPTION: This snippet demonstrates how to customize a TextInputBuilder with various properties such as maximum length, minimum length, placeholder text, default value, and required status.
+
+LANGUAGE: javascript
+CODE:
+const input = new TextInputBuilder()
+	// set the maximum number of characters to allow
+	.setMaxLength(1_000)
+	// set the minimum number of characters required for submission
+	.setMinLength(10)
+	// set a placeholder string to prompt the user
+	.setPlaceholder('Enter some text!')
+	// set a default value to pre-fill the input
+	.setValue('Default')
+	 // require a value in this input field
+	.setRequired(true);
+
+----------------------------------------
+
+TITLE: Bot Configuration Commands in Discord.js
+DESCRIPTION: Commands for configuring bot presence, status and activity using Discord.js client methods. Includes setting username, avatar, status and activity type.
+
+LANGUAGE: javascript
+CODE:
+client.user.setActivity('activity', { type: ActivityType.Watching });
+client.user.setActivity('activity', { type: ActivityType.Listening });
+client.user.setActivity('activity', { type: ActivityType.Competing });
+
+LANGUAGE: javascript
+CODE:
+client.user.setPresence({ activities: [{ name: 'activity' }], status: PresenceUpdateStatus.Idle });
+
+----------------------------------------
+
+TITLE: Sending Messages via WebhookClient in discord.js
+DESCRIPTION: This snippet demonstrates how to send a message with an embed using a WebhookClient, including custom username and avatar.
+
+LANGUAGE: javascript
+CODE:
+const { EmbedBuilder, WebhookClient } = require('discord.js');
+const { webhookId, webhookToken } = require('./config.json');
+
+const webhookClient = new WebhookClient({ id: webhookId, token: webhookToken });
+
+const embed = new EmbedBuilder()
+	.setTitle('Some Title')
+	.setColor(0x00FFFF);
+
+webhookClient.send({
+	content: 'Webhook test',
+	username: 'some-username',
+	avatarURL: 'https://i.imgur.com/AfFp7pu.png',
+	embeds: [embed],
+});
+
+----------------------------------------
+
+TITLE: Handling Modal Submissions in Discord.js
+DESCRIPTION: This code shows how to set up an event listener for modal submissions using the interactionCreate event. It demonstrates how to check if the interaction is a modal submission and how to respond to it.
+
+LANGUAGE: javascript
+CODE:
+client.on(Events.InteractionCreate, async interaction => {
+	if (!interaction.isModalSubmit()) return;
+	if (interaction.customId === 'myModal') {
+		await interaction.reply({ content: 'Your submission was received successfully!' });
+	}
+});
+
+----------------------------------------
+
+TITLE: Setting Default Member Permissions for Kick Command in discord.js
+DESCRIPTION: This snippet shows how to create a slash command for kicking members, setting the default permission to require the KickMembers flag.
+
+LANGUAGE: javascript
+CODE:
+const { SlashCommandBuilder, PermissionFlagsBits } = require('discord.js');
+
+const data = new SlashCommandBuilder()
+	.setName('kick')
+	.setDescription('Select a member and kick them.')
+	.addUserOption(option =>
+		option
+			.setName('target')
+			.setDescription('The member to kick')
+			.setRequired(true))
+	.setDefaultMemberPermissions(PermissionFlagsBits.KickMembers);
+
+----------------------------------------
+
+TITLE: Checking for Specific Permissions in Discord.js
+DESCRIPTION: Shows how to check for specific permissions using the .has() method on a Permissions object in discord.js.
+
+LANGUAGE: javascript
+CODE:
+const { PermissionsBitField } = require('discord.js');
+
+const bitPermissions = new PermissionsBitField(268_550_160n);
+
+console.log(bitPermissions.has(PermissionsBitField.Flags.ManageChannels));
+// output: true
+
+console.log(bitPermissions.has([PermissionsBitField.Flags.ManageChannels, PermissionsBitField.Flags.EmbedLinks]));
+// output: true
+
+console.log(bitPermissions.has([PermissionsBitField.Flags.ManageChannels, PermissionsBitField.Flags.KickMembers]));
+// output: false
+
+const flagsPermissions = new PermissionsBitField([
+	PermissionsBitField.Flags.ManageChannels,
+	PermissionsBitField.Flags.EmbedLinks,
+	PermissionsBitField.Flags.AttachFiles,
+	PermissionsBitField.Flags.ReadMessageHistory,
+	PermissionsBitField.Flags.ManageRoles,
+]);
+
+console.log(flagsPermissions.has(PermissionsBitField.Flags.ManageChannels));
+// output: true
+
+console.log(flagsPermissions.has([PermissionsBitField.Flags.ManageChannels, PermissionsBitField.Flags.EmbedLinks]));
+// output: true
+
+console.log(flagsPermissions.has([PermissionsBitField.Flags.ManageChannels, PermissionsBitField.Flags.KickMembers]));
+// output: false
+
+const adminPermissions = new PermissionsBitField(PermissionsBitField.Flags.Administrator);
+
+console.log(adminPermissions.has(PermissionsBitField.Flags.ManageChannels));
+// output: true
+
+console.log(adminPermissions.has(PermissionsBitField.Flags.ManageChannels, true));
+// output: true
+
+console.log(adminPermissions.has(PermissionsBitField.Flags.ManageChannels, false));
+// output: false
+
+----------------------------------------
+
+TITLE: Handling Context Menu Interactions in Discord.js
+DESCRIPTION: Shows how to handle incoming context menu command interactions by checking the interaction type using isUserContextMenuCommand().
+
+LANGUAGE: javascript
+CODE:
+client.on(Events.InteractionCreate, interaction => {
+	if (!interaction.isUserContextMenuCommand()) return;
+	console.log(interaction);
+});
+
+----------------------------------------
+
+TITLE: Configuring Sequelize Connection for SQLite
+DESCRIPTION: Sets up the Sequelize connection information for SQLite database, including host, dialect, and storage options.
+
+LANGUAGE: javascript
+CODE:
+const sequelize = new Sequelize('database', 'user', 'password', {
+	host: 'localhost',
+	dialect: 'sqlite',
+	logging: false,
+	// SQLite only
+	storage: 'database.sqlite',
+});
+
+----------------------------------------
+
+TITLE: Error Handling with Audio Players
+DESCRIPTION: Shows recommended approach for handling errors in audio playback using the AudioPlayer's error event. Includes metadata handling and error logging.
+
+LANGUAGE: javascript
+CODE:
+const { createAudioResource, createAudioPlayer } = require('@discordjs/voice');
+
+const player = createAudioPlayer();
+// An AudioPlayer will always emit an "error" event with a .resource property
+player.on('error', error => {
+	console.error('Error:', error.message, 'with track', error.resource.metadata.title);
+});
+
+const resource = createAudioResource('/home/user/voice/music.mp3', {
+	metadata: {
+		title: 'A good song!',
+	},
+});
+player.play(resource);
+
+----------------------------------------
+
+TITLE: Leaving a Thread in Discord.js
+DESCRIPTION: This snippet demonstrates how to leave a thread using the leave() method.
+
+LANGUAGE: javascript
+CODE:
+const thread = channel.threads.cache.find(x => x.name === 'food-talk');
+await thread.leave();
+
+----------------------------------------
+
+TITLE: Checking Member Permissions in Discord.js
+DESCRIPTION: Shows how to check if a member has specific permissions, including options to allow or disallow admin override.
+
+LANGUAGE: javascript
+CODE:
+const { PermissionsBitField } = require('discord.js');
+
+if (member.permissions.has(PermissionsBitField.Flags.KickMembers)) {
+	console.log('This member can kick');
+}
+
+if (member.permissions.has([PermissionsBitField.Flags.KickMembers, PermissionsBitField.Flags.BanMembers])) {
+	console.log('This member can kick and ban');
+}
+
+if (member.permissions.has(PermissionsBitField.Flags.KickMembers, false)) {
+	console.log('This member can kick without allowing admin to override');
+}
+
+----------------------------------------
+
+TITLE: Manipulating Permissions in Discord.js
+DESCRIPTION: Demonstrates how to add or remove individual permissions from an existing Permissions object using discord.js.
+
+LANGUAGE: javascript
+CODE:
+const { PermissionsBitField } = require('discord.js');
+
+const permissions = new PermissionsBitField([
+	PermissionsBitField.Flags.ViewChannel,
+	PermissionsBitField.Flags.EmbedLinks,
+	PermissionsBitField.Flags.AttachFiles,
+	PermissionsBitField.Flags.ReadMessageHistory,
+	PermissionsBitField.Flags.ManageRoles,
+]);
+
+console.log(permissions.has(PermissionsBitField.Flags.KickMembers));
+// output: false
+
+permissions.add(PermissionsBitField.Flags.KickMembers);
+console.log(permissions.has(PermissionsBitField.Flags.KickMembers));
+// output: true
+
+permissions.remove(PermissionsBitField.Flags.KickMembers);
+console.log(permissions.has(PermissionsBitField.Flags.KickMembers));
+// output: false
+
+----------------------------------------
+
+TITLE: Handling Autocomplete Interactions in Discord.js
+DESCRIPTION: This snippet shows how to handle autocomplete interactions using the interactionCreate event listener.
+
+LANGUAGE: javascript
+CODE:
+client.on(Events.InteractionCreate, interaction => {
+	if (!interaction.isAutocomplete()) return;
+	// do autocomplete handling
+});
+
+----------------------------------------
+
+TITLE: Editing Channel Permission Overwrites in Discord.js
+DESCRIPTION: Demonstrates how to edit existing permission overwrites for a channel using discord.js.
+
+LANGUAGE: javascript
+CODE:
+// edits overwrites to disallow everyone to view the channel
+channel.permissionOverwrites.edit(guild.id, { ViewChannel: false });
+
+// edits overwrites to allow a user to view the channel
+channel.permissionOverwrites.edit(user.id, { ViewChannel: true });
+
+----------------------------------------
+
+TITLE: Creating a Channel with Permission Overwrites in Discord.js
+DESCRIPTION: Shows how to create a new channel with specific permission overwrites for roles and users using discord.js.
+
+LANGUAGE: javascript
+CODE:
+const { ChannelType, PermissionsBitField } = require('discord.js');
+
+guild.channels.create({
+	name: 'new-channel',
+	type: ChannelType.GuildText,
+	permissionOverwrites: [
+		{
+			id: interaction.guild.id,
+			deny: [PermissionsBitField.Flags.ViewChannel],
+		},
+		{
+			id: interaction.user.id,
+			allow: [PermissionsBitField.Flags.ViewChannel],
+		},
+	],
+});
+
+----------------------------------------
+
+TITLE: Fetching Basic Audit Logs in Discord.js
+DESCRIPTION: Demonstrates the basic usage of fetchAuditLogs() method to retrieve audit log entries from a Discord guild.
+
+LANGUAGE: javascript
+CODE:
+const fetchedLogs = await guild.fetchAuditLogs();
+const firstEntry = fetchedLogs.entries.first();
+
+----------------------------------------
+
+TITLE: Playing Audio on a Voice Connection in discord.js
+DESCRIPTION: Illustrates how to subscribe a voice connection to an audio player and unsubscribe after a set duration. This snippet shows the basics of audio playback management.
+
+LANGUAGE: javascript
+CODE:
+// Subscribe the connection to the audio player (will play audio on the voice connection)
+const subscription = connection.subscribe(audioPlayer);
+
+// subscription could be undefined if the connection is destroyed!
+if (subscription) {
+	// Unsubscribe after 5 seconds (stop playing audio on the voice connection)
+	setTimeout(() => subscription.unsubscribe(), 5_000);
+}
+
+----------------------------------------
+
+TITLE: Command Reloading Implementation in Discord.js
+DESCRIPTION: Handles the actual command reloading process by clearing the require cache, reloading the command file, and updating the commands collection. Includes error handling with try-catch block for graceful failure handling.
+
+LANGUAGE: javascript
+CODE:
+delete require.cache[require.resolve(`./${command.data.name}.js`)];
+
+try {
+	const newCommand = require(`./${command.data.name}.js`);
+	interaction.client.commands.set(newCommand.data.name, newCommand);
+	await interaction.reply(`Command \`${newCommand.data.name}\` was reloaded!`);
+} catch (error) {
+	console.error(error);
+	await interaction.reply(`There was an error while reloading a command \`${command.data.name}\`:\n\`${error.message}\``);
+}
+
+----------------------------------------
+
+TITLE: Implementing Autocomplete in a Discord.js Command File
+DESCRIPTION: This snippet shows how to structure a command file with both execute and autocomplete functions for handling slash commands with autocomplete.
+
+LANGUAGE: javascript
+CODE:
+module.exports = {
+	data: new SlashCommandBuilder()
+		.setName('guide')
+		.setDescription('Search discordjs.guide!')
+		.addStringOption(option =>
+			option.setName('query')
+				.setDescription('Phrase to search for')
+				.setAutocomplete(true)),
+	async autocomplete(interaction) {
+		// handle the autocompletion response (more on how to do that below)
+	},
+	async execute(interaction) {
+		// respond to the complete slash command
+	},
+};
+
+----------------------------------------
+
+TITLE: Stopping Audio Player in Discord.js
+DESCRIPTION: Demonstrates how to stop an audio player when it's no longer needed.
+
+LANGUAGE: javascript
+CODE:
+player.stop();
+
+----------------------------------------
+
+TITLE: Adding Components to a Modal in Discord.js
+DESCRIPTION: This code shows how to add text input components to a modal, create action rows, and show the modal to the user. It includes examples of both short and paragraph style inputs.
+
+LANGUAGE: javascript
+CODE:
+const { ActionRowBuilder, Events, ModalBuilder, TextInputBuilder, TextInputStyle } = require('discord.js');
+
+client.on(Events.InteractionCreate, async interaction => {
+	if (!interaction.isChatInputCommand()) return;
+
+	if (interaction.commandName === 'ping') {
+		// Create the modal
+		const modal = new ModalBuilder()
+			.setCustomId('myModal')
+			.setTitle('My Modal');
+
+		// Add components to modal
+
+		// Create the text input components
+		const favoriteColorInput = new TextInputBuilder()
+			.setCustomId('favoriteColorInput')
+		    // The label is the prompt the user sees for this input
+			.setLabel("What's your favorite color?")
+		    // Short means only a single line of text
+			.setStyle(TextInputStyle.Short);
+
+		const hobbiesInput = new TextInputBuilder()
+			.setCustomId('hobbiesInput')
+			.setLabel("What's some of your favorite hobbies?")
+		    // Paragraph means multiple lines of text.
+			.setStyle(TextInputStyle.Paragraph);
+
+		// An action row only holds one text input,
+		// so you need one action row per text input.
+		const firstActionRow = new ActionRowBuilder().addComponents(favoriteColorInput);
+		const secondActionRow = new ActionRowBuilder().addComponents(hobbiesInput);
+
+		// Add inputs to the modal
+		modal.addComponents(firstActionRow, secondActionRow);
+
+		// Show the modal to the user
+		await interaction.showModal(modal);
+	}
+});
+
+----------------------------------------
+
+TITLE: Implementing Prefix Command
+DESCRIPTION: Discord.js command to set and retrieve guild-specific prefixes using Keyv.
+
+LANGUAGE: javascript
+CODE:
+client.on(Events.MessageCreate, async message => {
+	// ...
+	if (command === 'prefix') {
+		// if there's at least one argument, set the prefix
+		if (args.length) {
+			await prefixes.set(message.guild.id, args[0]);
+			return message.channel.send(`Successfully set prefix to \`${args[0]}\``);
+		}
+
+		return message.channel.send(`Prefix is \`${await prefixes.get(message.guild.id) || globalPrefix}\``);
+	}
+});
+
+----------------------------------------
+
+TITLE: Error Handling with Direct Response in Discord.js
+DESCRIPTION: Demonstrates error handling by immediately playing next resource when an error occurs.
+
+LANGUAGE: javascript
+CODE:
+const { createAudioResource } = require('@discordjs/voice');
+
+const resource = createAudioResource('/home/user/voice/music.mp3', {
+	metadata: {
+		title: 'A good song!',
+	},
+});
+
+player.play(resource);
+
+player.on('error', error => {
+	console.error(`Error: ${error.message} with resource ${error.resource.metadata.title}`);
+	player.play(getNextResource());
+});
+
+----------------------------------------
+
+TITLE: Creating a Basic Message Collector in discord.js
+DESCRIPTION: Demonstrates how to create a message collector that filters messages containing 'discord' and logs collected messages. It also shows how to handle the 'end' event of the collector.
+
+LANGUAGE: javascript
+CODE:
+const collectorFilter = m => m.content.includes('discord');
+const collector = interaction.channel.createMessageCollector({ filter: collectorFilter, time: 15_000 });
+
+collector.on('collect', m => {
+	console.log(`Collected ${m.content}`);
+});
+
+collector.on('end', collected => {
+	console.log(`Collected ${collected.size} items`);
+});
+
+----------------------------------------
+
+TITLE: Pausing and Unpausing Audio in Discord.js
+DESCRIPTION: Demonstrates pause and unpause functionality with a timeout example.
+
+LANGUAGE: javascript
+CODE:
+player.pause();
+
+// Unpause after 5 seconds
+setTimeout(() => player.unpause(), 5_000);
+
+----------------------------------------
+
+TITLE: Creating a Thread in Discord.js
+DESCRIPTION: This snippet demonstrates how to create a new thread in a Discord channel using the threads.create() method. It specifies the thread name, auto-archive duration, and a reason for creation.
+
+LANGUAGE: javascript
+CODE:
+const thread = await channel.threads.create({
+	name: 'food-talk',
+	autoArchiveDuration: ThreadAutoArchiveDuration.OneHour,
+	reason: 'Needed a separate thread for food',
+});
+
+console.log(`Created thread: ${thread.name}`);
+
+----------------------------------------
+
+TITLE: Creating Link Buttons in discord.js
+DESCRIPTION: This snippet demonstrates how to create a link button in discord.js. Link buttons open a URL in the browser and do not send an interaction to the bot.
+
+LANGUAGE: javascript
+CODE:
+const button = new ButtonBuilder()
+	.setLabel('discord.js docs')
+	.setURL('https://discord.js.org')
+	.setStyle(ButtonStyle.Link);
+
+----------------------------------------
+
+TITLE: Subscribing to All State Transitions in discord.js Voice
+DESCRIPTION: Shows how to use a single event listener to handle all possible state transitions for both VoiceConnection and AudioPlayer. This method logs the old and new states for each transition.
+
+LANGUAGE: javascript
+CODE:
+connection.on('stateChange', (oldState, newState) => {
+	console.log(`Connection transitioned from ${oldState.status} to ${newState.status}`);
+});
+
+player.on('stateChange', (oldState, newState) => {
+	console.log(`Audio player transitioned from ${oldState.status} to ${newState.status}`);
+});
+
+----------------------------------------
+
+TITLE: Deleting a Thread in Discord.js
+DESCRIPTION: This code snippet shows how to find a specific thread by name and delete it using the delete() method.
+
+LANGUAGE: javascript
+CODE:
+const thread = channel.threads.cache.find(x => x.name === 'food-talk');
+await thread.delete();
+
+----------------------------------------
+
+TITLE: Fetching Complete Message Data
+DESCRIPTION: Demonstrates how to fetch complete data for a partial message, including error handling and accessing message content.
+
+LANGUAGE: javascript
+CODE:
+if (message.partial) {
+	message.fetch()
+		.then(fullMessage => {
+			console.log(fullMessage.content);
+		})
+		.catch(error => {
+			console.log('Something went wrong when fetching the message: ', error);
+		});
+} else {
+	console.log(message.content);
+}
+
+----------------------------------------
+
+TITLE: Initializing Discord.js Client with Default Cache Limits
+DESCRIPTION: Creates a Discord.js client with default cache settings that limit message caches. Uses the Options helper class for basic cache configuration.
+
+LANGUAGE: javascript
+CODE:
+const { Client, Options } = require('discord.js');
+
+const client = new Client({
+	makeCache: Options.cacheWithLimits(Options.DefaultMakeCacheSettings),
+});
+
+----------------------------------------
+
+TITLE: Creating Mentions in discord.js
+DESCRIPTION: This snippet demonstrates how to use userMention(), channelMention(), and roleMention() functions to format Snowflakes into mentions for users, channels, and roles.
+
+LANGUAGE: javascript
+CODE:
+const { channelMention, roleMention, userMention } = require('discord.js');
+const id = '123456789012345678';
+
+const channel = channelMention(id);
+const role = roleMention(id);
+const user = userMention(id);
+
+----------------------------------------
+
+TITLE: Optimized Opus Stream Playback
+DESCRIPTION: Shows how to optimize performance by playing Opus streams directly without FFmpeg conversion. Includes examples for both OggOpus and WebmOpus formats.
+
+LANGUAGE: javascript
+CODE:
+const { createReadStream } = require('node:fs');
+const { createAudioResource, StreamType } = require('@discordjs/voice');
+
+let resource = createAudioResource(createReadStream('my_file.ogg'), {
+	inputType: StreamType.OggOpus,
+});
+
+resource = createAudioResource(createReadStream('my_file.webm'), {
+	inputType: StreamType.WebmOpus,
+});
+
+----------------------------------------
+
+TITLE: Creating .gitignore for Discord.js Bot Project
+DESCRIPTION: This snippet shows the contents of a .gitignore file for a Discord.js bot project. It specifies files and directories that should be ignored by Git version control to prevent sensitive information from being exposed.
+
+LANGUAGE: plaintext
+CODE:
+node_modules
+.env
+config.json
+
+----------------------------------------
+
+TITLE: Formatting Timestamps in discord.js
+DESCRIPTION: This snippet shows how to use the time() function to format Unix timestamps and dates into Discord time strings, including relative time formatting.
+
+LANGUAGE: javascript
+CODE:
+const { time, TimestampStyles } = require('discord.js');
+const date = new Date();
+
+const timeString = time(date);
+const relative = time(date, TimestampStyles.RelativeTime);
+
+----------------------------------------
+
+TITLE: Editing Command Responses
+DESCRIPTION: Demonstration of editing an initial command response after a delay using ChatInputCommandInteraction#editReply().
+
+LANGUAGE: javascript
+CODE:
+const wait = require('node:timers/promises').setTimeout;
+
+client.on(Events.InteractionCreate, async interaction => {
+	if (!interaction.isChatInputCommand()) return;
+
+	if (interaction.commandName === 'ping') {
+		await interaction.reply('Pong!');
+		await wait(2_000);
+		await interaction.editReply('Pong again!');
+	}
+});
+
+----------------------------------------
+
+TITLE: Comprehensive ESLint Rules Configuration
+DESCRIPTION: Complete ESLint configuration with detailed coding style rules for Discord.js development including spacing, formatting, and best practices.
+
+LANGUAGE: javascript
+CODE:
+const js = require('@eslint/js');
+
+module.exports = [
+	js.configs.recommended,
+	{
+		languageOptions: {
+			ecmaVersion: 'latest',
+		},
+		rules: {
+			'arrow-spacing': ['warn', { before: true, after: true }],
+			'brace-style': ['error', 'stroustrup', { allowSingleLine: true }],
+			'comma-dangle': ['error', 'always-multiline'],
+			'comma-spacing': 'error',
+			'comma-style': 'error',
+			curly: ['error', 'multi-line', 'consistent'],
+			'dot-location': ['error', 'property'],
+			'handle-callback-err': 'off',
+			indent: ['error', 'tab'],
+			'keyword-spacing': 'error',
+			'max-nested-callbacks': ['error', { max: 4 }],
+			'max-statements-per-line': ['error', { max: 2 }],
+			'no-console': 'off',
+			'no-empty-function': 'error',
+			'no-floating-decimal': 'error',
+			'no-inline-comments': 'error',
+			'no-lonely-if': 'error',
+			'no-multi-spaces': 'error',
+			'no-multiple-empty-lines': ['error', { max: 2, maxEOF: 1, maxBOF: 0 }],
+			'no-shadow': ['error', { allow: ['err', 'resolve', 'reject'] }],
+			'no-trailing-spaces': ['error'],
+			'no-var': 'error',
+			'no-undef': 'off',
+			'object-curly-spacing': ['error', 'always'],
+			'prefer-const': 'error',
+			quotes: ['error', 'single'],
+			semi: ['error', 'always'],
+			'space-before-blocks': 'error',
+			'space-before-function-paren': ['error', {
+				anonymous: 'never',
+				named: 'never',
+				asyncArrow: 'always',
+			}],
+			'space-in-parens': 'error',
+			'space-infix-ops': 'error',
+			'space-unary-ops': 'error',
+			'spaced-comment': 'error',
+			yoda: 'error',
+		},
+	},
+];
+
+----------------------------------------
+
+TITLE: Editing Webhook Messages in discord.js
+DESCRIPTION: This code demonstrates how to edit a message previously sent by a webhook, updating its content and embeds.
+
+LANGUAGE: javascript
+CODE:
+const message = await webhook.editMessage('123456789012345678', {
+	content: 'Edited!',
+	embeds: [embed],
+});
+
+----------------------------------------
+
+TITLE: Updating Button Data for discord.js v14
+DESCRIPTION: Changes required to define button data using the new ButtonStyle enum in v14.
+
+LANGUAGE: javascript
+CODE:
++ const { ButtonStyle } = require('discord.js');
+
+const button = {
+  label: 'test',
+- style: 'PRIMARY',
++ style: ButtonStyle.Primary,
+  customId: '1234'
+}
+
+----------------------------------------
+
+TITLE: Adding Choices to String Option in discord.js Slash Command
+DESCRIPTION: Demonstrates how to add predefined choices to a string option in a slash command. This example creates a 'gif' command with category choices.
+
+LANGUAGE: javascript
+CODE:
+const { SlashCommandBuilder } = require('discord.js');
+
+const data = new SlashCommandBuilder()
+	.setName('gif')
+	.setDescription('Sends a random gif!')
+	.addStringOption(option =>
+		option.setName('category')
+			.setDescription('The gif category')
+			.setRequired(true)
+			.addChoices(
+				{ name: 'Funny', value: 'gif_funny' },
+				{ name: 'Meme', value: 'gif_meme' },
+				{ name: 'Movie', value: 'gif_movie' },
+			));
+
+----------------------------------------
+
+TITLE: Specifying Component Type in TypeScript
+DESCRIPTION: Shows how to specify the type of components an action row holds when using TypeScript with discord.js.
+
+LANGUAGE: typescript
+CODE:
+new ActionRowBuilder<ButtonBuilder>()
+
+----------------------------------------
+
+TITLE: Creating Webhooks with discord.js
+DESCRIPTION: This snippet demonstrates how to create a webhook for a channel using the createWebhook method.
+
+LANGUAGE: javascript
+CODE:
+channel.createWebhook({
+	name: 'Some-username',
+	avatar: 'https://i.imgur.com/AfFp7pu.png',
+})
+	.then(webhook => console.log(`Created webhook ${webhook}`))
+	.catch(console.error);
+
+----------------------------------------
+
+TITLE: Updating allowed mentions
+DESCRIPTION: Changes in how allowed mentions are configured in v13.
+
+LANGUAGE: javascript
+CODE:
+- const client = new Discord.Client({ disableMentions: 'everyone' });
++ const client = new Discord.Client({ allowedMentions: { parse: ['users', 'roles'], repliedUser: true } });
+
+----------------------------------------
+
+TITLE: Deferred Response Handling
+DESCRIPTION: Implementation of deferred responses for commands that take longer than 3 seconds to process using deferReply().
+
+LANGUAGE: javascript
+CODE:
+const wait = require('node:timers/promises').setTimeout;
+
+client.on(Events.InteractionCreate, async interaction => {
+	if (!interaction.isChatInputCommand()) return;
+
+	if (interaction.commandName === 'ping') {
+		await interaction.deferReply();
+		await wait(4_000);
+		await interaction.editReply('Pong!');
+	}
+});
+
+----------------------------------------
+
+TITLE: Installing windows-build-tools with bun
+DESCRIPTION: Command to install windows-build-tools globally using bun, which is recommended for Windows users to set up build dependencies.
+
+LANGUAGE: sh
+CODE:
+bun add --global --production --add-python-to-path windows-build-tools
+
+----------------------------------------
+
+TITLE: Using awaitModalSubmit in discord.js
+DESCRIPTION: Demonstrates how to use the awaitModalSubmit method to wait for a modal submission within a command or button execution context.
+
+LANGUAGE: javascript
+CODE:
+initialInteraction.awaitModalSubmit({ time: 60_000, filter })
+	.then(interaction => interaction.editReply('Thank you for your submission!'))
+	.catch(err => console.log('No modal submit interaction was collected'));
+
+----------------------------------------
+
+TITLE: Updating Client application fetch
+DESCRIPTION: Changes in how the Client application is fetched in v13.
+
+LANGUAGE: javascript
+CODE:
+- client.fetchApplication().then(application => console.log(application.name))
++ console.log(client.application.name);
+
+----------------------------------------
+
+TITLE: Sending Autocomplete Results in Discord.js
+DESCRIPTION: This example demonstrates how to send autocomplete results by filtering choices based on user input and responding with an array of options.
+
+LANGUAGE: javascript
+CODE:
+module.exports = {
+	data: new SlashCommandBuilder()
+		.setName('guide')
+		.setDescription('Search discordjs.guide!')
+		.addStringOption(option =>
+			option.setName('query')
+				.setDescription('Phrase to search for')
+				.setAutocomplete(true)),
+	async autocomplete(interaction) {
+		const focusedValue = interaction.options.getFocused();
+		const choices = ['Popular Topics: Threads', 'Sharding: Getting started', 'Library: Voice Connections', 'Interactions: Replying to slash commands', 'Popular Topics: Embed preview'];
+		const filtered = choices.filter(choice => choice.startsWith(focusedValue));
+		await interaction.respond(
+			filtered.map(choice => ({ name: choice, value: choice })),
+		);
+	},
+};
+
+----------------------------------------
+
+TITLE: Updating GuildChannel methods
+DESCRIPTION: Changes in GuildChannel-related methods in v13.
+
+LANGUAGE: javascript
+CODE:
+- channel.createOverwrite(user, { VIEW_CHANNEL: false });
++ channel.permissionOverwrites.create(user, { VIEW_CHANNEL: false });
+
+- channel.overwritePermissions([{ id: user.id , allow: ['VIEW_CHANNEL'], deny: ['SEND_MESSAGES'] }]);
++ channel.permissionOverwrites.set([{ id: user.id , allow: ['VIEW_CHANNEL'], deny: ['SEND_MESSAGES'] }]);
+
+- channel.updateOverwrite(user, { VIEW_CHANNEL: false });
++ channel.permissionOverwrites.edit(user, { VIEW_CHANNEL: false });
+
+----------------------------------------
+
+TITLE: Arrow Functions in Discord.js Event Handlers
+DESCRIPTION: Demonstration of arrow function syntax for Discord.js event handlers and callbacks, showing improved readability over traditional function declarations.
+
+LANGUAGE: javascript
+CODE:
+client.once(Events.ClientReady, () => console.log('Ready!'));
+
+client.on(Events.TypingStart, typing => console.log(`${typing.user.tag} started typing in #${typing.channel.name}`));
+
+client.on(Events.MessageCreate, message => console.log(`${message.author.tag} sent: ${message.content}`));
+
+const doubleAge = age => `Your age doubled is: ${age * 2}`;
+
+const collectorFilter = m => m.content === 'I agree' && !m.author.bot;
+const collector = message.createMessageCollector({ filter: collectorFilter, time: 15_000 });
+
+----------------------------------------
+
+TITLE: Handling Multiple Autocomplete Options in Discord.js
+DESCRIPTION: This snippet shows how to handle multiple autocomplete options in a single command by distinguishing between focused options.
+
+LANGUAGE: javascript
+CODE:
+module.exports = {
+	data: new SlashCommandBuilder()
+		.setName('guide')
+		.setDescription('Search discordjs.guide!')
+		.addStringOption(option =>
+			option.setName('query')
+				.setDescription('Phrase to search for')
+				.setAutocomplete(true))
+		.addStringOption(option =>
+			option.setName('version')
+				.setDescription('Version to search in')
+				.setAutocomplete(true)),
+	async autocomplete(interaction) {
+		const focusedOption = interaction.options.getFocused(true);
+		let choices;
+
+		if (focusedOption.name === 'query') {
+			choices = ['Popular Topics: Threads', 'Sharding: Getting started', 'Library: Voice Connections', 'Interactions: Replying to slash commands', 'Popular Topics: Embed preview'];
+		}
+
+		if (focusedOption.name === 'version') {
+			choices = ['v9', 'v11', 'v12', 'v13', 'v14'];
+		}
+
+		const filtered = choices.filter(choice => choice.startsWith(focusedOption.value));
+		await interaction.respond(
+			filtered.map(choice => ({ name: choice, value: choice })),
+		);
+	},
+};
+
+----------------------------------------
+
+TITLE: Displaying Permission Flags in Discord.js
+DESCRIPTION: Shows how to convert a Permissions object into an array of permission flags or serialize it into an object using discord.js.
+
+LANGUAGE: javascript
+CODE:
+const memberPermissions = member.permissions.toArray();
+const rolePermissions = role.permissions.toArray();
+// output: ['SendMessages', 'AddReactions', 'ChangeNickname', ...]
+
+const memberPermissions = member.permissions.serialize();
+const rolePermissions = role.permissions.serialize();
+/* output: {
+SendMessages: true,
+AddReactions: true,
+BanMembers: false,
+...
+}
+*/
+
+----------------------------------------
+
+TITLE: Async Function Declaration Patterns
+DESCRIPTION: Shows different ways to declare async functions including standard functions, arrow functions, and event listeners.
+
+LANGUAGE: javascript
+CODE:
+async function declaredAsAsync() {
+	// ...
+}
+
+const declaredAsAsync = async () => {
+	// ...
+};
+
+client.on('event', async (first, last) => {
+	// ...
+});
+
+----------------------------------------
+
+TITLE: Implementing Autocomplete in a Command Handler for Discord.js
+DESCRIPTION: This example demonstrates how to implement autocomplete handling in a command handler setup.
+
+LANGUAGE: javascript
+CODE:
+client.on(Events.InteractionCreate, async interaction => {
+	if (interaction.isChatInputCommand()) {
+		// command handling
+	} else if (interaction.isAutocomplete()) {
+		const command = interaction.client.commands.get(interaction.commandName);
+
+		if (!command) {
+			console.error(`No command matching ${interaction.commandName} was found.`);
+			return;
+		}
+
+		try {
+			await command.autocomplete(interaction);
+		} catch (error) {
+			console.error(error);
+		}
+	}
+});
+
+----------------------------------------
+
+TITLE: Command Existence Validation in Discord.js
+DESCRIPTION: Implements validation to check if the specified command exists before attempting to reload it. Gets the command name from interaction options and verifies its presence in the commands collection.
+
+LANGUAGE: javascript
+CODE:
+module.exports = {
+	// ...
+	async execute(interaction) {
+		const commandName = interaction.options.getString('command', true).toLowerCase();
+		const command = interaction.client.commands.get(commandName);
+
+		if (!command) {
+			return interaction.reply(`There is no command with name \`${commandName}\`!`);
+		}
+	},
+};
+
+----------------------------------------
+
+TITLE: Collection Partition Method in Discord.js
+DESCRIPTION: Demonstrates the partition() method which splits a Collection into two new Collections based on a condition. Shows how to separate users into bots and humans collections.
+
+LANGUAGE: javascript
+CODE:
+// `bots` is a Collection of users where their `bot` property was true.
+// `humans` is a Collection where the property was false instead!
+const [bots, humans] = collection.partition(u => u.bot);
+
+// Both return true.
+bots.every(b => b.bot);
+humans.every(h => !h.bot);
+
+----------------------------------------
+
+TITLE: Handling Multiple Ordered Reactions
+DESCRIPTION: Shows how to add multiple reactions in a specific order using async/await pattern.
+
+LANGUAGE: javascript
+CODE:
+client.on(Events.InteractionCreate, async interaction => {
+	if (!interaction.isChatInputCommand()) return;
+
+	const { commandName } = interaction;
+
+	if (commandName === 'fruits') {
+		const response = await interaction.reply({ content: 'Reacting with fruits!', withResponse: true });
+		const { message } = response.resource;
+
+		try {
+			await message.react('🍎');
+			await message.react('🍊');
+			await message.react('🍇');
+		} catch (error) {
+			console.error('One of the emojis failed to react:', error);
+		}
+	}
+});
+
+----------------------------------------
+
+TITLE: Initializing Keyv with Different Backends
+DESCRIPTION: JavaScript code showing how to create a Keyv instance with various backend options.
+
+LANGUAGE: javascript
+CODE:
+const Keyv = require('keyv');
+
+// One of the following
+const keyv = new Keyv(); // for in-memory storage
+const keyv = new Keyv('redis://user:pass@localhost:6379');
+const keyv = new Keyv('mongodb://user:pass@localhost:27017/dbname');
+const keyv = new Keyv('sqlite://path/to/database.sqlite');
+const keyv = new Keyv('postgresql://user:pass@localhost:5432/dbname');
+const keyv = new Keyv('mysql://user:pass@localhost:3306/dbname');
+
+----------------------------------------
+
+TITLE: Replacing Channel Permission Overwrites in Discord.js
+DESCRIPTION: Shows how to replace all permission overwrites on a channel with a new set of overwrites using discord.js.
+
+LANGUAGE: javascript
+CODE:
+// copying overwrites from another channel
+channel.permissionOverwrites.set(otherChannel.permissionOverwrites.cache);
+
+// replacing overwrites with PermissionOverwriteOptions
+channel.permissionOverwrites.set([
+	{
+		id: guild.id,
+		deny: [PermissionsBitField.Flags.ViewChannel],
+	},
+	{
+		id: user.id,
+		allow: [PermissionsBitField.Flags.ViewChannel],
+	},
+]);
+
+----------------------------------------
+
+TITLE: Implementing Tag Retrieval Command
+DESCRIPTION: Handles the 'tag' command to fetch and display a tag from the database, incrementing its usage count.
+
+LANGUAGE: javascript
+CODE:
+else if (command === 'tag') {
+	const tagName = interaction.options.getString('name');
+
+	// equivalent to: SELECT * FROM tags WHERE name = 'tagName' LIMIT 1;
+	const tag = await Tags.findOne({ where: { name: tagName } });
+
+	if (tag) {
+		// equivalent to: UPDATE tags SET usage_count = usage_count + 1 WHERE name = 'tagName';
+		tag.increment('usage_count');
+
+		return interaction.reply(tag.get('description'));
+	}
+
+	return interaction.reply(`Could not find tag: ${tagName}`);
+}
+
+----------------------------------------
+
+TITLE: Enabling Autocomplete for a Slash Command Option in Discord.js
+DESCRIPTION: This snippet demonstrates how to enable autocomplete for a string option in a slash command using the SlashCommandBuilder.
+
+LANGUAGE: javascript
+CODE:
+const { SlashCommandBuilder } = require('discord.js');
+
+const data = new SlashCommandBuilder()
+	.setName('guide')
+	.setDescription('Search discordjs.guide!')
+	.addStringOption(option =>
+		option.setName('query')
+			.setDescription('Phrase to search for')
+			.setAutocomplete(true));
+
+----------------------------------------
+
+TITLE: Updating Client Initialization for discord.js v14
+DESCRIPTION: Changes required to initialize a discord.js Client with the new IntentsBits and Partials enums in v14.
+
+LANGUAGE: javascript
+CODE:
+- const { Client, Intents } = require('discord.js');
++ const { Client, GatewayIntentBits, Partials } = require('discord.js');
+
+- const client = new Client({ intents: [Intents.FLAGS.GUILDS], partials: ['CHANNEL'] });
++ const client = new Client({ intents: [GatewayIntentBits.Guilds], partials: [Partials.Channel] });
+
+----------------------------------------
+
+TITLE: Syncing Sequelize Model with Database
+DESCRIPTION: Ensures the Sequelize model is synced with the database when the Discord client is ready.
+
+LANGUAGE: javascript
+CODE:
+client.once(Events.ClientReady, readyClient => {
+	Tags.sync();
+	console.log(`Logged in as ${readyClient.user.tag}!`);
+});
+
+----------------------------------------
+
+TITLE: Creating Component Collector in Discord.js
+DESCRIPTION: This code snippet shows how to create an InteractionCollector for multiple StringSelectMenuInteractions. It sets up a collector that listens for select menu interactions for an hour and responds to each selection.
+
+LANGUAGE: javascript
+CODE:
+const response = await interaction.reply({
+	content: 'Choose your starter!',
+	components: [row],
+	withResponse: true,
+});
+
+const collector = response.resource.message.createMessageComponentCollector({ componentType: ComponentType.StringSelect, time: 3_600_000 });
+
+collector.on('collect', async i => {
+	const selection = i.values[0];
+	await i.reply(`${i.user} has selected ${selection}!`);
+});
+
+----------------------------------------
+
+TITLE: Uninstalling Redundant Packages for discord.js v14
+DESCRIPTION: Commands to uninstall packages that are now included in discord.js v14, using npm, yarn, or pnpm.
+
+LANGUAGE: sh
+CODE:
+npm uninstall @discordjs/builders @discordjs/formatters @discordjs/rest discord-api-types
+
+LANGUAGE: sh
+CODE:
+yarn remove @discordjs/builders @discordjs/formatters @discordjs/rest discord-api-types
+
+LANGUAGE: sh
+CODE:
+pnpm remove @discordjs/builders @discordjs/formatters @discordjs/rest discord-api-types
+
+----------------------------------------
+
+TITLE: Creating Associations and Helper Methods
+DESCRIPTION: Sets up associations between models and adds helper methods for adding items to users and retrieving user items.
+
+LANGUAGE: javascript
+CODE:
+const Sequelize = require('sequelize');
+
+const sequelize = new Sequelize('database', 'username', 'password', {
+	host: 'localhost',
+	dialect: 'sqlite',
+	logging: false,
+	storage: 'database.sqlite',
+});
+
+const Users = require('./models/Users.js')(sequelize, Sequelize.DataTypes);
+const CurrencyShop = require('./models/CurrencyShop.js')(sequelize, Sequelize.DataTypes);
+const UserItems = require('./models/UserItems.js')(sequelize, Sequelize.DataTypes);
+
+UserItems.belongsTo(CurrencyShop, { foreignKey: 'item_id', as: 'item' });
+
+Reflect.defineProperty(Users.prototype, 'addItem', {
+	value: async item => {
+		const userItem = await UserItems.findOne({
+			where: { user_id: this.user_id, item_id: item.id },
+		});
+
+		if (userItem) {
+			userItem.amount += 1;
+			return userItem.save();
+		}
+
+		return UserItems.create({ user_id: this.user_id, item_id: item.id, amount: 1 });
+	},
+});
+
+Reflect.defineProperty(Users.prototype, 'getItems', {
+	value: () => {
+		return UserItems.findAll({
+			where: { user_id: this.user_id },
+			include: ['item'],
+		});
+	},
+});
+
+module.exports = { Users, CurrencyShop, UserItems };
+
+----------------------------------------
+
+TITLE: Extracting Data from Modal Submissions in Discord.js
+DESCRIPTION: This snippet demonstrates how to extract the values submitted by the user in a modal. It uses the fields property of the ModalSubmitInteraction to access the input values by their custom IDs.
+
+LANGUAGE: javascript
+CODE:
+client.on(Events.InteractionCreate, interaction => {
+	if (!interaction.isModalSubmit()) return;
+
+	// Get the data entered by the user
+	const favoriteColor = interaction.fields.getTextInputValue('favoriteColorInput');
+	const hobbies = interaction.fields.getTextInputValue('hobbiesInput');
+	console.log({ favoriteColor, hobbies });
+});
+
+----------------------------------------
+
+TITLE: Updating string inputs
+DESCRIPTION: Changes in how string inputs are handled in v13.
+
+LANGUAGE: javascript
+CODE:
+- message.channel.send(user);
++ message.channel.send(user.toString());
+
+let count = 5;
+- embed.addField('Count', count);
++ embed.addField('Count', count.toString());
+
+----------------------------------------
+
+TITLE: Converting Permission Numbers in Discord.js
+DESCRIPTION: Demonstrates how to convert permission decimals or flag arrays into a Permissions object using discord.js.
+
+LANGUAGE: javascript
+CODE:
+const { PermissionsBitField } = require('discord.js');
+
+const permissions = new PermissionsBitField(268_550_160n);
+
+const flags = [
+	PermissionsBitField.Flags.ViewChannel,
+	PermissionsBitField.Flags.EmbedLinks,
+	PermissionsBitField.Flags.AttachFiles,
+	PermissionsBitField.Flags.ReadMessageHistory,
+	PermissionsBitField.Flags.ManageRoles,
+];
+
+const permissions = new PermissionsBitField(flags);
+
+----------------------------------------
+
+TITLE: Using Basic Markdown Formatters in discord.js
+DESCRIPTION: This snippet demonstrates how to use various Markdown formatting functions provided by discord.js, including bold, italic, strikethrough, underline, spoiler, quote, blockquote, and subtext.
+
+LANGUAGE: javascript
+CODE:
+const { blockQuote, bold, italic, quote, spoiler, strikethrough, underline, subtext } = require('discord.js');
+const string = 'Hello!';
+
+const boldString = bold(string);
+const italicString = italic(string);
+const strikethroughString = strikethrough(string);
+const underlineString = underline(string);
+const spoilerString = spoiler(string);
+const quoteString = quote(string);
+const blockquoteString = blockQuote(string);
+const subtextString = subtext(string);
+
+----------------------------------------
+
+TITLE: Updating bitfields and permissions
+DESCRIPTION: Changes in how bitfields and permissions are handled in v13.
+
+LANGUAGE: javascript
+CODE:
+- const p = new Permissions(104_324_673);
++ const p = new Permissions(BigInt(104_324_673));
++ const p = new Permissions(104_324_673n);
+
+- permissions.has('SEND_MESSAGES')
++ permissions.has(Permissions.FLAGS.SEND_MESSAGES)
+
+----------------------------------------
+
+TITLE: Class Property and Method Access Notation
+DESCRIPTION: Examples of how to interpret the Class#property notation for accessing properties, methods, and events in discord.js classes
+
+LANGUAGE: javascript
+CODE:
+BaseInteraction#user
+TextChannel#send
+Client#interactionCreate
+
+----------------------------------------
+
+TITLE: Handling Specific Discord API Errors
+DESCRIPTION: Examples of handling specific Discord API errors using error codes, both with direct code comparison and using discord.js constants.
+
+LANGUAGE: javascript
+CODE:
+message.delete().catch(error => {
+	if (error.code !== 10_008) {
+		console.error('Failed to delete the message:', error);
+	}
+});
+
+LANGUAGE: javascript
+CODE:
+const { RESTJSONErrorCodes } = require('discord.js');
+
+message.delete().catch(error => {
+	if (error.code !== RESTJSONErrorCodes.UnknownMessage) {
+		console.error('Failed to delete the message:', error);
+	}
+});
+
+----------------------------------------
+
+TITLE: Using State Transition Helper in discord.js Voice
+DESCRIPTION: Illustrates the use of the entersState helper function for writing sequential logic when handling state transitions. This example attempts to start playback and waits for the Playing state or times out after 5 seconds.
+
+LANGUAGE: javascript
+CODE:
+const { AudioPlayerStatus, entersState } = require('@discordjs/voice');
+
+async function start() {
+	player.play(resource);
+	try {
+		await entersState(player, AudioPlayerStatus.Playing, 5_000);
+		// The player has entered the Playing state within 5 seconds
+		console.log('Playback has started!');
+	} catch (error) {
+		// The player has not entered the Playing state and either:
+		// 1) The 'error' event has been emitted and should be handled
+		// 2) 5 seconds have passed
+		console.error(error);
+	}
+}
+
+void start();
+
+----------------------------------------
+
+TITLE: Reaction Collector Implementation
+DESCRIPTION: Example of using reaction collectors to await user reactions and handle responses.
+
+LANGUAGE: javascript
+CODE:
+message.react('👍').then(() => message.react('👎'));
+
+const collectorFilter = (reaction, user) => {
+	return ['👍', '👎'].includes(reaction.emoji.name) && user.id === interaction.user.id;
+};
+
+message.awaitReactions({ filter: collectorFilter, max: 1, time: 60_000, errors: ['time'] })
+	.then(collected => {
+		const reaction = collected.first();
+
+		if (reaction.emoji.name === '👍') {
+			message.reply('You reacted with a thumbs up.');
+		} else {
+			message.reply('You reacted with a thumbs down.');
+		}
+	})
+	.catch(collected => {
+		message.reply('You reacted with neither a thumbs up, nor a thumbs down.');
+	});
+
+----------------------------------------
+
+TITLE: Static vs Instance Method Notation
+DESCRIPTION: Shows the difference between static and instance method notation using Util class example
+
+LANGUAGE: javascript
+CODE:
+Util.resolveColor
+<Message>#send
+Role.comparePositions
+Role#comparePositionsTo
+
+----------------------------------------
+
+TITLE: Date Parsing with Day.js in Discord.js
+DESCRIPTION: Demonstrates how to parse user input into a Date object using Day.js and handle duration calculations in a Discord bot interaction.
+
+LANGUAGE: javascript
+CODE:
+const input = await interaction.channel.awaitMessages({ 
+	filter: m => m.author.id === interaction.user.id, 
+	max: 1,
+	time: 10e3,
+	errors: ['time'],
+});
+const date = dayjs(input.first().content).toDate();
+
+LANGUAGE: javascript
+CODE:
+if (date.isValid()) {
+	const now = dayjs();
+	const duration = date - now;
+	const formatted = dayjs.duration(duration, 'ms').format();
+
+	if (duration > 0) {
+		interaction.reply(`The date you gave me is ${formatted} into the future.`);
+	} else {
+		interaction.reply(`The date you gave me is ${formatted} into the past.`);
+	}
+} else {
+	interaction.reply('You didn\'t give me a valid date.');
+}
+
+----------------------------------------
+
+TITLE: Installing @discordjs/voice and libsodium-wrappers with bun
+DESCRIPTION: Command to install the @discordjs/voice package and libsodium-wrappers encryption library using bun.
+
+LANGUAGE: sh
+CODE:
+bun add @discordjs/voice libsodium-wrappers
+
+----------------------------------------
+
+TITLE: Adding Unicode Emoji Reactions
+DESCRIPTION: Implementation of adding Unicode emoji reactions to messages using the message.react() method.
+
+LANGUAGE: javascript
+CODE:
+client.on(Events.InteractionCreate, async interaction => {
+	if (!interaction.isChatInputCommand()) return;
+
+	const { commandName } = interaction;
+
+	if (commandName === 'react') {
+		const response = await interaction.reply({ content: 'You can react with Unicode emojis!', withResponse: true });
+		response.resource.message.react('😄');
+	}
+});
+
+----------------------------------------
+
+TITLE: Destroying a Voice Connection in discord.js
+DESCRIPTION: Demonstrates how to properly destroy a voice connection when it's no longer needed. This is important to prevent memory leaks and ensure the bot leaves the voice channel.
+
+LANGUAGE: javascript
+CODE:
+connection.destroy();
+
+----------------------------------------
+
+TITLE: Attaching Images to Embed Messages in Discord.js
+DESCRIPTION: Demonstrates how to attach and reference local images in Discord.js embed messages using AttachmentBuilder.
+
+LANGUAGE: javascript
+CODE:
+const { AttachmentBuilder, EmbedBuilder } = require('discord.js');
+const file = new AttachmentBuilder('../assets/discordjs.png');
+const exampleEmbed = new EmbedBuilder()
+	.setTitle('Some title')
+	.setImage('attachment://discordjs.png');
+
+channel.send({ embeds: [exampleEmbed], files: [file] });
+
+----------------------------------------
+
+TITLE: Implementing Command Handler with Prefix Support
+DESCRIPTION: Discord.js message event handler with support for global and guild-specific prefixes using Keyv.
+
+LANGUAGE: javascript
+CODE:
+client.on(Events.MessageCreate, async message => {
+	if (message.author.bot) return;
+
+	let args;
+	// handle messages in a guild
+	if (message.guild) {
+		let prefix;
+
+		if (message.content.startsWith(globalPrefix)) {
+			prefix = globalPrefix;
+		} else {
+			// check the guild-level prefix
+			const guildPrefix = await prefixes.get(message.guild.id);
+			if (message.content.startsWith(guildPrefix)) prefix = guildPrefix;
+		}
+
+		// if we found a prefix, setup args; otherwise, this isn't a command
+		if (!prefix) return;
+		args = message.content.slice(prefix.length).trim().split(/\s+/);
+	} else {
+		// handle DMs
+		const slice = message.content.startsWith(globalPrefix) ? globalPrefix.length : 0;
+		args = message.content.slice(slice).split(/\s+/);
+	}
+
+	// get the first space-delimited argument after the prefix as the command
+	const command = args.shift().toLowerCase();
+});
+
+----------------------------------------
+
+TITLE: Creating a Role with Permissions in Discord.js
+DESCRIPTION: Demonstrates how to create a new role with specific permissions using discord.js.
+
+LANGUAGE: javascript
+CODE:
+const { PermissionsBitField } = require('discord.js');
+
+guild.roles.create({ name: 'Mod', permissions: [PermissionsBitField.Flags.SendMessages, PermissionsBitField.Flags.KickMembers] });
+
+----------------------------------------
+
+TITLE: Creating Embed Messages Using Plain Objects in Discord.js
+DESCRIPTION: Shows how to create a rich embed message using a plain JavaScript object structure instead of the EmbedBuilder class.
+
+LANGUAGE: javascript
+CODE:
+const exampleEmbed = {
+	color: 0x0099ff,
+	title: 'Some title',
+	url: 'https://discord.js.org',
+	author: {
+		name: 'Some name',
+		icon_url: 'https://i.imgur.com/AfFp7pu.png',
+		url: 'https://discord.js.org',
+	},
+	description: 'Some description here',
+	thumbnail: {
+		url: 'https://i.imgur.com/AfFp7pu.png',
+	},
+	fields: [
+		{
+			name: 'Regular field title',
+			value: 'Some value here',
+		},
+		{
+			name: '\u200b',
+			value: '\u200b',
+			inline: false,
+		},
+		{
+			name: 'Inline field title',
+			value: 'Some value here',
+			inline: true,
+		},
+		{
+			name: 'Inline field title',
+			value: 'Some value here',
+			inline: true,
+		},
+		{
+			name: 'Inline field title',
+			value: 'Some value here',
+			inline: true,
+		},
+	],
+	image: {
+		url: 'https://i.imgur.com/AfFp7pu.png',
+	},
+	timestamp: new Date().toISOString(),
+	footer: {
+		text: 'Some footer text here',
+		icon_url: 'https://i.imgur.com/AfFp7pu.png',
+	},
+};
+
+channel.send({ embeds: [exampleEmbed] });
+
+----------------------------------------
+
+TITLE: Creating Disabled Buttons in discord.js
+DESCRIPTION: This code shows how to create a disabled button in discord.js. Disabled buttons cannot be interacted with but remain visible in the message.
+
+LANGUAGE: javascript
+CODE:
+const button = new ButtonBuilder()
+	.setCustomId('disabled')
+	.setLabel('Click me?')
+	.setStyle(ButtonStyle.Primary)
+	.setDisabled(true);
+
+----------------------------------------
+
+TITLE: Sending Buttons in discord.js Messages
+DESCRIPTION: This code snippet shows how to send buttons as components in a discord.js message. It creates an action row, adds the buttons to it, and then sends the message with the components.
+
+LANGUAGE: javascript
+CODE:
+const { ActionRowBuilder, ButtonBuilder, ButtonStyle, SlashCommandBuilder } = require('discord.js');
+
+module.exports = {
+	// data: new SlashCommandBuilder()...
+	async execute(interaction) {
+		const target = interaction.options.getUser('target');
+		const reason = interaction.options.getString('reason') ?? 'No reason provided';
+
+		const confirm = new ButtonBuilder()
+			.setCustomId('confirm')
+			.setLabel('Confirm Ban')
+			.setStyle(ButtonStyle.Danger);
+
+		const cancel = new ButtonBuilder()
+			.setCustomId('cancel')
+			.setLabel('Cancel')
+			.setStyle(ButtonStyle.Secondary);
+
+		const row = new ActionRowBuilder()
+			.addComponents(cancel, confirm);
+
+		await interaction.reply({
+			content: `Are you sure you want to ban ${target} for reason: ${reason}?`,
+			components: [row],
+		});
+	},
+};
+
+----------------------------------------
+
+TITLE: Multi-Select Menu Implementation
+DESCRIPTION: Demonstrates how to create a multi-select menu that allows users to select multiple items using min and max values configuration.
+
+LANGUAGE: javascript
+CODE:
+module.exports = {
+	// data: new SlashCommandBuilder()...
+	async execute(interaction) {
+		const userSelect = new UserSelectMenuBuilder()
+			.setCustomId('users')
+			.setPlaceholder('Select multiple users.')
+			.setMinValues(1)
+			.setMaxValues(10);
+
+		const row1 = new ActionRowBuilder()
+			.addComponents(userSelect);
+
+		await interaction.reply({
+			content: 'Select users:',
+			components: [row1],
+		});
+	},
+};
+
+----------------------------------------
+
+TITLE: Adding Emoji to Buttons in discord.js
+DESCRIPTION: This snippet demonstrates how to add a guild emoji to a button in discord.js using the setEmoji method.
+
+LANGUAGE: javascript
+CODE:
+const button = new ButtonBuilder()
+	.setCustomId('primary')
+	.setLabel('Primary')
+	.setStyle(ButtonStyle.Primary)
+	.setEmoji('123456789012345678');
+
+----------------------------------------
+
+TITLE: Installing @discordjs/voice and libsodium-wrappers with pnpm
+DESCRIPTION: Command to install the @discordjs/voice package and libsodium-wrappers encryption library using pnpm.
+
+LANGUAGE: sh
+CODE:
+pnpm add @discordjs/voice libsodium-wrappers
+
+----------------------------------------
+
+TITLE: Building Action Rows in JavaScript
+DESCRIPTION: Demonstrates how to create an action row and add components to it using the ActionRowBuilder class in discord.js.
+
+LANGUAGE: javascript
+CODE:
+const row = new ActionRowBuilder()
+	.addComponents(component);
+
+----------------------------------------
+
+TITLE: Generating Random State for OAuth2 Security
+DESCRIPTION: Implements a function to generate a random string for the state parameter to prevent CSRF attacks in OAuth2.
+
+LANGUAGE: javascript
+CODE:
+function generateRandomString() {
+	let randomString = '';
+	const randomNumber = Math.floor(Math.random() * 10);
+
+	for (let i = 0; i < 20 + randomNumber; i++) {
+		randomString += String.fromCharCode(33 + Math.floor(Math.random() * 94));
+	}
+
+	return randomString;
+}
+
+window.onload = () => {
+	// ...
+	if (!accessToken) {
+		const randomString = generateRandomString();
+		localStorage.setItem('oauth-state', randomString);
+
+		document.getElementById('login').href += `&state=${btoa(randomString)}`;
+		return (document.getElementById('login').style.display = 'block');
+	}
+};
+
+----------------------------------------
+
+TITLE: Implementing Tag Addition Command
+DESCRIPTION: Handles the 'addtag' command to create a new tag in the database, including error handling for duplicate entries.
+
+LANGUAGE: javascript
+CODE:
+if (commandName === 'addtag') {
+	const tagName = interaction.options.getString('name');
+	const tagDescription = interaction.options.getString('description');
+
+	try {
+		// equivalent to: INSERT INTO tags (name, description, username) values (?, ?, ?);
+		const tag = await Tags.create({
+			name: tagName,
+			description: tagDescription,
+			username: interaction.user.username,
+		});
+
+		return interaction.reply(`Tag ${tag.name} added.`);
+	}
+	catch (error) {
+		if (error.name === 'SequelizeUniqueConstraintError') {
+			return interaction.reply('That tag already exists.');
+		}
+
+		return interaction.reply('Something went wrong with adding a tag.');
+	}
+}
+
+----------------------------------------
+
+TITLE: Handling Authorization Code Grant Flow in Express
+DESCRIPTION: Implements the authorization code grant flow, exchanging the access code for an access token using Discord API.
+
+LANGUAGE: javascript
+CODE:
+const { request } = require('undici');
+const express = require('express');
+const { clientId, clientSecret, port } = require('./config.json');
+
+const app = express();
+
+app.get('/', async ({ query }, response) => {
+	const { code } = query;
+
+	if (code) {
+		try {
+			const tokenResponseData = await request('https://discord.com/api/oauth2/token', {
+				method: 'POST',
+				body: new URLSearchParams({
+					client_id: clientId,
+					client_secret: clientSecret,
+					code,
+					grant_type: 'authorization_code',
+					redirect_uri: `http://localhost:${port}`,
+					scope: 'identify',
+				}).toString(),
+				headers: {
+					'Content-Type': 'application/x-www-form-urlencoded',
+				},
+			});
+
+			const oauthData = await tokenResponseData.body.json();
+			console.log(oauthData);
+		} catch (error) {
+			// NOTE: An unauthorized token will not throw an error
+			// tokenResponseData.statusCode will be 401
+			console.error(error);
+		}
+	}
+
+	return response.sendFile('index.html', { root: '.' });
+});
+
+----------------------------------------
+
+TITLE: Checking Partial Message Status
+DESCRIPTION: Shows how to check if a message object is partial using the .partial property.
+
+LANGUAGE: javascript
+CODE:
+if (message.partial) {
+	console.log('The message is partial.');
+} else {
+	console.log('The message is not partial.');
+}
+
+----------------------------------------
+
+TITLE: Implementing Tag Editing Command
+DESCRIPTION: Handles the 'edittag' command to update an existing tag's description in the database.
+
+LANGUAGE: javascript
+CODE:
+else if (command === 'edittag') {
+	const tagName = interaction.options.getString('name');
+	const tagDescription = interaction.options.getString('description');
+
+	// equivalent to: UPDATE tags (description) values (?) WHERE name='?';
+	const affectedRows = await Tags.update({ description: tagDescription }, { where: { name: tagName } });
+
+	if (affectedRows > 0) {
+		return interaction.reply(`Tag ${tagName} was edited.`);
+	}
+
+	return interaction.reply(`Could not find a tag with name ${tagName}.`);
+}
+
+----------------------------------------
+
+TITLE: Combining fetchClientValues and broadcastEval in discord.js
+DESCRIPTION: This snippet demonstrates how to combine fetchClientValues and broadcastEval using Promise.all to gather both guild count and member count statistics in a single command for a sharded bot.
+
+LANGUAGE: javascript
+CODE:
+const promises = [
+	client.shard.fetchClientValues('guilds.cache.size'),
+	client.shard.broadcastEval(c => c.guilds.cache.reduce((acc, guild) => acc + guild.memberCount, 0)),
+];
+
+Promise.all(promises)
+	.then(results => {
+		const totalGuilds = results[0].reduce((acc, guildCount) => acc + guildCount, 0);
+		const totalMembers = results[1].reduce((acc, memberCount) => acc + memberCount, 0);
+		return interaction.reply(`Server count: ${totalGuilds}\nMember count: ${totalMembers}`);
+	})
+	.catch(console.error);
+
+----------------------------------------
+
+TITLE: Updating Guild member methods
+DESCRIPTION: Changes in how Guild member methods are accessed in v13.
+
+LANGUAGE: javascript
+CODE:
+- guild.addMember(user, { accessToken: token });
++ guild.members.add(user, { accessToken: token });
+
+- guild.fetchBan(user);
++ guild.bans.fetch(user);
+
+- guild.fetchBans();
++ guild.bans.fetch();
+
+- guild.fetchInvites();
++ guild.invites.fetch();
+
+----------------------------------------
+
+TITLE: Handling Cooldown Expiration and User Response
+DESCRIPTION: Handles the logic for checking cooldown expiration and responding to users who are still on cooldown with a formatted timestamp message.
+
+LANGUAGE: javascript
+CODE:
+if (timestamps.has(interaction.user.id)) {
+	const expirationTime = timestamps.get(interaction.user.id) + cooldownAmount;
+
+	if (now < expirationTime) {
+		const expiredTimestamp = Math.round(expirationTime / 1_000);
+		return interaction.reply({ content: `Please wait, you are on a cooldown for \`${command.data.name}\`. You can use it again <t:${expiredTimestamp}:R>.`, flags: MessageFlags.Ephemeral });
+	}
+}
+
+----------------------------------------
+
+TITLE: Using broadcastEval in discord.js Sharding
+DESCRIPTION: This code shows how to use the broadcastEval method to execute a function across all shards and gather the results. In this example, it's used to calculate the total member count across all guilds and shards.
+
+LANGUAGE: javascript
+CODE:
+client.shard
+	.broadcastEval(c => c.guilds.cache.reduce((acc, guild) => acc + guild.memberCount, 0))
+	.then(results => {
+		return interaction.reply(`Total member count: ${results.reduce((acc, memberCount) => acc + memberCount, 0)}`);
+	})
+	.catch(console.error);
+
+----------------------------------------
+
+TITLE: Setting Up Cooldown Logic in InteractionCreate Event
+DESCRIPTION: Implements the core cooldown logic in the InteractionCreate event handler. Includes collection initialization, timestamp tracking, and cooldown duration calculation.
+
+LANGUAGE: javascript
+CODE:
+const { cooldowns } = interaction.client;
+
+if (!cooldowns.has(command.data.name)) {
+	cooldowns.set(command.data.name, new Collection());
+}
+
+const now = Date.now();
+const timestamps = cooldowns.get(command.data.name);
+const defaultCooldownDuration = 3;
+const cooldownAmount = (command.cooldown ?? defaultCooldownDuration) * 1_000;
+
+if (timestamps.has(interaction.user.id)) {
+	// ...
+}
+
+try {
+	// ...
+} catch (error) {
+	// ...
+}
+
+----------------------------------------
+
+TITLE: Initializing Cooldown Collection in Discord.js
+DESCRIPTION: Shows how to initialize a Collection to store command cooldowns at the client level.
+
+LANGUAGE: javascript
+CODE:
+client.cooldowns = new Collection();
+
+----------------------------------------
+
+TITLE: Using fetchClientValues in discord.js Sharding
+DESCRIPTION: This snippet demonstrates how to use the fetchClientValues method to retrieve guild counts from all shards and calculate the total. It's useful for getting accurate statistics in a sharded bot.
+
+LANGUAGE: javascript
+CODE:
+client.shard.fetchClientValues('guilds.cache.size')
+	.then(results => {
+		console.log(`${results.reduce((acc, guildCount) => acc + guildCount, 0)} total guilds`);
+	})
+	.catch(console.error);
+
+----------------------------------------
+
+TITLE: Basic package.json Structure
+DESCRIPTION: Initial package.json template with default configuration for a Discord bot project
+
+LANGUAGE: json
+CODE:
+{
+	"name": "my-bot",
+	"version": "1.0.0",
+	"description": "A Discord bot!",
+	"main": "index.js",
+	"scripts": {
+		"test": "echo \"Error: no test specified\" && exit 1"
+	},
+	"keywords": [],
+	"author": "",
+	"license": "ISC"
+}
+
+----------------------------------------
+
+TITLE: Stream Type Probing and Resource Creation
+DESCRIPTION: Demonstrates automatic detection of stream types using demuxProbe to optimize playback performance for different audio formats.
+
+LANGUAGE: javascript
+CODE:
+const { createReadStream } = require('node:fs');
+const { demuxProbe, createAudioResource } = require('@discordjs/voice');
+
+async function probeAndCreateResource(readableStream) {
+	const { stream, type } = await demuxProbe(readableStream);
+	return createAudioResource(stream, { inputType: type });
+}
+
+async function createResources() {
+	// Creates an audio resource with inputType = StreamType.Arbitrary
+	const mp3Stream = await probeAndCreateResource(createReadStream('file.mp3'));
+
+	// Creates an audio resource with inputType = StreamType.OggOpus
+	const oggStream = await probeAndCreateResource(createReadStream('file.ogg'));
+
+	// Creates an audio resource with inputType = StreamType.WebmOpus
+	const webmStream = await probeAndCreateResource(createReadStream('file.webm'));
+}
+
+createResources();
+
+----------------------------------------
+
+TITLE: Basic discord.js Bot Structure without Sharding
+DESCRIPTION: This code shows a basic structure of a discord.js bot without sharding implemented. It includes a simple 'stats' command that returns the number of guilds the bot is in.
+
+LANGUAGE: javascript
+CODE:
+// bot.js
+const { Client, Events, GatewayIntentBits } = require('discord.js');
+
+const client = new Client({ intents: [GatewayIntentBits.Guilds] });
+
+client.on(Events.InteractionCreate, interaction => {
+	if (!interaction.isChatInputCommand()) return;
+
+	const { commandName } = interaction;
+
+	if (commandName === 'stats') {
+		return interaction.reply(`Server count: ${client.guilds.cache.size}.`);
+	}
+});
+
+client.login('your-token-goes-here');
+
+----------------------------------------
+
+TITLE: Random Cat API Implementation
+DESCRIPTION: Implementation of a command that fetches and displays random cat images using the random.cat API
+
+LANGUAGE: javascript
+CODE:
+const catResult = await request('https://aws.random.cat/meow');
+const { file } = await catResult.body.json();
+
+if (commandName === 'cat') {
+	const catResult = await request('https://aws.random.cat/meow');
+	const { file } = await catResult.body.json();
+	interaction.editReply({ files: [file] });
+}
+
+----------------------------------------
+
+TITLE: Error Handling with Idle State in Discord.js
+DESCRIPTION: Shows error handling approach that waits for Idle state before playing next resource.
+
+LANGUAGE: javascript
+CODE:
+const { createAudioResource } = require('@discordjs/voice');
+
+const resource = createAudioResource('/home/user/voice/music.mp3', {
+	metadata: {
+		title: 'A good song!',
+	},
+});
+
+player.play(resource);
+
+player.on('error', error => {
+	console.error(error);
+});
+
+player.on(AudioPlayerStatus.Idle, () => {
+	player.play(getNextResource());
+});
+
+----------------------------------------
+
+TITLE: Monitoring Audio Player State in Discord.js
+DESCRIPTION: Shows how to listen for state changes in the audio player using event listeners.
+
+LANGUAGE: javascript
+CODE:
+const { AudioPlayerStatus } = require('@discordjs/voice');
+
+player.on(AudioPlayerStatus.Playing, () => {
+	console.log('The audio player has started playing!');
+});
+
+----------------------------------------
+
+TITLE: Detecting Webhook Messages in discord.js
+DESCRIPTION: This snippet demonstrates how to check if a message was sent by a webhook using the webhookId property.
+
+LANGUAGE: javascript
+CODE:
+if (message.webhookId) return;
+
+----------------------------------------
+
+TITLE: Installing Discord.js Package
+DESCRIPTION: Commands to install the discord.js package using different package managers. This installs the core library needed for Discord bot development.
+
+LANGUAGE: sh
+CODE:
+npm install discord.js
+
+LANGUAGE: sh
+CODE:
+yarn add discord.js
+
+LANGUAGE: sh
+CODE:
+pnpm add discord.js
+
+LANGUAGE: sh
+CODE:
+bun add discord.js
+
+----------------------------------------
+
+TITLE: Generating Dependency Report for @discordjs/voice
+DESCRIPTION: JavaScript code to generate a dependency report for @discordjs/voice, which helps in debugging and identifying installed dependencies.
+
+LANGUAGE: js
+CODE:
+const { generateDependencyReport } = require('@discordjs/voice');
+
+console.log(generateDependencyReport());
+
+/*
+--------------------------------------------------
+Core Dependencies
+- @discordjs/voice: 0.3.1
+- prism-media: 1.2.9
+
+Opus Libraries
+- @discordjs/opus: 0.5.3
+- opusscript: not found
+
+Encryption Libraries
+- sodium: 3.0.2
+- libsodium-wrappers: not found
+- tweetnacl: not found
+
+FFmpeg
+- version: 4.2.4-1ubuntu0.1
+- libopus: yes
+--------------------------------------------------
+*/
+
+----------------------------------------
+
+TITLE: Adding a Member to a Thread in Discord.js
+DESCRIPTION: This code demonstrates how to add a member to a thread using the members.add() method with a user ID.
+
+LANGUAGE: javascript
+CODE:
+const thread = channel.threads.cache.find(x => x.name === 'food-talk');
+await thread.members.add('140214425276776449');
+
+----------------------------------------
+
+TITLE: Constructing Discord Bot OAuth2 Authorization URL
+DESCRIPTION: The standard OAuth2 URL structure for authorizing a Discord bot application. Contains parameters for client ID, permissions, and scopes for bot and slash commands functionality.
+
+LANGUAGE: url
+CODE:
+https://discord.com/api/oauth2/authorize?client_id=123456789012345678&permissions=0&scope=bot%20applications.commands
+
+----------------------------------------
+
+TITLE: Installing @discordjs/voice and libsodium-wrappers with npm
+DESCRIPTION: Command to install the @discordjs/voice package and libsodium-wrappers encryption library using npm.
+
+LANGUAGE: sh
+CODE:
+npm install @discordjs/voice libsodium-wrappers
+
+----------------------------------------
+
+TITLE: Creating Context Menu Command Builder in Discord.js
+DESCRIPTION: Demonstrates how to create a user context menu command using ContextMenuCommandBuilder. Sets up a basic user information command with the appropriate command type.
+
+LANGUAGE: javascript
+CODE:
+const { ContextMenuCommandBuilder, ApplicationCommandType } = require('discord.js');
+
+const data = new ContextMenuCommandBuilder()
+	.setName('User Information')
+	.setType(ApplicationCommandType.User);
+
+----------------------------------------
+
+TITLE: Configuring OAuth2 Settings in JSON
+DESCRIPTION: Defines the client ID, client secret, and server port for OAuth2 configuration in a JSON file.
+
+LANGUAGE: json
+CODE:
+{
+	"clientId": "",
+	"clientSecret": "",
+	"port": 53134
+}
+
+----------------------------------------
+
+TITLE: Updating Application Command Data for discord.js v14
+DESCRIPTION: Changes required to define application command data using the new ApplicationCommandType and ApplicationCommandOptionType enums in v14.
+
+LANGUAGE: javascript
+CODE:
++ const { ApplicationCommandType, ApplicationCommandOptionType } = require('discord.js');
+
+const command = {
+  name: 'ping',
+- type: 'CHAT_INPUT',
++ type: ApplicationCommandType.ChatInput,
+  options: [{
+    name: 'option',
+    description: 'A sample option',
+-   type: 'STRING',
++   type: ApplicationCommandOptionType.String,
+  }],
+};
+
+----------------------------------------
+
+TITLE: Fetching Filtered Audit Logs in Discord.js
+DESCRIPTION: Shows how to fetch specific audit log entries by type using options like AuditLogEvent type and entry limit.
+
+LANGUAGE: javascript
+CODE:
+const { AuditLogEvent } = require('discord.js');
+
+const fetchedLogs = await guild.fetchAuditLogs({
+	type: AuditLogEvent.InviteCreate,
+	limit: 1,
+});
+
+const firstEntry = fetchedLogs.entries.first();
+
+----------------------------------------
+
+TITLE: Setting up Express Server for OAuth2
+DESCRIPTION: Initializes an Express server to handle OAuth2 requests and serve the index HTML file.
+
+LANGUAGE: javascript
+CODE:
+const express = require('express');
+const { port } = require('./config.json');
+
+const app = express();
+
+app.get('/', (request, response) => {
+	return response.sendFile('index.html', { root: '.' });
+});
+
+app.listen(port, () => console.log(`App listening at http://localhost:${port}`));
+
+----------------------------------------
+
+TITLE: Updating Guild widget methods
+DESCRIPTION: Changes in Guild widget-related methods in v13.
+
+LANGUAGE: javascript
+CODE:
+- Guild.fetchVanityCode().then(code => console.log(`Vanity URL: https://discord.gg/${code}`));
++ Guild.fetchVanityData().then(res => console.log(`Vanity URL: https://discord.gg/${res.code} with ${res.uses} uses`));
+
+----------------------------------------
+
+TITLE: Collection Utility Methods in Discord.js
+DESCRIPTION: Demonstrates various utility methods unique to Collections including random(), first(), last(), and sweep(). Shows how to access random elements, get first/last elements, and remove elements conditionally.
+
+LANGUAGE: javascript
+CODE:
+// A random value.
+collection.random();
+
+// The first value.
+collection.first();
+
+// The first 5 values.
+collection.first(5);
+
+// Similar to `first`, but from the end.
+collection.last();
+collection.last(2);
+
+// Removes anything that meets the condition from the collection.
+// Sort of like `filter`, but in-place.
+collection.sweep(user => user.username === 'Bob');
+
+----------------------------------------
+
+TITLE: Defining UserItems Junction Table in Sequelize
+DESCRIPTION: Creates a Sequelize model for UserItems, acting as a junction table between Users and CurrencyShop. It includes user_id, item_id, and amount fields.
+
+LANGUAGE: javascript
+CODE:
+module.exports = (sequelize, DataTypes) => {
+	return sequelize.define('user_item', {
+		user_id: DataTypes.STRING,
+		item_id: DataTypes.INTEGER,
+		amount: {
+			type: DataTypes.INTEGER,
+			allowNull: false,
+			'default': 0,
+		},
+	}, {
+		timestamps: false,
+	});
+};
+
+----------------------------------------
+
+TITLE: Updating intents configuration
+DESCRIPTION: Changes in how intents are specified in the Client constructor in v13.
+
+LANGUAGE: javascript
+CODE:
+- const client = new Client({ ws: { intents: [Intents.FLAGS.GUILDS] } });
++ const client = new Client({ intents: [Intents.FLAGS.GUILDS] });
+
+----------------------------------------
+
+TITLE: Logging with Pino
+DESCRIPTION: Implementation of Pino logger for efficient logging in Discord.js applications with configuration examples.
+
+LANGUAGE: javascript
+CODE:
+const pino = require('pino');
+const logger = pino();
+module.exports = logger;
+
+LANGUAGE: javascript
+CODE:
+const { Client, Events, GatewayIntentBits } = require('discord.js');
+const client = new Client({ intents: [GatewayIntentBits.Guilds] });
+const logger = require('./logger');
+
+client.once(Events.ClientReady, () => logger.info('The bot is online'));
+client.on(Events.Debug, info => logger.debug(info));
+client.on(Events.Warn, info => logger.warn(info));
+client.on(Events.Error, error => logger.error(error));
+
+client.login('your-token-goes-here');
+
+LANGUAGE: javascript
+CODE:
+const pino = require('pino');
+const transport = pino.transport({
+	target: 'pino/file',
+	options: { destination: './log.json' },
+});
+const logger = pino(transport);
+module.exports = logger;
+
+----------------------------------------
+
+TITLE: Initializing Database and Syncing Models
+DESCRIPTION: Sets up the Sequelize connection, imports models, and syncs them with the database. It also populates the CurrencyShop with initial items.
+
+LANGUAGE: javascript
+CODE:
+const Sequelize = require('sequelize');
+
+const sequelize = new Sequelize('database', 'username', 'password', {
+	host: 'localhost',
+	dialect: 'sqlite',
+	logging: false,
+	storage: 'database.sqlite',
+});
+
+const CurrencyShop = require('./models/CurrencyShop.js')(sequelize, Sequelize.DataTypes);
+require('./models/Users.js')(sequelize, Sequelize.DataTypes);
+require('./models/UserItems.js')(sequelize, Sequelize.DataTypes);
+
+const force = process.argv.includes('--force') || process.argv.includes('-f');
+
+sequelize.sync({ force }).then(async () => {
+	const shop = [
+		CurrencyShop.upsert({ name: 'Tea', cost: 1 }),
+		CurrencyShop.upsert({ name: 'Coffee', cost: 2 }),
+		CurrencyShop.upsert({ name: 'Cake', cost: 5 }),
+	];
+
+	await Promise.all(shop);
+	console.log('Database synced');
+
+	sequelize.close();
+}).catch(console.error);
+
+----------------------------------------
+
+TITLE: Updating message sending with embeds
+DESCRIPTION: Changes in how messages with embeds are sent in v13.
+
+LANGUAGE: javascript
+CODE:
+- channel.send(embed);
++ channel.send({ embeds: [embed, embed2] });
+
+- channel.send('Hello!', { embed });
++ channel.send({ content: 'Hello!', embeds: [embed, embed2] });
+
+- interaction.reply('Hello!', { ephemeral: true });
++ interaction.reply({ content: 'Hello!', ephemeral: true });
+
+----------------------------------------
+
+TITLE: Implementing Tag Listing Command
+DESCRIPTION: Handles the 'showtags' command to fetch and display a list of all tag names from the database.
+
+LANGUAGE: javascript
+CODE:
+else if (command === 'showtags') {
+	// equivalent to: SELECT name FROM tags;
+	const tagList = await Tags.findAll({ attributes: ['name'] });
+	const tagString = tagList.map(t => t.name).join(', ') || 'No tags set.';
+
+	return interaction.reply(`List of tags: ${tagString}`);
+}
+
+----------------------------------------
+
+TITLE: Updating RoleManager create method
+DESCRIPTION: Changes in the RoleManager create method in v13.
+
+LANGUAGE: javascript
+CODE:
+- guild.roles.create({ data: { name: "New role" } }, "Creating new role");
++ guild.roles.create({ name: "New role", reason: "Creating new role" })
+
+----------------------------------------
+
+TITLE: Customizing Manager caches
+DESCRIPTION: Example of using Options.cacheWithLimits to customize caching limits for different managers.
+
+LANGUAGE: javascript
+CODE:
+const client = new Client({
+	makeCache: Options.cacheWithLimits({
+		MessageManager: 200, // This is default
+		PresenceManager: 0,
+		// Add more class names here
+	}),
+});
+
+----------------------------------------
+
+TITLE: Defining Sequelize Model for Tags
+DESCRIPTION: Creates a Sequelize model for the tags table, defining the structure with name, description, username, and usage count fields.
+
+LANGUAGE: javascript
+CODE:
+const Tags = sequelize.define('tags', {
+	name: {
+		type: Sequelize.STRING,
+		unique: true,
+	},
+	description: Sequelize.TEXT,
+	username: Sequelize.STRING,
+	usage_count: {
+		type: Sequelize.INTEGER,
+		defaultValue: 0,
+		allowNull: false,
+	},
+});
+
+----------------------------------------
+
+TITLE: Updating GuildMember methods
+DESCRIPTION: Changes in GuildMember-related methods in v13.
+
+LANGUAGE: javascript
+CODE:
+- member.ban('reason')
++ member.ban({ reason: 'reason' })
+
+- member.hasPermission(Permissions.FLAGS.SEND_MESSAGES);
++ member.permissions.has(Permissions.FLAGS.SEND_MESSAGES);
+
+----------------------------------------
+
+TITLE: Installing discord.js v13 with yarn
+DESCRIPTION: Commands to install discord.js v13 using yarn, with options for text-only or voice support.
+
+LANGUAGE: sh
+CODE:
+yarn add discord.js # text-only
+yarn add discord.js @discordjs/voice # voice support
+
+----------------------------------------
+
+TITLE: Demonstrating Class Instance Notation in Discord.js
+DESCRIPTION: Shows how to interpret and use the <Class> notation for class instances and method calls in discord.js
+
+LANGUAGE: javascript
+CODE:
+<BaseInteraction>.reply('Hello')
+interaction.reply('Hello')
+
+----------------------------------------
+
+TITLE: Handling Keyv Connection Errors
+DESCRIPTION: Code snippet demonstrating how to handle connection errors in Keyv.
+
+LANGUAGE: javascript
+CODE:
+keyv.on('error', err => console.error('Keyv connection error:', err));
+
+----------------------------------------
+
+TITLE: Updating Shard respawn method
+DESCRIPTION: Changes in the Shard respawn method in v13.
+
+LANGUAGE: javascript
+CODE:
+- shard.respawn(500, 30_000);
++ shard.respawn({ delay: 500, timeout: 30_000 });
+
+----------------------------------------
+
+TITLE: Creating and Manipulating Canvas for Profile Image
+DESCRIPTION: Code to create a canvas, load a background image, and draw it onto the canvas for a profile command.
+
+LANGUAGE: javascript
+CODE:
+client.on(Events.InteractionCreate, async interaction => {
+	if (!interaction.isChatInputCommand()) return;
+
+	if (interaction.commandName === 'profile') {
+		// Create a 700x250 pixel canvas and get its context
+		// The context will be used to modify the canvas
+		const canvas = Canvas.createCanvas(700, 250);
+		const context = canvas.getContext('2d');
+
+		const background = await Canvas.loadImage('./wallpaper.jpg');
+
+		// This uses the canvas dimensions to stretch the image onto the entire canvas
+		context.drawImage(background, 0, 0, canvas.width, canvas.height);
+
+		// Use the helpful Attachment class structure to process the file for you
+		const attachment = new AttachmentBuilder(await canvas.encode('png'), { name: 'profile-image.png' });
+
+		interaction.reply({ files: [attachment] });
+	}
+});
+
+----------------------------------------
+
+TITLE: Installing windows-build-tools with pnpm
+DESCRIPTION: Command to install windows-build-tools globally using pnpm, which is recommended for Windows users to set up build dependencies.
+
+LANGUAGE: sh
+CODE:
+pnpm add --global --production --add-python-to-path windows-build-tools
+
+----------------------------------------
+
+TITLE: Updating collector creation
+DESCRIPTION: Changes in how collectors are created in v13.
+
+LANGUAGE: javascript
+CODE:
+- const collector = message.createReactionCollector(collectorFilter, { time: 15_000 });
++ const collector = message.createReactionCollector({ filter: collectorFilter, time: 15_000 });
+
+- const reactions = await message.awaitReactions(collectorFilter, { time: 15_000 });
++ const reactions = await message.awaitReactions({ filter: collectorFilter, time: 15_000 });
+
+----------------------------------------
+
+TITLE: Creating Audio Resources in discord.js
+DESCRIPTION: Demonstrates various ways to create audio resources using createAudioResource() with different input types and options. Shows basic MP3 playback, volume control, and Opus stream handling.
+
+LANGUAGE: javascript
+CODE:
+const { createReadStream } = require('node:fs');
+const { join } = require('node:path');
+const { createAudioResource, StreamType } = require('@discordjs/voice');
+
+// Basic, default options are:
+// Input type is unknown, so will use FFmpeg to convert to Opus under-the-hood
+// Inline volume is opt-in to improve performance
+let resource = createAudioResource(join(__dirname, 'file.mp3'));
+
+// Will use FFmpeg with volume control enabled
+resource = createAudioResource(join(__dirname, 'file.mp3'), { inlineVolume: true });
+resource.volume.setVolume(0.5);
+
+// Will play .ogg or .webm Opus files without FFmpeg for better performance
+// Remember, inline volume is still disabled
+resource = createAudioResource(createReadStream(join(__dirname, 'file.ogg'), {
+	inputType: StreamType.OggOpus,
+}));
+
+// Will play with FFmpeg due to inline volume being enabled.
+resource = createAudioResource(createReadStream(join(__dirname, 'file.webm'), {
+	inputType: StreamType.WebmOpus,
+	inlineVolume: true,
+}));
+
+player.play(resource);
+
+----------------------------------------
+
+TITLE: Installing windows-build-tools with yarn
+DESCRIPTION: Command to install windows-build-tools globally using yarn, which is recommended for Windows users to set up build dependencies.
+
+LANGUAGE: sh
+CODE:
+yarn global add --production --add-python-to-path windows-build-tools
+
+----------------------------------------
+
+TITLE: Updating file attachments in embeds
+DESCRIPTION: Changes in how files are attached to embeds in v13.
+
+LANGUAGE: javascript
+CODE:
+- const embed = new Discord.MessageEmbed().setTitle("Attachments").attachFiles(['./image1.png', './image2.jpg']);
+- channel.send(embed);
++ const embed = new Discord.MessageEmbed().setTitle("Attachments");
++ channel.send({ embeds: [embed], files: ['./image1.png', './image2.jpg'] });
+
+----------------------------------------
+
+TITLE: Creating a Modal Builder in Discord.js
+DESCRIPTION: This snippet demonstrates how to create a basic ModalBuilder instance with a custom ID and title. It's the first step in creating a modal form for Discord interactions.
+
+LANGUAGE: javascript
+CODE:
+const { Events, ModalBuilder } = require('discord.js');
+
+client.on(Events.InteractionCreate, async interaction => {
+	if (!interaction.isChatInputCommand()) return;
+
+	if (interaction.commandName === 'ping') {
+		const modal = new ModalBuilder()
+			.setCustomId('myModal')
+			.setTitle('My Modal');
+
+		// TODO: Add components to modal...
+	}
+});
+
+----------------------------------------
+
+TITLE: Installing discord.js v13 with pnpm
+DESCRIPTION: Commands to install discord.js v13 using pnpm, with options for text-only or voice support.
+
+LANGUAGE: sh
+CODE:
+pnpm add discord.js # text-only
+pnpm add discord.js @discordjs/voice # voice support
+
+----------------------------------------
+
+TITLE: Updating naming conventions
+DESCRIPTION: Changes in naming conventions for various properties in v13.
+
+LANGUAGE: javascript
+CODE:
+- console.log(guild.ownerID);
++ console.log(guild.ownerId);
+
+- console.log(interaction.channelID);
++ console.log(interaction.channelId);
+
+- client.on("message", message => { ... });
++ client.on("messageCreate", message => { ... });
+
+----------------------------------------
+
+TITLE: Styling Emoji Container in HTML/CSS
+DESCRIPTION: Defines CSS styles for displaying emoji images inline with text. It sets the dimensions and alignment of emoji images within a container.
+
+LANGUAGE: html
+CODE:
+<style scoped>
+.emoji-container {
+	display: inline-block;
+}
+
+.emoji-container .emoji-image {
+	width: 1.375rem;
+	height: 1.375rem;
+	vertical-align: bottom;
+}
+</style>
+
+----------------------------------------
+
+TITLE: Checking and reinstalling discord.js with yarn
+DESCRIPTION: Commands to check the installed discord.js version and reinstall it using yarn.
+
+LANGUAGE: sh
+CODE:
+# check version
+yarn list discord.js
+# uninstall and re-install
+yarn remove discord.js
+yarn add discord.js
+
+----------------------------------------
+
+TITLE: Updating ShardClientUtil broadcastEval method
+DESCRIPTION: Changes in the ShardClientUtil broadcastEval method in v13.
+
+LANGUAGE: javascript
+CODE:
+- client.shard.broadcastEval('this.guilds.cache.size')
++ client.shard.broadcastEval(client => client.guilds.cache.size)
+		.then(results => console.log(`${results.reduce((prev, val) => prev + val, 0)} total guilds`))
+		.catch(console.error);
+
+----------------------------------------
+
+TITLE: Creating Code Blocks in discord.js
+DESCRIPTION: This snippet demonstrates how to use inlineCode() for inline code blocks and codeBlock() for regular code blocks with optional syntax highlighting.
+
+LANGUAGE: javascript
+CODE:
+const { inlineCode, codeBlock } = require('discord.js');
+const jsString = 'const value = true;';
+
+const inline = inlineCode(jsString);
+const codeblock = codeBlock(jsString);
+const highlighted = codeBlock('js', jsString);
+
+----------------------------------------
+
+TITLE: Custom cache implementation
+DESCRIPTION: Example of providing a custom cache implementation function for different managers.
+
+LANGUAGE: javascript
+CODE:
+const client = new Client({
+	makeCache: manager => {
+		if (manager.name === 'MessageManager') return new LimitedCollection({ maxSize: 0 });
+		return new Collection();
+	},
+});
+
+----------------------------------------
+
+TITLE: Initializing Discord.js Client with Default Sweep Settings
+DESCRIPTION: Creates a Discord.js client with default sweep settings for cleaning up thread caches periodically.
+
+LANGUAGE: javascript
+CODE:
+const { Client, Options } = require('discord.js');
+
+const client = new Client({
+	sweepers: Options.DefaultSweeperSettings,
+});
+
+----------------------------------------
+
+TITLE: Executing Discord.js Ban Command with Options
+DESCRIPTION: Demonstrates how to retrieve and use command option values using CommandInteractionOptionResolver. Shows handling of required and optional parameters.
+
+LANGUAGE: javascript
+CODE:
+module.exports = {
+	// data: new SlashCommandBuilder()...
+	async execute(interaction) {
+		const target = interaction.options.getUser('target');
+		const reason = interaction.options.getString('reason') ?? 'No reason provided';
+
+		await interaction.reply(`Banning ${target.username} for reason: ${reason}`);
+		await interaction.guild.members.ban(target);
+	},
+};
+
+----------------------------------------
+
+TITLE: Updating ShardingManager spawn method
+DESCRIPTION: Changes in the ShardingManager spawn method in v13.
+
+LANGUAGE: javascript
+CODE:
+- manager.spawn('auto', 5_500, 30_000);
++ manager.spawn({ amount: 'auto', delay: 5_500, timeout: 30_000 });
+
+----------------------------------------
+
+TITLE: Configuring Discord.js Client with Custom Reaction Cache Limits
+DESCRIPTION: Demonstrates how to customize cache settings to disable reaction caching while maintaining default settings for other caches.
+
+LANGUAGE: javascript
+CODE:
+const client = new Client({
+	makeCache: Options.cacheWithLimits({
+		...Options.DefaultMakeCacheSettings,
+		ReactionManager: 0,
+	}),
+});
+
+----------------------------------------
+
+TITLE: PM2 System Startup Configuration
+DESCRIPTION: Commands for setting up PM2 to start on system boot and saving process lists.
+
+LANGUAGE: sh
+CODE:
+pm2 startup
+
+LANGUAGE: sh
+CODE:
+pm2 startup [ubuntu | ubuntu14 | ubuntu12 | centos | centos6 | arch | oracle | amazon | macos | darwin | freesd | systemd | systemv | upstart | launchd | rcd | openrc]
+
+LANGUAGE: sh
+CODE:
+sudo su -c "env PATH=$PATH:/home/user/.nvm/versions/node/v8.9/bin pm2 startup ubuntu -u user --hp /home/user"
+
+LANGUAGE: sh
+CODE:
+pm2 save
+
+LANGUAGE: sh
+CODE:
+pm2 unstartup
+
+----------------------------------------
+
+TITLE: Updating WebhookClient constructor
+DESCRIPTION: Changes in the WebhookClient constructor in v13.
+
+LANGUAGE: javascript
+CODE:
+- new WebhookClient(id, token, options);
++ new WebhookClient({ id, token }, options);
+
++ new WebhookClient({ url }, options);
+
+----------------------------------------
+
+TITLE: Implementing Advanced Guild Member Cache Limits in Discord.js
+DESCRIPTION: Sets up complex cache limitations for guild members with a maximum size of 200 per guild, while preserving the client's own member object.
+
+LANGUAGE: javascript
+CODE:
+const client = new Client({
+	makeCache: Options.cacheWithLimits({
+		...Options.DefaultMakeCacheSettings,
+		ReactionManager: 0,
+		GuildMemberManager: {
+			maxSize: 200,
+			keepOverLimit: member => member.id === member.client.user.id,
+		},
+	}),
+});
+
+----------------------------------------
+
+TITLE: Setting Up Discord.js Client with Keyv
+DESCRIPTION: Initializing Discord.js client and Keyv instance for per-guild prefix configuration.
+
+LANGUAGE: javascript
+CODE:
+const Keyv = require('keyv');
+const { Client, Events, GatewayIntentBits } = require('discord.js');
+const { globalPrefix, token } = require('./config.json');
+
+const client = new Client({ intents: [GatewayIntentBits.Guilds, GatewayIntentBits.GuildMessages, GatewayIntentBits.MessageContent] });
+const prefixes = new Keyv('sqlite://path/to.sqlite');
+
+----------------------------------------
+
+TITLE: Setting up Discord.js Client with Sequelize
+DESCRIPTION: Basic setup for a Discord.js client with Sequelize integration. Includes client initialization and event handling skeleton.
+
+LANGUAGE: javascript
+CODE:
+// Require Sequelize
+const Sequelize = require('sequelize');
+// Require the necessary discord.js classes
+const { Client, Events, GatewayIntentBits } = require('discord.js');
+
+// Create a new client instance
+const client = new Client({ intents: [GatewayIntentBits.Guilds] });
+
+// When the client is ready, run this code (only once)
+client.once(Events.ClientReady, readyClient => {
+	console.log(`Ready! Logged in as ${readyClient.user.tag}`);
+});
+
+client.on(Events.InteractionCreate, async interaction => {
+	if (!interaction.isChatInputCommand()) return;
+
+	const { commandName } = interaction;
+	// ...
+});
+
+// Login to Discord with your client's token
+client.login('your-token-goes-here');
+
+----------------------------------------
+
+TITLE: String Formatting with common-tags
+DESCRIPTION: Demonstrates template literal formatting using common-tags package for clean multi-line strings and array interpolation.
+
+LANGUAGE: javascript
+CODE:
+const packageName = 'common-tags';
+
+if (someCondition) {
+	const poem = stripIndents`
+		I like ${packageName}.
+		It makes my strings so pretty,
+		you should use it too.
+	`;
+
+	console.log(poem);
+
+LANGUAGE: javascript
+CODE:
+const options = ['add', 'delete', 'edit'];
+
+// -> Do you want me to add, delete or edit the channel?
+interaction.reply(oneLineCommaListsOr`
+	Do you want me to ${options} the channel?
+`);
+
+----------------------------------------
+
+TITLE: Installing windows-build-tools with npm
+DESCRIPTION: Command to install windows-build-tools globally using npm, which is recommended for Windows users to set up build dependencies.
+
+LANGUAGE: sh
+CODE:
+npm install --global --production --add-python-to-path windows-build-tools
+
+----------------------------------------
+
+TITLE: Defining Users Model in Sequelize
+DESCRIPTION: Creates a Sequelize model for Users with user_id as the primary key and balance as an attribute. Timestamps are disabled for this model.
+
+LANGUAGE: javascript
+CODE:
+module.exports = (sequelize, DataTypes) => {
+	return sequelize.define('users', {
+		user_id: {
+			type: DataTypes.STRING,
+			primaryKey: true,
+		},
+		balance: {
+			type: DataTypes.INTEGER,
+			defaultValue: 0,
+			allowNull: false,
+		},
+	}, {
+		timestamps: false,
+	});
+};
+
+----------------------------------------
+
+TITLE: Displaying Project Banner in Markdown
+DESCRIPTION: Centers and displays the Discord.js Guide banner image using HTML within a Markdown file.
+
+LANGUAGE: markdown
+CODE:
+<div align="center">
+	<img src="guide/images/branding/banner-blurple-small.png" title="discord.js Guide" alt="discord.js Guide" />
+</div>
+
+----------------------------------------
+
+TITLE: Sending Select Menu with Action Row
+DESCRIPTION: Shows how to send a select menu by creating an action row, adding the select menu as a component, and sending it in an interaction reply.
+
+LANGUAGE: javascript
+CODE:
+const { ActionRowBuilder, StringSelectMenuBuilder, StringSelectMenuOptionBuilder, SlashCommandBuilder } = require('discord.js');
+
+module.exports = {
+	// data: new SlashCommandBuilder()...
+	async execute(interaction) {
+		const select = new StringSelectMenuBuilder()
+			.setCustomId('starter')
+			.setPlaceholder('Make a selection!')
+			.addOptions(
+				new StringSelectMenuOptionBuilder()
+					.setLabel('Bulbasaur')
+					.setDescription('The dual-type Grass/Poison Seed Pokémon.')
+					.setValue('bulbasaur'),
+				new StringSelectMenuOptionBuilder()
+					.setLabel('Charmander')
+					.setDescription('The Fire-type Lizard Pokémon.')
+					.setValue('charmander'),
+				new StringSelectMenuOptionBuilder()
+					.setLabel('Squirtle')
+					.setDescription('The Water-type Tiny Turtle Pokémon.')
+					.setValue('squirtle'),
+			);
+
+		const row = new ActionRowBuilder()
+			.addComponents(select);
+
+		await interaction.reply({
+			content: 'Choose your starter!',
+			components: [row],
+		});
+	},
+};
+
+----------------------------------------
+
+TITLE: Extracting User Data from Context Menu in Discord.js
+DESCRIPTION: Demonstrates how to extract the username from a user context menu interaction using the targetUser property.
+
+LANGUAGE: javascript
+CODE:
+client.on(Events.InteractionCreate, interaction => {
+	if (!interaction.isUserContextMenuCommand()) return;
+	// Get the User's username from context menu
+	const { username } = interaction.targetUser;
+	console.log(username);
+});
+
+----------------------------------------
+
+TITLE: Using Code Block Line Highlighting in Markdown
+DESCRIPTION: Demonstration of how to use code block line highlighting in Markdown for the discord.js guide.
+
+LANGUAGE: md
+CODE:
+Here's our base code:
+
+```js {2,6}
+client.once(Events.ClientReady, readyClient => {
+	console.log(`Ready! Logged in as ${readyClient.user.tag}`);
+});
+
+client.on(Events.MessageCreate, message => {
+	console.log(message.content);
+});
+```
+
+To add this feature, use this code:
+
+```js {2,6-8}
+client.once(Events.ClientReady, readyClient => {
+	console.log(`Ready! Logged in as ${readyClient.user.tag}`);
+});
+
+client.on(Events.MessageCreate, message => {
+	if (message.content === '!ping') {
+		message.channel.send('Pong.');
+	}
+});
+```
+
+----------------------------------------
+
+TITLE: Creating String Select Menu with Pokemon Options
+DESCRIPTION: Demonstrates how to create a string select menu with Pokemon starter options using StringSelectMenuBuilder and StringSelectMenuOptionBuilder. Each option includes a label, description, and value.
+
+LANGUAGE: javascript
+CODE:
+const { StringSelectMenuBuilder, StringSelectMenuOptionBuilder, SlashCommandBuilder } = require('discord.js');
+
+module.exports = {
+	// data: new SlashCommandBuilder()...
+	async execute(interaction) {
+		const select = new StringSelectMenuBuilder()
+			.setCustomId('starter')
+			.setPlaceholder('Make a selection!')
+			.addOptions(
+				new StringSelectMenuOptionBuilder()
+					.setLabel('Bulbasaur')
+					.setDescription('The dual-type Grass/Poison Seed Pokémon.')
+					.setValue('bulbasaur'),
+				new StringSelectMenuOptionBuilder()
+					.setLabel('Charmander')
+					.setDescription('The Fire-type Lizard Pokémon.')
+					.setValue('charmander'),
+				new StringSelectMenuOptionBuilder()
+					.setLabel('Squirtle')
+					.setDescription('The Water-type Tiny Turtle Pokémon.')
+					.setValue('squirtle'),
+			);
+	},
+};
+
+----------------------------------------
+
+TITLE: Deleting All Discord.js Commands using REST API
+DESCRIPTION: This code snippet shows how to delete all commands in a specific scope (guild or global) by passing an empty array when setting commands using the Discord.js REST API.
+
+LANGUAGE: javascript
+CODE:
+const { REST, Routes } = require('discord.js');
+const { clientId, guildId, token } = require('./config.json');
+
+const rest = new REST().setToken(token);
+
+// ...
+
+// for guild-based commands
+rest.put(Routes.applicationGuildCommands(clientId, guildId), { body: [] })
+	.then(() => console.log('Successfully deleted all guild commands.'))
+	.catch(console.error);
+
+// for global commands
+rest.put(Routes.applicationCommands(clientId), { body: [] })
+	.then(() => console.log('Successfully deleted all application commands.'))
+	.catch(console.error);
+
+----------------------------------------
+
+TITLE: Setting up Local Development Environment for discord.js Guide
+DESCRIPTION: Instructions for cloning the repository, installing dependencies, and running a local development server for the discord.js guide.
+
+LANGUAGE: bash
+CODE:
+git clone https://github.com/discordjs/guide.git
+cd guide
+npm install
+
+----------------------------------------
+
+TITLE: Enhanced Select Menu Options Configuration
+DESCRIPTION: Example of configuring a select menu option with additional properties like description, emoji, and default selection status.
+
+LANGUAGE: javascript
+CODE:
+const select = new StringSelectMenuBuilder()
+	.setCustomId('select')
+	.addOptions(
+		new StringSelectMenuOptionBuilder()
+			.setLabel('Option')
+			.setValue('option')
+			.setDescription('A selectable option')
+			.setEmoji('123456789012345678')
+			.setDefault(true),
+	);
+
+----------------------------------------
+
+TITLE: Initializing package.json
+DESCRIPTION: Commands to initialize a new package.json file using different package managers
+
+LANGUAGE: sh
+CODE:
+npm init -y
+
+----------------------------------------
+
+TITLE: Discord.js Bot Basic Template
+DESCRIPTION: Basic setup for a Discord.js bot with client initialization and event handling structure.
+
+LANGUAGE: javascript
+CODE:
+const { Client, Events, GatewayIntentBits } = require('discord.js');
+
+const client = new Client({ intents: [GatewayIntentBits.Guilds] });
+
+client.once(Events.ClientReady, () => {
+	console.log('I am ready!');
+});
+
+client.on(Events.InteractionCreate, interaction => {
+	if (!interaction.isChatInputCommand()) return;
+
+	if (interaction.commandName === 'react') {
+		// ...
+	}
+});
+
+client.login('your-token-goes-here');
+
+----------------------------------------
+
+TITLE: Discord.js Bot Skeleton Setup
+DESCRIPTION: Basic Discord.js bot setup with client initialization and event handling structure
+
+LANGUAGE: javascript
+CODE:
+const { Client, EmbedBuilder, Events, GatewayIntentBits } = require('discord.js');
+
+const client = new Client({ intents: [GatewayIntentBits.Guilds] });
+
+client.once(Events.ClientReady, readyClient => {
+	console.log(`Ready! Logged in as ${readyClient.user.tag}`);
+});
+
+client.on(Events.InteractionCreate, async interaction => {
+	if (!interaction.isChatInputCommand()) return;
+
+	const { commandName } = interaction;
+	await interaction.deferReply();
+	// ...
+});
+
+client.login('your-token-goes-here');
+
+----------------------------------------
+
+TITLE: Adding Channel Option to Slash Command in discord.js
+DESCRIPTION: Shows how to add a channel option to the 'echo' command, allowing users to specify a channel for the bot's response.
+
+LANGUAGE: javascript
+CODE:
+const { SlashCommandBuilder } = require('discord.js');
+
+const data = new SlashCommandBuilder()
+	.setName('echo')
+	.setDescription('Replies with your input!')
+	.addStringOption(option =>
+		option.setName('input')
+			.setDescription('The input to echo back'))
+	.addChannelOption(option =>
+		option.setName('channel')
+			.setDescription('The channel to echo into'));
+
+----------------------------------------
+
+TITLE: Promise Chain Implementation for Message Reactions
+DESCRIPTION: Shows how to chain Promises for sequential message reactions using .then() syntax.
+
+LANGUAGE: javascript
+CODE:
+client.on(Events.InteractionCreate, interaction => {
+	// ...
+	if (commandName === 'react') {
+		interaction.reply({ content: 'Reacting!', withResponse: true })
+			.then(response => {
+				const { message } = response.resource;
+
+				message.react('🇦')
+					.then(() => message.react('🇧'))
+					.then(() => message.react('🇨'))
+					.catch(error => {
+						// handle failure of any Promise rejection inside here
+					});
+			});
+	}
+});
+
+----------------------------------------
+
+TITLE: Extended Method Notation with Parameters
+DESCRIPTION: Demonstrates the extended notation format used to indicate method calls with parameters
+
+LANGUAGE: javascript
+CODE:
+TextChannel#send(options)
+Client#event:messageCreate
+
+----------------------------------------
+
+TITLE: Removing Channel Permission Overwrites in Discord.js
+DESCRIPTION: Demonstrates how to remove permission overwrites for a specific member or role in a channel using discord.js.
+
+LANGUAGE: javascript
+CODE:
+// deleting the channel's overwrite for the user who interacted
+channel.permissionOverwrites.delete(interaction.user.id);
+
+----------------------------------------
+
+TITLE: Installing undici package
+DESCRIPTION: Commands to install the undici package using different package managers
+
+LANGUAGE: shell
+CODE:
+npm install undici
+yarn add undici
+pnpm add undici
+bun add undici
+
+----------------------------------------
+
+TITLE: Basic ESLint Configuration
+DESCRIPTION: Basic ESLint configuration setup with recommended rules and latest ECMAScript version.
+
+LANGUAGE: javascript
+CODE:
+const js = require('@eslint/js');
+
+module.exports = [
+	js.configs.recommended,
+	{
+		languageOptions: {
+			ecmaVersion: 'latest',
+		},
+		rules: {
+
+		},
+	},
+];
+
+----------------------------------------
+
+TITLE: Updating Message delete method
+DESCRIPTION: Changes in the Message delete method in v13.
+
+LANGUAGE: javascript
+CODE:
+- message.delete({ timeout: 10_000 });
++ setTimeout(() => message.delete(), 10_000);
+
+----------------------------------------
+
+TITLE: Message and Channel Management in Discord.js
+DESCRIPTION: Utility functions for managing messages, channels and user interactions. Includes sending messages, creating forum posts, and handling DMs.
+
+LANGUAGE: javascript
+CODE:
+const channel = client.channels.cache.get('id');
+channel.send('content');
+
+LANGUAGE: javascript
+CODE:
+channel.threads.create({ name: 'Post name', message: { content: 'Message content' }, appliedTags: ['tagID', 'anotherTagID'] });
+
+LANGUAGE: javascript
+CODE:
+interaction.reply('Please enter more input.').then(() => {
+	const collectorFilter = m => interaction.user.id === m.author.id;
+
+	interaction.channel.awaitMessages({ filter: collectorFilter, time: 60_000, max: 1, errors: ['time'] })
+		.then(messages => {
+			interaction.followUp(`You've entered: ${messages.first().content}`);
+		})
+		.catch(() => {
+			interaction.followUp('You did not enter any input!');
+		});
+});
+
+----------------------------------------
+
+TITLE: Installing ESLint Package Commands
+DESCRIPTION: Commands to install ESLint and its JavaScript plugin using different package managers.
+
+LANGUAGE: sh
+CODE:
+npm install --save-dev eslint @eslint/js
+
+LANGUAGE: sh
+CODE:
+yarn add eslint @eslint/js --dev
+
+LANGUAGE: sh
+CODE:
+pnpm add --save-dev eslint @eslint/js
+
+LANGUAGE: sh
+CODE:
+bun add --dev eslint
+
+----------------------------------------
+
+TITLE: Defining CurrencyShop Model in Sequelize
+DESCRIPTION: Creates a Sequelize model for CurrencyShop with name and cost attributes. The name is set to be unique, and timestamps are disabled.
+
+LANGUAGE: javascript
+CODE:
+module.exports = (sequelize, DataTypes) => {
+	return sequelize.define('currency_shop', {
+		name: {
+			type: DataTypes.STRING,
+			unique: true,
+		},
+		cost: {
+			type: DataTypes.INTEGER,
+			allowNull: false,
+		},
+	}, {
+		timestamps: false,
+	});
+};
+
+----------------------------------------
+
+TITLE: Manipulating Intents Bitfield in JavaScript using discord.js
+DESCRIPTION: This code snippet shows how to create and modify an Intents Bitfield using the IntentsBitField class from discord.js. It demonstrates adding and removing intents, as well as initializing a client with custom intents.
+
+LANGUAGE: javascript
+CODE:
+const { Client, IntentsBitField } = require('discord.js');
+
+const myIntents = new IntentsBitField();
+myIntents.add(IntentsBitField.Flags.GuildPresences, IntentsBitField.Flags.GuildMembers);
+
+const client = new Client({ intents: myIntents });
+
+// other examples:
+const otherIntents = new IntentsBitField([IntentsBitField.Flags.Guilds, IntentsBitField.Flags.DirectMessages]);
+otherIntents.remove([IntentsBitField.Flags.DirectMessages]);
+
+----------------------------------------
+
+TITLE: Quick Project Initialization
+DESCRIPTION: Commands for quick project initialization with default values using different package managers. The -y flag automatically accepts all defaults without prompting for input.
+
+LANGUAGE: sh
+CODE:
+npm init -y
+
+LANGUAGE: sh
+CODE:
+yarn init -y
+
+LANGUAGE: sh
+CODE:
+pnpm init
+
+LANGUAGE: sh
+CODE:
+bun init -y
+
+----------------------------------------
+
+TITLE: Async/Await Implementation with Try/Catch
+DESCRIPTION: Demonstrates error handling with async/await using try/catch blocks for message reactions.
+
+LANGUAGE: javascript
+CODE:
+client.on(Events.InteractionCreate, async interaction => {
+	if (commandName === 'react') {
+		try {
+			const response = await interaction.reply({ content: 'Reacting!', withResponse: true });
+			const { message } = response.resource;
+			await message.react('🇦');
+			await message.react('🇧');
+			await message.react('🇨');
+		} catch (error) {
+			// handle failure of any Promise rejection inside here
+		}
+	}
+});
+
+----------------------------------------
+
+TITLE: Archiving and Unarchiving Threads in Discord.js
+DESCRIPTION: This code shows how to archive and unarchive a thread using the setArchived() method with boolean parameters.
+
+LANGUAGE: javascript
+CODE:
+const thread = channel.threads.cache.find(x => x.name === 'food-talk');
+await thread.setArchived(true); // archived
+await thread.setArchived(false); // unarchived
+
+----------------------------------------
+
+TITLE: Initializing Node Project
+DESCRIPTION: Commands to initialize a new Node.js project using different package managers (npm, yarn, pnpm, or bun). Creates a package.json file to track project dependencies and configuration.
+
+LANGUAGE: sh
+CODE:
+npm init
+
+LANGUAGE: sh
+CODE:
+yarn init
+
+LANGUAGE: sh
+CODE:
+pnpm init
+
+LANGUAGE: sh
+CODE:
+bun init
+
+----------------------------------------
+
+TITLE: Setting Command Context for Ban Command in discord.js
+DESCRIPTION: This snippet demonstrates how to restrict a ban command to only be available in guild contexts, not in DMs, using the setContexts method.
+
+LANGUAGE: javascript
+CODE:
+const { InteractionContextType, PermissionFlagsBits, SlashCommandBuilder } = require('discord.js');
+
+const data = new SlashCommandBuilder()
+	.setName('ban')
+	.setDescription('Select a member and ban them.')
+	.addUserOption(option =>
+		option
+			.setName('target')
+			.setDescription('The member to ban')
+			.setRequired(true))
+	.setDefaultMemberPermissions(PermissionFlagsBits.BanMembers)
+	.setContexts(InteractionContextType.Guild);
+
+----------------------------------------
+
+TITLE: Removing a Member from a Thread in Discord.js
+DESCRIPTION: This snippet shows how to remove a member from a thread using the members.remove() method with a user ID.
+
+LANGUAGE: javascript
+CODE:
+const thread = channel.threads.cache.find(x => x.name === 'food-talk');
+await thread.members.remove('140214425276776449');
+
+----------------------------------------
+
+TITLE: Installing PM2 with Package Managers
+DESCRIPTION: Various package manager commands to install PM2 globally on the system.
+
+LANGUAGE: sh
+CODE:
+npm install --global pm2
+
+LANGUAGE: sh
+CODE:
+yarn global add pm2
+
+LANGUAGE: sh
+CODE:
+pnpm add --global pm2
+
+LANGUAGE: sh
+CODE:
+bun add --global pm2
+
+----------------------------------------
+
+TITLE: Comparing Array and Collection Find Methods in Discord.js
+DESCRIPTION: Demonstrates the similarity between Array.find() and Collection.find() methods when searching for a user by discriminator. Shows the parallel between callback function parameters in both approaches.
+
+LANGUAGE: javascript
+CODE:
+array.find(u => u.discriminator === '1000');
+collection.find(u => u.discriminator === '1000');
+
+----------------------------------------
+
+TITLE: Sending Messages to Threads with Webhooks in Discord.js
+DESCRIPTION: This code illustrates how to send a message to a specific thread using a webhook, assuming a webhook already exists for the parent channel.
+
+LANGUAGE: javascript
+CODE:
+const webhooks = await channel.fetchWebhooks();
+const webhook = webhooks.first();
+
+await webhook.send({
+	content: 'Look ma! I\'m in a thread!',
+	threadId: '123456789012345678',
+});
+
+----------------------------------------
+
+TITLE: Managing PM2 Processes
+DESCRIPTION: Commands for stopping PM2 processes and managing process lists.
+
+LANGUAGE: sh
+CODE:
+pm2 stop your-app-name.js
+
+----------------------------------------
+
+TITLE: Adding Validations to Slash Command Options in discord.js
+DESCRIPTION: Shows how to add various validations to slash command options, including string length limits, channel type restrictions, and boolean options.
+
+LANGUAGE: javascript
+CODE:
+const { SlashCommandBuilder, ChannelType } = require('discord.js');
+
+const data = new SlashCommandBuilder()
+	.setName('echo')
+	.setDescription('Replies with your input!')
+	.addStringOption(option =>
+		option.setName('input')
+			.setDescription('The input to echo back')
+			// Ensure the text will fit in an embed description, if the user chooses that option
+			.setMaxLength(2_000))
+	.addChannelOption(option =>
+		option.setName('channel')
+			.setDescription('The channel to echo into')
+			// Ensure the user can only select a TextChannel for output
+			.addChannelTypes(ChannelType.GuildText))
+	.addBooleanOption(option =>
+		option.setName('embed')
+			.setDescription('Whether or not the echo should be embedded'));
+
+----------------------------------------
+
+TITLE: Initializing Discord.js Client with Reactions Support
+DESCRIPTION: Basic setup code for a Discord.js client with necessary intents for handling message reactions.
+
+LANGUAGE: javascript
+CODE:
+const { Client, Events, GatewayIntentBits } = require('discord.js');
+
+const client = new Client({
+	intents: [GatewayIntentBits.Guilds, GatewayIntentBits.GuildMessages, GatewayIntentBits.GuildMessageReactions],
+});
+
+client.once(Events.ClientReady, readyClient => {
+	console.log(`Ready! Logged in as ${readyClient.user.tag}`);
+});
+
+client.on(Events.InteractionCreate, interaction => {
+	// ...
+});
+
+client.login('your-token-goes-here');
+
+----------------------------------------
+
+TITLE: Starting Applications with PM2
+DESCRIPTION: Basic and advanced PM2 commands for starting applications with optional parameters for naming and file watching.
+
+LANGUAGE: sh
+CODE:
+pm2 start your-app-name.js
+
+LANGUAGE: sh
+CODE:
+pm2 start your-app-name.js --name "Some cool name"
+
+LANGUAGE: bash
+CODE:
+pm2 start your-app-name.js --watch
+
+----------------------------------------
+
+TITLE: Creating Audio Player in Discord.js
+DESCRIPTION: Basic initialization of an audio player using @discordjs/voice package. Shows both default creation and customized behavior configuration.
+
+LANGUAGE: javascript
+CODE:
+const { createAudioPlayer } = require('@discordjs/voice');
+
+const player = createAudioPlayer();
+
+LANGUAGE: javascript
+CODE:
+const { createAudioPlayer, NoSubscriberBehavior } = require('@discordjs/voice');
+
+const player = createAudioPlayer({
+	behaviors: {
+		noSubscriber: NoSubscriberBehavior.Pause,
+	},
+});
+
+----------------------------------------
+
+TITLE: Creating WebhookClient in discord.js
+DESCRIPTION: This code shows how to create a WebhookClient instance using either id and token or a full webhook URL.
+
+LANGUAGE: javascript
+CODE:
+const webhookClient = new WebhookClient({ id: 'id', token: 'token' });
+
+LANGUAGE: javascript
+CODE:
+const webhookClient = new WebhookClient({ url: 'https://discord.com/api/webhooks/id/token' });
+
+----------------------------------------
+
+TITLE: Running Bot Scripts with Package Managers
+DESCRIPTION: Commands to run start and lint scripts using different package managers (npm, yarn, pnpm, bun)
+
+LANGUAGE: sh
+CODE:
+npm run start
+npm run lint
+
+----------------------------------------
+
+TITLE: Fetching Webhook Messages in discord.js
+DESCRIPTION: This snippet shows how to fetch a message previously sent by a webhook using its ID.
+
+LANGUAGE: javascript
+CODE:
+const message = await webhookClient.fetchMessage('123456789012345678');
+
+----------------------------------------
+
+TITLE: Complete package.json with Scripts
+DESCRIPTION: Final package.json configuration including both start and lint scripts
+
+LANGUAGE: json
+CODE:
+{
+	"name": "my-bot",
+	"version": "1.0.0",
+	"description": "A Discord bot!",
+	"main": "index.js",
+	"scripts": {
+		"test": "echo \"Error: no test specified\" && exit 1",
+		"start": "node .",
+		"lint": "eslint ."
+	},
+	"keywords": [],
+	"author": "",
+	"license": "ISC"
+}
+
+----------------------------------------
+
+TITLE: Creating a Basic Reaction Collector in discord.js
+DESCRIPTION: Demonstrates how to create a reaction collector that filters for the thumbs up emoji and checks if the reactor is the original message author.
+
+LANGUAGE: javascript
+CODE:
+const collectorFilter = (reaction, user) => {
+	return reaction.emoji.name === '👍' && user.id === message.author.id;
+};
+
+const collector = message.createReactionCollector({ filter: collectorFilter, time: 15_000 });
+
+collector.on('collect', (reaction, user) => {
+	console.log(`Collected ${reaction.emoji.name} from ${user.tag}`);
+});
+
+collector.on('end', collected => {
+	console.log(`Collected ${collected.size} items`);
+});
+
+----------------------------------------
+
+TITLE: Adding Start Script
+DESCRIPTION: Script configuration to start the Discord bot using Node.js
+
+LANGUAGE: json
+CODE:
+"start": "node ."
+
+----------------------------------------
+
+TITLE: Using awaitMessageComponent in discord.js
+DESCRIPTION: Shows how to use the awaitMessageComponent method to collect a single interaction from a select menu, with a filter to defer updates and check the user ID.
+
+LANGUAGE: javascript
+CODE:
+const { ComponentType } = require('discord.js');
+
+const collectorFilter = i => {
+	i.deferUpdate();
+	return i.user.id === interaction.user.id;
+};
+
+message.awaitMessageComponent({ filter: collectorFilter, componentType: ComponentType.StringSelect, time: 60_000 })
+	.then(interaction => interaction.editReply(`You selected ${interaction.values.join(', ')}!`))
+	.catch(err => console.log('No interactions were collected.'));
+
+----------------------------------------
+
+TITLE: Adding Lint Script
+DESCRIPTION: Script configuration to run ESLint for code linting
+
+LANGUAGE: json
+CODE:
+"lint": "eslint ."
+
+----------------------------------------
+
+TITLE: Formatting Hyperlinks in discord.js
+DESCRIPTION: This snippet shows how to use the hyperlink() function to create a masked markdown link and the hideLinkEmbed() function to prevent a URL from embedding.
+
+LANGUAGE: javascript
+CODE:
+const { hyperlink, hideLinkEmbed } = require('discord.js');
+const url = 'https://discord.js.org/';
+
+const link = hyperlink('discord.js', url);
+const hiddenEmbed = hideLinkEmbed(url);
+
+----------------------------------------
+
+TITLE: Tracking User Kicks with Audit Logs in Discord.js
+DESCRIPTION: Implements an event listener to track who kicks users from a Discord server using the guildAuditLogEntryCreate event.
+
+LANGUAGE: javascript
+CODE:
+const { AuditLogEvent, Events } = require('discord.js');
+
+client.on(Events.GuildAuditLogEntryCreate, async auditLog => {
+	// Define your variables.
+	const { action, executorId, targetId } = auditLog;
+
+	// Check only for kicked users.
+	if (action !== AuditLogEvent.MemberKick) return;
+
+	// Ensure the executor is cached.
+	const executor = await client.users.fetch(executorId);
+
+	// Ensure the kicked guild member is cached.
+	const kickedUser = await client.users.fetch(targetId);
+
+	// Now you can log the output!
+	console.log(`${kickedUser.tag} was kicked by ${executor.tag}.`);
+});
+
+----------------------------------------
+
+TITLE: Tracking Message Deletions with Audit Logs in Discord.js
+DESCRIPTION: Implements an event listener to track who deletes messages in a Discord server using the guildAuditLogEntryCreate event.
+
+LANGUAGE: javascript
+CODE:
+const { AuditLogEvent, Events } = require('discord.js');
+
+client.on(Events.GuildAuditLogEntryCreate, async auditLog => {
+	// Define your variables.
+	// The extra information here will be the channel.
+	const { action, extra: channel, executorId, targetId } = auditLog;
+
+	// Check only for deleted messages.
+	if (action !== AuditLogEvent.MessageDelete) return;
+
+	// Ensure the executor is cached.
+	const executor = await client.users.fetch(executorId);
+
+	// Ensure the author whose message was deleted is cached.
+	const target = await client.users.fetch(targetId);
+
+	// Log the output.
+	console.log(`A message by ${target.tag} was deleted by ${executor.tag} in ${channel}.`);
+});
+
+----------------------------------------
+
+TITLE: Subscribing to Individual Events in discord.js Voice
+DESCRIPTION: Demonstrates how to listen for specific state changes in VoiceConnection and AudioPlayer using the on() method. This approach allows for targeted handling of particular states.
+
+LANGUAGE: javascript
+CODE:
+const { VoiceConnectionStatus, AudioPlayerStatus } = require('@discordjs/voice');
+
+connection.on(VoiceConnectionStatus.Ready, (oldState, newState) => {
+	console.log('Connection is in the Ready state!');
+});
+
+player.on(AudioPlayerStatus.Playing, (oldState, newState) => {
+	console.log('Audio player is in the Playing state!');
+});
+
+----------------------------------------
+
+TITLE: Using Keyv Methods
+DESCRIPTION: Example of using Keyv's set, get, and clear methods with async/await.
+
+LANGUAGE: javascript
+CODE:
+(async () => {
+	// true
+	await keyv.set('foo', 'bar');
+
+	// bar
+	await keyv.get('foo');
+
+	// undefined
+	await keyv.clear();
+
+	// undefined
+	await keyv.get('foo');
+})();
+
+----------------------------------------
+
+TITLE: Configuring Custom Cache Sweeping in Discord.js
+DESCRIPTION: Implements custom sweep settings for messages and users, with messages older than 30 minutes being removed hourly and non-client bot users being swept hourly.
+
+LANGUAGE: javascript
+CODE:
+const client = new Client({
+	sweepers: {
+		...Options.DefaultSweeperSettings,
+		messages: {
+			interval: 3_600, // Every hour.
+			lifetime: 1_800, // Remove messages older than 30 minutes.
+		},
+		users: {
+			interval: 3_600, // Every hour.
+			filter: () => user => user.bot && user.id !== user.client.user.id, // Remove all bots.
+		},
+	},
+});
+
+----------------------------------------
+
+TITLE: Installing Keyv and Backend Packages
+DESCRIPTION: Commands to install Keyv and various backend packages using different package managers.
+
+LANGUAGE: sh
+CODE:
+npm install keyv
+
+LANGUAGE: sh
+CODE:
+npm install @keyv/redis
+npm install @keyv/mongo
+npm install @keyv/sqlite
+npm install @keyv/postgres
+npm install @keyv/mysql
+
+----------------------------------------
+
+TITLE: Message Timing with ms Package
+DESCRIPTION: Shows how to measure and format time differences between Discord messages using the ms package.
+
+LANGUAGE: javascript
+CODE:
+await interaction.reply('Send two messages and I\'ll tell you how far apart you sent them.');
+const messages = await interaction.channel.awaitMessages({
+	filter: m => m.author.id === interaction.user.id,
+	max: 2,
+	time: 30e3,
+	errors: ['time'],
+});
+
+const difference = messages.last().createdTimestamp - messages.first().createdTimestamp;
+const formatted = ms(difference);
+
+await interaction.followUp(`You sent the two messages ${formatted} apart.`);
+
+----------------------------------------
+
+TITLE: Sending Messages Across Shards in Discord.js
+DESCRIPTION: This snippet demonstrates how to send a message to a channel that may be on a different shard using broadcastEval(). It searches for the channel across all shards and sends a message if found.
+
+LANGUAGE: javascript
+CODE:
+if (commandName === 'send') {
+	const id = interaction.options.getString('destination');
+	return client.shard.broadcastEval(async (c, { channelId }) => {
+		const channel = c.channels.cache.get(channelId);
+		if (channel) {
+			await channel.send(`This is a message from shard ${c.shard.ids.join(',')}!`);
+			return true;
+		}
+		return false;
+	}, { context: { channelId: id } })
+		.then(console.log);
+}
+
+----------------------------------------
+
+TITLE: Finding Emojis Across Shards in Discord.js
+DESCRIPTION: This function demonstrates how to search for an emoji across all shards using broadcastEval(). It returns the emoji object if found, or null if not found.
+
+LANGUAGE: javascript
+CODE:
+function findEmoji(c, { nameOrId }) {
+	const emoji = c.emojis.cache.get(nameOrId) || c.emojis.cache.find(e => e.name.toLowerCase() === nameOrId.toLowerCase());
+	if (!emoji) return null;
+	// If you wanted to delete the emoji with discord.js, this is where you would do it. Otherwise, don't include this code.
+	emoji.delete();
+	return emoji;
+}
+
+----------------------------------------
+
+TITLE: Displaying Emoji Results in Discord.js
+DESCRIPTION: This snippet shows how to process the results of a broadcastEval() call for finding an emoji, and then display the found emoji in a message reply. It handles both animated and static emojis.
+
+LANGUAGE: javascript
+CODE:
+return client.shard.broadcastEval(findEmoji, { context: { nameOrId: emojiNameOrId } })
+	.then(emojiArray => {
+		// Locate a non falsy result, which will be the emoji in question
+		const foundEmoji = emojiArray.find(emoji => emoji);
+		if (!foundEmoji) return message.reply('I could not find such an emoji.');
+		return message.reply(`I have found the ${foundEmoji.animated ? `<${foundEmoji.identifier}>` : `<:${foundEmoji.identifier}> emoji!`}!`);
+	});
+
+----------------------------------------
+
+TITLE: Configuring ShardingManager with Arguments in Discord.js
+DESCRIPTION: Shows how to initialize ShardingManager with custom execution arguments and shard arguments. Includes configuration for Node.js flags and bot-specific arguments.
+
+LANGUAGE: javascript
+CODE:
+const manager = new ShardingManager('./bot.js', {
+	execArgv: ['--trace-warnings'],
+	shardArgs: ['--ansi', '--color'],
+	token: 'your-token-goes-here',
+});
+
+----------------------------------------
+
+TITLE: Targeting Specific Shards in Discord.js
+DESCRIPTION: Demonstrates how to target and terminate a specific shard using broadcastEval. This example targets shard 0 for process termination.
+
+LANGUAGE: javascript
+CODE:
+client.shard.broadcastEval(c => {
+	if (c.shard.ids.includes(0)) process.exit();
+});
+
+----------------------------------------
+
+TITLE: Handling BroadcastEval Results in Discord.js
+DESCRIPTION: This snippet shows how to process the results of a broadcastEval() call, providing appropriate feedback to the user based on whether the message was successfully sent to a channel on any shard.
+
+LANGUAGE: javascript
+CODE:
+return client.shard.broadcastEval(c => {
+	// ...
+})
+	.then(sentArray => {
+		// Search for a non falsy value before providing feedback
+		if (!sentArray.includes(true)) {
+			return message.reply('I could not find such a channel.');
+		}
+		return message.reply(`I have sent a message to channel: \`${id}\`!`);
+	});
+
+----------------------------------------
+
+TITLE: Creating OAuth2 User Interface in HTML
+DESCRIPTION: Defines the basic HTML structure for the OAuth2 application interface.
+
+LANGUAGE: html
+CODE:
+<!DOCTYPE html>
+<html>
+	<head>
+		<title>My Discord OAuth2 App</title>
+	</head>
+	<body>
+		<div id="info">Hoi!</div>
+	</body>
+</html>
+
+----------------------------------------
+
+TITLE: Localized Response Implementation
+DESCRIPTION: Example showing how to implement localized command responses based on user locale.
+
+LANGUAGE: javascript
+CODE:
+client.on(Events.InteractionCreate, interaction => {
+	const locales = {
+		pl: 'Witaj Świecie!',
+		de: 'Hallo Welt!',
+	};
+	interaction.reply(locales[interaction.locale] ?? 'Hello World (default is english)');
+});
+
+----------------------------------------
+
+TITLE: Implementing Implicit Grant Flow in HTML
+DESCRIPTION: Adds JavaScript to handle the implicit grant flow, including parsing the access token and fetching user data from Discord API.
+
+LANGUAGE: html
+CODE:
+<div id="info">Hoi!</div>
+<a id="login" style="display: none;" href="your-oauth2-URL-here">Identify Yourself</a>
+<script>
+	window.onload = () => {
+		const fragment = new URLSearchParams(window.location.hash.slice(1));
+		const [accessToken, tokenType] = [fragment.get('access_token'), fragment.get('token_type')];
+
+		if (!accessToken) {
+			return (document.getElementById('login').style.display = 'block');
+		}
+
+		fetch('https://discord.com/api/users/@me', {
+			headers: {
+				authorization: `${tokenType} ${accessToken}`,
+			},
+		})
+			.then(result => result.json())
+			.then(response => {
+				const { username, discriminator } = response;
+				document.getElementById('info').innerText += ` ${username}#${discriminator}`;
+			})
+			.catch(console.error);
+	};
+</script>
+
+----------------------------------------
+
+TITLE: Deleting Specific Discord.js Commands using REST API
+DESCRIPTION: This code snippet demonstrates how to delete specific guild-based or global commands using the Discord.js REST API. It requires the command ID, which can be obtained from the Discord server settings.
+
+LANGUAGE: javascript
+CODE:
+const { REST, Routes } = require('discord.js');
+const { clientId, guildId, token } = require('./config.json');
+
+const rest = new REST().setToken(token);
+
+// ...
+
+// for guild-based commands
+rest.delete(Routes.applicationGuildCommand(clientId, guildId, 'commandId'))
+	.then(() => console.log('Successfully deleted guild command'))
+	.catch(console.error);
+
+// for global commands
+rest.delete(Routes.applicationCommand(clientId, 'commandId'))
+	.then(() => console.log('Successfully deleted application command'))
+	.catch(console.error);
+
+----------------------------------------
+
+TITLE: Sending Action Rows in discord.js
+DESCRIPTION: Illustrates how to send action rows as part of an interaction reply in discord.js, using the components property of InteractionReplyOptions.
+
+LANGUAGE: javascript
+CODE:
+const row = new ActionRowBuilder()
+	.addComponents(component);
+
+await interaction.reply({ components: [row] });
+
+----------------------------------------
+
+TITLE: Setting Required Option in Slash Command for discord.js
+DESCRIPTION: Shows how to make an option required in a slash command using setRequired(true). This ensures the command cannot be executed without the required value.
+
+LANGUAGE: javascript
+CODE:
+const { SlashCommandBuilder } = require('discord.js');
+
+const data = new SlashCommandBuilder()
+	.setName('echo')
+	.setDescription('Replies with your input!')
+	.addStringOption(option =>
+		option.setName('input')
+			.setDescription('The input to echo back')
+			.setRequired(true));
+
+----------------------------------------
+
+TITLE: Adding Localizations to Slash Commands in discord.js
+DESCRIPTION: Shows how to add localizations to slash command names and descriptions using setNameLocalizations() and setDescriptionLocalizations(). This example localizes a 'dog' command to Polish and German.
+
+LANGUAGE: javascript
+CODE:
+const { SlashCommandBuilder } = require('discord.js');
+
+const data = new SlashCommandBuilder()
+	.setName('dog')
+	.setNameLocalizations({
+		pl: 'pies',
+		de: 'hund',
+	})
+	.setDescription('Get a cute picture of a dog!')
+	.setDescriptionLocalizations({
+		pl: 'Słodkie zdjęcie pieska!',
+		de: 'Poste ein niedliches Hundebild!',
+	})
+	.addStringOption(option =>
+		option
+			.setName('breed')
+			.setDescription('Breed of dog')
+			.setNameLocalizations({
+				pl: 'rasa',
+				de: 'rasse',
+			})
+			.setDescriptionLocalizations({
+				pl: 'Rasa psa',
+				de: 'Hunderasse',
+			}),
+	);
+
+----------------------------------------
+
+TITLE: Managing Cooldown Timeouts in Discord.js
+DESCRIPTION: Sets up automatic cleanup of cooldown entries using setTimeout, ensuring that expired cooldowns are removed from the collection.
+
+LANGUAGE: javascript
+CODE:
+if (timestamps.has(interaction.user.id)) {
+	// ...
+}
+
+timestamps.set(interaction.user.id, now);
+setTimeout(() => timestamps.delete(interaction.user.id), cooldownAmount);
+
+----------------------------------------
+
+TITLE: Implementing Tag Info Display Command
+DESCRIPTION: Handles the 'taginfo' command to display metadata about a specific tag, including creation date and usage count.
+
+LANGUAGE: javascript
+CODE:
+else if (commandName == 'taginfo') {
+	const tagName = interaction.options.getString('name');
+
+	// equivalent to: SELECT * FROM tags WHERE name = 'tagName' LIMIT 1;
+	const tag = await Tags.findOne({ where: { name: tagName } });
+
+	if (tag) {
+		return interaction.reply(`${tagName} was created by ${tag.username} at ${tag.createdAt} and has been used ${tag.usage_count} times.`);
+	}
+
+	return interaction.reply(`Could not find tag: ${tagName}`);
+}
+
+----------------------------------------
+
+TITLE: Direct Resource Error Handling
+DESCRIPTION: Demonstrates alternative (not recommended) approach of handling errors directly on the audio resource instead of the player.
+
+LANGUAGE: javascript
+CODE:
+const { createAudioResource, createAudioPlayer } = require('@discordjs/voice');
+
+const player = createAudioPlayer();
+
+const resource = createAudioResource('/home/user/voice/music.mp3', {
+	metadata: {
+		title: 'A good song!',
+	},
+});
+
+// Not recommended - listen to errors from the audio player instead for most usecases!
+resource.playStream.on('error', error => {
+	console.error('Error:', error.message, 'with track', resource.metadata.title);
+});
+
+player.play(resource);
+
+----------------------------------------
+
+TITLE: Implementing Tag Deletion Command
+DESCRIPTION: Handles the 'deletetag' command to remove a tag from the database, with error handling for non-existent tags.
+
+LANGUAGE: javascript
+CODE:
+else if (command === 'deletetag') {
+	const tagName = interaction.options.getString('name');
+	// equivalent to: DELETE from tags WHERE name = ?;
+	const rowCount = await Tags.destroy({ where: { name: tagName } });
+
+	if (!rowCount) return interaction.reply('That tag doesn\'t exist.');
+
+	return interaction.reply('Tag deleted.');
+}
+
+----------------------------------------
+
+TITLE: Adding User Avatar to Profile Image
+DESCRIPTION: Code to load and draw the user's avatar onto the canvas, including circular clipping for a rounded avatar.
+
+LANGUAGE: javascript
+CODE:
+const { request } = require('undici');
+
+client.on(Events.InteractionCreate, async interaction => {
+	// ...
+	context.strokeRect(0, 0, canvas.width, canvas.height);
+
+	// Using undici to make HTTP requests for better performance
+	const { body } = await request(interaction.user.displayAvatarURL({ extension: 'jpg' }));
+	const avatar = await Canvas.loadImage(await body.arrayBuffer());
+
+	// Pick up the pen
+	context.beginPath();
+
+	// Start the arc to form a circle
+	context.arc(125, 125, 100, 0, Math.PI * 2, true);
+
+	// Put the pen down
+	context.closePath();
+
+	// Clip off the region you drew on
+	context.clip();
+
+	// Draw a shape onto the main canvas
+	context.drawImage(avatar, 25, 25, 200, 200);
+	// ...
+});

@@ -1,0 +1,1979 @@
+TITLE: Describing Behavior in Gherkin
+DESCRIPTION: Demonstrates the difference between describing behavior and implementation in Gherkin scenarios. The first example shows a concise, behavior-focused approach, while the second shows a more detailed, implementation-specific approach.
+
+LANGUAGE: gherkin
+CODE:
+When "Bob" logs in
+
+LANGUAGE: gherkin
+CODE:
+Given I visit "/login"
+When I enter "Bob" in the "user name" field
+  And I enter "tester" in the "password" field
+  And I press the "login" button
+Then I should see the "welcome" page
+
+----------------------------------------
+
+TITLE: Writing a Gherkin Scenario for Cucumber
+DESCRIPTION: This snippet demonstrates how to write a basic scenario in Gherkin syntax, which Cucumber uses to create executable specifications. It includes Given, When, and Then steps to describe a word-guessing game interaction.
+
+LANGUAGE: gherkin
+CODE:
+Scenario: Breaker guesses a word
+  Given the Maker has chosen a word
+  When the Breaker makes a guess
+  Then the Maker is asked to score
+
+----------------------------------------
+
+TITLE: Basic Gherkin Scenario Example
+DESCRIPTION: A simple Gherkin scenario demonstrating the syntax for defining test steps
+
+LANGUAGE: gherkin
+CODE:
+Scenario: Some cukes
+  Given I have 48 cukes in my belly
+
+----------------------------------------
+
+TITLE: Basic Gherkin Feature Example
+DESCRIPTION: Demonstrates basic Gherkin syntax including features, scenarios, and steps with comments. Shows proper indentation and structure.
+
+LANGUAGE: gherkin
+CODE:
+Feature: Guess the word
+
+  # The first example has two steps
+  Scenario: Maker starts a game
+    When the Maker starts a game
+    Then the Maker waits for a Breaker to join
+
+  # The second example has three steps
+  Scenario: Breaker joins a game
+    Given the Maker has started a game with the word "silky"
+    When the Breaker joins the Maker's game
+    Then the Breaker must guess a word with 5 characters
+
+----------------------------------------
+
+TITLE: Writing Basic Cucumber Feature with Scenario
+DESCRIPTION: Demonstrates the structure of a basic Cucumber feature file including feature description, business value, user role, and a simple scenario with Given-When-Then steps
+
+LANGUAGE: gherkin
+CODE:
+Feature: Explaining Cucumber
+  In order to gain an understanding of the Cucumber testing system
+  As a non-programmer
+  I want to have an overview of Cucumber that is understandable by non-geeks
+
+  Scenario: A worker seeks an overview of Cucumber
+    Given I have a coworker who knows a lot about Cucumber
+    When I ask my coworker to give an overview of how Cucumber works
+    And I listen to their explanation
+    Then I should have a basic understanding of Cucumber
+
+----------------------------------------
+
+TITLE: Basic User Story Format Template
+DESCRIPTION: Standard template for writing user stories following the Who/What/Why format
+
+LANGUAGE: plaintext
+CODE:
+As an <actor>
+I want a <feature>
+So that <benefit>
+
+----------------------------------------
+
+TITLE: Basic Gherkin Feature File
+DESCRIPTION: Defines a feature file with scenarios to test whether a given day is Friday
+
+LANGUAGE: gherkin
+CODE:
+Feature: Is it Friday yet?
+  Everybody wants to know when it's Friday
+
+  Scenario: Sunday isn't Friday
+    Given today is Sunday
+    When I ask whether it's Friday yet
+    Then I should be told "Nope"
+
+----------------------------------------
+
+TITLE: Java Step Definition Implementation
+DESCRIPTION: Implementation of step definitions in Java using both traditional and lambda syntax
+
+LANGUAGE: java
+CODE:
+package com.example;
+import io.cucumber.java.en.Given;
+
+public class StepDefinitions {
+    @Given("I have {int} cukes in my belly")
+    public void i_have_n_cukes_in_my_belly(int cukes) {
+        System.out.format("Cukes: %n\n", cukes);
+    }
+}
+
+LANGUAGE: java
+CODE:
+package com.example;
+import io.cucumber.java8.En;
+
+public class StepDefinitions implements En {
+    public StepDefinitions() {
+        Given("I have {int} cukes in my belly", (Integer cukes) -> {
+            System.out.format("Cukes: %n\n", cukes);
+        });
+    }
+}
+
+----------------------------------------
+
+TITLE: Step Definitions Implementation
+DESCRIPTION: Implementation of Cucumber step definitions in multiple languages
+
+LANGUAGE: java
+CODE:
+public class Stepdefs {
+    private String today;
+    private String actualAnswer;
+
+    @Given("today is {string}")
+    public void today_is(String today) {
+        this.today = today;
+    }
+
+    @When("I ask whether it's Friday yet")
+    public void i_ask_whether_it_s_Friday_yet() {
+        actualAnswer = IsItFriday.isItFriday(today);
+    }
+
+    @Then("I should be told {string}")
+    public void i_should_be_told(String expectedAnswer) {
+        assertEquals(expectedAnswer, actualAnswer);
+    }
+}
+
+LANGUAGE: javascript
+CODE:
+const assert = require('assert');
+const { Given, When, Then } = require('@cucumber/cucumber');
+
+Given('today is {string}', function (givenDay) {
+  this.today = givenDay;
+});
+
+When('I ask whether it\'s Friday yet', function () {
+  this.actualAnswer = isItFriday(this.today);
+});
+
+Then('I should be told {string}', function (expectedAnswer) {
+  assert.strictEqual(this.actualAnswer, expectedAnswer);
+});
+
+----------------------------------------
+
+TITLE: Implementing Debugging Helpers for Cucumber in Ruby
+DESCRIPTION: This Ruby code snippet adds debugging capabilities to Cucumber tests. It includes features like screenshot capture on failure, stepping through scenarios, and dropping into a debugger on failure. The code also provides logging and error handling mechanisms.
+
+LANGUAGE: ruby
+CODE:
+# rubocop:disable Lint/Debugger
+class CucumberCounters
+  @error_counter = 0
+  @step_counter = 0
+  @screenshot_counter = 0
+  class << self
+    attr_accessor :error_counter, :step_counter, :screenshot_counter
+  end
+end
+
+# `LAUNCHY=1 cucumber` to open save screenshot after every step
+After do |scenario|
+  next unless (ENV['LAUNCHY'] || ENV['CI']) && scenario.failed?
+  puts "Opening snapshot for #{scenario.name}"
+  begin
+    save_and_open_screenshot
+  rescue StandardError
+    puts "Can't save screenshot"
+  end
+  begin
+    save_and_open_page
+  rescue StandardError
+    puts "Can't save page"
+  end
+end
+
+# `FAST=1 cucumber` to stop on first failure
+After do |scenario|
+  Cucumber.wants_to_quit = ENV['FAST'] && scenario.failed?
+end
+
+# `DEBUG=1 cucumber` to drop into debugger on failure
+Cucumber::Core::Test::Action.class_eval do
+  ## first make sure we don't lose original accept method
+  unless instance_methods.include?(:orig_failed)
+    alias_method :orig_failed, :failed
+  end
+
+  ## wrap original accept method to catch errors in executed step
+  def failed(*args)
+    begin
+      CucumberCounters.error_counter += 1
+      file_name = format('tmp/capybara/error_%03d.png',
+                         CucumberCounters.error_counter)
+      Capybara.page.save_screenshot(file_name, full: true)
+    rescue
+      Rails.logger.info('[Cucumber] Can not make screenshot of failure')
+    end
+    binding.pry if ENV['DEBUG']
+    orig_failed(*args)
+  end
+end
+
+# Store the current scenario name as an instance variable, to make it
+# available to the other hooks.
+Before do |scenario|
+  case scenario
+  when Cucumber::Ast::Scenario
+    @scenario_name = scenario.name
+  when Cucumber::Ast::OutlineTable::ExampleRow
+    @scenario_name = scenario.scenario_outline.name
+  end
+  Rails.logger.info("[Cucumber] starting the #{@scenario_name}")
+end
+
+# `STEP=1 cucumber` to pause after each step
+AfterStep do |scenario|
+  next unless ENV['STEP']
+  unless defined?(@counter)
+    puts "Stepping through #{@scenario_name}"
+    @counter = 0
+  end
+  @counter += 1
+  print "After step ##{@counter}/#{scenario.send(:steps).try(:count)}: "\
+        "#{scenario.send(:steps).to_a[@counter].try(:name) ||
+        '[RETURN to continue]'}..."
+  STDIN.getc
+end
+
+AfterStep do |scenario|
+  CucumberCounters.step_counter += 1
+  step = CucumberCounters.step_counter
+  file_name = format('tmp/capybara/step_%03d.png', step)
+  Rails.logger.info("[Cucumber] after step: #{@scenario_name}, step: #{step}")
+  next unless scenario.source_tag_names.include?('@intermittent')
+  begin
+    Capybara.page.save_screenshot(file_name, full: true)
+    Rails.logger.info("[Cucumber] Screenshot #{step} saved")
+  rescue
+    Rails.logger.info("[Cucumber] Can not make screenshot of #{step}")
+  end
+end
+
+AfterStep do
+  begin
+    execute_script "$(window).unbind('beforeunload')"
+  rescue => e
+    Rails.logger.error("An error was encountered and rescued")
+    Rails.logger.error(e.backtrace)
+  end
+end
+
+def dismiss_nav_warning
+  execute_script "$(window).unbind('beforeunload')"
+  wait_until_jquery_inactive
+end
+
+def wait_until_jquery_inactive
+  Capybara.using_wait_time(Capybara.default_max_wait_time) do
+    page.evaluate_script('jQuery.active').zero?
+  end
+end
+
+----------------------------------------
+
+TITLE: Implementing Custom World Module in Ruby
+DESCRIPTION: Shows how to create and configure a custom World object to share helper methods across step definitions in Ruby Cucumber tests.
+
+LANGUAGE: ruby
+CODE:
+module CustomWorld
+  def a_helper
+    ...
+  end
+end
+
+World(CustomWorld)
+
+----------------------------------------
+
+TITLE: Gherkin Scenario Outline Example
+DESCRIPTION: Shows how to use Scenario Outlines with Examples tables to run the same scenario with different data sets.
+
+LANGUAGE: gherkin
+CODE:
+Scenario Outline: eating
+  Given there are <start> cucumbers
+  When I eat <eat> cucumbers
+  Then I should have <left> cucumbers
+
+  Examples:
+    | start | eat | left |
+    |    12 |   5 |    7 |
+    |    20 |   5 |   15 |
+
+----------------------------------------
+
+TITLE: Configuring Cucumber Profiles in Ruby
+DESCRIPTION: This snippet shows how to set up Cucumber profiles in a cucumber.yml file for Ruby, including a default profile and custom profiles.
+
+LANGUAGE: yaml
+CODE:
+default: --profile html_report --profile bvt
+html_report: --format progress --format html --out=features_report.html
+bvt: --tags @bvt
+
+----------------------------------------
+
+TITLE: Registering Custom Data Table Type in Java
+DESCRIPTION: This snippet demonstrates how to register a custom 'Author' data table type in Java using the @DataTableType annotation.
+
+LANGUAGE: java
+CODE:
+package com.example;
+
+import io.cucumber.java.DataTableType;
+import io.cucumber.java.en.Given;
+
+import java.util.List;
+import java.util.Map;
+
+public class StepDefinitions {
+
+    @DataTableType
+    public Author authorEntry(Map<String, String> entry) {
+        return new Author(
+            entry.get("firstName"),
+            entry.get("lastName"),
+            entry.get("famousBook"));
+    }
+
+    @Given("There are my favorite authors")
+    public void these_are_my_favourite_authors(List<Author> authors) {
+        // step implementation
+    }
+}
+
+----------------------------------------
+
+TITLE: Implementing Java Step Definition with DataTable
+DESCRIPTION: Shows how to implement a step definition in Java that accepts a DataTable parameter for passing tabular test data
+
+LANGUAGE: java
+CODE:
+@Given("the following animals:")
+public void the_following_animals(List<String> animals) {
+}
+
+----------------------------------------
+
+TITLE: Kotlin Step Definition Implementation
+DESCRIPTION: Implementation of step definitions using Kotlin with cucumber-java8
+
+LANGUAGE: kotlin
+CODE:
+package com.example
+import io.cucumber.java8.En
+
+class StepDefinitions : En {
+
+    init {
+        Given("I have {int} cukes in my belly") { cukes: Int ->
+                println("Cukes: $cukes")
+        }
+    }
+
+}
+
+----------------------------------------
+
+TITLE: Scala Step Definition Implementation
+DESCRIPTION: Implementation of step definitions using Scala with ScalaDsl
+
+LANGUAGE: scala
+CODE:
+package com.example
+import io.cucumber.scala.{ScalaDsl, EN}
+
+class StepDefinitions extends ScalaDsl with EN {
+
+    Given("I have {int} cukes in my belly") { cukes: Int =>
+        println(s"Cukes: $cukes")
+    }
+
+}
+
+----------------------------------------
+
+TITLE: Selenium WebDriver Implementation in Java
+DESCRIPTION: Java implementation of Google search test using Selenium WebDriver and Cucumber step definitions
+
+LANGUAGE: java
+CODE:
+package com.example;
+
+import io.cucumber.java.After;
+import org.openqa.selenium.By;
+import org.openqa.selenium.WebDriver;
+import org.openqa.selenium.WebElement;
+import org.openqa.selenium.firefox.FirefoxDriver;
+import org.openqa.selenium.support.ui.ExpectedCondition;
+import org.openqa.selenium.support.ui.WebDriverWait;
+import io.cucumber.java.en.Given;
+import io.cucumber.java.en.Then;
+import io.cucumber.java.en.When;
+
+public class ExampleSteps {
+
+    private final WebDriver driver = new FirefoxDriver();
+    
+    @Given("I am on the Google search page")
+    public void I_visit_google() {
+        driver.get("https://www.google.com");
+    }
+
+    @When("I search for {string}")
+    public void search_for(String query) {
+        WebElement element = driver.findElement(By.name("q"));
+        // Enter something to search for
+        element.sendKeys(query);
+        // Now submit the form. WebDriver will find the form for us from the element
+        element.submit();
+   }
+
+   @Then("the page title should start with {string}")
+   public void checkTitle(String titleStartsWith) {
+       // Google's search is rendered dynamically with JavaScript
+       // Wait for the page to load timeout after ten seconds
+       new WebDriverWait(driver,10L).until(new ExpectedCondition<Boolean>() {
+           public Boolean apply(WebDriver d) {
+               return d.getTitle().toLowerCase().startsWith(titleStartsWith);
+           }
+       });
+   }
+
+   @After()
+   public void closeBrowser() {
+       driver.quit();
+   }
+}
+
+----------------------------------------
+
+TITLE: Ruby Step Definition Implementation
+DESCRIPTION: Implementation of step definitions in Ruby using cucumber syntax
+
+LANGUAGE: ruby
+CODE:
+Given('I have {int} cukes in my belly') do |cukes|
+  puts "Cukes: #{cukes}"
+end
+
+----------------------------------------
+
+TITLE: JavaScript Step Definition Implementation
+DESCRIPTION: Implementation of step definitions in JavaScript using cucumber-js
+
+LANGUAGE: javascript
+CODE:
+const { Given } = require('cucumber')
+
+Given('I have {int} cukes in my belly', function (cukes) {
+  console.log(`Cukes: ${cukes}`)
+});
+
+----------------------------------------
+
+TITLE: Using RestAssured with Cucumber
+DESCRIPTION: RestAssured integration with Cucumber for Java and Kotlin based API testing. Used in step definitions for making API calls and response verification.
+
+
+
+----------------------------------------
+
+TITLE: Installing Cucumber-JVM with Maven
+DESCRIPTION: Maven dependency configuration for adding Cucumber-JVM to a Java project. Adds the core cucumber-java package with test scope.
+
+LANGUAGE: xml
+CODE:
+<dependency>
+    <groupId>io.cucumber</groupId>
+    <artifactId>cucumber-java</artifactId>
+    <version>{{% version "cucumberjvm" %}}</version>
+    <scope>test</scope>
+</dependency>
+
+----------------------------------------
+
+TITLE: Installing Cucumber.js with npm
+DESCRIPTION: This command installs Cucumber.js as a development dependency using npm. It adds @cucumber/cucumber to the project's devDependencies in package.json.
+
+LANGUAGE: shell
+CODE:
+npm install --save-dev @cucumber/cucumber
+
+----------------------------------------
+
+TITLE: Adding Cucumber to Gemfile for Bundler
+DESCRIPTION: Adds the Cucumber gem to the project's Gemfile for use with Bundler.
+
+LANGUAGE: ruby
+CODE:
+gem 'cucumber'
+
+----------------------------------------
+
+TITLE: Defining Step for Opening Web Pages in Kotlin
+DESCRIPTION: Demonstrates how to create a reusable step definition in Kotlin for opening various web pages using a factory method.
+
+LANGUAGE: kotlin
+CODE:
+@Given("I go to the {string} page")
+fun `I want to open page`(webpage: String) {
+  webpageFactory.openPage(webpage)
+}
+
+----------------------------------------
+
+TITLE: Defining Step for Opening Web Pages in Go
+DESCRIPTION: Shows how to implement a flexible step definition in Go for opening different web pages using a factory method.
+
+LANGUAGE: golang
+CODE:
+s.Step(`^I go to the "([^"]*)" page$`, goToPage)
+
+func goToPage(webpage string) error {
+ return webpageFactory.Open(webpage)
+}
+
+----------------------------------------
+
+TITLE: Implementing Feature-Coupled Step Definition in Java
+DESCRIPTION: Demonstrates how a feature-coupled step definition might be implemented in Java. This example shows a step definition that is tightly coupled to a specific feature, making it difficult to reuse across different scenarios.
+
+LANGUAGE: java
+CODE:
+    @Given("I have a CV and I'm on the edit description page")
+    public void I_have_a_CV_and_Im_on_the_edit_description_page() {
+        Employee employee = new Employee("Sally");
+        employee.createCV();
+    }
+
+----------------------------------------
+
+TITLE: Implementing Step Definitions
+DESCRIPTION: Step definition classes in Java and Kotlin that implement the Gherkin steps with thread ID logging
+
+LANGUAGE: java
+CODE:
+package parallel;
+
+import io.cucumber.java.BeforeStep;
+import io.cucumber.java.en.Given;
+
+public class StepDefs {
+
+	@Given("Step from {string} in {string} feature file")
+	public void step(String scenario, String file) {
+		System.out.format("Thread ID - %2d - %s from %s feature file.\n",
+		Thread.currentThread().getId(), scenario,file);
+	}
+}
+
+LANGUAGE: kotlin
+CODE:
+package parallel
+
+import io.cucumber.java8.En
+
+class StepDefs : En {	
+	init {
+        Given("Step from {string} in {string} feature file") { scenario: String , file: String ->
+            println("Thread ID - ${Thread.currentThread().id} - $scenario from $file feature file")
+        }
+    }
+}
+
+----------------------------------------
+
+TITLE: Ruby HTTP Clients with Cucumber
+DESCRIPTION: Various Ruby HTTP client libraries integration with Cucumber including HTTParty, Net::HTTP, Faraday, curb, and Typhoeus for API testing.
+
+
+
+----------------------------------------
+
+TITLE: Gherkin Feature with DataTable
+DESCRIPTION: Example Gherkin feature file demonstrating use of data tables to pass test data
+
+LANGUAGE: gherkin
+CODE:
+Given the following animals:
+  | cow   |
+  | horse |
+  | sheep |
+
+----------------------------------------
+
+TITLE: Adding Cucumber-Scala Dependency in Sbt
+DESCRIPTION: This Scala snippet demonstrates how to add the Cucumber-Scala dependency to an Sbt project's build file. It uses the %% operator for cross-building and specifies the Test configuration.
+
+LANGUAGE: scala
+CODE:
+libraryDependencies += "io.cucumber" %% "cucumber-scala" % "{{% version "cucumberscala" %}}" % Test
+
+----------------------------------------
+
+TITLE: Installing Cucumber via RubyGems
+DESCRIPTION: Installs Cucumber globally using the RubyGems package manager.
+
+LANGUAGE: shell
+CODE:
+gem install cucumber
+
+----------------------------------------
+
+TITLE: Stubbing HTTP Responses with RSpec in Ruby Cucumber Tests
+DESCRIPTION: This snippet demonstrates how to use RSpec to stub an HTTP response in a Cucumber test. It sets up a temporary scope for the stub and defines a mock response for a SmartyStreets API call.
+
+LANGUAGE: ruby
+CODE:
+require 'cucumber/rspec/doubles'
+
+RSpec::Mocks.with_temporary_scope do
+stub_resp = {"city"=>"San Francisco", "state_abbreviation"=>"CA", "state"=>"California", "mailable_city"=>true}
+SmartyStreets.stub(:get_city_state).with("94109").and_return(stub_resp)
+
+click_button "check zip"
+end
+
+----------------------------------------
+
+TITLE: Adding Cucumber-Rails to Gemfile
+DESCRIPTION: Adds the cucumber-rails and database_cleaner gems to the test group in the Gemfile for Rails projects.
+
+LANGUAGE: ruby
+CODE:
+group :test do
+  gem 'cucumber-rails', require: false
+  # database_cleaner is not mandatory, but highly recommended
+  gem 'database_cleaner'
+end
+
+----------------------------------------
+
+TITLE: Initializing Cucumber Features Directory
+DESCRIPTION: Creates the initial Cucumber features directory structure in the project.
+
+LANGUAGE: shell
+CODE:
+cucumber --init
+
+----------------------------------------
+
+TITLE: PactumJS Integration with Cucumber
+DESCRIPTION: PactumJS usage guidelines for REST API testing with Cucumber in JavaScript. Supports all levels of the test pyramid for API automation.
+
+
+
+----------------------------------------
+
+TITLE: Maven Dependencies for TestNG Integration
+DESCRIPTION: XML configuration for adding TestNG and Cucumber TestNG dependencies to a Maven project.
+
+LANGUAGE: xml
+CODE:
+<dependency>
+    <groupId>org.testng</groupId>
+    <artifactId>testng</artifactId>
+    <version>{{% version "testng" %}}</version>
+    <scope>test</scope>
+</dependency>
+<dependency>
+    <groupId>io.cucumber</groupId>
+    <artifactId>cucumber-testng</artifactId>
+    <version>{{% version "cucumberjvm" %}}</version>
+    <scope>test</scope>
+</dependency>
+
+----------------------------------------
+
+TITLE: Installing Gems with Bundler
+DESCRIPTION: Installs all gems specified in the Gemfile, including Cucumber.
+
+LANGUAGE: shell
+CODE:
+bundle
+
+----------------------------------------
+
+TITLE: Checking Cucumber Installation
+DESCRIPTION: Verifies the Cucumber installation by displaying the help information.
+
+LANGUAGE: shell
+CODE:
+cucumber --help
+
+----------------------------------------
+
+TITLE: Ruby RSpec Configuration Example
+DESCRIPTION: Example of configuring RSpec expectations in Cucumber environment.
+
+LANGUAGE: ruby
+CODE:
+RSpec.configure do |config|
+  config.expect_with :rspec do |c|
+    c.syntax = :expect
+  end
+end
+
+----------------------------------------
+
+TITLE: Configuring Basic Cucumber Rake Task in Ruby
+DESCRIPTION: Sets up a basic Rake task for running Cucumber features with pretty formatting. Demonstrates how to require necessary gems and configure cucumber options.
+
+LANGUAGE: ruby
+CODE:
+require 'rubygems'
+require 'cucumber'
+require 'cucumber/rake/task'
+
+Cucumber::Rake::Task.new(:features) do |t|
+  t.cucumber_opts = "--format pretty" # Any valid command line option can go here.
+end
+
+----------------------------------------
+
+TITLE: Configuring Multiple Profile-based Rake Tasks for Cucumber
+DESCRIPTION: Creates separate Rake tasks for different Cucumber profiles, allowing different configurations for scenarios like non-JavaScript and Selenium tests.
+
+LANGUAGE: ruby
+CODE:
+require 'rubygems'
+require 'cucumber'
+require 'cucumber/rake/task'
+
+namespace :features do
+  Cucumber::Rake::Task.new(:non_js) do |t|
+    t.profile = "webrat"
+  end
+
+  Cucumber::Rake::Task.new(:selenium) do |t|
+    t.profile = "selenium"
+  end
+end
+
+----------------------------------------
+
+TITLE: Maven Test File Naming Conventions
+DESCRIPTION: Specifies the naming patterns required for test files to be automatically detected by Maven Surefire and Failsafe plugins.
+
+LANGUAGE: text
+CODE:
+Surefire: *Test.java (Java) or *Test.kt (Kotlin)
+Failsafe: *IT.java (Java) or *IT.kt (Kotlin)
+
+----------------------------------------
+
+TITLE: Production-Safe Cucumber Rake Task Implementation
+DESCRIPTION: Implements a guarded Rake task that safely handles environments where Cucumber isn't installed, preventing errors in production systems.
+
+LANGUAGE: ruby
+CODE:
+require 'rubygems'
+
+begin
+  require 'cucumber'
+  require 'cucumber/rake/task'
+
+  Cucumber::Rake::Task.new(:features) do |t|
+    t.cucumber_opts = "--format pretty"
+  end
+
+  task features: 'db:test:prepare'
+rescue LoadError
+  desc 'Cucumber rake task not available'
+  task :features do
+    abort 'Cucumber rake task is not available. Be sure to install cucumber as a gem or plugin'
+  end
+end
+
+----------------------------------------
+
+TITLE: Creating Card Layout for Book Recommendations using HTML and Markdown
+DESCRIPTION: This snippet demonstrates how to create a responsive card layout for displaying book recommendations. It uses a combination of HTML for structure and Markdown shortcodes for content. The layout is divided into three columns, each containing a card with a book's information.
+
+LANGUAGE: html
+CODE:
+<div class="columns">
+  <div class="column is-one-third">
+     {{% card 
+         title="Discovery"
+         image="/img/book-discovery.png" 
+         link="https://bddbooks.com/"
+     %}}
+This practical guide by Gáspár Nagy and Seb Rose explains good collaboration techniques, illustrated by concrete examples.
+     {{% /card %}}
+  </div>
+  <div class="column is-one-third">
+    {{% card 
+        title="The Cucumber Book"
+        image="/img/book-cucumber-book.jpg" 
+        link="https://www.amazon.com/Cucumber-Book-2e-Matt-Wynne/dp/1680502387"
+    %}}
+Matt Wynne and Aslak Hellesøy show you how to express your customers' wild ideas as a set of clear, executable specifications that everyone on the team can read.
+    {{% /card %}}
+  </div>
+  <div class="column is-one-third">
+    {{% card 
+        title="BDD in Action"
+        image="/img/book-bdd-in-action.jpg" 
+        link="https://www.manning.com/books/bdd-in-action"
+    %}}
+BDD in Action by John Ferguson Smart teaches you Behavior-Driven Development and shows you how to integrate it into your existing development process.
+    {{% /card %}}
+  </div>
+</div>
+
+----------------------------------------
+
+TITLE: Imperative Style Gherkin Scenario
+DESCRIPTION: An example of a Gherkin feature written in an imperative style. This style focuses on specific implementation details and steps, which can make the scenario more brittle and harder to maintain.
+
+LANGUAGE: gherkin
+CODE:
+Feature: Subscribers see different articles based on their subscription level 
+
+Scenario: Free subscribers see only the free articles
+  Given users with a free subscription can access "FreeArticle1" but not "PaidArticle1" 
+  When I type "freeFrieda@example.com" in the email field
+  And I type "validPassword123" in the password field
+  And I press the "Submit" button
+  Then I see "FreeArticle1" on the home page
+  And I do not see "PaidArticle1" on the home page
+
+Scenario: Subscriber with a paid subscription can access "FreeArticle1" and "PaidArticle1"
+  Given I am on the login page
+  When I type "paidPattya@example.com" in the email field
+  And I type "validPassword123" in the password field
+  And I press the "Submit" button
+  Then I see "FreeArticle1" and "PaidArticle1" on the home page
+
+----------------------------------------
+
+TITLE: Using Language-Specific Text Fragments in Markdown
+DESCRIPTION: Shows how to use the 'text' shortcode to display text fragments conditionally based on the selected programming language.
+
+LANGUAGE: markdown
+CODE:
+The preferred build tool is
+{{% text "ruby" %}}Rake{{% /text %}}
+{{% text "javascript" %}}Yarn{{% /text %}}
+{{% text "java,kotlin,scala" %}}Maven{{% /text %}}.
+
+----------------------------------------
+
+TITLE: Creating Language-Specific Content Blocks in Markdown
+DESCRIPTION: Demonstrates how to wrap language-specific paragraphs and code blocks using the 'block' shortcode. This allows content to be displayed conditionally based on the selected language.
+
+LANGUAGE: markdown
+CODE:
+{{% block "ruby" %}}
+Put this in your `hello.rb`:
+
+```ruby
+puts "hello"
+```
+{{% /block %}}
+
+{{% block "javascript" %}}
+Put this in your `hello.js`:
+
+```javascript
+console.log("hello")
+```
+{{% /block %}}
+
+{{% block "java" %}}
+Put this in your `Hello.java`:
+```java
+System.out.println("hello")
+```
+
+{{% block "kotlin" %}}
+Put this in your `Hello.kt`:
+```kotlin
+println("hello")
+```
+{{% /block %}}
+
+{{% block "scala" %}}
+Put this in your `Hello.scala`:
+```scala
+println("hello")
+```
+{{% /block %}}
+
+----------------------------------------
+
+TITLE: Defining Polyglot Page Languages in YAML Front Matter
+DESCRIPTION: Specifies the programming languages for which a page should display language-specific content. This enables a language selector on the page.
+
+LANGUAGE: yaml
+CODE:
+polyglot:
+- java
+- javascript
+- ruby
+- kotlin
+- scala
+- dotnet
+
+----------------------------------------
+
+TITLE: Java JUnit Assertion Example
+DESCRIPTION: Example of using JUnit assertions in a Cucumber step definition to compare expected and actual results.
+
+LANGUAGE: java
+CODE:
+import static org.junit.Assert.*;
+
+public class Example {
+
+    @Then("the result should be {int}")
+    public void the_result_should_be(int expectedResult) {
+        assertEquals(expectedResult, result);
+    }
+}
+
+----------------------------------------
+
+TITLE: Ruby Test::Unit Integration
+DESCRIPTION: Example of incorporating Test::Unit assertions into Cucumber World object.
+
+LANGUAGE: ruby
+CODE:
+require 'test/unit/assertions'
+
+World(Test::Unit::Assertions)
+
+----------------------------------------
+
+TITLE: Maven Dependencies for JUnit Integration
+DESCRIPTION: XML configuration for adding JUnit and Cucumber JUnit dependencies to a Maven project.
+
+LANGUAGE: xml
+CODE:
+<dependency>
+    <groupId>junit</groupId>
+    <artifactId>junit</artifactId>
+    <version>{{% version "junit" %}}</version>
+    <scope>test</scope>
+</dependency>
+<dependency>
+    <groupId>io.cucumber</groupId>
+    <artifactId>cucumber-junit</artifactId>
+    <version>{{% version "cucumberjvm" %}}</version>
+    <scope>test</scope>
+</dependency>
+
+----------------------------------------
+
+TITLE: Installing Cucumber-JVM with Gradle (4.10.3 or older)
+DESCRIPTION: Gradle configuration for older versions (4.10.3 or below) to add Cucumber dependencies and configure Maven Central repository.
+
+LANGUAGE: groovy
+CODE:
+dependencies {
+    testCompile 'io.cucumber:cucumber-java:{{% version "cucumberjvm" %}}'
+    testCompile 'io.cucumber:cucumber-junit:{{% version "cucumberjvm" %}}'
+}
+
+repositories {
+    mavenCentral()
+}
+
+----------------------------------------
+
+TITLE: Node.js Built-in Assert Example
+DESCRIPTION: Example of using Node.js built-in assert module in Cucumber step definitions.
+
+LANGUAGE: javascript
+CODE:
+const assert = require('assert')
+
+Then('the result should be {word}', function (expected) {
+  // this.actual is typically set in a previous step
+  assert.equal(this.actual, expected)
+})
+
+----------------------------------------
+
+TITLE: JavaScript Chai Assertion Example
+DESCRIPTION: Example of using Chai assertion library in Cucumber step definitions.
+
+LANGUAGE: javascript
+CODE:
+const { expect } = require('chai')
+
+Then('the result should be {word}', function (expected) {
+  expect(this.actual).to.eql(expected)
+})
+
+----------------------------------------
+
+TITLE: Ruby RSpec Assertion Example
+DESCRIPTION: Example of using RSpec expectations in Cucumber step definitions.
+
+LANGUAGE: ruby
+CODE:
+Given /^a nice new bike$/ do
+  expect(bike).to be_shiny
+end
+
+----------------------------------------
+
+TITLE: Maven Plugin Configuration
+DESCRIPTION: Maven Surefire and Failsafe plugin configurations for parallel test execution
+
+LANGUAGE: shell
+CODE:
+<plugin>
+	<groupId>org.apache.maven.plugins</groupId>
+	<artifactId>maven-surefire-plugin</artifactId>
+	<version>2.22.0</version>
+	<configuration>
+		<parallel>methods</parallel>
+		<useUnlimitedThreads>true</useUnlimitedThreads>
+	</configuration>
+</plugin>
+
+----------------------------------------
+
+TITLE: Building and Checking Documentation Links
+DESCRIPTION: Commands to clean, build, and verify links in the documentation using HTMLProofer, including an option for checking external links in CI environment
+
+LANGUAGE: bash
+CODE:
+./docker_shell.sh make clean
+./docker_shell.sh make
+./docker_shell.sh make htmlproofer
+
+CI=true ./docker_shell.sh make htmlproofer
+
+----------------------------------------
+
+TITLE: Configuring Test Runners
+DESCRIPTION: Test runner configurations for JUnit and TestNG with parallel execution settings
+
+LANGUAGE: java
+CODE:
+package parallel;
+
+import io.cucumber.junit.Cucumber;
+import org.junit.runner.RunWith;
+
+@RunWith(Cucumber.class)
+public class RunCucumberTest {
+}
+
+LANGUAGE: kotlin
+CODE:
+package parallel
+
+import io.cucumber.junit.Cucumber
+import org.junit.runner.RunWith
+
+@RunWith(Cucumber::class)
+class RunCucumberTest
+
+----------------------------------------
+
+TITLE: Defining Gherkin Feature Scenarios
+DESCRIPTION: Sample feature files demonstrating basic scenarios and scenario outlines for parallel execution testing
+
+LANGUAGE: gherkin
+CODE:
+Feature: Scenarios feature file
+
+  Scenario: Scenario Number One
+    Given Step from 'Scenario 1' in 'scenarios' feature file
+
+  Scenario: Scenario Number Two
+    Given Step from 'Scenario 2' in 'scenarios' feature file
+
+LANGUAGE: gherkin
+CODE:
+Feature: Scenario Outlines feature file
+
+  Scenario Outline: <scen_out_row_num>
+    Given Step from '<scen_out_row_num>' in 'scenario-outlines' feature file
+
+    Examples: 
+      | scen_out_row_num       |
+      | Scenario Outline Row 1 |
+      | Scenario Outline Row 2 |
+
+----------------------------------------
+
+TITLE: Installing Cucumber in Rails Project
+DESCRIPTION: Runs the cucumber-rails generator to install and configure Cucumber in a Rails project.
+
+LANGUAGE: shell
+CODE:
+rails generate cucumber:install
+
+----------------------------------------
+
+TITLE: Viewing Cucumber-Rails Installation Options
+DESCRIPTION: Displays the available options for installing Cucumber in a Rails project using the cucumber-rails generator.
+
+LANGUAGE: shell
+CODE:
+rails generate cucumber:install --help
+
+----------------------------------------
+
+TITLE: Setting Environment Variable in Bash or Zsh
+DESCRIPTION: This command exports the CUCUMBER_PUBLISH_TOKEN environment variable in Bash or Zsh shells.
+
+LANGUAGE: shell
+CODE:
+export CUCUMBER_PUBLISH_TOKEN=some-secret-token
+
+----------------------------------------
+
+TITLE: Defining Step for Opening Web Pages in Ruby
+DESCRIPTION: Illustrates the creation of a flexible step definition in Ruby for opening different web pages using a helper method.
+
+LANGUAGE: ruby
+CODE:
+Given 'I go to the {string} page' do |page|
+  open_web_page page
+end
+
+----------------------------------------
+
+TITLE: Defining Step for Opening Web Pages in JavaScript
+DESCRIPTION: Shows how to implement a reusable step definition in JavaScript for opening various web pages using a factory method.
+
+LANGUAGE: javascript
+CODE:
+Given("I go to the {string} page", function (webpage) {
+  webpageFactory.openPage(webpage)
+})
+
+----------------------------------------
+
+TITLE: Defining Step for Opening Web Pages in Java
+DESCRIPTION: Demonstrates how to create a reusable step definition in Java for opening different web pages using a factory method.
+
+LANGUAGE: java
+CODE:
+@Given("I go to the {string} page")
+public void i_want_to_open_page(String webpage) {
+  webpageFactory.openPage(webpage);
+}
+
+----------------------------------------
+
+TITLE: Implementing Feature-Coupled Step Definition in Ruby
+DESCRIPTION: Demonstrates the implementation of a feature-coupled step definition in Ruby. This example shows how step definitions can be tied to specific features, making them less flexible and reusable.
+
+LANGUAGE: ruby
+CODE:
+Given /I have a CV and I'm on the edit description page/ do
+  @employee = Employee.create!(name: 'Sally')
+  @employee.create_cv
+  visits("/employees/#{@employee.id}/descriptions/new")
+end
+
+----------------------------------------
+
+TITLE: Implementing Feature-Coupled Step Definition in JavaScript
+DESCRIPTION: Illustrates a feature-coupled step definition implementation in JavaScript. This example shows how step definitions can become specific to a particular feature, limiting their reuse potential.
+
+LANGUAGE: javascript
+CODE:
+var { Given } = require('cucumber');
+
+Given(/^I have a CV and I'm on the edit description page$/, function () {
+  this.employee = new Employee('Sally');
+  this.employee.createCV();
+});
+
+----------------------------------------
+
+TITLE: Implementing Feature-Coupled Step Definition in Kotlin
+DESCRIPTION: Shows the implementation of a feature-coupled step definition in Kotlin. This example illustrates how step definitions can become tightly bound to specific features, reducing their reusability.
+
+LANGUAGE: kotlin
+CODE:
+@Given("I have a CV and I'm on the edit description page")
+fun I_have_a_CV_and_Im_on_the_edit_description_page() {
+    val employee = Employee("Sally")
+    employee.createCV()
+}
+
+----------------------------------------
+
+TITLE: Demonstrating Feature-Coupled Step Definitions File Structure
+DESCRIPTION: Shows the file structure for feature-coupled step definitions, illustrating how step definition files are tightly coupled to specific features. This anti-pattern can lead to code duplication and maintenance issues.
+
+LANGUAGE: plaintext
+CODE:
+features/
++--edit_work_experience.feature
++--edit_languages.feature
++--edit_education.feature
++--steps/
+   +--edit_work_experience_steps.java
+   +--edit_languages_steps.java
+   +--edit_education_steps.java
+
+----------------------------------------
+
+TITLE: Defining Custom Parameter Type in Ruby
+DESCRIPTION: This example demonstrates how to define a custom 'person' parameter type in Ruby using the ParameterType method.
+
+LANGUAGE: ruby
+CODE:
+ParameterType(
+  name: 'person',
+  regexp: /[A-Z][a-z]+/,
+  transformer: -> (name) { Person.new(name) }
+)
+
+Then('the user {person} should have {int} followers') do |person, count|
+  expect(person).to be_a(Person))
+end
+
+----------------------------------------
+
+TITLE: Configuring Default Transformers in Scala
+DESCRIPTION: This snippet illustrates how to set up default transformers for parameters, data table cells, and entries using Jackson ObjectMapper in Scala.
+
+LANGUAGE: scala
+CODE:
+package com.example
+
+import com.fasterxml.jackson.databind.ObjectMapper
+import io.cucumber.scala.ScalaDsl
+
+import java.lang.reflect.Type
+
+class StepDefinitions extends ScalaDsl {
+
+    private val objectMapper = ObjectMapper()
+
+    DefaultParameterTransformer { (fromValue: String, toValueType: Type) => 
+        objectMapper.convertValue(fromValue, objectMapper.constructType(toValueType)) 
+    }
+
+    DefaultDataTableCellTransformer { (fromValue: String, toValueType: Type) => 
+        objectMapper.convertValue(fromValue, objectMapper.constructType(toValueType)) 
+    }
+
+    DefaultDataTableEntryTransformer { (fromValue: Map[String, String], toValueType: Type) => 
+        objectMapper.convertValue(fromValue, objectMapper.constructType(toValueType))
+    }
+}
+
+----------------------------------------
+
+TITLE: Defining Parameter Type in Kotlin
+DESCRIPTION: This example shows how to define a custom 'book' parameter type in Kotlin using the @ParameterType annotation.
+
+LANGUAGE: kotlin
+CODE:
+package com.example
+
+import io.cucumber.java.ParameterType
+import io.cucumber.java.en.Given
+
+class StepDefinitions {
+
+    @ParameterType(".*")
+    fun book(bookName: String): Book {
+        return Book(bookName)
+    }
+
+    @Given("{book} is my favorite book")
+    fun this_is_my_favorite_book(book: Book) {
+        // step implementation
+    }
+}
+
+----------------------------------------
+
+TITLE: Gherkin Background Example
+DESCRIPTION: Demonstrates using Background to set up common preconditions for multiple scenarios within a feature.
+
+LANGUAGE: gherkin
+CODE:
+Feature: Multiple site support
+  Only blog owners can post to a blog, except administrators,
+  who can post to all blogs.
+
+  Background:
+    Given a global administrator named "Greg"
+    And a blog named "Greg's anti-tax rants"
+    And a customer named "Dr. Bill"
+    And a blog named "Expensive Therapy" owned by "Dr. Bill"
+
+  Scenario: Dr. Bill posts to his own blog
+    Given I am logged in as Dr. Bill
+    When I try to post to "Expensive Therapy"
+    Then I should see "Your article was published."
+
+----------------------------------------
+
+TITLE: Gherkin Rule Keyword Example
+DESCRIPTION: Shows how to use the Rule keyword to group related scenarios and represent business rules within a feature.
+
+LANGUAGE: gherkin
+CODE:
+Feature: Highlander
+
+  Rule: There can be only One
+
+    Example: Only One -- More than one alive
+      Given there are 3 ninjas
+      And there are more than one ninja alive
+      When 2 ninjas meet, they will fight
+      Then one ninja dies (but not me)
+      And there is one ninja less alive
+
+    Example: Only One -- One alive
+      Given there is only 1 ninja alive
+      Then he (or she) will live forever ;-)
+
+  Rule: There can be Two (in some cases)
+
+    Example: Two -- Dead and Reborn as Phoenix
+      ...
+
+----------------------------------------
+
+TITLE: Implementing Custom Guice Object Factory
+DESCRIPTION: Java implementation of a custom ObjectFactory for Guice dependency injection in Cucumber tests.
+
+LANGUAGE: java
+CODE:
+public final class CustomObjectFactory implements ObjectFactory {
+    private Injector injector;
+
+    public CustomObjectFactory() {
+        this.injector = Guice.createInjector(Stage.PRODUCTION, CucumberModules.createScenarioModule(), new ServiceModule());
+    }
+
+    @Override
+    public boolean addClass(Class<?> clazz) {
+        return true;
+    }
+
+    @Override
+    public void start() {
+        this.injector.getInstance(ScenarioScope.class).enterScope();
+    }
+
+    @Override
+    public void stop() {
+        this.injector.getInstance(ScenarioScope.class).exitScope();
+    }
+
+    @Override
+    public <T> T getInstance(Class<T> clazz) {
+        return this.injector.getInstance(clazz);
+    }
+}
+
+----------------------------------------
+
+TITLE: Configuring Maven Dependencies for PicoContainer
+DESCRIPTION: XML configuration for adding PicoContainer dependency injection support to a Java Cucumber project.
+
+LANGUAGE: xml
+CODE:
+<dependency>
+    <groupId>io.cucumber</groupId>
+    <artifactId>cucumber-picocontainer</artifactId>
+    <version>{{% version "cucumberjvm" %}}</version>
+    <scope>test</scope>
+</dependency>
+
+----------------------------------------
+
+TITLE: Ruby Custom Formatter Usage
+DESCRIPTION: Command to execute Cucumber with a custom formatter class located in the features/support directory
+
+LANGUAGE: ruby
+CODE:
+cucumber --format MyModule::CustomFormatter
+
+----------------------------------------
+
+TITLE: Java/Kotlin Custom Formatter Usage
+DESCRIPTION: Command to execute Cucumber with a custom formatter class in Java or Kotlin
+
+LANGUAGE: java
+CODE:
+cucumber --format CustomFormatter
+
+----------------------------------------
+
+TITLE: Gherkin Test Scenario for Google Search
+DESCRIPTION: Basic Gherkin scenario for testing Google search functionality
+
+LANGUAGE: gherkin
+CODE:
+Scenario: Finding some cheese
+   Given I am on the Google search page
+   When I search for "Cheese!"
+   Then the page title should start with "cheese"
+
+----------------------------------------
+
+TITLE: Selenium WebDriver Implementation in Kotlin
+DESCRIPTION: Kotlin implementation of Google search test using Selenium WebDriver and Cucumber step definitions
+
+LANGUAGE: kotlin
+CODE:
+package com.example
+
+import io.cucumber.java8.Scenario
+import io.cucumber.java8.En
+import org.openqa.selenium.By
+import org.openqa.selenium.WebDriver
+import org.openqa.selenium.WebElement
+import org.openqa.selenium.support.ui.WebDriverWait
+
+class ExampleSteps: En {
+
+    lateinit var driver: WebDriver
+
+    init {
+        Given("I am on the Google search page") {
+            driver.get("https:\\www.google.com")
+        }
+
+        When("I search for {string}") { query: String ->
+            val element: WebElement = driver.findElement(By.name("q"))
+            // Enter something to search for
+            element.sendKeys(query)
+            // Now submit the form. WebDriver will find the form for us from the element
+            element.submit()
+        }
+
+        Then("the page title should start with {string}") { titleStartsWith: String ->
+            // Google's search is rendered dynamically with JavaScript
+            // Wait for the page to load timeout after ten seconds
+            WebDriverWait(driver, 10L).until { d ->
+                d.title.toLowerCase().startsWith(titleStartsWith)
+            }
+        }
+
+        After { scenario: Scenario ->
+            driver.quit()
+        }
+    }
+}
+
+----------------------------------------
+
+TITLE: YAML Frontmatter Configuration
+DESCRIPTION: YAML configuration header defining the page metadata including title, subtitle and navigation weight.
+
+LANGUAGE: yaml
+CODE:
+---
+title: Continuous Build
+subtitle: Running Cucumber on a build server
+weight: 1500
+---
+
+----------------------------------------
+
+TITLE: Jenkins Cucumber Command
+DESCRIPTION: Command line instruction for running Cucumber with JUnit output formatting in Jenkins CI environment.
+
+LANGUAGE: bash
+CODE:
+cucumber -f junit --out WORKSPACE
+
+----------------------------------------
+
+TITLE: Configuring Cucumber Runner with Tags
+DESCRIPTION: Shows JUnit test runner configuration with tag filters to selectively run scenarios
+
+LANGUAGE: java
+CODE:
+@RunWith(Cucumber.class)
+@CucumberOptions(tags = "@smoke and not @slow")
+public class RunCucumberTest {}
+
+----------------------------------------
+
+TITLE: Defining Before Hook in JavaScript
+DESCRIPTION: Example of implementing a Before hook in JavaScript that runs setup code before each scenario
+
+LANGUAGE: javascript
+CODE:
+Before(async function () {
+})
+
+----------------------------------------
+
+TITLE: Installing Cucumber with Yarn
+DESCRIPTION: Command to install Cucumber.js as a development dependency using Yarn package manager. Requires Yarn to be pre-installed on the system.
+
+LANGUAGE: shell
+CODE:
+yarn add --dev @cucumber/cucumber
+
+----------------------------------------
+
+TITLE: Installing Cucumber with NPM
+DESCRIPTION: Command to install Cucumber.js as a development dependency using npm package manager. Requires npm to be pre-installed on the system.
+
+LANGUAGE: shell
+CODE:
+npm install --save-dev @cucumber/cucumber
+
+----------------------------------------
+
+TITLE: Running Cucumber Features via Rake Command
+DESCRIPTION: Shell command to execute Cucumber features using the Rake task.
+
+LANGUAGE: shell
+CODE:
+rake features
+
+----------------------------------------
+
+TITLE: Implementing a Step Definition in JavaScript for Cucumber
+DESCRIPTION: This code snippet shows how to create a step definition in JavaScript that matches a Gherkin step. It demonstrates the connection between the Gherkin specification and the actual code implementation, using a function to start a game with a specific word.
+
+LANGUAGE: javascript
+CODE:
+When("{maker} starts a game", function(maker) {
+  maker.startGameWithWord({ word: "whale" })
+})
+
+----------------------------------------
+
+TITLE: Mobile Banking Acceptance Criteria Example
+DESCRIPTION: Practical example of acceptance criteria for a mobile banking application using Gherkin syntax
+
+LANGUAGE: gherkin
+CODE:
+Feature: Some important feature
+
+  Scenario: Do not show balance if not logged in
+    Given I am not logged on to the mobile banking app
+    When I open the mobile banking app
+    Then I can see a login page
+    And I do not see account balance
+
+  Scenario: Show balance on the accounts page after logging in
+    Given I have just logged on to the mobile banking app
+    When I load the accounts page
+    Then I can see account balance for each of my accounts
+
+----------------------------------------
+
+TITLE: Basic Gherkin Scenario Structure
+DESCRIPTION: Example showing the basic structure of Cucumber scenarios using Given/When/Then format
+
+LANGUAGE: gherkin
+CODE:
+Feature: Some important feature
+
+  Scenario: Get something
+    Given I have something
+    When I do something
+    Then I get something else
+
+  Scenario: Get something different
+    Given I have something
+    And I have also some other thing
+    When I do something different
+    Then I get something different
+
+----------------------------------------
+
+TITLE: Declarative Style Gherkin Scenario
+DESCRIPTION: An example of a Gherkin feature written in a declarative style. This approach focuses on describing behavior and outcomes rather than specific implementation details, making the scenario more resilient to changes in the application.
+
+LANGUAGE: gherkin
+CODE:
+Feature: Subscribers see different articles based on their subscription level
+ 
+Scenario: Free subscribers see only the free articles
+  Given Free Frieda has a free subscription
+  When Free Frieda logs in with her valid credentials
+  Then she sees a Free article
+
+Scenario: Subscriber with a paid subscription can access both free and paid articles
+  Given Paid Patty has a basic-level paid subscription
+  When Paid Patty logs in with her valid credentials
+  Then she sees a Free article and a Paid article
+
+----------------------------------------
+
+TITLE: Improving Gherkin Step Clarity
+DESCRIPTION: Shows how to break down complex steps into simpler, more maintainable steps by splitting combined actions into separate steps
+
+LANGUAGE: gherkin
+CODE:
+When I fill in the "Name" field and the "Address" field
+
+LANGUAGE: gherkin
+CODE:
+When I fill in the "Name" field
+And I fill in the "Address" field
+
+----------------------------------------
+
+TITLE: Maintaining Consistent Step Definitions
+DESCRIPTION: Demonstrates the importance of consistency in step definitions by showing two variations of the same login step that should be standardized
+
+LANGUAGE: gherkin
+CODE:
+Given I am logged in
+
+LANGUAGE: gherkin
+CODE:
+Given I have logged in to the site
+
+----------------------------------------
+
+TITLE: Maven Project Configuration for Cucumber
+DESCRIPTION: XML configuration for setting up a Kotlin Cucumber project with Maven
+
+LANGUAGE: xml
+CODE:
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xmlns="http://maven.apache.org/POM/4.0.0"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <groupId>hellocucumber</groupId>
+    <artifactId>hellocucumber</artifactId>
+    <version>1.0.0-SNAPSHOT</version>
+    <packaging>jar</packaging>
+
+    <properties>
+        <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+        <kotlin.version>1.8.10</kotlin.version>
+    </properties>
+    <!-- Additional dependencies and configuration omitted for brevity -->
+</project>
+
+----------------------------------------
+
+TITLE: Installing Cucumber.js with Yarn
+DESCRIPTION: This command installs Cucumber.js as a development dependency using Yarn. It adds @cucumber/cucumber to the project's devDependencies in package.json.
+
+LANGUAGE: shell
+CODE:
+yarn add --dev @cucumber/cucumber
+
+----------------------------------------
+
+TITLE: Installing Cucumber.ml with Dune
+DESCRIPTION: Commands to build and install the Cucumber Opam package into the local Opam repository using the Dune build system. This must be run after installing prerequisites including gherkin-c, Opam package manager, and Dune build system.
+
+LANGUAGE: shell
+CODE:
+dune build && dune install
+
+----------------------------------------
+
+TITLE: Installing Cucumber-JVM with Gradle (5.0+)
+DESCRIPTION: Gradle configuration for version 5.0 and above to add Cucumber dependencies and configure Maven Central repository using newer testImplementation configuration.
+
+LANGUAGE: groovy
+CODE:
+dependencies {
+    testImplementation 'io.cucumber:cucumber-java:{{% version "cucumberjvm" %}}'
+    testImplementation 'io.cucumber:cucumber-junit:{{% version "cucumberjvm" %}}'
+}
+
+repositories {
+    mavenCentral()
+}
+
+----------------------------------------
+
+TITLE: Adding Cucumber-Scala Dependency in Maven
+DESCRIPTION: This XML snippet shows how to add the Cucumber-Scala dependency to a Maven project's pom.xml file. It specifies the groupId, artifactId, version, and test scope for the dependency.
+
+LANGUAGE: xml
+CODE:
+<dependency>
+    <groupId>io.cucumber</groupId>
+    <artifactId>cucumber-scala_2.13</artifactId>
+    <version>{{% version "cucumberscala" %}}</version>
+    <scope>test</scope>
+</dependency>
+
+----------------------------------------
+
+TITLE: Configuring YAML Front Matter for Cucumber Blog Link
+DESCRIPTION: YAML configuration block that defines metadata for an external link to Cucumber's blog and podcast content. Sets the title, subtitle, external URL and navigation weight.
+
+LANGUAGE: yaml
+CODE:
+title: Cucumber Blog / Podcast
+subtitle: Keep up with the latest news
+external_url: https://cucumber.io/blog
+weight: 10
+
+----------------------------------------
+
+TITLE: IntelliJ IDEA Plugin Configuration for Java/Kotlin
+DESCRIPTION: Configuration guidance for setting up the Cucumber plugin in IntelliJ IDEA, including Run/Debug Configuration settings and important parameters that need to be configured manually since they aren't imported from build tools.
+
+LANGUAGE: text
+CODE:
+* Main class
+* Glue
+* Feature or folder path
+* VM options
+* Program arguments
+* Working directory
+* Environment variables
+* Use classpath of module
+
+----------------------------------------
+
+TITLE: Configuring Cucumber Options in Java/Kotlin
+DESCRIPTION: Example showing how to specify glue path for step definitions using CucumberOptions annotation
+
+LANGUAGE: java
+CODE:
+@CucumberOptions(glue = {"<package>", "<package>", "<etc>"})
+public class RunCucumberTest{}
+
+LANGUAGE: kotlin
+CODE:
+@CucumberOptions(glue = ["<package>", "<package>", "<etc>"])
+class RunCucumberTest
+
+----------------------------------------
+
+TITLE: Step Definition Examples using Regex vs Cucumber Expressions
+DESCRIPTION: Comparison showing step definition patterns using regular expressions and Cucumber expressions syntax
+
+LANGUAGE: java
+CODE:
+@Given("^today is ([0-9]{4}-[0-9]{2}-[0-9]{2})$")
+public void today_is(Date date) {
+    calculator = new DateCalculator(date);
+}
+
+@When("I add {int} and {int}")
+public void adding(int arg1, int arg2) {
+    calc.push(arg1);
+    calc.push(arg2);
+    calc.push("+");
+}
+
+----------------------------------------
+
+TITLE: Setting Environment Variable in Windows Command Prompt
+DESCRIPTION: This command sets the CUCUMBER_PUBLISH_TOKEN environment variable in Windows using the setx command.
+
+LANGUAGE: shell
+CODE:
+setx /M CUCUMBER_PUBLISH_TOKEN "some-secret-token"
+
+----------------------------------------
+
+TITLE: HTML Structure for Cucumber Documentation Portal
+DESCRIPTION: HTML markup defining the structure and content of the Cucumber documentation landing page. Includes sections for product introductions, hero banner, and community information.
+
+LANGUAGE: html
+CODE:
+<section class="band py-6 bg-image-cover  band-full-width-content bg-transparent" style="background-image:url(https://static0.smartbear.co/cucumber/media/images/home/cucumber-home-hero-bg.png?ext=.png);" id="" data-nav-text="">
+    <div class="container">
+        <div class="row">
+          <div class="col-12">
+
+<div class="row text-center text-md-left py-4 py-md-6 px-4 px-md-6">
+<div class="col-12 col-md-12">
+<h1 class="text-white font-light text-center">Cucumber Docs</h1>
+
+<p class="h5 text-white anti-aliased text-center">Executable Specifications
+Free, open source, any platform </p>
+</div>
+</div>
+          </div>
+        </div>
+    </div>
+  </div></section>
+
+----------------------------------------
+
+TITLE: YAML Front Matter Configuration for Sponsors Page
+DESCRIPTION: YAML configuration block that defines the page metadata including title, subtitle, weight, menu placement and icon class.
+
+LANGUAGE: yaml
+CODE:
+title: Sponsors
+subtitle: Financial supporters of the Cucumber contributors
+weight: 1180
+menu: main
+iconClass: fas fa-money-bill-alt
+
+----------------------------------------
+
+TITLE: OpenCollective Banner Script Integration
+DESCRIPTION: HTML script tag that embeds the OpenCollective banner to display Cucumber project sponsors.
+
+LANGUAGE: html
+CODE:
+<script src="https://opencollective.com/cucumber/banner.js"></script>
+
+----------------------------------------
+
+TITLE: Configuring YAML Frontmatter for Training Page
+DESCRIPTION: YAML configuration block that defines metadata for the Cucumber School online training page, including title, subtitle, image path, external URL and weight for page ordering.
+
+LANGUAGE: yaml
+CODE:
+---
+title: Online training
+subtitle: Become a Cucumber expert at your own pace with Cucumber School
+card_image: /img/cucumber-school-black-128.png
+external_url: https://cucumber.io/school
+weight: 6
+---
+
+----------------------------------------
+
+TITLE: Cloning Cucumber Documentation Repository
+DESCRIPTION: Commands to clone the Cucumber documentation repository and navigate to its directory
+
+LANGUAGE: bash
+CODE:
+git clone https://github.com/cucumber/docs
+cd docs
+
+----------------------------------------
+
+TITLE: Building and Serving Documentation Site
+DESCRIPTION: Docker commands for building and serving the documentation website locally on port 1313
+
+LANGUAGE: bash
+CODE:
+./docker_shell.sh
+
+----------------------------------------
+
+TITLE: Rebuilding Cucumber CSS with Yarn
+DESCRIPTION: Commands to install dependencies and rebuild the CSS file after making changes to the SASS. This process ensures that modifications to the SASS file are reflected in the final CSS output.
+
+LANGUAGE: bash
+CODE:
+yarn        # install dependencies
+yarn build  # rebuild cucumber.css
+
+----------------------------------------
+
+TITLE: Rebuilding Cucumber CSS with Yarn
+DESCRIPTION: Commands to install dependencies and rebuild the cucumber.css file after making changes to the Sass source.
+
+LANGUAGE: bash
+CODE:
+yarn        # install dependencies
+yarn build  # rebuild cucumber.css
+
+----------------------------------------
+
+TITLE: Updating Gherkin i18n Table Commands
+DESCRIPTION: Commands for updating the Gherkin internationalization table. First upgrades @cucumber/gherkin dependency to get latest gherkin-languages.json, then generates the HTML table file.
+
+LANGUAGE: sh
+CODE:
+yarn upgrade
+make layouts/shortcodes/gherkin-i18n-table.html
+
+----------------------------------------
+
+TITLE: Generating HTML Panel for Gherkin Dialects using JQ
+DESCRIPTION: This JQ script transforms a JSON structure of Gherkin dialects into an HTML panel. It creates a collapsible section for each dialect, containing a table that maps English Gherkin keywords to their equivalents in the specific dialect. The script handles HTML escaping and structures the output with proper nesting and formatting.
+
+LANGUAGE: jq
+CODE:
+. as $root
+| (
+  [ 
+    to_entries | sort_by(.value.name)[]
+    | [
+        "  <a class=\"panel-block\" data-target=\"#gherkin-dialect-", (.key|@html), "-content\">
+", (.value.name|@html), " (", (.key|@html), ")", "</a>
+",
+        "  <div id=\"gherkin-dialect-", (.key|@html), "-content\" class=\"panel-block collapsed\">
+",
+        "   <table class=\"table is-size-6\">
+",
+        "     <thead>
+",
+        "      <tr>
+",
+        "       <th>English Keyword</th>
+",
+        "       <th>", (.value.name|@html), " equivalent(s)</th>
+",
+        "      </tr>
+",
+        "     </thead>
+",
+        "     <tbody>
+"
+      ] + (
+          [ .value
+            | {"feature","background","scenario","scenarioOutline","examples","given","when","then","and","but","rule"}
+            | to_entries[]
+            | "       <tr>
+",
+              "         <td><code>", ([ .key ] | add), "</code></th>
+",
+              "         <td>", ([ .value[] | "<code>", @html, "</code><br>"] | add), "</td>
+",
+              "       </tr>
+"
+          ]
+      ) + [
+        "     </tbody>
+",
+        "   </table>
+",
+        "  </div>
+"
+      ]
+    | add
+  ]
+  | add
+  )
+| "<div class=\"panel collapsible\">
+"	
++   .
++ "</div>
+"

@@ -1,0 +1,5181 @@
+TITLE: Implementing Event Subscriber in Java
+DESCRIPTION: Example showing how to implement an EventSubscriber to receive ItemStateEvents and ItemCommandEvents from the openHAB event bus. The subscriber uses a TopicEventFilter to filter events based on item name.
+
+LANGUAGE: java
+CODE:
+@Component(immediate = true, service = EventSubscriber.class)
+public class SomeItemEventSubscriber implements EventSubscriber {
+
+    private final Set<String> subscribedEventTypes = Set.of(ItemStateEvent.TYPE, ItemCommandEvent.TYPE);
+    private final EventFilter eventFilter = new TopicEventFilter("openhab/items/ItemX/.*");
+
+    @Override
+    public Set<String> getSubscribedEventTypes() {
+        return subscribedEventTypes;
+    }
+
+    @Override
+    public EventFilter getEventFilter() {
+        return eventFilter;
+    }
+
+    @Override
+    public void receive(Event event) {
+        String topic = event.getTopic();
+        String type = event.getType();
+        String payload = event.getPayload();
+        if (event instanceof ItemCommandEvent) {
+            ItemCommandEvent itemCommandEvent = (ItemCommandEvent) event;
+            String itemName = itemCommandEvent.getItemName();
+            Command command = itemCommandEvent.getItemCommand();
+            // ...
+        } else if (event instanceof ItemStateEvent) {
+            ItemStateEvent itemStateEvent = (ItemStateEvent) event;
+            // ...
+        }
+    }
+}
+
+----------------------------------------
+
+TITLE: Abstract Item Event Subscriber Implementation
+DESCRIPTION: Example showing how to use the AbstractItemEventSubscriber base class to handle ItemStateEvents and ItemCommandEvents in a more convenient way.
+
+LANGUAGE: java
+CODE:
+@Component(immediate = true, service = EventSubscriber.class)
+public class SomeItemEventSubscriber extends AbstractItemEventSubscriber {
+
+    private final EventFilter eventFilter = new TopicEventFilter("openhab/items/ItemX/.*");
+
+    @Override
+    public EventFilter getEventFilter() {
+        return eventFilter;
+    }
+
+    @Override
+    protected void receiveCommand(ItemCommandEvent commandEvent) {
+        // do something
+    }
+
+    @Override
+    protected void receiveUpdate(ItemStateEvent stateEvent) {
+        // do something
+    }
+}
+
+----------------------------------------
+
+TITLE: Custom Event Type Definition
+DESCRIPTION: Example showing how to create a custom event type by extending AbstractEvent class, including proper event type declaration and data handling.
+
+LANGUAGE: java
+CODE:
+public class SunriseEvent extends AbstractEvent {
+
+    public static final String TYPE = SunriseEvent.class.getSimpleName();
+
+    private final SunriseDTO sunriseDTO;
+
+    SunriseEvent(String topic, String payload, SunriseDTO sunriseDTO) {
+        super(topic, payload, null);
+        this.sunriseDTO = sunriseDTO;
+    }
+
+    @Override
+    public String getType() {
+        return TYPE;
+    }
+
+    public SunriseDTO getSunriseDTO() {
+        return sunriseDTO;
+    }
+
+    @Override
+    public String toString() {
+        return "Sunrise at '" + getSunriseDTO.getTime() + "'.";
+    }
+}
+
+----------------------------------------
+
+TITLE: Defining Group Items in openHAB
+DESCRIPTION: This snippet demonstrates how to define a Group Item and associate other Items with it in openHAB. It creates a 'groundFloor' group and adds two Switch Items to it.
+
+LANGUAGE: shell
+CODE:
+Group groundFloor
+Switch kitchenLight (groundFloor)
+Switch livingroomLight (groundFloor)
+
+----------------------------------------
+
+TITLE: Basic Item Definition
+DESCRIPTION: Shows the basic syntax for defining an Item with itemtype, name, label, icon and binding configuration.
+
+LANGUAGE: java
+CODE:
+itemtype itemname "labeltext [stateformat]" <iconname> (group1, group2, ...) ["tag1", "tag2", ...] {bindingconfig}
+
+----------------------------------------
+
+TITLE: Custom Event Factory Implementation
+DESCRIPTION: Example demonstrating how to implement a custom event factory by extending AbstractEventFactory, including event creation and payload handling.
+
+LANGUAGE: java
+CODE:
+public class SunEventFactory extends AbstractEventFactory {
+
+    private static final String SUNRISE_EVENT_TOPIC = "openhab/sun/{time}/sunrise";
+
+    public SunEventFactory() {
+        super(Set.of(SunriseEvent.TYPE));
+    }
+
+    @Override
+    protected Event createEventByType(String eventType, String topic, String payload, String source) throws Exception {
+        if (SunriseEvent.TYPE.equals(eventType)) {
+            return createSunriseEvent(topic, payload);
+        }
+        return null;
+    }
+
+    private Event createSunriseEvent(String topic, String payload) {
+        SunriseDTO sunriseDTO = deserializePayload(payload, SunriseDTO.class);
+        return new SunriseEvent(topic, payload, sunriseDTO);
+    }
+
+    public static SunriseEvent createSunriseEvent(Sunrise sunrise) {
+        String topic = buildTopic(SUNRISE_EVENT_TOPIC, sunrise.getTime());
+        SunriseDTO sunriseDTO = map(sunrise);
+        String payload = serializePayload(sunriseDTO);
+        return new SunriseEvent(topic, payload, sunriseDTO);
+    }
+}
+
+----------------------------------------
+
+TITLE: Implementing OSGi EventHandler Service in Java
+DESCRIPTION: Demonstrates how to create and register an OSGi EventHandler service using Declarative Services. Includes event handling method and service properties.
+
+LANGUAGE: java
+CODE:
+@Component(service = {MyService.class, EventHandler.class}, immediate = true, property = { "event.topics=some/topic" })
+@NonNullByDefault
+public class MyService implements EventHandler {
+    @Activate
+    protected void activate(BundleContext context) {
+        System.out.println("Bundle is activated!");
+    }
+
+    @Deactivate
+    protected void deactivate(BundleContext context) {
+        System.out.println("Bundle is deactivated!");
+    }
+
+    @Override
+    public void handleEvent(Event event) {
+        String topic = event.getTopic();
+        System.out.println("Received event with topic: " + topic);
+    }
+}
+
+----------------------------------------
+
+TITLE: Scene Rule Implementation
+DESCRIPTION: A rule that sets multiple Items to predefined states when a Movie Scene is activated
+
+LANGUAGE: java
+CODE:
+rule "Movie Scene"
+when
+  Item MovieScene received command ON
+then
+  LivingRoom_Blinds.sendCommand(90%)
+  LivingRoom_MainLight.sendCommand(OFF)
+  LivingRoom_LEDStripe.sendCommand(50%)
+  Soundbar.sendCommand(ON)
+  TV.sendCommand(ON)
+end
+
+----------------------------------------
+
+TITLE: Rule Template Sample JSON Definition
+DESCRIPTION: Example JSON configuration of a rule template that can be used as a base for creating rule instances.
+
+LANGUAGE: json
+CODE:
+{
+  "uid": "sample.rulebytemplate",
+  "name": "RuleByTemplate",
+  "templateUID": "SampleRuleTemplate",
+  "tags": [
+    "rule",
+    "template"
+  ],
+  "configuration": {
+    "condition_operator": "!=",
+    "condition_constraint": "template"
+  }
+}
+
+----------------------------------------
+
+TITLE: Implementing OSGi Component with Constructor Injection in Java
+DESCRIPTION: Demonstrates how to create an OSGi component using constructor injection to reference the ItemRegistry service. Includes activation and deactivation methods.
+
+LANGUAGE: java
+CODE:
+@Component(service = MyService.class, immediate = true)
+@NonNullByDefault
+public class MyService {
+    protected final ItemRegistry itemRegistry;
+
+    @Activate
+    public MyService(final @Reference ItemRegistry itemRegistry) {
+        this.itemRegistry = itemRegistry;
+    }
+
+    @Activate
+    protected void activate(BundleContext context) {
+        System.out.println("Bundle is activated!");
+    }
+
+    @Deactivate
+    protected void deactivate(BundleContext context) {
+        System.out.println("Bundle is deactivated!");
+    }
+}
+
+----------------------------------------
+
+TITLE: Basic Add-on XML Structure
+DESCRIPTION: Basic XML structure for defining an OpenHAB add-on with mandatory and optional fields. Shows the core schema and common properties like type, name, description, and configuration.
+
+LANGUAGE: xml
+CODE:
+<?xml version=\"1.0\" encoding=\"UTF-8\"?>
+<addon:addon id=\"addonID\"
+    xmlns:xsi=\"https://www.w3.org/2001/XMLSchema-instance\"
+    xmlns:addon=\"https://openhab.org/schemas/addon/v1.0.0\"
+    xsi:schemaLocation=\"https://openhab.org/schemas/addon/v1.0.0
+        https://openhab.org/schemas/addon-1.0.0.xsd\">
+
+  <type>String</type>
+  <name>String</name>
+  <description>String</description>
+
+  <service-id>String</service-id>
+
+  <config-description>
+    ...
+  </config-description>
+  OR
+  <config-description-ref uri=\"{addon|thing-type|channel-type|any_other}:addonID:...\" />
+
+  <discovery-methods>
+    ...
+  </discovery-methods>
+
+</addon:addon>
+
+----------------------------------------
+
+TITLE: Implementing Basic Transformation Service in Java
+DESCRIPTION: Example of implementing a basic TransformationService that appends ',bro!' to input strings. Shows the basic service structure with OSGi component declaration.
+
+LANGUAGE: java
+CODE:
+@NonNullByDefault
+@Component(immediate = true, property = { "openhab.transform=BRO" })
+public class TheBroTransformationService implements TransformationService {
+    private final Logger logger = LoggerFactory.getLogger(TheBroTransformationService.class);
+
+    @Override
+    public @Nullable String transform(String config, String input) throws TransformationException {
+    }
+}
+
+----------------------------------------
+
+TITLE: Checking Java Version in Shell
+DESCRIPTION: Command to verify the installed Java version and its output showing OpenJDK 17 configuration
+
+LANGUAGE: text
+CODE:
+openjdk version "17.0.5" 2022-10-18 LTS
+OpenJDK Runtime Environment Zulu17.38+21-CA (build 17.0.5+8-LTS)
+OpenJDK 64-Bit Server VM Zulu17.38+21-CA (build 17.0.5+8-LTS, mixed mode, sharing)
+
+----------------------------------------
+
+TITLE: Module Types JSON Configuration
+DESCRIPTION: JSON-based declarative definition of automation module types including triggers, conditions and actions with their respective configurations.
+
+LANGUAGE: json
+CODE:
+{
+   "triggers":[
+      {
+         "uid":"TemperatureTriggerType",
+         "label":"Temperature Trigger",
+         "description":"This triggers when the temperature has reached a certain value",
+         "configDescriptions":[
+            {
+               "name":"temperature",
+               "type":"INTEGER",
+               "label":"Temperature",
+               "description":"Trigger temperature",
+               "required":true
+            },
+            {
+               "name":"operator",
+               "type":"TEXT",
+               "label":"Operator",
+               "description":"Below/Above temperature",
+               "required":true,
+               "default": "above"
+            }
+         ],
+         "outputs":[
+            {
+               "name":"temperature",
+               "type":"java.lang.Integer",
+               "label":"Current Temperature",
+               "description":"Indicates the current room temperature"
+            }
+         ]
+      }
+   ]
+}
+
+----------------------------------------
+
+TITLE: Implementing ProfileFactory in Java
+DESCRIPTION: Basic implementation of a ProfileFactory for creating custom profiles in openHAB.
+
+LANGUAGE: java
+CODE:
+@Component(service = { ProfileFactory.class })
+public class MyProfileFactory implements ProfileFactory {
+
+----------------------------------------
+
+TITLE: Implementing a ThingHandlerFactory in Java
+DESCRIPTION: Example of a WeatherHandlerFactory that creates handlers for a weather thing type
+
+LANGUAGE: Java
+CODE:
+@NonNullByDefault
+@Component(configurationPid = "binding.myweatherbinding", service = ThingHandlerFactory.class)
+public class WeatherHandlerFactory extends BaseThingHandlerFactory {
+
+    private static final Collection<ThingTypeUID> SUPPORTED_THING_TYPES_UIDS = Collections.singleton(WeatherBindingConstants.THING_TYPE_WEATHER);
+
+    @Override
+    public boolean supportsThingType(ThingTypeUID thingTypeUID) {
+        return SUPPORTED_THING_TYPES_UIDS.contains(thingTypeUID);
+    }
+
+    @Override
+    protected @Nullable ThingHandler createHandler(Thing thing) {
+        ThingTypeUID thingTypeUID = thing.getThingTypeUID();
+
+        if (WeatherBindingConstants.THING_TYPE_WEATHER.equals(thingTypeUID)) {
+            return new WeatherHandler(thing);
+        }
+
+        return null;
+    }
+}
+
+----------------------------------------
+
+TITLE: Basic Thing Definition Syntax in openHAB
+DESCRIPTION: Shows the basic syntax for defining a Thing in openHAB configuration files. Includes required elements like binding ID, type ID, and thing ID, along with optional label and location.
+
+LANGUAGE: xtend
+CODE:
+Thing <binding_id>:<type_id>:<thing_id> "Label" @ "Location" [ <parameters> ]
+
+----------------------------------------
+
+TITLE: Implementing OSGi EventHandler in Java
+DESCRIPTION: Example implementation of an OSGi EventHandler that logs received events. The handler is registered as a component that listens to all event topics using the wildcard '*' property. It demonstrates how to receive and process OSGi events.
+
+LANGUAGE: java
+CODE:
+package com.example.handler;
+
+import org.osgi.service.event.Event;
+import org.osgi.service.event.EventHandler;
+import org.osgi.service.log.LogService;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+@Component(service = {LogEventHandler.class,EventHandler.class}, property = "event.topics=*")
+public class LogEventHandler implements EventHandler {
+    Logger logger = LoggerFactory.getLogger(this.getClass());
+
+    @Override
+    public void handleEvent(Event event) {
+        logger.info(" Received event with topic: {}", event.getTopic());
+    }
+}
+
+----------------------------------------
+
+TITLE: Configuring Item Persistence in Java
+DESCRIPTION: Example of configuring which items to persist with which strategies and filters
+
+LANGUAGE: java
+CODE:
+Items {
+  Heating_Mode, Notifications_Active: strategy = everyChange, restoreOnStartup
+  Temperature*, Weather* : strategy = everyHour
+  *, !Weather*, !CellarTemperature: strategy = everyDay
+}
+
+----------------------------------------
+
+TITLE: Basic XML Thing Type Definition
+DESCRIPTION: Example of defining a basic thing type with channels and properties
+
+LANGUAGE: XML
+CODE:
+<thing-type id="thing-type-id">
+    <supported-bridge-type-refs>
+        <bridge-type-ref id="bridge-type-id" />
+    </supported-bridge-type-refs>
+    <label>Sample Thing</label>
+    <description>Some sample description</description>
+    <category>Lightbulb</category>
+    <properties>
+         <property name="vendor">MyThingVendor</property>
+    </properties>
+</thing-type>
+
+----------------------------------------
+
+TITLE: Implementing ExtensionService Interface in Java for openHAB
+DESCRIPTION: To create an Extension Service, implement the org.openhab.core.extension.ExtensionService interface and register it as an OSGi service. The service should provide a list of available extensions and methods for installation and uninstallation.
+
+LANGUAGE: java
+CODE:
+org.openhab.core.extension.ExtensionService
+
+----------------------------------------
+
+TITLE: Sample Rule Instance JSON Definition
+DESCRIPTION: Example JSON configuration showing the structure of a rule instance with triggers, conditions and actions.
+
+LANGUAGE: json
+CODE:
+{
+        "uid":"sample.rule1",
+        "name":"SampleRule",
+        "tags":[
+            "sample",
+            "rule"
+        ],
+        "description":"Sample Rule definition.",
+        "triggers":[
+            {
+                "id":"SampleTriggerID",
+                "type":"SampleTrigger"
+            }
+        ],
+        "conditions":[
+            {
+                "id":"SampleConditionID",
+                "type":"SampleCondition",
+                "configuration":{
+                    "operator":"=",
+                    "constraint":"dtag"
+                },
+                "inputs":{
+                    "conditionInput":"SampleTriggerID.triggerOutput"
+                }
+            }
+        ],
+        "actions":[
+            {
+                "id":"SampleActionID",
+                "type":"SampleAction",
+                "configuration":{
+                    "message":">>> Hello World!!!"
+                }
+            }
+        ]
+}
+
+----------------------------------------
+
+TITLE: Basic UI Rule for Sunrise Actions
+DESCRIPTION: A UI rule that raises blinds and adjusts temperature when the sun rises using the Astro binding
+
+LANGUAGE: yaml
+CODE:
+configuration: {}
+triggers:
+  - id: "1"
+    configuration:
+      event: START
+      channelUID: astro:sun:home:rise#event
+    type: core.ChannelEventTrigger
+conditions: []
+actions:
+  - inputs: {}
+    id: "2"
+    configuration:
+      itemName: gBlinds
+      command: UP
+    type: core.ItemCommandAction
+  - inputs: {}
+    id: "3"
+    configuration:
+      itemName: gThermostat
+      command: INCREASE
+    type: core.ItemCommandAction
+
+----------------------------------------
+
+TITLE: Restoring Item States on Restart in Java
+DESCRIPTION: Example of persisting items on every change and restoring them at startup
+
+LANGUAGE: java
+CODE:
+Strategies {
+  everyHour : "0 0 * * * ?"
+  everyDay  : "0 0 0 * * ?"
+}
+
+Items {
+  item1, item2 : strategy = everyChange, restoreOnStartup
+}
+
+----------------------------------------
+
+TITLE: Docker Run Command for openHAB
+DESCRIPTION: Docker command to run openHAB container with proper volume mounts and configuration
+
+LANGUAGE: bash
+CODE:
+docker run \\n        --name openhab \\n        --net=host \\n        -v /etc/localtime:/etc/localtime:ro \\n        -v /etc/timezone:/etc/timezone:ro \\n        -v /opt/openhab/conf:/openhab/conf \\n        -v /opt/openhab/userdata:/openhab/userdata \\n        -v /opt/openhab/addons:/openhab/addons \\n        -d \\n        -e USER_ID=<uid> \\n        -e GROUP_ID=<gid> \\n        -e CRYPTO_POLICY=unlimited \\n        --restart=always \\n        openhab/openhab:<version>-<distribution>
+
+----------------------------------------
+
+TITLE: Complete Persistence Configuration Example in Java
+DESCRIPTION: A full example of a persistence configuration file including strategies, filters and items
+
+LANGUAGE: java
+CODE:
+Strategies {
+  everyHour : "0 0 * * * ?"
+  everyDay  : "0 0 0 * * ?"
+}
+
+Filters {
+  fivepercent : > % 5
+  atMostOnceAMinute : T 1 m
+}
+
+Items {
+  Heating_Mode, Notifications_Active: strategy = everyChange, restoreOnStartup
+  Temperature*, Weather* : strategy = everyHour
+  *, !Weather*, !CellarTemperature: strategy = everyDay
+}
+
+----------------------------------------
+
+TITLE: Implementing a Discovery Service in Java
+DESCRIPTION: Example of a HueLightDiscoveryService that discovers Hue lights
+
+LANGUAGE: Java
+CODE:
+@Override
+public void startScan() {
+    List<FullLight> lights = hueBridgeHandler.getFullLights();
+    if (lights != null) {
+        for (FullLight l : lights) {
+            onLightAddedInternal(l);
+        }
+    }
+    // search for unpaired lights
+    hueBridgeHandler.startSearch();
+}
+
+----------------------------------------
+
+TITLE: Defining Persistence Filters in Java
+DESCRIPTION: Example of defining named persistence filters
+
+LANGUAGE: java
+CODE:
+Filters {
+  fivepercent : > % 5
+  atMostOnceAMinute : T 1 m
+}
+
+----------------------------------------
+
+TITLE: Complete NGINX Configuration with HTTPS and Authentication
+DESCRIPTION: Full NGINX server block configuration including HTTPS, authentication, and proxy settings for openHAB.
+
+LANGUAGE: json
+CODE:
+server {
+    listen                          80;
+    server_name                     mydomain_or_myip;
+    return 301                      https://$server_name$request_uri;
+}
+server {
+    listen                          443 ssl;
+    server_name                     mydomain_or_myip;
+
+    # Cross-Origin Resource Sharing.
+    add_header 'Access-Control-Allow-Origin' '*' always;
+    add_header 'Access-Control-Allow_Credentials' 'true' always;
+    add_header 'Access-Control-Allow-Headers' 'Authorization,Accept,Origin,DNT,X-CustomHeader,Keep-Alive,User-Agent,X-Requested-With,If-Modified-Since,Cache-Control,Content-Type,Content-Range,Range' always;
+    add_header 'Access-Control-Allow-Methods' 'GET,POST,OPTIONS,PUT,DELETE,PATCH' always;
+
+    # openHAB 3 api authentication
+    add_header Set-Cookie X-OPENHAB-AUTH-HEADER=1;
+
+    ssl_certificate                 /etc/letsencrypt/live/mydomain/fullchain.pem; # or /etc/ssl/openhab.crt
+    ssl_certificate_key             /etc/letsencrypt/live/mydomain/privkey.pem;   # or /etc/ssl/openhab.key
+    add_header                      Strict-Transport-Security "max-age=31536000"; # Remove if using self-signed and are having trouble.
+
+    location / {
+        proxy_http_version                      1.1;
+        proxy_pass                              http://localhost:8080/;
+        proxy_set_header Host                   $http_host;
+        proxy_set_header X-Real-IP              $remote_addr;
+        proxy_set_header X-Forwarded-For        $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto      $scheme;
+        proxy_set_header Upgrade                $http_upgrade;
+        proxy_set_header Connection             "Upgrade";
+        proxy_set_header Authorization          "";
+        satisfy                                 any;
+        allow                                   192.168.0.0/24;
+        allow                                   127.0.0.1;
+        deny                                    all;
+        auth_basic                              "Username and Password Required";
+        auth_basic_user_file                    /etc/nginx/.htpasswd;
+    }
+
+    #### When using Let's Encrypt Only ####
+    location /.well-known/acme-challenge/ {
+        root                                    /var/www/mydomain;
+    }
+}
+
+----------------------------------------
+
+TITLE: Defining Persistence Strategies in Java
+DESCRIPTION: Example of defining named persistence strategies using cron expressions
+
+LANGUAGE: java
+CODE:
+Strategies {
+  everyHour : "0 0 * * * ?"
+  everyDay  : "0 0 0 * * ?"
+}
+
+----------------------------------------
+
+TITLE: Updating Configuration using Configuration Admin in Java
+DESCRIPTION: This code snippet shows how to use the Configuration Admin service to update or create a configuration. It demonstrates the process of obtaining a configuration, modifying its properties, and updating it.
+
+LANGUAGE: java
+CODE:
+package com.example;
+
+import java.io.IOException;
+import java.util.Dictionary;
+import java.util.Hashtable;
+
+import org.eclipse.jdt.annotation.NonNullByDefault;
+import org.osgi.service.cm.Configuration;
+import org.osgi.service.cm.ConfigurationAdmin;
+import org.osgi.service.component.annotations.Activate;
+import org.osgi.service.component.annotations.Component;
+import org.osgi.service.component.annotations.Reference;
+
+@Component(service = TimeEventHandler.class)
+@NonNullByDefault
+public class TimeEventHandler {
+
+    private final ConfigurationAdmin configurationAdmin;
+
+    // Here we perform a configuration update as soon as this service gets activated
+    @Activate
+    public TimeEventHandler(@Reference ConfigurationAdmin configurationAdmin) {
+        this.configurationAdmin = configurationAdmin;
+        try {
+            Configuration config = configurationAdmin.getConfiguration("com.example.handler", null);
+            Dictionary<String, Object> props = config.getProperties();
+
+            if (props == null) { // if null, the configuration is new
+                props = new Hashtable<>();
+            }
+
+            // set some properties
+            props.put("formatting", "EEE, d MMM yyyy HH:mm:ss Z");
+
+            // update the configuration, the target bundle will be notified for the change
+            config.update(props);
+        } catch (IOException e) {
+            // TODO: handle exception
+        }
+    }
+}
+
+----------------------------------------
+
+TITLE: Timer Rule in JavaScript/ECMAScript 5.1
+DESCRIPTION: Example of creating a simple timer-based rule using JavaScript that prints a hello world message every minute.
+
+LANGUAGE: javascript
+CODE:
+'use strict';
+
+scriptExtension.importPreset("RuleSupport");
+scriptExtension.importPreset("RuleSimple");
+
+var sRule = new SimpleRule() {
+    execute: function( module, input) {
+        print("This is a 'hello world!' from a JavaScript rule.");
+    }
+};
+
+sRule.setTriggers([
+    TriggerBuilder.create()
+        .withId("aTimerTrigger")
+        .withTypeUID("timer.GenericCronTrigger")
+        .withConfiguration(
+            new Configuration({
+                "cronExpression": "0 * * * * ?"
+            })).build()
+    ]);
+
+automationManager.addRule(sRule);
+
+----------------------------------------
+
+TITLE: Simple Temperature Control Rule
+DESCRIPTION: Example of a basic rule that turns on heating when temperature falls below 20 degrees
+
+LANGUAGE: java
+CODE:
+if (Temperature.state < 20) {
+    Heating.sendCommand(ON)
+}
+
+----------------------------------------
+
+TITLE: Implementing Asynchronous Cache Updater in Java
+DESCRIPTION: Demonstrates how to implement an asynchronous cache updater using CompletableFuture for device state refresh. This example uses a callback-based device refreshing method.
+
+LANGUAGE: java
+CODE:
+class FetchValueFromDevice implements Supplier<CompletableFuture<double>>, DeviceStateUpdateListener {
+    CompletableFuture<double> c;
+
+    @Override
+    CompletableFuture<double> get() {
+       if (c != null) {
+          c = new CompletableFuture<double>();
+          doSuperImportantAsyncStuffHereToGetRefreshedValue( (DeviceStateUpdateListener)this );
+       }
+       return c;
+    }
+
+    // Here you process the callback from your device refresh method
+    @Override
+    void asyncCallbackFromDeviceStateRefresh(double newValue) {
+       // Notify the future that we have something
+       if (c != null) {
+          c.complete(newValue);
+          c = null;
+       }
+    }
+}
+
+----------------------------------------
+
+TITLE: Integration Test with OSGi Services
+DESCRIPTION: Shows how to implement an integration test for OSGi services using JavaOSGiTest base class and Mockito.
+
+LANGUAGE: java
+CODE:
+@NonNullByDefault
+@ExtendWith(MockitoExtension.class)
+public class JavaItemRegistryOSGiTest extends JavaOSGiTest {
+
+    private static final String ITEM_NAME = "switchItem";
+
+    private @Mock @NonNullByDefault({}) ItemProvider itemProviderMock;
+
+    private @NonNullByDefault({}) ItemRegistry itemRegistry;
+
+    @BeforeEach
+    public void setUp() {
+        itemRegistry = getService(ItemRegistry.class);
+        when(itemProviderMock.getAll()).thenReturn(List.of(new SwitchItem(ITEM_NAME)));
+    }
+
+    @Test
+    public void getItemsShouldReturnItemsFromRegisteredItemProvider() {
+        assertThat(itemRegistry.getItems(), hasSize(0));
+
+        registerService(itemProviderMock);
+
+        List<Item> items = List.copyOf(itemRegistry.getItems());
+        assertThat(items, hasSize(1));
+        assertThat(items.get(0).getName(), is(equalTo(ITEM_NAME)));
+
+        unregisterService(itemProviderMock);
+
+        assertThat(itemRegistry.getItems(), hasSize(0));
+    }
+}
+
+----------------------------------------
+
+TITLE: Example Configuration Description Implementation
+DESCRIPTION: Complete example showing a configuration description for a bridge thing-type, demonstrating parameter groups, network configuration, and authentication parameters.
+
+LANGUAGE: xml
+CODE:
+<?xml version="1.0" encoding="UTF-8"?>
+<config-description:config-description uri="thing-type:my-great-binding:my-bridge-name"
+    xmlns:xsi="https://www.w3.org/2001/XMLSchema-instance"
+    xmlns:config-description="https://openhab.org/schemas/config-description/v1.0.0"
+    xsi:schemaLocation="https://openhab.org/schemas/config-description/v1.0.0
+        https://openhab.org/schemas/config-description-1.0.0.xsd">
+
+  <parameter-group name="connection">
+    <label>Connection</label>
+    <description>Connection settings.</description>
+  </parameter-group>
+
+  <parameter-group name="authentication">
+    <label>Authentication</label>
+    <description>Authentication settings.</description>
+  </parameter-group>
+
+  <parameter name="ipAddress" type="text" required="true" groupName="connection">
+    <context>network-address</context>
+    <label>Network Address</label>
+    <description>Network address of the device.</description>
+  </parameter>
+
+  <parameter name="port" type="integer" min="0" max="65535" multiple="true" groupName="connection">
+    <label>Port</label>
+    <default>80,443,8080</default>
+  </parameter>
+
+  <parameter name="userName" type="text" required="true" groupName="authentication">
+    <label>User Name</label>
+  </parameter>
+
+  <parameter name="password" type="text" required="false" groupName="authentication">
+    <context>password</context>
+  </parameter>
+
+</config-description:config-description>
+
+----------------------------------------
+
+TITLE: Hamcrest Matcher Test Example
+DESCRIPTION: Shows how to use Hamcrest matchers for more expressive assertions compared to standard JUnit assertions.
+
+LANGUAGE: java
+CODE:
+PercentType pt = new PercentType("0.0001");
+assertThat(pt.toString(), is(equalTo("0.0001")));
+
+----------------------------------------
+
+TITLE: Profile Configuration Examples
+DESCRIPTION: Shows examples of using different profile types to modify Item behavior with channels.
+
+LANGUAGE: java
+CODE:
+/** Hysteresis Profile **/
+Number:Temperature Outdoor_Temperature { channel="openweathermap:weather-and-forecast:api:local:current#temperature" }
+// Triggers a temperature high alarm (Switch = ON) as of 30 °c and stays ON until temperature drops below 29 °C
+Switch Outdoor_Temperature_High_Alert { channel="openweathermap:weather-and-forecast:api:local:current#temperature" [profile="system:hysteresis", lower="29 °C", upper="30 °C"] }
+// Temperature low alert below 0 °C
+Switch Outdoor_Temperature_Low_Alert { channel="openweathermap:weather-and-forecast:api:local:current#temperature" [profile="system:hysteresis", lower="0 °C", inverted="true"] }
+
+/** Battery Level Profile **/
+Number Battery_Level { channel="serialbutton:button:mybutton:battery-level" }
+// Indicates a battery low alarm if battery level drops below 15
+Switch Low_Battery { channel="serialbutton:button:mybutton:battery-level" [profile="system:hysteresis", lower=15, inverted="true"] }
+
+/** Range Profile **/
+Number:Dimensionless Outdoor_Humidity { channel="openweathermap:weather-and-forecast:api:local:current#humidity" }
+// Triggers a humidity low / high alarm (Switch = ON) if humidity drops below 40 % or exceeds 60 %
+Switch Outdoor_Humidity_Alert { channel="openweathermap:weather-and-forecast:api:local:current#humidity" [profile="system:range", lower="40 %", upper="60 %", inverted="true"] }
+
+/** Timestamp Offset **/
+// 30 min before sunrise
+DateTime Sunrise { channel="astro:sun:home:rise#start" [profile="system:timestamp-offset", offset=-1800] }
+
+----------------------------------------
+
+TITLE: XML Structure for Configuration Descriptions
+DESCRIPTION: Basic XML schema showing the core structure and attributes for configuration descriptions in openHAB. Defines the config-description root element and parameter structure.
+
+LANGUAGE: xml
+CODE:
+<?xml version="1.0" encoding="UTF-8"?>
+<config-description:config-descriptions
+    xmlns:xsi="https://www.w3.org/2001/XMLSchema-instance"
+    xmlns:config-description="https://openhab.org/schemas/config-description/v1.0.0"
+    xsi:schemaLocation="https://openhab.org/schemas/config-description/v1.0.0
+        https://openhab.org/schemas/config-description-1.0.0.xsd">
+
+  <config-description uri="{binding|thing-type|channel-type|any_other}:bindingID:...">
+    <parameter-group name="String">
+      <label>String</label>
+      <description>String</description>
+      <context>String</context>
+      <advanced>{true|false}</advanced>
+    </parameter-group>
+
+    <parameter name="String" type="{text|integer|decimal|boolean}" min="Decimal" max="Decimal" step="Decimal" pattern="String" required="{true|false}" readOnly="{true|false}" multiple="{true|false}" groupName="String" unit="A|cd|K|kg|m|mol|s|g|rad|sr|Hz|N|Pa|J|W|C|V|F|Ω|S|Wb|T|H|Cel|lm|lx|Bq|Gy|Sv|kat|m/s2|m2v|m3|kph|%|l|ms|min|h|d|week|y">
+    </parameter>
+  </config-description>
+</config-description:config-descriptions>
+
+----------------------------------------
+
+TITLE: Implementing OSGi Component with Field Injection in Java
+DESCRIPTION: Shows how to create an OSGi component using field injection to reference the ItemRegistry service. Includes activation and deactivation methods.
+
+LANGUAGE: java
+CODE:
+@Component(service = MyService.class, immediate = true)
+@NonNullByDefault
+public class MyService {
+    @Reference // you can add some configuration parameters to this annotation
+    protected @NonNullByDefault({}) ItemRegistry itemRegistry;
+
+
+    @Activate
+    protected void activate(BundleContext context) {
+        System.out.println("Bundle is activated!");
+    }
+
+    @Deactivate
+    protected void deactivate(BundleContext context) {
+        System.out.println("Bundle is deactivated!");
+    }
+}
+
+----------------------------------------
+
+TITLE: Example Thing Definitions
+DESCRIPTION: Provides concrete examples of Thing definitions for network devices, astronomical data, and NTP servers, showing how to specify parameters for different types of Things.
+
+LANGUAGE: xtend
+CODE:
+Thing network:device:webcam "Webcam" @ "Living Room" [ hostname="192.168.0.2", timeout="5000", ... ]
+Thing astro:moon:home [ geolocation="50.12345,10.98765", interval=300 ]
+Thing ntp:ntp:local [ hostname="de.pool.ntp.org" ]
+
+----------------------------------------
+
+TITLE: Implementing ModuleTypeProvider in Java
+DESCRIPTION: OSGi service implementation that provides custom module types to the automation engine. This class exposes triggers, conditions and actions to the system.
+
+LANGUAGE: java
+CODE:
+@NonNullByDefault
+@Component(immediately=true, service={ModuleTypeProvider.class})
+public class MyModuleTypeProvider implements ModuleTypeProvider {
+    private Map<String, ModuleType> providedModuleTypes;
+
+    public MyModuleTypeProvider() {
+        providedModuleTypes = new HashMap<>();
+        providedModuleTypes.put(TemperatureTriggerType.UID, TemperatureTriggerType.initialize());
+        providedModuleTypes.put(PresenceConditionType.UID, PresenceConditionType.initialize());
+        providedModuleTypes.put(AirConditionerActionType.UID, AirConditionerActionType.initialize());
+    }
+
+    @SuppressWarnings("unchecked")
+    @Override
+    public <T extends ModuleType> T getModuleType(String UID, Locale locale) {
+        return (T) providedModuleTypes.get(UID);
+    }
+
+    @SuppressWarnings("unchecked")
+    @Override
+    public <T extends ModuleType> Collection<T> getModuleTypes(Locale locale) {
+        return (Collection<T>) providedModuleTypes.values();
+    }
+
+    @Override
+    public void addProviderChangeListener(ProviderChangeListener<ModuleType> listener) {
+        // does nothing because this provider does not change
+    }
+
+    @Override
+    public Collection<ModuleType> getAll() {
+        return Collections.unmodifiableCollection(providedModuleTypes.values());
+    }
+
+    @Override
+    public void removeProviderChangeListener(ProviderChangeListener<ModuleType> listener) {
+        // does nothing because this provider does not change
+    }
+}
+
+----------------------------------------
+
+TITLE: Handling Commands in a ThingHandler in Java
+DESCRIPTION: Example of implementing the handleCommand method in a ThingHandler
+
+LANGUAGE: Java
+CODE:
+@Override
+public void handleCommand(ChannelUID channelUID, Command command) {
+    try {
+        switch (channelUID.getId()) {
+            case CHANNEL_TEMPERATURE:
+                if(command instanceof OnOffType.class) {
+                    // binding specific logic goes here
+                    SwitchState deviceSwitchState = convert((OnOffType) command);
+                    updateDeviceState(deviceSwitchState);
+                }
+                break;
+            // ...
+        }
+        statusUpdated(ThingStatus.ONLINE);
+    } catch(DeviceCommunicationException ex) {
+        // catch exceptions and handle it in your binding
+        statusUpdated(ThingStatus.OFFLINE, ThingStatusDetail.COMMUNICATION_ERROR, ex.getMessage());
+    }
+}
+
+----------------------------------------
+
+TITLE: Implementing ThingTypeProvider Interface in Java
+DESCRIPTION: Shows the interface for programmatically providing Thing Type descriptions in OpenHAB bindings, as an alternative to static XML files.
+
+LANGUAGE: java
+CODE:
+ThingTypeProvider
+
+----------------------------------------
+
+TITLE: Using Transformations in Rules with Java
+DESCRIPTION: Examples of applying Map, JSON, and JavaScript transformations within rules to process data.
+
+LANGUAGE: java
+CODE:
+var condition = transform("MAP", "window_esp.map", "CLOSED")
+var temperature = transform("JSONPATH", "$.temperature", jsonstring)
+var fahrenheit = transform("JS", "convert-C-to-F.js", temperature)
+
+----------------------------------------
+
+TITLE: Bridge Definition with Connected Things
+DESCRIPTION: Demonstrates how to define a Hue bridge with connected light bulbs, showing the parent-child relationship between bridges and things.
+
+LANGUAGE: xtend
+CODE:
+Bridge hue:bridge:mybridge [ ipAddress="192.168.3.123" ] {
+ Thing 0210 bulb1 [ lightId="1" ]
+ Thing 0210 bulb2 [ lightId="2" ]
+}
+
+----------------------------------------
+
+TITLE: Downloading Image from URL in Java
+DESCRIPTION: Demonstrates how to download an image from a URL for use in an OpenHAB binding, using the HttpUtil helper method.
+
+LANGUAGE: java
+CODE:
+HttpUtil.downloadImage(URL url)
+
+----------------------------------------
+
+TITLE: Retrieving Items List Using REST GET - Bash
+DESCRIPTION: Example of using curl to retrieve a list of all Items and Groups using an HTTP GET request to the openHAB REST API.
+
+LANGUAGE: bash
+CODE:
+curl -X GET --header "Accept: application/json" "http://{openHAB_IP}:8080/rest/items?recursive=false"
+
+----------------------------------------
+
+TITLE: MQTT Bridge Configuration Example
+DESCRIPTION: Complex example showing MQTT broker bridge configuration with multiple connected Things and their channels for Sonoff devices.
+
+LANGUAGE: xtend
+CODE:
+Bridge mqtt:broker:MyMQTTBroker [ host="192.168.178.50", secure=false, username="MyUserName", password="MyPassword"] {
+  Thing topic sonoff_Dual_Thing "Light_Dual" @ "Sonoff" {
+    Channels:
+      Type switch : PowerSwitch1  [ stateTopic="stat/sonoff_dual/POWER1" , commandTopic="cmnd/sonoff_dual/POWER1", on="ON", off="OFF"]
+      Type switch : PowerSwitch2  [ stateTopic="stat/sonoff_dual/POWER2" , commandTopic="cmnd/sonoff_dual/POWER2", on="ON", off="OFF"]
+      Type string : Version [stateTopic="stat/sonoff_dual/STATUS2", transformationPattern="JSONPATH:$.StatusFWR.Version"]
+      }
+  Thing topic sonoff_TH_Thing "Light_TH" @ "Sonoff" {
+    Channels:
+      Type switch : PowerSwitch  [ stateTopic="stat/sonoff_TH/POWER", commandTopic="cmnd/sonoff_TH/POWER", on="ON", off="OFF" ]
+      Type string : Version [stateTopic="stat/sonoff_TH/STATUS2", transformationPattern="JSONPATH:$.StatusFWR.Version"]
+      Type number : Temperature [stateTopic="tele/sonoff_TH/SENSOR", transformationPattern="JSONPATH:$.AM2301.Temperature"]
+      Type number : Humidity [stateTopic="tele/sonoff_TH/SENSOR", transformationPattern="JSONPATH:$.AM2301.Humidity"]
+   }
+}
+
+----------------------------------------
+
+TITLE: Creating Log Entries in Rules
+DESCRIPTION: Examples of creating log entries with different severity levels within openHAB rules, demonstrating various logging methods and parameter formatting.
+
+LANGUAGE: java
+CODE:
+logError("heating", "This is a log entry of type Error!")
+logWarn("heating", "Heating control failed while in mode {}", Heating_Mode.state)
+logInfo("heating", "Heating mode set to normal")
+logDebug("heating", "Bedroom: Temperature: {}, Mode: {}", Bedroom_Temp.state, Bedroom_Heater_Mode.state)
+
+----------------------------------------
+
+TITLE: Exporting Packages in Maven POM
+DESCRIPTION: Shows how to manually export packages from a bundle by adding properties to the POM. This is necessary when imported packages need to be exposed to other bundles.
+
+LANGUAGE: xml
+CODE:
+  <properties>
+    <bnd.exportpackage>foo.bar.*;version="1.0.0"</bnd.exportpackage>
+  </properties>
+
+----------------------------------------
+
+TITLE: Defining a ZWave Switch with Alexa Metadata in openHAB
+DESCRIPTION: This example shows how to define a Switch Item linked to a ZWave channel and include Alexa metadata for integration with Amazon's voice assistant.
+
+LANGUAGE: shell
+CODE:
+Switch LightSwitch "Light Switch" {channel="zwave:device:22c99d1e:node3:switch_binary", alexa="PowerController.powerState"}
+
+----------------------------------------
+
+TITLE: Subscribing to Events Using REST - Bash
+DESCRIPTION: Examples of using curl to subscribe to different types of events (ThingStatusInfoChangedEvent and ChannelTriggeredEvent) through the openHAB REST API.
+
+LANGUAGE: bash
+CODE:
+# ThingStatusInfoChangedEvent - The status of a thing changed.
+curl "http://{openHAB_IP}:8080/rest/events?topics=openhab/things/{thingUID}/statuschanged"
+
+# ChannelTriggeredEvent - A channel has been triggered.
+curl "http://{openHAB_IP}:8080/rest/events?topics=openhab/channels/{channelUID}/triggered"
+
+----------------------------------------
+
+TITLE: Concurrency Guard Example
+DESCRIPTION: Shows how to implement a concurrency guard for rules that trigger on UI events
+
+LANGUAGE: javascript
+CODE:
+import java.util.concurrent.locks.ReentrantLock
+
+val ReentrantLock lock  = new ReentrantLock()
+
+rule ConcurrentCode
+when
+    Item Dummy received update
+then
+    lock.lock()
+    try {
+        // do stuff
+    } finally{
+        lock.unlock()
+    }
+end
+
+----------------------------------------
+
+TITLE: Defining Stand-Alone Chromecast Widget in YAML
+DESCRIPTION: This YAML snippet creates a complex stand-alone widget for a Chromecast device. It includes image display, media information, player controls, and volume control, all based on a single item prefix property.
+
+LANGUAGE: yaml
+CODE:
+uid: chromecast_widget
+tags:
+  - card
+props:
+  parameters:
+    - description: How all the Items associated with this chromecast starts
+      label: Item prefix
+      name: prefix
+      required: false
+      type: TEXT
+    - description: Title for the widget
+      label: Static Title
+      name: title
+      required: false
+  parameterGroups: []
+timestamp: Feb 2, 2021, 12:15:54 PM
+component: f7-card
+config:
+  title: =props.title
+slots:
+  default:
+    - component: f7-row
+      slots:
+        default:
+          - component: oh-image
+            config:
+              item: =props.prefix+"_Image"
+              style:
+                width: 100%
+                height: auto
+    - component: f7-row
+      config:
+        class:
+          - justify-content-left
+      slots:
+        default:
+          - component: f7-col
+            slots:
+              default:
+                - component: Label
+                  config:
+                    class:
+                      - text-align-center
+                    text: =items[props.prefix+"_MediaArtist"].state
+          - component: f7-col
+            slots:
+              default:
+                - component: Label
+                  config:
+                    class:
+                      - text-align-center
+                    text: =items[props.prefix+"_MediaTitle"].state
+    - component: f7-row
+      config:
+        class:
+          - padding-top
+          - padding-bottom
+      slots:
+        default:
+          - component: f7-col
+            slots:
+              default:
+                - component: oh-player-controls
+                  config:
+                    item: =props.prefix+"_MediaControl"
+          - component: f7-col
+            slots:
+              default:
+                - component: oh-slider
+                  config:
+                    item: =props.prefix+"_Volume"
+                    min: 0
+                    max: 100
+                    step: 10
+                    unit: "%"
+                    label: true
+                - component: oh-button
+                  config:
+                    text: Stop
+                    iconF7: stop
+                    fill: true
+                    color: red
+                    action: command
+                    actionCommand: ON
+                    actionFeedback: Media Stopped
+                    actionItem: =props.prefix+"_Stop"
+                    class:
+                      - margin-top
+    - component: f7-row
+      config:
+        class:
+          - justify-content-center
+      slots:
+        default:
+          - component: Label
+            config:
+              text: =items[props.prefix+"_App"].state
+
+----------------------------------------
+
+TITLE: Defining a Basic Sitemap in Java
+DESCRIPTION: Example of a simple sitemap definition with a Frame, Text, Switch and Group elements.
+
+LANGUAGE: Java
+CODE:
+sitemap demo label="My home automation" {
+    Frame label="Date" {
+        Text item=Date
+    }
+    Frame label="Demo" {
+        Switch item=Lights icon="light"
+        Text item=LR_Temperature label="Livingroom [%.1f °C]"
+        Group item=Heating
+    }
+}
+
+----------------------------------------
+
+TITLE: Inline Script Transformations in Various Languages
+DESCRIPTION: Examples of inline script transformations in DSL, JavaScript, Ruby, and Groovy that return the length of the input string.
+
+LANGUAGE: java
+CODE:
+DSL(|"String has " + input.length + " characters")
+
+LANGUAGE: javascript
+CODE:
+JS(|"String has " + input.length + " characters")
+
+LANGUAGE: ruby
+CODE:
+RB(|"String has #{input.length} characters")
+
+LANGUAGE: groovy
+CODE:
+GROOVY(|"String has ${input.length()} characters")
+
+----------------------------------------
+
+TITLE: Basic Rule Structure
+DESCRIPTION: Shows the basic syntax structure for defining a rule in Rules DSL with trigger conditions and script block
+
+LANGUAGE: java
+CODE:
+rule "<RULE_NAME>"
+when
+    <TRIGGER_CONDITION> [or <TRIGGER_CONDITION2> [or ...]]
+then
+    <SCRIPT_BLOCK>
+end
+
+----------------------------------------
+
+TITLE: Connecting to OpenHAB Console via SSH
+DESCRIPTION: Command to establish an SSH connection to the OpenHAB console on localhost port 8101.
+
+LANGUAGE: shell
+CODE:
+ssh -p 8101 openhab@localhost
+
+----------------------------------------
+
+TITLE: Creating and Rescheduling a Timer in JavaScript
+DESCRIPTION: This code snippet demonstrates how to create a timer, check if it exists, and reschedule it if necessary. It's used in the 'After period of time Do With Timer with options on retriggering rule' block.
+
+LANGUAGE: javascript
+CODE:
+if (cache.private.exists('MyTimer') === false || cache.private.get('MyTimer').hasTerminated()) {
+  cache.private.put('MyTimer', actions.ScriptExecution.createTimer('MyTimer', time.ZonedDateTime.now().plusSeconds(10), function () {
+    cache.private.remove('MyTimer');
+  }));
+} else {
+  cache.private.get('MyTimer').reschedule(time.ZonedDateTime.now().plusSeconds(10));
+};
+
+----------------------------------------
+
+TITLE: Switching Items State Using REST POST - Bash
+DESCRIPTION: Example of using curl to switch an item named 'My_Item' to OFF state using an HTTP POST request to the openHAB REST API.
+
+LANGUAGE: bash
+CODE:
+curl -X POST --header "Content-Type: text/plain" --header "Accept: application/json" -d "OFF" "http://{openHAB_IP}:8080/rest/items/My_Item"
+
+----------------------------------------
+
+TITLE: Trigger Channel Type Definition
+DESCRIPTION: Example of defining a trigger channel with event options
+
+LANGUAGE: XML
+CODE:
+<channel-type id="trigger-channel">
+    <kind>trigger</kind>
+    <label>Trigger Channel</label>
+    <event>
+        <options>
+            <option value="PRESSED">pressed</option>
+            <option value="RELEASED">released</option>
+            <option value="DOUBLE_PRESSED">double pressed</option>
+        </options>
+    </event>
+</channel-type>
+
+----------------------------------------
+
+TITLE: Checking Text-to-Speech Services in openHAB Console
+DESCRIPTION: Console command to list available Text-to-Speech services in openHAB.
+
+LANGUAGE: text
+CODE:
+openhab> openhab:voice ttsservices
+* VoiceRSS (voicerss)
+
+----------------------------------------
+
+TITLE: Updated addons.cfg with Network Binding
+DESCRIPTION: Example showing how to add the network binding to the configuration
+
+LANGUAGE: text
+CODE:
+binding = astro,network
+
+----------------------------------------
+
+TITLE: Defining Items with Transformations in Java
+DESCRIPTION: Examples of using Map, JSON, and JavaScript transformations in Item definitions to process raw values into human-readable formats.
+
+LANGUAGE: java
+CODE:
+Contact Livingroom_Window        "Window [MAP(window_esp.map):%s]"             {/*Some Binding*/}
+Number  Kitchen_Temperature_C    "Temperature [JSONPATH($.temperature):%s °C]" {/*Some Binding*/}
+Number  Livingroom_Temperature_F "Temperature [JS(convert-C-to-F.js):%s °F]"   {/*Some Binding*/}
+
+----------------------------------------
+
+TITLE: Sample addons.cfg Configuration
+DESCRIPTION: Example configuration file showing how to enable various openHAB add-ons
+
+LANGUAGE: text
+CODE:
+ui = basic,habpanel
+action = pushover
+binding = astro
+transformation = jsonpath
+persistence = influxdb
+
+----------------------------------------
+
+TITLE: State Channel Type Definition
+DESCRIPTION: Example of defining a channel type with state options and properties
+
+LANGUAGE: XML
+CODE:
+<channel-type id="setpoint-temperature" advanced="true">
+    <item-type>Number</item-type>
+    <label>Setpoint Temperature</label>
+    <category>Temperature</category>
+    <state min="12" max="30" step="0.5" pattern="%.1f °C" readOnly="false" />
+</channel-type>
+
+----------------------------------------
+
+TITLE: Applying Topic Filter in JSON via WebSocket
+DESCRIPTION: Example of applying a topic filter to the WebSocket connection. It includes the event type, topic, payload with filter rules, source, and eventId.
+
+LANGUAGE: json
+CODE:
+{
+    "type": "WebSocketEvent",
+    "topic": "openhab/websocket/filter/topic",
+    "payload": "[\"openhab/items/*/command\", \"!openhab/items/MyItem/command\"]",
+    "source": "WebSocketTestInstance",
+    "eventId": "10"
+}
+
+----------------------------------------
+
+TITLE: HTTP GET Request Implementation in Blockly
+DESCRIPTION: Send HTTP GET requests with optional timeout, headers, and query parameters. The block accepts a destination URI and can be extended with additional options through toggle buttons.
+
+LANGUAGE: blockly
+CODE:
+HTTP.GET(URI: String, [timeout], [headers: Dictionary], [queryParams: Dictionary]) -> response
+
+----------------------------------------
+
+TITLE: Applying Source Filter in JSON via WebSocket
+DESCRIPTION: Example of applying a source filter to the WebSocket connection. It includes the event type, topic, payload with source names to filter, source, and eventId.
+
+LANGUAGE: json
+CODE:
+{
+    "type": "WebSocketEvent",
+    "topic": "openhab/websocket/filter/source",
+    "payload": "[\"WebSocketTestInstance\", \"RuleEngineImpl\"]",
+    "source": "WebSocketTestInstance",
+    "eventId": "10"
+}
+
+----------------------------------------
+
+TITLE: Item Linking Example
+DESCRIPTION: Shows how to link an Item to a Thing's channel using the channel ID in the Items configuration file.
+
+LANGUAGE: xtend
+CODE:
+Switch Kitchen_Light_Switch "Kitchen Light" (Indoor_Lights) { channel="zwave:device:1a2b3c4d:node2:switch_binary" }
+
+----------------------------------------
+
+TITLE: Cancelling a Timer in JavaScript
+DESCRIPTION: This code snippet demonstrates how to cancel an existing timer. It's used in the 'Cancel' option of the retriggerable timer block.
+
+LANGUAGE: javascript
+CODE:
+if (cache.private.exists('MyTimer') === false || cache.private.get('MyTimer').hasTerminated()) {
+  cache.private.put('MyTimer', actions.ScriptExecution.createTimer('MyTimer', time.ZonedDateTime.now().plusSeconds(10), function () {
+    cache.private.remove('MyTimer');
+  }));
+} else {
+  cache.private.remove('MyTimer').cancel();
+};
+
+----------------------------------------
+
+TITLE: Parsing JSON data from MQTT plant sensor in openHAB
+DESCRIPTION: This JSON structure represents the data published by an MQTT-enabled plant sensor. It includes metrics for light, moisture, temperature, conductivity, and battery level.
+
+LANGUAGE: json
+CODE:
+{"light": 5424, "moisture": 30, "temperature": 21.4, "conductivity": 1020, "battery": 100}
+
+----------------------------------------
+
+TITLE: Performing Bitwise Operations in Blockly
+DESCRIPTION: Shows how to use the bitwise operator block in Blockly to perform operations like AND, OR, XOR, and bit shifts.
+
+LANGUAGE: blockly
+CODE:
+[Image of Blockly blocks for bitwise operations]
+
+----------------------------------------
+
+TITLE: Rule Module Conceptual Syntax
+DESCRIPTION: Basic syntax structure for defining rules showing the trigger, condition and action components.
+
+LANGUAGE: text
+CODE:
+ON item_id state changed IF item_id.state == desired_value THEN item_id2.state = desired_value2
+
+----------------------------------------
+
+TITLE: Timer Rule in JRuby
+DESCRIPTION: JRuby implementation of a timer rule showing both direct API usage and the bundled helper library approach.
+
+LANGUAGE: ruby
+CODE:
+$scriptExtension.importPreset('RuleSupport')
+$scriptExtension.importPreset('RuleSimple')
+
+class MyRule < SimpleRule
+  def execute(_mod, _inputs)
+    logger = org.slf4j.LoggerFactory.getLogger('org.openhab.automation.example')
+    logger.info('Hello World from JRuby')
+  end
+end
+
+s_rule = MyRule.new
+s_rule.set_triggers([
+        TriggerBuilder.create
+                      .with_id('aTimerTrigger')
+                      .with_type_uid('timer.GenericCronTrigger')
+                      .with_configuration(Configuration.new({ 'cronExpression' => '0 * * * * ?' }))
+                      .build
+    ])
+
+$automationManager.add_rule(s_rule)
+
+LANGUAGE: ruby
+CODE:
+# And the same rule using the bundled helper library:
+
+rule "A Cron Rule in Ruby" do
+  every :minute
+  run do
+    logger.info "Hello World from JRuby"
+  end
+end
+
+----------------------------------------
+
+TITLE: Quantity Block Examples - JavaScript
+DESCRIPTION: Examples showing how to create and handle quantity blocks with values and units of measurement in OpenHAB Blockly. These blocks combine numeric values with measurement units like Watts or Temperature.
+
+LANGUAGE: javascript
+CODE:
+// Example 1: Basic quantity "10 W"
+// Example 2: Separate value and unit handling
+// Example 3: Temperature item handling
+
+
+----------------------------------------
+
+TITLE: Receiving ItemStateEvent in JSON via WebSocket
+DESCRIPTION: Example of an ItemStateEvent received from openHAB through the WebSocket connection. It includes the event type, topic, and payload.
+
+LANGUAGE: json
+CODE:
+{
+    "type": "ItemStateEvent",
+    "topic": "openhab/items/DTR/state",
+    "payload": "{\"type\":\"Quantity\",\"value\":\"5 MB/s\"}"
+}
+
+----------------------------------------
+
+TITLE: HTTP Request Example
+DESCRIPTION: Example showing how to send an HTTP GET request with custom headers and timeout
+
+LANGUAGE: javascript
+CODE:
+val headers = newHashMap("Cache-control" -> "no-cache")
+val output = sendHttpGetRequest("https://example.com/?id=1", headers, 1000)
+
+----------------------------------------
+
+TITLE: Quantity Computation Operations - JavaScript
+DESCRIPTION: Demonstrates mathematical operations (addition, subtraction, multiplication, division) between quantities while maintaining proper unit handling. Shows both explicit and smart type detection approaches.
+
+LANGUAGE: javascript
+CODE:
+// Example: Multiplication of quantities
+// Result: 100 W²
+
+
+----------------------------------------
+
+TITLE: Using Text-to-Speech in openHAB Rules
+DESCRIPTION: Examples of using the 'say' function in openHAB rules to convert text to speech with various options like voice selection and volume control.
+
+LANGUAGE: java
+CODE:
+say("Hello world!")
+say("Hello world!", new PercentType(25))
+say("Hello world!", "voicerss:enGB")
+say("Hello world!", "voicerss:enGB", new PercentType(25))
+say("Hello world!", "voicerss:enUS", "sonos:PLAY5:kitchen")
+say("Hello world!", "voicerss:enUS", "sonos:PLAY5:kitchen", new PercentType(25))
+
+----------------------------------------
+
+TITLE: Quantity Comparison Operations - JavaScript
+DESCRIPTION: Shows how to compare quantities using various operators (equals, not equals, greater than, less than) and use them in conditional statements.
+
+LANGUAGE: javascript
+CODE:
+// Example: Comparison in if statement
+// if (quantity1 > quantity2) {
+//   // action
+// }
+
+
+----------------------------------------
+
+TITLE: Applying Type Filter in JSON via WebSocket
+DESCRIPTION: Example of applying a type filter to the WebSocket connection. It includes the event type, topic, payload with event types to include, source, and eventId.
+
+LANGUAGE: json
+CODE:
+{
+    "type": "WebSocketEvent",
+    "topic": "openhab/websocket/filter/type",
+    "payload": "[\"ItemStateEvent\", \"ItemStateChangedEvent\"]",
+    "source": "WebSocketTestInstance",
+    "eventId": "5"
+}
+
+----------------------------------------
+
+TITLE: Persistence Extension Example in Java
+DESCRIPTION: Example of using a persistence extension to get an item's state from 24 hours ago
+
+LANGUAGE: java
+CODE:
+Temperature.persistedState(now.minusDays(1))
+
+----------------------------------------
+
+TITLE: Initialize Undefined Value Example in Blockly
+DESCRIPTION: Example showing how to check if a value is undefined and initialize it if needed. This pattern is commonly used for setting default values in rules.
+
+LANGUAGE: blockly
+CODE:
+Example shown in image: blockly-value-example1.png
+
+----------------------------------------
+
+TITLE: Sending ItemCommandEvent in JSON via WebSocket
+DESCRIPTION: Example of sending an ItemCommandEvent to openHAB through the WebSocket connection. It includes the event type, topic, payload, optional eventId, and recommended source.
+
+LANGUAGE: json
+CODE:
+{
+    "type": "ItemCommandEvent",
+    "topic": "openhab/items/DTR/command",
+    "payload": "{\"type\":\"Quantity\",\"value\":\"10 MB/s\"}",
+    "eventId": "5",
+    "source": "WebSocketTestInstance"
+}
+
+----------------------------------------
+
+TITLE: Date and Time Extension Examples in Java
+DESCRIPTION: Examples of using date and time extensions for persistence queries
+
+LANGUAGE: java
+CODE:
+Lights.changedSince(now.minusMinutes(2).minusSeconds(30))
+Temperature.maximumSince(now.truncatedTo(ChronoUnit.DAYS))
+Temperature.minimumSince(parse("2012-01-01"))
+PowerMeter.historicState(now.truncatedTo(ChronoUnit.DAYS).withDayOfMonth(1))
+
+----------------------------------------
+
+TITLE: Color Value Storage Example in Blockly
+DESCRIPTION: Demonstrates using rule instance variables to remember a color value that has been previously set. Shows practical application of value storage for maintaining state between rule executions.
+
+LANGUAGE: blockly
+CODE:
+Example shown in image: blockly-value-example2.png
+
+----------------------------------------
+
+TITLE: Checking Item Change or Update in OpenHAB Blockly
+DESCRIPTION: This block checks if an item was updated or changed within a specified time range. It returns a boolean value indicating whether a change or update occurred.
+
+LANGUAGE: blockly
+CODE:
+![item-change](../images/blockly/blockly-persistence-get-item-change.png)
+
+----------------------------------------
+
+TITLE: Timer Rule in JS Scripting (ECMAScript 2020)
+DESCRIPTION: Modern JavaScript implementation of a timer rule using the newer JS Scripting engine, showing both direct API usage and helper library approach.
+
+LANGUAGE: javascript
+CODE:
+// Import openHAB Java API
+Object.assign(this, require('@runtime'));
+Object.assign(this, require('@runtime/RuleSimple'));
+Object.assign(this, require('@runtime/RuleSupport'));
+
+// Override non-working TriggerBuilder import
+const TriggerBuilder = Java.type('org.openhab.core.automation.util.TriggerBuilder');
+
+const sRule = new SimpleRule({
+  execute: function(module, input) {
+    print('This is a \'hello world!\' from a JavaScript rule.');
+  }
+});
+sRule.setName('A JavaScript/ECMAScript 262 Edition 11')
+sRule.setTriggers([
+  TriggerBuilder.create()
+    .withId('aTimerTrigger')
+    .withTypeUID('timer.GenericCronTrigger')
+    .withConfiguration(
+      new Configuration({
+        'cronExpression': '0 * * * * ?'
+      }))
+    .build()
+]);
+
+automationManager.addRule(sRule);
+
+LANGUAGE: javascript
+CODE:
+// And the same rule using the helper library:
+
+const { rules, triggers } = require('openhab');
+
+rules.JSRule({
+    name: 'A JavaScript/ECMAScript 262 Edition 11',
+    description: 'This is a JavaScript rule.',
+    triggers: [
+        triggers.GenericCronTrigger('0 * * * * ?')
+    ],
+    execute: (event) => {
+        console.log('This is a \'hello world!\' from a JavaScript rule.');
+    }
+});
+
+----------------------------------------
+
+TITLE: Startup Behavior Workaround Rule in Java
+DESCRIPTION: Rule to refresh all rules after persistence service has started
+
+LANGUAGE: java
+CODE:
+var boolean reloadOnce = true
+rule "Refresh rules after persistence service has started"
+  when System started
+then
+  if(reloadOnce)
+    executeCommandLine("$OPENHAB_CONF/rules/rules_refresh.sh")
+  else
+    println("reloadOnce is false")
+  reloadOnce = false
+end
+
+----------------------------------------
+
+TITLE: Sending WebSocket Heartbeat in JSON
+DESCRIPTION: Example of a heartbeat message sent to keep the WebSocket connection alive. It includes the event type, topic, payload, and source.
+
+LANGUAGE: json
+CODE:
+{
+    "type": "WebSocketEvent",
+    "topic": "openhab/websocket/heartbeat",
+    "payload": "PING",
+    "source": "WebSocketTestInstance"
+}
+
+----------------------------------------
+
+TITLE: Script Transformation in DSL
+DESCRIPTION: Example of a DSL script transformation that returns the length of the input string.
+
+LANGUAGE: java
+CODE:
+var returnValue = "String has " + input.length + " characters"
+
+returnValue
+
+----------------------------------------
+
+TITLE: OpenHAB Log Output Example
+DESCRIPTION: Example output from date text formatting block showing different date format options
+
+LANGUAGE: text
+CODE:
+2022-01-31
+2022-01-31 00:00:00
+2022-01-31 20:47:36
+
+----------------------------------------
+
+TITLE: Inline Script Transformation Profile
+DESCRIPTION: Example of using an inline script transformation profile in an Item definition.
+
+LANGUAGE: java
+CODE:
+Number <itemName> { channel="<channelUID>"[profile="transform:RB", toItemScript="| input.to_f * 10", commandFromItemScript="| input.to_f * 0.1" ] }
+
+----------------------------------------
+
+TITLE: Script Transformation in JavaScript
+DESCRIPTION: Example of a JavaScript script transformation that returns the length of the input string.
+
+LANGUAGE: javascript
+CODE:
+(function(data) {
+  var returnValue = "String has " + data.length + " characters"
+  return returnValue
+})(input)
+
+----------------------------------------
+
+TITLE: Quantity Unit Conversion - JavaScript
+DESCRIPTION: Demonstrates how to convert quantities between different units of measurement, such as converting Watts to Kilowatts.
+
+LANGUAGE: javascript
+CODE:
+// Example: Converting W to kW
+// Result: 0.01 kW
+
+
+----------------------------------------
+
+TITLE: WebSocket Error Response in JSON
+DESCRIPTION: Example of an error message sent by openHAB when a WebSocket message can't be processed. It includes the error type, topic, payload with error description, and the original eventId.
+
+LANGUAGE: json
+CODE:
+{
+    "type": "WebSocketEvent",
+    "topic": "openhab/websocket/response/failed",
+    "payload": "Processing error: Topic does not match event type.",
+    "eventId": "17"
+}
+
+----------------------------------------
+
+TITLE: HTTP POST Request Implementation in Blockly
+DESCRIPTION: Send HTTP POST requests with payload, optional timeout, and headers. Supports different content types including JSON and form-urlencoded data. The block requires a destination URI and payload configuration.
+
+LANGUAGE: blockly
+CODE:
+HTTP.POST(URI: String, mimeType: String, content: Any, [timeout], [headers: Dictionary], [queryParams: Dictionary]) -> response
+
+----------------------------------------
+
+TITLE: Checking Audio Sinks in openHAB Console
+DESCRIPTION: Console command to list available audio sinks in openHAB.
+
+LANGUAGE: text
+CODE:
+openhab> openhab:audio sinks
+* System Speaker (enhancedjavasound)
+  Web Audio (webaudio)
+
+----------------------------------------
+
+TITLE: Comparing Undefined Values with UNDEFINED Block in Blockly
+DESCRIPTION: Demonstrates how to use the UNDEFINED block added by openHAB for better comparison of undefined values in Blockly logic operations.
+
+LANGUAGE: blockly
+CODE:
+[Image of Blockly blocks showing UNDEFINED comparison]
+
+----------------------------------------
+
+TITLE: Receiving WebSocket Heartbeat Response in JSON
+DESCRIPTION: Example of a heartbeat response received from openHAB acknowledging the heartbeat message. It includes the event type, topic, and payload.
+
+LANGUAGE: json
+CODE:
+{
+    "type": "WebSocketEvent",
+    "topic": "openhab/websocket/heartbeat",
+    "payload": "PONG"
+}
+
+----------------------------------------
+
+TITLE: Retrieving Statistical Value from Persistence in OpenHAB Blockly
+DESCRIPTION: This block computes statistical values for a given item over a specified time range. It supports various functions like average, median, delta, and more, with options for output type and time scope.
+
+LANGUAGE: blockly
+CODE:
+![statistical-value](../images/blockly/blockly-persistence-get-statistical-value.png)
+
+----------------------------------------
+
+TITLE: Checking Keyword Spotter Services in openHAB Console
+DESCRIPTION: Console command to list available Keyword Spotter services in openHAB.
+
+LANGUAGE: text
+CODE:
+openhab> openhab:voice keywordspotters
+* Porcupine (porcupineks)
+
+----------------------------------------
+
+TITLE: F7 Popup Widget Example - YAML
+DESCRIPTION: Example of creating a popup widget using Framework7 components with open/close functionality.
+
+LANGUAGE: yaml
+CODE:
+- component: f7-card
+  config:
+    title: Popup Card
+  slots:
+    default:
+      - component: oh-link
+        config:
+          text: Open the popup
+          popupOpen: .demo-pop
+      - component: f7-popup
+        config:
+          class: demo-pop
+        slots:
+          default:
+            - component: oh-button
+              config:
+                text: Close it again
+                popupClose: .demo-pop
+
+----------------------------------------
+
+TITLE: Docker Compose Configuration
+DESCRIPTION: Docker Compose configuration for running openHAB with additional services
+
+LANGUAGE: ini
+CODE:
+COMPOSE_PROJECT_NAME=openhab\n\nOPENHAB_ADDONS=/opt/openhab/addons\nOPENHAB_CONF=/opt/openhab/conf\nOPENHAB_LOGDIR=/opt/openhab/userdata/logs\nOPENHAB_USERDATA=/opt/openhab/userdata\n\nEXTRA_JAVA_OPTS="-Duser.timezone=Europe/Berlin -Dorg.jupnp.network.useInterfaces=eno1 -Dorg.jupnp.network.useAddresses=192.168.0.65"
+
+LANGUAGE: yaml
+CODE:
+version: '3.9'\nservices:\n\n  frontail:     # place frontail configuration here ... \n  grafana:      # place grafana configuration here ...\n  influxdb:     # place influx configuration here ...\n  zigbee2mqtt:  # place zigbee2mqtt configuration here ..\n  mosquitto:    # place mosquitto configuration here ...\n\n  openhab:\n    depends_on:\n      - frontail\n      - influxdb\n      - grafana\n      - zigbee2mqtt\n    container_name: ${COMPOSE_PROJECT_NAME}-server\n    image: openhab/openhab:4.1.0-debian\n    restart: unless-stopped\n    network_mode: host\n    group_add:\n      - tty\n    volumes:\n      - /etc/localtime:/etc/localtime\n      - /etc/timezone:/etc/timezone\n      - $OPENHAB_CONF/ssh:/openhab/.ssh\n      - $OPENHAB_ADDONS:/openhab/addons\n      - $OPENHAB_CONF:/openhab/conf\n      - $OPENHAB_USERDATA:/openhab/userdata\n    devices:\n      - /dev/serial/by-id/usb-0658_0200-if00:/dev/ttyACM2\n      - /dev/serial/by-id/usb-Prolific_Technology_Inc._USB-Serial_Controller_D-if00-port0:/dev/ttyUSB0\n    environment:\n      - CRYPTO_POLICY=unlimited\n      - EXTRA_JAVA_OPTS=${EXTRA_JAVA_OPTS}
+
+----------------------------------------
+
+TITLE: Basic Widget Component Reference - YAML
+DESCRIPTION: Example showing how to reference a personal widget in a layout using the widget:<uid> syntax with configuration props.
+
+LANGUAGE: yaml
+CODE:
+component: widget:widget_0a26c10a4d
+config:
+  prop1: Test
+  item: Color1
+
+----------------------------------------
+
+TITLE: Retrieving Last or Next Update/Change Date of an Item in OpenHAB Blockly
+DESCRIPTION: This block provides the last or next updated or changed date (including time) of an Item. It returns a ZonedDateTime value.
+
+LANGUAGE: blockly
+CODE:
+![item-updated-date](../images/blockly/blockly-persistence-updated-date.png)
+
+----------------------------------------
+
+TITLE: Checking Human Language Interpreters in openHAB Console
+DESCRIPTION: Console command to list available Human Language Interpreters in openHAB.
+
+LANGUAGE: text
+CODE:
+openhab> openhab:voice interpreters
+  Built-in Interpreter (system)
+* Rule-based Interpreter (rulehli)
+
+----------------------------------------
+
+TITLE: YAML Complex Variable Definition
+DESCRIPTION: Example showing how to define complex variables like arrays and objects using oh-context.
+
+LANGUAGE: yaml
+CODE:
+- component: oh-context
+  config:
+    variables:
+      lightArray:
+        - ON
+        - OFF
+        - OFF
+        - OFF
+      userObject:
+        user: Guest
+        color: red
+        timeout: 5
+
+----------------------------------------
+
+TITLE: Basic HTML Component Example - YAML
+DESCRIPTION: Demonstrates using HTML components directly in widgets with styling.
+
+LANGUAGE: yaml
+CODE:
+- component: div
+  config:
+    content: Make this text bold
+    style:
+        font-weight: bold
+
+----------------------------------------
+
+TITLE: Text-to-Speech Block Configuration
+DESCRIPTION: Block configuration for text-to-speech functionality using the default TTS service. Converts text to speech based on selected language and plays through specified audio sink.
+
+LANGUAGE: blockly
+CODE:
+say block
+
+----------------------------------------
+
+TITLE: Querying Item State in openHAB Console
+DESCRIPTION: Demonstrates how to query the current state of an item named 'Heating_GF_Corridor' using the openhab:status command.
+
+LANGUAGE: shell
+CODE:
+openhab> openhab:status Heating_GF_Corridor
+OFF
+
+----------------------------------------
+
+TITLE: Managing Voice Assistants in openHAB Console
+DESCRIPTION: Console commands to start, stop, and manage voice assistants in openHAB.
+
+LANGUAGE: text
+CODE:
+openhab> openhab:voice startdialog --source javasound --sink sonos:PLAY5:kitchen --hlis system,rulehli --stt voicerss --tts voskstt --keyword terminator --ks rustpotterks
+openhab> openhab:voice dialogs
+openhab> openhab:voice registerdialog --source javasound --sink sonos:PLAY5:kitchen --hlis system,rulehli --tts voicerss --stt voskstt --keyword terminator --ks rustpotterks
+openhab> openhab:voice dialogregs
+openhab> openhab:voice stopdialog --source javasound
+openhab> openhab:voice unregisterdialog --source javasound
+openhab> openhab:voice listenandanswer --source javasound --sink sonos:PLAY5:kitchen --hlis system,rulehli --tts voicerss --stt voskstt --keyword terminator --ks rustpotterks
+openhab> openhab:voice transcribe --source javasound --stt voskstt
+
+----------------------------------------
+
+TITLE: Logging to OpenHAB Log with Severity Levels in Blockly
+DESCRIPTION: This block sends an entry to the openHAB log file with a defined severity level. Users can select from error, warn, info, debug, or trace severity levels. Since version 3.3, the attached block is not restricted to string type.
+
+LANGUAGE: blockly
+CODE:
+![log-statement](../images/blockly/blockly-logging-log.png)
+
+----------------------------------------
+
+TITLE: Checking Speech-to-Text Services in openHAB Console
+DESCRIPTION: Console command to list available Speech-to-Text services in openHAB.
+
+LANGUAGE: text
+CODE:
+openhab> openhab:voice sttservices
+* Vosk (voskstt)
+
+----------------------------------------
+
+TITLE: Managing Key-Value Pairs with Dictionary in Blockly
+DESCRIPTION: Demonstrates how to create and use a dictionary block for managing key-value pairs in Blockly, including adding and retrieving values.
+
+LANGUAGE: blockly
+CODE:
+[Image of Blockly dictionary blocks with key-value pairs]
+
+----------------------------------------
+
+TITLE: Getting Help for openHAB Console Command
+DESCRIPTION: Illustrates how to get help information for the openhab:send command using the help command.
+
+LANGUAGE: shell
+CODE:
+openhab> help openhab:send
+Usage: openhab:send <item> <command> - sends a command for an item
+
+----------------------------------------
+
+TITLE: Triggering Scene in JavaScript Rule
+DESCRIPTION: JavaScript code to run a scene rule by its ID using the rules.runRule() method.
+
+LANGUAGE: javascript
+CODE:
+rules.runRule('scene_office_dimmed_light', {});
+
+----------------------------------------
+
+TITLE: Installing openHAB Repository Key
+DESCRIPTION: Commands to add the openHAB repository key to the package manager on apt-based systems
+
+LANGUAGE: shell
+CODE:
+curl -fsSL "https://openhab.jfrog.io/artifactory/api/gpg/key/public" | gpg --dearmor > openhab.gpg
+sudo mkdir /usr/share/keyrings
+sudo mv openhab.gpg /usr/share/keyrings
+sudo chmod u=rw,g=r,o=r /usr/share/keyrings/openhab.gpg
+
+----------------------------------------
+
+TITLE: Creating Timer-Based Motion Sensor Rule with Blockly
+DESCRIPTION: Visual code example showing a complete Blockly implementation of a motion sensor rule that turns on a light when motion is detected and turns it off after 30 minutes of no motion, but only between sunset and 23:00.
+
+LANGUAGE: blockly
+CODE:
+// Main rule sequence:
+log.info("Motion detected");
+items.sendCommand("PorchLight", "ON");
+
+timers.rescheduleAfter("motionTimer", 30, "MINUTES", function() {
+    log.info("No motion for 30 minutes");
+    items.sendCommand("PorchLight", "OFF");
+});
+
+----------------------------------------
+
+TITLE: Updating Bundles from Local File System
+DESCRIPTION: Demonstrates how to update a bundle using a local file system path, useful for testing locally developed or modified bundles.
+
+LANGUAGE: text
+CODE:
+openhab>bundle:update 303 file:///localhost/srv/openhab-sys/org.openhab.binding.my-3.4.0-SNAPSHOT.jar
+
+----------------------------------------
+
+TITLE: Creating openHAB Directory Structure
+DESCRIPTION: Commands to create and configure the required openHAB directories on the host system
+
+LANGUAGE: bash
+CODE:
+sudo mkdir -p /opt/openhab/{conf,userdata,addons}\nsudo chown -R openhab:openhab /opt/openhab
+
+----------------------------------------
+
+TITLE: Configuring USB Device Permissions for openHAB on Synology
+DESCRIPTION: These commands set up the necessary permissions for openHAB to access USB devices like Z-Wave dongles. They add the openhab user to the dialout group and set appropriate permissions on the ttyACM0 device.
+
+LANGUAGE: bash
+CODE:
+sudo synogroup --add dialout openhab
+sudo chown root:dialout /dev/ttyACM0
+sudo chmod g+rw /dev/ttyACM0
+
+----------------------------------------
+
+TITLE: Creating openHAB Directory in macOS
+DESCRIPTION: Commands to create and navigate to the openHAB installation directory in the user's home folder
+
+LANGUAGE: shell
+CODE:
+mkdir ~/openhab
+cd ~/openhab
+
+----------------------------------------
+
+TITLE: Rule Technologies Comparison Table in Markdown
+DESCRIPTION: A markdown table comparing different rule engine technologies for openHAB, including their native support status, programming language/interface type, and implementation notes.
+
+LANGUAGE: markdown
+CODE:
+| Name                                                  | Native             | Language/Graphical | Notes                                    |
+| ----------------------------------------------------- | ------------------ | ------------------ | ---------------------------------------- |
+| [Blockly](rules_blockly.html)                         | :heavy_check_mark: | Graphical          | Only available through the UI            |
+| [GraalVM JavaScript](/addons/automation/jsscripting/) | :heavy_check_mark: | ECMAScript 11      | Enabled by installing an official add-on |
+| [Groovy](/addons/automation/groovyscripting/)         | :heavy_check_mark: | Groovy 3.0         | Enabled by installing an official add-on |
+| [HABApp](https://habapp.readthedocs.io/)              | :x:                | >= Python 3.8      | A third-party solution                   |
+| [JRuby](/addons/automation/jrubyscripting/)           | :heavy_check_mark: | Ruby 3.1           | Enabled by installing an official add-on |
+| [Jython](/addons/automation/jythonscripting)          | :heavy_check_mark: | Python 2.7         | Enabled by installing an official add-on |
+| NodeRed                                               | :x:                | Graphical          | Own UI. A third-party solution           |
+| Nashorn JavaScript                                    | :heavy_check_mark: | ECMAScript 5.1     | Deprecated                               |
+| [RulesDSL](/docs/configuration/rules-dsl.html)        | :heavy_check_mark: | RulesDSL           | Built-in                                 |
+
+----------------------------------------
+
+TITLE: Bundle Naming Convention Format
+DESCRIPTION: Shows the standard naming convention format used for openHAB bundles, consisting of prefix, type, and ID components.
+
+LANGUAGE: text
+CODE:
+<prefix>.<type>.<id>
+
+----------------------------------------
+
+TITLE: Configuring openHAB Windows Service Wrapper
+DESCRIPTION: Configuration file for the Windows service wrapper that defines Java parameters, system properties, and service settings
+
+LANGUAGE: conf
+CODE:
+#*******************************************************
+# openHAB-wrapper.conf for Windows Service Installation
+#*******************************************************
+
+# openHAB installation dir (Adapt this first setting to your system)
+set.default.OPENHAB_HOME=C:\openHAB
+
+# Wrapper Properties
+set.default.OPENHAB_CONF=%OPENHAB_HOME%\conf
+set.default.OPENHAB_RUNTIME=%OPENHAB_HOME%\runtime
+set.default.OPENHAB_USERDATA=%OPENHAB_HOME%\userdata
+set.default.OPENHAB_LOGDIR=%OPENHAB_USERDATA%\logs
+set.default.KARAF_LOG=%OPENHAB_USERDATA%\logs
+set.default.KARAF_HOME=%OPENHAB_RUNTIME%
+set.default.KARAF_BASE=%OPENHAB_USERDATA%
+set.default.KARAF_DATA=%OPENHAB_USERDATA%
+set.default.KARAF_ETC=%OPENHAB_USERDATA%\etc
+set.default.PATH=%PATH%;%KARAF_BASE%\lib;%KARAF_HOME%\lib
+
+# Java Application
+wrapper.working.dir=%KARAF_BASE%
+wrapper.java.command=%JAVA_HOME%\bin\java
+wrapper.java.mainclass=org.apache.karaf.wrapper.internal.service.Main
+wrapper.java.classpath.1=%KARAF_HOME%\lib\boot\*.jar
+wrapper.java.classpath.2=%KARAF_DATA%\lib\wrapper\*.jar
+wrapper.java.classpath.3=%KARAF_HOME%\lib\jdk9plus\*.jar
+wrapper.java.classpath.4=%KARAF_HOME%\lib\endorsed\*.jar
+wrapper.java.library.path.1=%KARAF_DATA%\lib\wrapper\
+
+# Java Parameters
+wrapper.java.additional.1=-Dkaraf.home="%KARAF_HOME%"
+wrapper.java.additional.2=-Dkaraf.base="%KARAF_BASE%"
+wrapper.java.additional.3=-Dkaraf.data="%KARAF_DATA%"
+wrapper.java.additional.4=-Dkaraf.etc="%KARAF_ETC%"
+wrapper.java.additional.5=-Dcom.sun.management.jmxremote
+wrapper.java.additional.6=-Dkaraf.startLocalConsole=false
+wrapper.java.additional.7=-Dkaraf.startRemoteShell=true
+wrapper.java.additional.8=-Dopenhab.home="%OPENHAB_HOME%"
+wrapper.java.additional.9=-Dopenhab.conf="%OPENHAB_HOME%\conf"
+wrapper.java.additional.10=-Dopenhab.runtime="%OPENHAB_HOME%\runtime"
+wrapper.java.additional.11=-Dopenhab.userdata="%OPENHAB_HOME%\userdata"
+wrapper.java.additional.12=-Dopenhab.logdir="%OPENHAB_USERDATA%\logs"
+wrapper.java.additional.13=-Dfelix.cm.dir="%OPENHAB_HOME%\userdata\config"
+wrapper.java.additional.14=-Djdk.util.zip.disableZip64ExtraFieldValidation=true
+wrapper.java.additional.15=-Djetty.host=0.0.0.0
+wrapper.java.additional.16=-Djetty.http.compliance=RFC2616
+wrapper.java.additional.17=-Dorg.apache.cxf.osgi.http.transport.disable=true
+wrapper.java.additional.18=-Dorg.osgi.service.http.port=8080
+wrapper.java.additional.19=-Dorg.osgi.service.http.port.secure=8443
+wrapper.java.additional.20=-Djava.util.logging.config.file="%KARAF_ETC%\java.util.logging.properties"
+wrapper.java.additional.21=-Dkaraf.logs="%OPENHAB_LOGDIR%"
+wrapper.java.additional.22=-Djava.awt.headless=true
+wrapper.java.additional.23=-Dfile.encoding=UTF-8
+wrapper.java.maxmemory=512
+
+# Wrapper Logging Properties
+wrapper.console.format=PM
+wrapper.console.loglevel=INFO
+wrapper.logfile=%OPENHAB_USERDATA%\logs\wrapper.log
+wrapper.logfile.format=LPTM
+wrapper.logfile.loglevel=INFO
+wrapper.logfile.maxsize=10m
+wrapper.logfile.maxfiles=5
+wrapper.syslog.loglevel=NONE
+
+# Wrapper Windows Properties
+wrapper.console.title=openHAB
+wrapper.ntservice.name=openHAB
+wrapper.ntservice.displayname=openHAB
+wrapper.ntservice.description=openHAB Service
+wrapper.ntservice.dependency.1=
+wrapper.ntservice.starttype=AUTO_START
+wrapper.ntservice.interactive=false
+
+----------------------------------------
+
+TITLE: Launching openHAB Runtime
+DESCRIPTION: Command to start the openHAB runtime using the startup script
+
+LANGUAGE: shell
+CODE:
+./start.sh
+
+----------------------------------------
+
+TITLE: Configuring Basic Rule in YAML
+DESCRIPTION: Example YAML configuration for a basic rule that sets vIsCloudy to ON when cloudiness is above 50%. Shows trigger, conditions, and action configuration.
+
+LANGUAGE: yaml
+CODE:
+triggers:
+  - id: "1"
+    configuration:
+      itemName: vCloudiness
+      event: changed
+    type: core.ItemStateChangeTrigger
+conditions:
+  - id: "2"
+    configuration:
+      itemName: vCloudiness
+      operator: GE
+      state: 50 %
+    type: core.ItemStateCondition
+  - id: "3"
+    configuration:
+      itemName: vIsCloudy
+      operator: NE
+      state: ON
+    type: core.ItemStateCondition
+actions:
+  - id: "4"
+    configuration:
+      command: ON
+      itemName: vIsCloudy
+    type: core.ItemCommandAction
+
+----------------------------------------
+
+TITLE: Timer Function Definition in JavaScript
+DESCRIPTION: Implementation of a timer function to handle delayed light control actions.
+
+LANGUAGE: javascript
+CODE:
+console.info('Motion was detected');
+items.getItem('FrontPorchLight').sendCommand('ON');
+var lightsOut = function() {
+  console.info('No more motion, turning off the light');
+  items.getItem('FrontPorchLight').sendCommand('OFF');
+};
+
+----------------------------------------
+
+TITLE: Launching Armbian Configuration Tool
+DESCRIPTION: Command to launch the Armbian configuration utility for installing OpenHAB.
+
+LANGUAGE: shell
+CODE:
+sudo armbian-config
+
+----------------------------------------
+
+TITLE: Installing Windows Service Features in openHAB Console
+DESCRIPTION: Commands to install the service wrapper feature and create a Windows service for openHAB
+
+LANGUAGE: shell
+CODE:
+feature:install service-wrapper
+wrapper:install --name "openHAB" --display "openHAB" --description "openHAB Service"
+
+----------------------------------------
+
+TITLE: Installing NGINX on Linux
+DESCRIPTION: Command to install NGINX on a Linux system using apt-get package manager.
+
+LANGUAGE: shell
+CODE:
+sudo apt-get update && sudo apt-get install nginx
+
+----------------------------------------
+
+TITLE: Sunset Condition Check in JavaScript
+DESCRIPTION: Implementation of a condition to check if current time is between sunset and 23:00.
+
+LANGUAGE: javascript
+CODE:
+var sunset = time.ZonedDateTime.parse(items.getItem('Sunset').state);
+var endTime = time.ZonedDateTime.now().withHour(23).withMinute(0).withSecond(0).withNano(0);
+now.isAfter(sunset) && now.isBefore(endTime)
+
+----------------------------------------
+
+TITLE: Complete Timer Implementation with JS-Joda
+DESCRIPTION: Full implementation of timer creation using JS-Joda library for datetime handling.
+
+LANGUAGE: javascript
+CODE:
+console.info('Motion was detected');
+items.getItem('FrontPorchLight').sendCommand('ON');
+var lightsOut = function() {
+  console.info('No more motion, turning off the light');
+  items.getItem('FrontPorchLight').sendCommand('OFF');
+};
+actions.ScriptExecution.createTimer(time.ZonedDateTime.now().plusMinutes(30), lightsOut);
+
+----------------------------------------
+
+TITLE: Printing to stdout in Blockly Rules
+DESCRIPTION: This block creates a print statement with the given text in the rule that logs to stdout. It provides a simple way to output information during rule execution.
+
+LANGUAGE: blockly
+CODE:
+![print-to-stdout](../images/blockly/blockly-logging-print.png)
+
+----------------------------------------
+
+TITLE: Configuring YUM/DNF Repository for openHAB Stable Release
+DESCRIPTION: This snippet provides the repository configuration for RPM-based installers to access the stable openHAB release packages.
+
+LANGUAGE: shell
+CODE:
+[openHAB-Stable]
+name=openHAB Stable
+baseurl=https://openhab.jfrog.io/artifactory/openhab-linuxpkg-rpm/stable
+gpgcheck=1
+gpgkey=https://openhab.jfrog.io/artifactory/api/gpg/key/public
+enabled=1
+
+----------------------------------------
+
+TITLE: Complete Rule Implementation with Cache
+DESCRIPTION: Full rule implementation using cache to manage timer state between rule executions.
+
+LANGUAGE: javascript
+CODE:
+console.info('Motion was detected');
+items.getItem('FrontPorchLight').sendCommand('ON');
+
+timerId = ruleUID+'_timer';
+var lightsOut = function() {
+  console.info('No more motion, turning off the light');
+  items.getItem('FrontPorchLight').sendCommand('OFF');
+  cache.put(timerId, null);
+};
+
+var timer = cache.get(timerId);
+if(!timer) {
+    cache.put(timerId, ScriptExecution.createTimer(time.ZonedDateTime.now().plusMinutes(30), lightsOut));
+}
+else {
+    timer.reschedule(time.ZonedDateTime.now());
+}
+
+----------------------------------------
+
+TITLE: Holiday and Weekend Check Block
+DESCRIPTION: Blockly block that checks if a given date is a holiday, weekday or weekend. Returns a boolean value true or false.
+
+
+
+----------------------------------------
+
+TITLE: Fresh Installation of openHAB using APT
+DESCRIPTION: This snippet demonstrates the commands for a fresh installation of openHAB using APT package manager, including removal of openHAB 2.
+
+LANGUAGE: shell
+CODE:
+sudo apt purge openhab2
+sudo apt update
+sudo apt install openhab
+
+----------------------------------------
+
+TITLE: Script Transformation Profile with Parameters
+DESCRIPTION: Example of using a script transformation profile with additional parameters in an Item definition.
+
+LANGUAGE: java
+CODE:
+Number <itemName> { channel="<channelUID>"[profile="transform:RB", toItemScript="multiply.rb?factor=10", commandFromItemScript="multiply.rb?factor=0.1" ] }
+
+----------------------------------------
+
+TITLE: Updating openHAB Manually on Windows
+DESCRIPTION: This snippet shows the PowerShell commands to update openHAB manually to version 3.0.0 on Windows systems.
+
+LANGUAGE: shell
+CODE:
+. .\runtime\bin\update.ps1
+Update-openHAB -OHVersion 3.0.0
+
+----------------------------------------
+
+TITLE: Creating Complex Garage Door List Widget in YAML
+DESCRIPTION: This YAML snippet defines a more complex custom widget for a garage door. It combines two items - a sensor for the door status and an actuator for the door control - into a single widget.
+
+LANGUAGE: yaml
+CODE:
+uid: garagedoor_list
+tags:
+  - list
+  - garagedoor
+props:
+  parameters:
+    - description: Door name
+      label: Name
+      name: name
+      required: false
+      type: TEXT
+    - context: item
+      description: Control Item
+      label: Control Item
+      name: control_item
+      required: false
+      type: TEXT
+    - context: item
+      description: Sensor Item
+      label: Sensor Item
+      name: sensor_item
+      required: false
+      type: TEXT
+  parameterGroups: []
+timestamp: Feb 5, 2021, 2:01:31 PM
+component: oh-list-item
+config:
+  icon: '=(items[props.sensor_item].state == "CLOSED") ? "f7:house" : "f7:house_fill"'
+  iconColor: '=(items[props.sensor_item].state == "CLOSED") ? "green" : "red"'
+  title: =props.name
+  action: command
+  actionItem: =props.control_item
+  actionCommand: ON
+  badgeColor: '=(items[props.sensor_item].state == "CLOSED") ? "green" : "red"'
+  badge: '=(items[props.sensor_item].state == "CLOSED") ? "CLOSED" : "OPEN"'
+
+----------------------------------------
+
+TITLE: Holiday Name Retrieval Block
+DESCRIPTION: Blockly block that retrieves the holiday name for a specified date. Returns the holiday name as a string or null if no holiday is found.
+
+
+
+----------------------------------------
+
+TITLE: Creating a New Git Branch for openHAB Binding Development
+DESCRIPTION: Git command to create and switch to a new branch for developing a new openHAB binding. This helps isolate changes for the new binding.
+
+LANGUAGE: bash
+CODE:
+git checkout -b <mynewbranch>
+
+----------------------------------------
+
+TITLE: Running Maven bnd Resolver
+DESCRIPTION: Command to resolve OSGi dependencies and update the runbundles section in app.bndrun file
+
+LANGUAGE: shell
+CODE:
+mvn bnd-resolver:resolve
+
+----------------------------------------
+
+TITLE: Defining Custom Light List Widget with Properties in YAML
+DESCRIPTION: This YAML snippet shows a more flexible custom widget for a light switch. It uses properties to allow customization of the title and item, making the widget reusable for different lights.
+
+LANGUAGE: yaml
+CODE:
+uid: test_light_list
+props:
+  parameterGroups: []
+  parameters:
+    - name: title
+      label: Widget Title
+      type: TEXT
+      description: Used as the label for the widget.
+    - name: item
+      label: Item
+      type: TEXT
+      context: item
+      description: The item to control
+tags:
+  - lights
+  - list
+component: oh-toggle-item
+config:
+  icon: f7:lightbulb
+  iconColor: '=(items[props.item].state == "ON") ? "yellow" : "gray"'
+  title: =props.title
+  color: '=(items[props.item].state == "ON") ? "yellow" : "gray"'
+  item: =props.item
+
+----------------------------------------
+
+TITLE: HTTP PUT Request Implementation in Blockly
+DESCRIPTION: Send HTTP PUT requests with payload and optional parameters. Similar to POST requests, supports various content types and requires URI and payload specification.
+
+LANGUAGE: blockly
+CODE:
+HTTP.PUT(URI: String, mimeType: String, content: Any, [timeout], [headers: Dictionary], [queryParams: Dictionary]) -> response
+
+----------------------------------------
+
+TITLE: Launching openHAB Demo App
+DESCRIPTION: Maven command to run the openHAB demo application using the app.bndrun configuration
+
+LANGUAGE: shell
+CODE:
+mvn bnd-run:run
+
+----------------------------------------
+
+TITLE: Location Card Background Image Configuration in YAML
+DESCRIPTION: YAML configuration example for customizing a location card's background image, including brightness adjustment and path reference to a static image file.
+
+LANGUAGE: yaml
+CODE:
+component: oh-location-card
+config:
+  backgroundImage: /static/garage.jpg
+  backgroundImageStyle:
+    filter: brightness(60%)
+  invertText: false
+
+----------------------------------------
+
+TITLE: Running openHAB in Debug Mode
+DESCRIPTION: Maven command to launch openHAB demo app in debug mode with remote debugging enabled on port 10001
+
+LANGUAGE: shell
+CODE:
+mvn -D-runjdb=10001 package bnd-run:run
+
+----------------------------------------
+
+TITLE: Setting Audio Volume in openHAB Rules
+DESCRIPTION: Examples of using audio volume control functions in openHAB rules to set, increase, or decrease the master volume.
+
+LANGUAGE: java
+CODE:
+playSound("doorbell.mp3")
+playSound("doorbell.mp3", new PercentType(25))
+playSound("sonos:PLAY5:kitchen", "doorbell.mp3")
+playSound("sonos:PLAY5:kitchen", "doorbell.mp3", new PercentType(25))
+
+playStream("example.com")
+playStream("sonos:PLAY5:kitchen", "example.com")
+
+----------------------------------------
+
+TITLE: HTTP DELETE Request Implementation in Blockly
+DESCRIPTION: Send HTTP DELETE requests with optional parameters. The basic implementation requires only a destination URI, with support for additional options through toggles.
+
+LANGUAGE: blockly
+CODE:
+HTTP.DELETE(URI: String, [timeout], [headers: Dictionary], [queryParams: Dictionary]) -> response
+
+----------------------------------------
+
+TITLE: Accessing Developer Sidebar in openHAB MainUI
+DESCRIPTION: This code snippet demonstrates how to access the Developer Sidebar in openHAB's MainUI using a keyboard shortcut.
+
+LANGUAGE: markdown
+CODE:
+<kbd>Alt</kbd><kbd>Shift</kbd><kbd>D</kbd>
+
+----------------------------------------
+
+TITLE: Cloning openHAB Repositories with Git in Bash
+DESCRIPTION: This command clones an openHAB repository (addons, core, or webui) to the local machine. The user needs to replace <yourgitusername> with their GitHub username and select the appropriate repository.
+
+LANGUAGE: bash
+CODE:
+git clone https://github.com/<yourgitusername>/openhab-<addons|core|webui>
+
+----------------------------------------
+
+TITLE: Interpreting Voice Commands in openHAB Rules
+DESCRIPTION: Examples of using the 'interpret' function in openHAB rules to process voice commands with different interpreters and audio sinks.
+
+LANGUAGE: java
+CODE:
+interpret("turn on the light")
+var String result = interpret("turn on the light", "system")
+result = interpret("turn on the light", "system", null)
+result = interpret("turn on the light", "system,rulehli")
+result = interpret(VoiceCommand.state, "system", "sonos:PLAY5:kitchen")
+
+----------------------------------------
+
+TITLE: Script Transformation in Ruby
+DESCRIPTION: Example of a Ruby script transformation that returns the length of the input string.
+
+LANGUAGE: ruby
+CODE:
+"String has #{input.length} characters"
+
+----------------------------------------
+
+TITLE: Building openHAB Projects with Maven in Bash
+DESCRIPTION: This Maven command cleans and installs the openHAB projects. It should be run in the root directory of the cloned repositories. Some addons might fail to build, which is not an issue if they're not the focus of development.
+
+LANGUAGE: bash
+CODE:
+mvn clean install
+
+----------------------------------------
+
+TITLE: Getting openHAB Installation Info
+DESCRIPTION: Command to display system information and paths for openHAB installation using openhab-cli
+
+LANGUAGE: shell
+CODE:
+openhab-cli info
+
+LANGUAGE: text
+CODE:
+Version:     4.0.0 (Build)
+
+User:        openhab (Active Process 7466)
+User Groups: openhab tty dialout audio bluetooth gpio
+
+Directories: Folder Name      | Path                        | User:Group
+             -----------      | ----                        | ----------
+             OPENHAB_HOME     | /usr/share/openhab          | openhab:openhab
+             OPENHAB_RUNTIME  | /usr/share/openhab/runtime  | openhab:openhab
+             OPENHAB_USERDATA | /var/lib/openhab            | openhab:openhab
+             OPENHAB_CONF     | /etc/openhab                | openhab:openhab
+             OPENHAB_LOGDIR   | /var/log/openhab            | openhab:openhab
+
+URLs:        http://169.254.63.209:8080
+             https://169.254.63.209:8443
+
+----------------------------------------
+
+TITLE: Generating openHAB Binding Skeleton on Linux
+DESCRIPTION: Command to generate the basic skeleton for a new openHAB binding on Linux systems. It creates the necessary file structure and initial code.
+
+LANGUAGE: bash
+CODE:
+./create_openhab_binding_skeleton.sh  MyNewBinding "<Author>" <GitHubUsername>
+
+----------------------------------------
+
+TITLE: Managing Voice Assistants in openHAB Rules
+DESCRIPTION: Examples of starting, stopping, and configuring voice assistants in openHAB rules using various parameters and options.
+
+LANGUAGE: java
+CODE:
+startDialog(null, null)
+stopDialog(null)
+
+startDialog("javasound", "sonos:PLAY5:kitchen")
+stopDialog("javasound")
+
+startDialog("porcupineks", "voskstt", "voicerss", "voicerss:frFR_Zola", "system,rulehli", "javasound", "sonos:PLAY5:kitchen", "fr-FR", "terminator", "listeningItem")
+stopDialog("javasound")
+
+listenAndAnswer(null, null)
+listenAndAnswer("javasound", "sonos:PLAY5:kitchen")
+listenAndAnswer("voskstt", "voicerss", "voicerss:frFR_Axel", "system,rulehli", "javasound", "sonos:PLAY5:kitchen", "fr-FR", "listeningItem")
+
+----------------------------------------
+
+TITLE: Script Transformation in Groovy
+DESCRIPTION: Example of a Groovy script transformation that returns the length of the input string.
+
+LANGUAGE: groovy
+CODE:
+"String has ${input.length()} characters"
+
+----------------------------------------
+
+TITLE: Sample Mapping Configuration
+DESCRIPTION: Example map file content for transforming values with key-value pairs for ON/OFF states and effects
+
+LANGUAGE: text
+CODE:
+ON=Ja
+OFF=Nein
+effects=Effekte
+-=?
+NULL=n/a
+hs = Hue/Saturation
+ct = Color Temperature
+
+----------------------------------------
+
+TITLE: Generating openHAB Binding Skeleton on Windows
+DESCRIPTION: Command to generate the basic skeleton for a new openHAB binding on Windows systems. It creates the necessary file structure and initial code.
+
+LANGUAGE: batch
+CODE:
+create_openhab_binding_skeleton.cmd MyNewBinding "<Author>" <GitHubUsername>
+
+----------------------------------------
+
+TITLE: Playing Audio in openHAB Console
+DESCRIPTION: Console commands to play audio files or streams in openHAB.
+
+LANGUAGE: text
+CODE:
+openhab> openhab:audio play doorbell.mp3
+openhab> openhab:audio play sonos:PLAY5:kitchen doorbell.mp3
+openhab> openhab:audio play sonos:PLAY5:kitchen doorbell.mp3 25
+
+openhab> openhab:audio stream example.com
+openhab> openhab:audio stream sonos:PLAY5:kitchen example.com
+
+----------------------------------------
+
+TITLE: Script Transformation Profile in Item Definition
+DESCRIPTION: Example of using a script transformation profile in an Item definition to process data between the Thing handler and the Item.
+
+LANGUAGE: java
+CODE:
+Number <itemName> { channel="<channelUID>"[profile="transform:JS", toItemScript="decode_json.js", commandFromItemScript="encode_json.js" ] }
+
+----------------------------------------
+
+TITLE: DCO Sign-off Format
+DESCRIPTION: Example showing the required Developer Certificate of Origin sign-off format for commit messages, including the proper format for single and multiple contributors.
+
+LANGUAGE: text
+CODE:
+Signed-off-by: Joe Smith <joe.smith@email.com>
+
+LANGUAGE: text
+CODE:
+Also-by: Ted Nerd <ted.nerd@email.com>
+Also-by: Sue Walker <sue.walker@email.com>
+Signed-off-by: Joe Smith <joe.smith@email.com>
+
+----------------------------------------
+
+TITLE: Tags Array Example
+DESCRIPTION: Example of tags array format returned by getItemAttributes
+
+LANGUAGE: json
+CODE:
+[plannedTimes]
+
+----------------------------------------
+
+TITLE: Fixing Code Formatting Issues
+DESCRIPTION: Command to automatically fix code formatting issues in the add-on using the Spotless Maven plugin.
+
+LANGUAGE: bash
+CODE:
+mvn spotless:apply
+
+----------------------------------------
+
+TITLE: Using Text-to-Speech in openHAB Console
+DESCRIPTION: Console command to use Text-to-Speech in openHAB.
+
+LANGUAGE: text
+CODE:
+openhab> openhab:voice say Hello world!
+
+----------------------------------------
+
+TITLE: Variable Declarations in Rules DSL
+DESCRIPTION: Examples of declaring different types of variables in Rules DSL, including initialized, read-only and uninitialized variables
+
+LANGUAGE: java
+CODE:
+// a variable with an initial value. Note that the variable type is automatically inferred
+var counter = 0
+
+// a read-only value, again the type is automatically inferred
+val msg = "This is a message"
+
+// an uninitialized variable where we have to provide the type (as it cannot be inferred from an initial value)
+var Number x
+
+----------------------------------------
+
+TITLE: Thing Type Update Instructions
+DESCRIPTION: Example of XML instructions for updating existing thing types
+
+LANGUAGE: XML
+CODE:
+<?xml version="1.0" encoding="UTF-8" standalone="yes" ?>
+<update:update-descriptions xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xmlns:update="https://openhab.org/schemas/update-description/v1.0.0"
+    xsi:schemaLocation="https://openhab.org/schemas/update-description/v1.0.0 https://openhab.org/schemas/update-description-1.0.0.xsd">
+    <thing-type uid="foo:pool">
+        <instruction-set targetVersion="1">
+            <remove-channel id="water-level">
+            </remove-channel>
+            <add-channel id="chlorine">
+                <type>foo:concentration</type>
+                <label>Chlorine Concentration</label>
+            </add-channel>
+        </instruction-set>
+    </thing-type>
+</update:update-descriptions>
+
+----------------------------------------
+
+TITLE: mDNS Discovery Service Example
+DESCRIPTION: Example XML configuration for an add-on using mDNS discovery to find Philips Hue bridges on the local network. Includes both mDNS and UPnP discovery methods.
+
+LANGUAGE: xml
+CODE:
+<?xml version=\"1.0\" encoding=\"UTF-8\"?>
+<addon:addon id=\"bindingID\"
+    xmlns:xsi=\"https://www.w3.org/2001/XMLSchema-instance\"
+    xmlns:addon=\"https://openhab.org/schemas/addon/v1.0.0\"
+    xsi:schemaLocation=\"https://openhab.org/schemas/addon/v1.0.0
+        https://openhab.org/schemas/addon-1.0.0.xsd\">
+
+  <type>binding</type>
+  <name>hue Binding</name>
+  <description>The hue Binding integrates the Philips hue system. It allows to control hue bulbs.</description>
+
+  <connection>local</connection>
+
+  <discovery-methods>
+    <discovery-method>
+      <serviceType>mdns</serviceType>
+      <discovery-parameters>
+        <discovery-parameter>
+          <name>mdnsServiceType</name>
+          <value>_hue._tcp.local.</value>
+        </discovery-parameter>
+      </discovery-parameters>
+    </discovery-method>
+    <discovery-method>
+      <service-type>upnp</service-type>
+      </match-properties>
+        <match-property>
+          <name>modelName</name>
+          <regex>Philips hue bridge</regex>
+        </match-property>
+      </match-properties>
+    </discovery-method>
+  </discovery-methods>
+
+</addon:addon>
+
+----------------------------------------
+
+TITLE: Using Human Language Interpreter in openHAB Console
+DESCRIPTION: Console command to interpret a voice command using the default Human Language Interpreter in openHAB.
+
+LANGUAGE: text
+CODE:
+openhab> openhab:voice interpret turn on the light
+
+----------------------------------------
+
+TITLE: Retrieving openHAB User ID on Synology
+DESCRIPTION: This command displays the user ID and group information for the openHAB user, which is needed for Docker container configuration.
+
+LANGUAGE: bash
+CODE:
+sudo id openhab
+
+----------------------------------------
+
+TITLE: Simple JUnit Test for PercentType
+DESCRIPTION: Demonstrates a basic JUnit test that verifies the toString conversion of a PercentType object.
+
+LANGUAGE: java
+CODE:
+public class PercentTypeTest {
+    @Test
+    public void DoubleValue() {
+        PercentType pt = new PercentType("0.0001");
+        assertEquals("0.0001", pt.toString());
+    }
+}
+
+----------------------------------------
+
+TITLE: Changing Item State in openHAB Console
+DESCRIPTION: Shows how to change the state of an item named 'Heating_GF_Corridor' to 'ON' using the openhab:send command.
+
+LANGUAGE: shell
+CODE:
+openhab> openhab:send Heating_GF_Corridor ON
+Command has been sent successfully.
+
+----------------------------------------
+
+TITLE: Retrieving Unique Instance ID in Java
+DESCRIPTION: Demonstrates how to get a unique identifier for external system communication using the org.openhab.core.id bundle. The ID is automatically persisted in the userdata directory.
+
+LANGUAGE: java
+CODE:
+String uuid = InstanceUUID.get();
+
+----------------------------------------
+
+TITLE: Group Definitions with Aggregation
+DESCRIPTION: Examples of Group Items with different aggregation functions to compute combined states.
+
+LANGUAGE: java
+CODE:
+Group:Number                  Lights       "Active Lights [%d]"              // e.g. "2"
+Group:Switch:OR(ON,OFF)       Lights       "Active Lights [%d]"              // e.g. ON and "2"
+Group:Switch:AND(ON,OFF)      Lights       "Active Lights [%d]"              // e.g. ON and "2"
+Group:Switch:XOR(ON,OFF)      Lights       "Active Lights [%d]"              // e.g. ON and "1"
+Group:Number:Temperature:AVG  Temperatures "All Room Temperatures [%.1f °C]" // e.g. "21.3 °C"
+Group:DateTime:EARLIEST       LatestUpdate "Latest Update [%1$tY.%1$tm.%1$tY %1$tH:%1$tM:%1$tS]"
+Group:DateTime:LATEST         LastSeen     "Last Seen [%1$tY.%1$tm.%1$tY %1$tH:%1$tM:%1$tS]"
+Group:Number:COUNT("OFFLINE") OfflineDevices "Offline Devices [%d]"     // e.g. "2"
+
+----------------------------------------
+
+TITLE: Synology Boot-up Scheduled Task for USB Driver
+DESCRIPTION: This script is used as a boot-up scheduled task on Synology DSM 7.2 to load the USB to UART driver and set appropriate permissions for the USB device used by openHAB.
+
+LANGUAGE: bash
+CODE:
+#!/bin/sh
+chmod 760 /var/lock
+insmod /lib/modules/cp210x.ko > /dev/null 2>&1 # cp210x.ko sample
+chown root:dialout /dev/ttyACM0
+chmod g+rw /dev/ttyACM0
+
+----------------------------------------
+
+TITLE: Setting up Node.js and Ruby versions using version managers
+DESCRIPTION: Commands to set up specific versions of Node.js and Ruby using NVM and RVM for local documentation builds.
+
+LANGUAGE: shell
+CODE:
+nvm use
+rvm use
+
+----------------------------------------
+
+TITLE: Timer Example
+DESCRIPTION: Example demonstrating how to create, reschedule and cancel a timer in OpenHAB rules
+
+LANGUAGE: php
+CODE:
+var Timer myTimer = null
+
+rule "timer example"
+when
+    Item YourItem changed
+then
+    if (YourItem.state == ON) {
+        if (myTimer !== null) {
+            logInfo("rules", "Timer rescheduled")
+            myTimer.reschedule(now.plusMinutes(5))
+        } else {
+            myTimer = createTimer(now.plusMinutes(5), [ |
+                logInfo("rules", "Timer activated")
+                //Do something...
+            ])
+            logInfo("rules", "Timer created")
+        }
+    } else {
+        logInfo("rules", "Timer canceled")
+        myTimer?.cancel()
+        myTimer = null
+    }
+end
+
+----------------------------------------
+
+TITLE: Extracting openHAB ZIP Archive
+DESCRIPTION: Command to unzip the downloaded openHAB archive into the installation directory
+
+LANGUAGE: shell
+CODE:
+unzip ~/Downloads/openhab-3.x.x.zip -d .
+
+----------------------------------------
+
+TITLE: Listing Bundle Symbolic Names
+DESCRIPTION: Demonstrates how to list bundles with their symbolic names using the bundle:list -s command.
+
+LANGUAGE: text
+CODE:
+openhab> bundle:list -s
+ ID | State    | Lvl | Version                | Symbolic name
+----------------------------------------------------------------------------------------------
+...
+209 | Active   |  80 | 3.0.0                  | org.openhab.binding.network
+
+----------------------------------------
+
+TITLE: Monitoring Real-time Logs in Karaf Console
+DESCRIPTION: Example showing how to use the log:tail command in the Karaf console to monitor logs in real-time, displaying debug information about temperature storage and HTTP requests.
+
+LANGUAGE: shell
+CODE:
+openhab> log:tail
+20:38:00.031 [DEBUG] [sistence.rrd4j.internal.RRD4jService] - Stored 'Temperature_FF_Child' with state '19.1' in rrd4j database
+20:38:00.032 [DEBUG] [sistence.rrd4j.internal.RRD4jService] - Stored 'Temperature_FF_Bed' with state '19.5' in rrd4j database
+20:38:20.463 [DEBUG] [thome.io.rest.core.item.ItemResource] - Received HTTP POST request at 'items/Light_FF_Bath_Ceiling' with value 'ON'.
+20:38:21.444 [DEBUG] [thome.io.rest.core.item.ItemResource] - Received HTTP POST request at 'items/Light_FF_Bath_Mirror' with value 'ON'.
+
+----------------------------------------
+
+TITLE: Custom Bank Holidays XML Example
+DESCRIPTION: Example XML configuration for defining custom bank holidays and important dates in Ephemeris
+
+LANGUAGE: xml
+CODE:
+<?xml version="1.0" encoding="UTF-8"?>
+<tns:Configuration hierarchy="us" description="United States"
+    xmlns:tns="https://www.example.org/Holiday" xmlns:xsi="https://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="https://www.example.org/Holiday /Holiday.xsd">
+    <tns:Holidays>
+        <tns:Fixed month="MARCH" day="20" descriptionPropertiesKey="Rich Birthday" />
+        <tns:Fixed month="MARCH" day="27" descriptionPropertiesKey="Son's Birthday" />
+        <tns:Fixed month="JUNE" day="12" descriptionPropertiesKey="Wife's Birthday" />
+        <tns:Fixed month="DECEMBER" day="27" descriptionPropertiesKey="Anniversary" />
+        <tns:FixedWeekday which="FIRST" weekday="TUESDAY" month="NOVEMBER" descriptionPropertiesKey="Election Day"/>
+    </tns:Holidays>
+</tns:Configuration>
+
+----------------------------------------
+
+TITLE: Backup and Restore Commands
+DESCRIPTION: Commands for backing up and restoring openHAB configuration using built-in scripts
+
+LANGUAGE: shell
+CODE:
+sudo $OPENHAB_RUNTIME/bin/backup
+sudo $OPENHAB_RUNTIME/bin/backup /path/to/backups/folder/myBackup.zip
+cd $OPENHAB_HOME
+sudo $OPENHAB_RUNTIME/bin/restore $OPENHAB_BACKUPS/myBackup.zip
+$OPENHAB_RUNTIME/bin/backup --help
+
+----------------------------------------
+
+TITLE: Creating Symlinks for USB-Serial Converters in Linux
+DESCRIPTION: This shell script creates symlinks for USB-Serial converters in Linux to prevent device naming issues after reboots. It assigns specific alias names to serial devices based on their vendor ID, product ID, and serial number.
+
+LANGUAGE: shell
+CODE:
+SUBSYSTEM=="tty", ATTRS{idVendor}=="0403", ATTRS{idProduct}=="6001", ATTRS{serial}=="AE01F0PD", SYMLINK+="ttyMySensors"
+SUBSYSTEM=="tty", ATTRS{idVendor}=="10c4", ATTRS{idProduct}=="ea60", ATTRS{serial}=="0001", SYMLINK+="ttyCulStick"
+
+----------------------------------------
+
+TITLE: File Name Format for i18n Properties
+DESCRIPTION: Demonstrates the naming convention for internationalization property files with language and country codes
+
+LANGUAGE: text
+CODE:
+Format:     any_<language-code>_<country-code>.properties
+Example:    any_de_DE.properties
+
+----------------------------------------
+
+TITLE: Samba Share Configuration
+DESCRIPTION: Samba configuration for network sharing of openHAB files
+
+LANGUAGE: ini
+CODE:
+[openHAB-userdata]
+  comment=openHAB userdata
+  path=/var/lib/openhab
+  browseable=Yes
+  writeable=Yes
+  only guest=no
+  public=no
+  create mask=0777
+  directory mask=0777
+
+----------------------------------------
+
+TITLE: Thing Status Transitions Diagram Reference
+DESCRIPTION: Reference to a diagram showing the allowed status transitions between different Thing states, from UNINITIALIZED through various operational states to REMOVED.
+
+LANGUAGE: markdown
+CODE:
+![Status Transitions](diagrams/status_transitions.png)
+
+----------------------------------------
+
+TITLE: Implementing Transform Method
+DESCRIPTION: Implementation of the transform method for the BRO transformation service that appends ',bro!' to the input string.
+
+LANGUAGE: java
+CODE:
+@Override
+public @Nullable String transform(String config, String input) throws TransformationException {
+    return input + ",bro!";
+}
+
+----------------------------------------
+
+TITLE: openHAB Service Configuration
+DESCRIPTION: Systemd service configuration file for running openHAB as a system service
+
+LANGUAGE: ini
+CODE:
+[Unit]
+Description=openHAB - empowering the smart home
+Documentation=https://www.openhab.org/docs/
+Documentation=https://community.openhab.org
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+User=openhab
+Group=openhab
+
+WorkingDirectory=/opt/openhab
+#EnvironmentFile=-/etc/default/openhab
+
+ExecStart=/opt/openhab/runtime/bin/karaf daemon
+ExecStop=/opt/openhab/runtime/bin/karaf stop
+Restart=on-failure
+SuccessExitStatus=0 143
+
+[Install]
+WantedBy=multi-user.target
+
+----------------------------------------
+
+TITLE: Updating Armbian System
+DESCRIPTION: Commands to update the Armbian system packages before OpenHAB installation.
+
+LANGUAGE: shell
+CODE:
+sudo apt-get update
+sudo apt-get upgrade
+
+----------------------------------------
+
+TITLE: Profile Configuration in Items File
+DESCRIPTION: Example of how to specify a profile in the items configuration file.
+
+LANGUAGE: java
+CODE:
+<item-type> MyItem { channel="<bindingID>:<thing-typeID>:MyThing:myChannel"[profile="MyScope:MyProfile"]}
+
+----------------------------------------
+
+TITLE: Updating openHAB Runtime with PowerShell
+DESCRIPTION: PowerShell commands to update the openHAB runtime to a specific version
+
+LANGUAGE: shell
+CODE:
+cd C:\openHAB
+. .\runtime\bin\update.ps1
+Update-openHAB -OHVersion x.x.x
+
+----------------------------------------
+
+TITLE: Creating NGINX Password File
+DESCRIPTION: Command to create an NGINX password file for basic authentication.
+
+LANGUAGE: shell
+CODE:
+sudo htpasswd -c /etc/nginx/.htpasswd username
+
+----------------------------------------
+
+TITLE: Adding External Dependencies to Karaf Feature XML
+DESCRIPTION: Illustrates how to add external dependencies to the feature.xml file. This ensures that the dependencies are available at runtime for Karaf features.
+
+LANGUAGE: xml
+CODE:
+  <bundle dependency="true">mvn:org.openhab.addons.bundles/org.openhab.binding.bluetooth/${project.version}</bundle>
+  <bundle dependency="true">mvn:com.github.foo/bar/2.0.0</bundle>
+
+----------------------------------------
+
+TITLE: Configuring Multi-Bundle Features in Karaf
+DESCRIPTION: Demonstrates how to configure a feature.xml for a sub-bundle in a multi-bundle feature. This ensures that all required bundles are installed together.
+
+LANGUAGE: xml
+CODE:
+<feature>openhab-transport-mqtt</feature>
+<bundle start-level="80">mvn:org.openhab.addons.bundles/org.openhab.binding.mqtt/${project.version}</bundle>
+
+----------------------------------------
+
+TITLE: Installing and Starting openHAB Windows Service
+DESCRIPTION: Commands to install and start the openHAB Windows service using the command prompt
+
+LANGUAGE: text
+CODE:
+C:\openHAB\userdata\bin\openHAB-service.bat install
+net start "openHAB"
+
+----------------------------------------
+
+TITLE: Creating openHAB User in Linux
+DESCRIPTION: Commands to create the openHAB system user and group for container permissions
+
+LANGUAGE: bash
+CODE:
+sudo useradd -r -s /sbin/nologin openhab\nsudo usermod -a -G openhab openhab
+
+----------------------------------------
+
+TITLE: OSGi Bundle Manifest Configuration
+DESCRIPTION: Example of a basic OSGi bundle manifest file showing essential configuration headers including bundle identification, version, execution environment, and package dependencies.
+
+LANGUAGE: xml
+CODE:
+Manifest-Version: 1.0
+Bundle-ManifestVersion: 2
+Bundle-Name: Example Plug-in
+Bundle-SymbolicName: com.example.myosgi; singleton:=true
+Bundle-Version: 1.0.0
+Bundle-RequiredExecutionEnvironment: JavaSE-11
+Import-Package: org.example.required
+Export-Package: org.example.provided
+
+----------------------------------------
+
+TITLE: Updating openHAB Version
+DESCRIPTION: Commands for updating openHAB to different versions using the built-in update script
+
+LANGUAGE: shell
+CODE:
+cd ~/openhab
+sudo runtime/bin/update
+sudo runtime/bin/update 2.5.11
+sudo runtime/bin/update 2.5.12-SNAPSHOT
+
+----------------------------------------
+
+TITLE: Running openHAB Upgrade Tool
+DESCRIPTION: Example command for running the upgrade tool to copy item units to metadata
+
+LANGUAGE: shell
+CODE:
+java -jar upgradetool.jar --dir /var/lib/openhab --command itemCopyUnitToMetadata
+
+----------------------------------------
+
+TITLE: Markdown Front Matter Configuration
+DESCRIPTION: YAML front matter for the documentation page defining layout and title
+
+LANGUAGE: yaml
+CODE:
+---
+layout: documentation
+title: Settings
+---
+
+----------------------------------------
+
+TITLE: Playing Sound in openHAB Rules
+DESCRIPTION: Example of using playSound action to play audio through the web audio sink in rules.
+
+LANGUAGE: text
+CODE:
+playSound("webaudio", "barking.mp3")
+
+----------------------------------------
+
+TITLE: Systemd Service Configuration
+DESCRIPTION: Systemd service definition for managing openHAB Docker container
+
+LANGUAGE: bash
+CODE:
+[Unit]\nDescription=openHAB\nRequires=docker.service\nAfter=docker.service\n\n[Service]\nRestart=always\nExecStart=/usr/bin/docker run --name=%n --net=host \\n  -v /etc/localtime:/etc/localtime:ro \\n  -v /etc/timezone:/etc/timezone:ro \\n  -v /opt/openhab/conf:/openhab/conf \\n  -v /opt/openhab/userdata:/openhab/userdata \\n  -v /opt/openhab/addons:/openhab/addons \\n  -v /opt/openhab/.java:/openhab/.java \\n  --device=/dev/ttyUSB0 \\n  -e USER_ID=<uid_of_openhab> \\n  -e GROUP_ID=<gid_of_openhab> \\n  -e CRYPTO_POLICY=unlimited \\n  openhab/openhab:<version>-<distribution>\nExecStop=/usr/bin/docker stop -t 2 %n ; /usr/bin/docker rm -f %n\n\n[Install]\nWantedBy=multi-user.target
+
+----------------------------------------
+
+TITLE: Console Port Configuration
+DESCRIPTION: Configuration entry to change the SSH port number for the console in runtime.cfg.
+
+LANGUAGE: shell
+CODE:
+org.apache.karaf.shell:sshPort = 1234
+
+----------------------------------------
+
+TITLE: Using CSS Variable in YAML Configuration
+DESCRIPTION: This snippet shows how to use a CSS variable in a YAML configuration. It sets the border color using a predefined variable.
+
+LANGUAGE: yaml
+CODE:
+border-color: var(--f7-button-border-color)
+
+----------------------------------------
+
+TITLE: Creating openHAB User and Group on Synology DSM 7.0+
+DESCRIPTION: These commands create a new user and group for openHAB on Synology DiskStation. They are prerequisites for setting up openHAB on DSM 7.0 and higher.
+
+LANGUAGE: bash
+CODE:
+sudo synouser --add openhab habopen "openhab" 0 "" 0
+sudo synogroup --add openhab openhab
+
+----------------------------------------
+
+TITLE: Implementing Network Address Change Listener in Java
+DESCRIPTION: Shows how to implement the NetworkAddressChangeListener interface to receive notifications about network interface address changes. Only 'useful' network interface changes are notified.
+
+LANGUAGE: java
+CODE:
+public void handleCommand(ChannelUID channelUID, Command command) {
+    if (command instanceof RefreshType) {
+        switch (channelUID.getId()) {
+            case CHANNEL_1:
+                cache1.getValue(updater).thenAccept(value -> updateState(CHANNEL_1, value));
+                break;
+            ...
+        }
+    }
+}
+
+----------------------------------------
+
+TITLE: Defining and Using Custom CSS Variables in YAML
+DESCRIPTION: This example demonstrates how to define a custom CSS variable and use it in component styling within a YAML configuration.
+
+LANGUAGE: yaml
+CODE:
+config:
+  style:
+    --my-color: =props.color
+slots:
+  ...
+     ...
+        ...
+           config:
+             style:
+               background-color: var(--my-color)
+
+----------------------------------------
+
+TITLE: Dynamic Height Calculation using CSS calc() Function
+DESCRIPTION: This CSS snippet shows how to dynamically calculate the height of a component using the calc() function. It subtracts the navbar and toolbar heights from 96% of the viewport height.
+
+LANGUAGE: css
+CODE:
+calc(96vh - var(--f7-navbar-height) - var(--f7-toolbar-height))
+
+----------------------------------------
+
+TITLE: Setting USB Stick Permissions in openHAB Docker Container
+DESCRIPTION: These commands set the correct permissions for a USB device (e.g., Z-Wave stick) inside the openHAB Docker container on Synology DSM 7.2.
+
+LANGUAGE: bash
+CODE:
+root@openhab:/openhab# chown openhab:openhab /dev/ttyACM0
+root@openhab:/openhab# chmod o+rw /dev/ttyACM0
+
+----------------------------------------
+
+TITLE: Implementing OSGi Component with Method Injection in Java
+DESCRIPTION: Illustrates how to create an OSGi component using method injection to reference the ItemRegistry service. Includes methods for setting and unsetting the service reference.
+
+LANGUAGE: java
+CODE:
+@Component(service = MyService.class, immediate = true)
+@NonNullByDefault
+public class MyService {
+    protected @NonNullByDefault({}) ItemRegistry itemRegistry;
+
+    @Activate
+    protected void activate(BundleContext context) {
+        System.out.println("Bundle is activated!");
+    }
+
+    @Deactivate
+    protected void deactivate(BundleContext context) {
+        System.out.println("Bundle is deactivated!");
+    }
+
+    @Reference
+    public void setItemRegistry(ItemRegistry itemRegistry) {
+        // We store a reference to the ItemRegistry !
+        this.itemRegistry = itemRegistry;
+        System.out.println("Log service is available!");
+    }
+
+    public void unsetItemRegistry(ItemRegistry itemRegistry) {
+        System.out.println("Log service is not available anymore!");
+        // We have to clean up after ourselves, when the reference is not needed anymore !
+        this.itemRegistry = null;
+    }
+}
+
+----------------------------------------
+
+TITLE: JavaScript Variable Default Value Expression
+DESCRIPTION: Example showing how to provide a default value for a variable using OR construction in expressions.
+
+LANGUAGE: javascript
+CODE:
+text: =(vars.selectedNumber || '0')
+
+----------------------------------------
+
+TITLE: Basic NGINX Configuration for openHAB Proxy
+DESCRIPTION: NGINX server block configuration for proxying requests to openHAB, including CORS headers and proxy settings.
+
+LANGUAGE: json
+CODE:
+server {
+    listen                                    80;
+    server_name                               mydomain_or_myip;
+
+    # Cross-Origin Resource Sharing
+    add_header 'Access-Control-Allow-Origin' '*' always;
+    add_header 'Access-Control-Allow_Credentials' 'true' always;
+    add_header 'Access-Control-Allow-Headers' 'Authorization,Accept,Origin,DNT,X-CustomHeader,Keep-Alive,User-Agent,X-Requested-With,If-Modified-Since,Cache-Control,Content-Type,Content-Range,Range' always;
+    add_header 'Access-Control-Allow-Methods' 'GET,POST,OPTIONS,PUT,DELETE,PATCH' always;
+
+    location / {
+        proxy_http_version                    1.1;
+        proxy_pass                            http://localhost:8080/;
+        proxy_set_header Host                 $http_host;
+        proxy_set_header X-Real-IP            $remote_addr;
+        proxy_set_header X-Forwarded-For      $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto    $scheme;
+        proxy_read_timeout                    3600;
+    }
+}
+
+----------------------------------------
+
+TITLE: Configuring Equinox Runtime in config.ini
+DESCRIPTION: This snippet shows the content of the config.ini file used to configure the Equinox runtime. It specifies the OSGi bundles to be loaded and sets some Eclipse-specific properties.
+
+LANGUAGE: ini
+CODE:
+osgi.bundles=\
+    org.eclipse.core.runtime,\
+    org.eclipse.equinox.common,\
+    org.eclipse.core.jobs,\
+    org.eclipse.equinox.registry,\
+    org.eclipse.equinox.preferences,\
+    org.eclipse.core.contenttype,\
+    org.eclipse.equinox.app,\
+    org.eclipse.equinox.console,\
+    org.apache.felix.gogo.runtime,\
+    org.apache.felix.gogo.shell,\
+    org.apache.felix.gogo.command
+
+eclipse.ignoreApp=true
+eclipse.consoleLog=true
+
+----------------------------------------
+
+TITLE: YAML Context Variables Configuration
+DESCRIPTION: Example demonstrating how to define variables with default values using oh-context component in YAML.
+
+LANGUAGE: yaml
+CODE:
+- component: oh-context
+  config:
+    variables:
+      setBrightness: 75
+  slots:
+    default:
+      - component: oh-slider
+        config:
+          variable: setBrightness
+      - component: Label
+        config:
+          text: =vars.setBrightness
+
+----------------------------------------
+
+TITLE: Creating Dynamic All Lights Widget in YAML
+DESCRIPTION: This YAML snippet defines a dynamic widget that displays and controls all light switches in the system. It uses the oh-repeater component to iterate over items with specific tags, and includes a conditional filter based on another item's state.
+
+LANGUAGE: yaml
+CODE:
+uid: all_lights
+tags:
+  - card
+  - lights
+props:
+  parameters:
+    - description: A text prop
+      label: Prop 1
+      name: prop1
+      required: false
+      type: TEXT
+    - context: item
+      description: An item to control
+      label: Item
+      name: item
+      required: false
+      type: TEXT
+  parameterGroups: []
+timestamp: Feb 11, 2021, 3:03:59 PM
+component: f7-card
+config:
+  title: Lights
+slots:
+  default:
+    - component: oh-list
+      slots:
+        default:
+          - component: oh-repeater
+            config:
+              fragment: true
+              for: item
+              sourceType: itemsWithTags
+              itemTags: Switch,Light
+              filter: loop.item.label.includes("Christmas") == false || items.TisTheSeason.state == "ON"
+            slots:
+              default:
+                - component: oh-toggle-item
+                  config:
+                    icon: f7:lightbulb
+                    iconColor: '=(items[loop.item.name].state == "ON") ? "yellow" : "gray"'
+                    color: '=(items[loop.item.name].state == "ON") ? "yellow" : "gray"'
+                    title: =loop.item.label
+                    item: =loop.item.name
+
+----------------------------------------
+
+TITLE: Generating Self-Signed SSL Certificate
+DESCRIPTION: OpenSSL command to generate a self-signed SSL certificate for NGINX.
+
+LANGUAGE: shell
+CODE:
+sudo openssl req -x509 -nodes -days 365 -newkey rsa:2048 -keyout /etc/ssl/openhab.key -out /etc/ssl/openhab.crt
+
+----------------------------------------
+
+TITLE: Temperature Trigger Type Implementation
+DESCRIPTION: Implementation of a custom trigger type for temperature-based automation. Defines configuration parameters and outputs for temperature monitoring.
+
+LANGUAGE: java
+CODE:
+@NonNullByDefault
+public class TemperatureTriggerType extends TriggerType {
+    public static final String UID = "TemperatureTriggerType";
+    public static final String DATA_CURRENT_TEMPERATURE = "temperature";
+
+    public static final String CONFIG_OPERATOR = "operator";
+    public static final String CONFIG_TEMPERATURE = "temperature";
+
+    public static TriggerType initialize() {
+        List<Output> output = new ArrayList<>();
+        Output temperature = new Output(DATA_CURRENT_TEMPERATURE, Integer.class.getName(),
+                "Temperature", "Indicates the current room temperature", null, null, null);
+        output.add(temperature);
+
+        final ConfigDescriptionParameter temperature = ConfigDescriptionParameterBuilder
+                .create(CONFIG_TEMPERATURE, Type.INTEGER).withRequired(true).withReadOnly(true).withMultiple(false)
+                .withLabel("Temperature").withDescription("Trigger temperature").build();
+        final ConfigDescriptionParameter operator = ConfigDescriptionParameterBuilder.create(CONFIG_OPERATOR, Type.TEXT)
+                .withRequired(true).withReadOnly(true).withMultiple(false).withLabel("Operator")
+                .withDescription("Below/Above temperature").withDefault("above").build();
+
+        final List<ConfigDescriptionParameter> config = new ArrayList<>();
+        config.add(temperature);
+        config.add(operator);
+
+        return new TemperatureTriggerType(output,config);
+    }
+
+    public TemperatureTriggerType(List<Output> output, List<ConfigDescriptionParameter> config) {
+        super(UID, config, "Temperature Trigger", "This triggers when the temperature has reached a certain value", null, Visibility.VISIBLE, output);
+    }
+}
+
+----------------------------------------
+
+TITLE: Triggering Scene in JRuby Rule
+DESCRIPTION: Ruby code to trigger a scene using the rules object and run method. The rule object is accessed by ID and supports the trigger method which is aliased as run.
+
+LANGUAGE: ruby
+CODE:
+rules["scene_id"].run
+
+----------------------------------------
+
+TITLE: Configuring Local-Only HTTP Access in openHAB
+DESCRIPTION: This configuration limits HTTP access to openHAB to only the local loopback interface, enhancing security by preventing external network access.
+
+LANGUAGE: conf
+CODE:
+OPENHAB_HTTP_ADDRESS=127.0.0.1
+
+----------------------------------------
+
+TITLE: Directory Structure Example for i18n Files
+DESCRIPTION: Shows the standard folder structure for placing internationalization files within an OpenHAB bundle
+
+LANGUAGE: text
+CODE:
+|- OH-INF
+|---- i18n
+|------- acmeweather.properties
+|------- acmeweather_de.properties
+|------- acmeweather_de_DE.properties
+|------- acmeweather_fr.properties
+
+----------------------------------------
+
+TITLE: Time Comparison Function in Blockly
+DESCRIPTION: Example of creating a reusable function in Blockly to compare two datetime values, used for checking if current time is between sunset and a fixed time.
+
+LANGUAGE: blockly
+CODE:
+function compareDTs(time1, time2) {
+    var tcomp = 0;
+    if(time1.isBefore(time2)) {
+        tcomp = 1;
+    } else if(time1.isAfter(time2)) {
+        tcomp = -1;
+    }
+    return tcomp;
+}
+
+----------------------------------------
+
+TITLE: Setting Contact Item State Using REST PUT - Bash
+DESCRIPTION: Example of using curl to set a Contact item named 'My_Item' to CLOSED state using an HTTP PUT request to the openHAB REST API.
+
+LANGUAGE: bash
+CODE:
+curl -X PUT --header "Content-Type: text/plain" --header "Accept: application/json" -d "CLOSED" "http://{openHAB_IP}:8080/rest/items/My_Item/state"
+
+----------------------------------------
+
+TITLE: Monitoring OpenHAB Installation
+DESCRIPTION: Command to monitor OpenHAB installation progress using htop, filtered to show only OpenHAB-related processes.
+
+LANGUAGE: shell
+CODE:
+sudo htop -u openhab
+
+----------------------------------------
+
+TITLE: Binding Definition XML with i18n Support
+DESCRIPTION: Example of a binding XML file with internationalization support and corresponding German language properties
+
+LANGUAGE: xml
+CODE:
+<binding:binding id="acmeweather">
+    <name>ACME Weather Binding</name>
+    <description>The ACME Weather Binding requests the ACME Weather Service
+        to show the current temperature, humidity and pressure.</description>
+</binding:binding>
+
+LANGUAGE: ini
+CODE:
+binding.acmeweather.name =ACME Wetter Binding
+binding.acmeweather.description = Das ACME Wetter Binding stellt verschiedene Wetterdaten wie die Temperatur, die Luftfeuchtigkeit und den Luftdruck für konfigurierbare Orte vom ACME Wetterdienst bereit.
+
+----------------------------------------
+
+TITLE: Example JSON Data Structure for JsonPath Transformation
+DESCRIPTION: Sample JSON structure showing nested device data with temperature information that can be accessed via JsonPath
+
+LANGUAGE: json
+CODE:
+{ "device": { "location": "Outside", "status": { "temperature": 23.2 }}}
+
+----------------------------------------
+
+TITLE: Configuring Windows PowerShell Terminal in VSCode
+DESCRIPTION: VSCode configuration to use PowerShell as the default terminal on Windows systems
+
+LANGUAGE: json
+CODE:
+"terminal.integrated.automationShell.windows": "C:\\Windows\\sysnative\\WindowsPowerShell\\v1.0\\powershell.exe"
+
+----------------------------------------
+
+TITLE: Mockito Test Example for Thing Handler
+DESCRIPTION: Demonstrates using Mockito for mocking dependencies and verifying interactions in a Thing Handler test.
+
+LANGUAGE: java
+CODE:
+@ExtendWith(MockitoExtension.class)
+public class MyBindingHandlerTest {
+
+    private ThingHandler handler;
+
+    private @Mock ThingHandlerCallback callbackMock;
+    private @Mock Thing thingMock;
+
+    @BeforeEach
+    public void setUp() {
+        handler = new MyBindingHandler(thingMock);
+        handler.setCallback(callbackMock);
+    }
+
+    @AfterEach
+    public void tearDown() {
+        handler.dispose();
+    }
+
+    @Test
+    public void initializeShouldCallTheCallback() {
+        handler.initialize();
+        verify(callbackMock).statusUpdated(eq(thingMock), argThat(arg -> arg.getStatus().equals(ThingStatus.ONLINE)));
+    }
+}
+
+----------------------------------------
+
+TITLE: Item Metadata YAML Configuration
+DESCRIPTION: YAML configuration example for item metadata with expire settings
+
+LANGUAGE: yaml
+CODE:
+value: 0h3m0s
+config:
+  ignoreStateUpdates: "true"
+  ignoreCommands: "true"
+
+----------------------------------------
+
+TITLE: Complex Metadata Configuration
+DESCRIPTION: YAML example showing complex hierarchical metadata configuration
+
+LANGUAGE: yaml
+CODE:
+value: ON
+config:
+  ooone: "123"
+  oone:
+    two: "456"
+  one:
+    two:
+      three: "756"
+  field1: 1
+  field2: 2
+  field3: 3
+
+----------------------------------------
+
+TITLE: Copying Addon JAR to openHAB Distribution in Bash
+DESCRIPTION: This command copies the built addon JAR file to the addons directory of the openHAB distribution. <ADDON_NAME> should be replaced with the actual addon name, and <DISTRO_DIR> with the path to the openHAB distribution directory.
+
+LANGUAGE: bash
+CODE:
+cp target/<ADDON_NAME>.jar <DISTRO_DIR>/addons
+
+----------------------------------------
+
+TITLE: Assertions Usage Examples
+DESCRIPTION: Demonstrates when to use Hamcrest vs JUnit assertions with various test scenarios.
+
+LANGUAGE: java
+CODE:
+@Test
+public void assertionsToBeUsed() {
+    assertNotNull(new Object());
+    assertNull(null);
+
+    boolean booleanValue = true;
+    assertTrue(booleanValue);
+
+    assertThat("myString", is("myString"));
+    assertThat("myString", is(instanceOf(String.class)));
+    assertThat("myString", containsString("yS"));
+    assertThat(List.of("one", "two"), hasItem("two"));
+    assertThat(List.of("one", "two"), hasSize(2));
+
+    assertThat(null, is(nullValue()));
+    assertThat(new Object(), is(not(nullValue())));
+    assertThat(true, is(not(false)));
+}
+
+----------------------------------------
+
+TITLE: Rounding Numbers with Decimal Places in Blockly
+DESCRIPTION: Demonstrates the extended math rounding block in Blockly that allows setting the number of decimal places for rounding operations.
+
+LANGUAGE: blockly
+CODE:
+[Image of Blockly math round block with decimal places option]
+
+----------------------------------------
+
+TITLE: Building openHAB Add-on
+DESCRIPTION: Maven command to clean and install an add-on to local repository for demo project usage
+
+LANGUAGE: shell
+CODE:
+mvn clean install
+
+----------------------------------------
+
+TITLE: Implementing ProfileTypeProvider in Java
+DESCRIPTION: Example of implementing a ProfileTypeProvider to announce custom profile types to the openHAB framework.
+
+LANGUAGE: java
+CODE:
+@Component(service = { ProfileTypeProvider.class })
+public class MyProfileTypeProvider implements ProfileTypeProvider {
+    @Override
+    public Collection<ProfileType> getProfileTypes(Locale locale) {
+        //return custom types
+    }
+}
+
+----------------------------------------
+
+TITLE: Adding Line Breaks in Blockly Text Operations
+DESCRIPTION: Shows how to use the CRLF block to add newline characters in string operations within Blockly.
+
+LANGUAGE: blockly
+CODE:
+[Image of Blockly text blocks using CRLF for line breaks]
+
+----------------------------------------
+
+TITLE: Converting RGB Colors to HSB in Blockly
+DESCRIPTION: Illustrates the use of the HSB conversion block to transform RGB color values into the HSB format required by openHAB color commands.
+
+LANGUAGE: blockly
+CODE:
+[Image of Blockly color blocks converting RGB to HSB]
+
+----------------------------------------
+
+TITLE: Building a Specific openHAB Binding with Maven
+DESCRIPTION: Maven command to build a specific binding in the openHAB addons project. It includes options for skipping checks and tests, and specifying the openHAB version.
+
+LANGUAGE: bash
+CODE:
+mvn clean install -pl :org.openhab.binding.mynewbinding
+
+----------------------------------------
+
+TITLE: Combined ProfileFactory and ProfileTypeProvider
+DESCRIPTION: Example of combining ProfileFactory and ProfileTypeProvider into a single class.
+
+LANGUAGE: java
+CODE:
+@Component(service = { ProfileFactory.class, ProfileTypeProvider.class })
+public class MyProfileFactory implements ProfileFactory, ProfileTypeProvider {
+
+----------------------------------------
+
+TITLE: Creating a Simple Timer in JavaScript
+DESCRIPTION: This code snippet shows how to create a simple timer without rescheduling options. It's used in the basic timer block.
+
+LANGUAGE: javascript
+CODE:
+if (cache.private.exists('MyTimer') === false || cache.private.get('MyTimer').hasTerminated()) {
+  cache.private.put('MyTimer', actions.ScriptExecution.createTimer('MyTimer', time.ZonedDateTime.now().plusSeconds(10), function () {
+    cache.private.remove('MyTimer');
+  }));
+};
+
+----------------------------------------
+
+TITLE: Configuring Git Line Endings for openHAB Development on Windows
+DESCRIPTION: Content for a .gitattributes file to ensure consistent line endings when developing openHAB on Windows. This prevents issues with CRLF vs LF line endings.
+
+LANGUAGE: text
+CODE:
+* text eol=lf
+
+----------------------------------------
+
+TITLE: Adding Astro Binding Dependency in Maven POM
+DESCRIPTION: XML configuration snippet showing how to add the Astro binding dependency to the demo project's pom.xml file. This is required to make the binding available in the development environment.
+
+LANGUAGE: xml
+CODE:
+    <dependency>
+        <groupId>org.openhab.addons.bundles</groupId>
+        <artifactId>org.openhab.binding.astro</artifactId>
+        <version>${project.version}</version>
+        <scope>runtime</scope>
+    </dependency>
+
+----------------------------------------
+
+TITLE: Stream Control Block Configuration
+DESCRIPTION: Block configuration for controlling audio streams including starting and stopping streams on audio sinks. Streams must be accessible from the openHAB server.
+
+LANGUAGE: blockly
+CODE:
+play-stream block
+stop-stream block
+
+----------------------------------------
+
+TITLE: Listing openHAB Features via Console
+DESCRIPTION: Console command to list all available openHAB add-ons by filtering feature list with grep
+
+LANGUAGE: sh
+CODE:
+feature:list | grep ^openhab
+
+----------------------------------------
+
+TITLE: Developer Certificate of Origin
+DESCRIPTION: Full text of the Developer Certificate of Origin v1.1 that contributors must agree to when making contributions.
+
+LANGUAGE: text
+CODE:
+Developer Certificate of Origin
+Version 1.1
+
+Copyright (C) 2004, 2006 The Linux Foundation and its contributors.
+660 York Street, Suite 102,
+San Francisco, CA 94110 USA
+
+Everyone is permitted to copy and distribute verbatim copies of this
+license document, but changing it is not allowed.
+
+
+Developer's Certificate of Origin 1.1
+
+By making a contribution to this project, I certify that:
+
+(a) The contribution was created in whole or in part by me and I
+    have the right to submit it under the open source license
+    indicated in the file; or
+
+(b) The contribution is based upon previous work that, to the best
+    of my knowledge, is covered under an appropriate open source
+    license and I have the right under that license to submit that
+    work with modifications, whether created in whole or in part
+    by me, under the same open source license (unless I am
+    permitted to submit under a different license), as indicated
+    in the file; or
+
+(c) The contribution was provided directly to me by some other
+    person who certified (a), (b) or (c) and I have not modified
+    it.
+
+(d) I understand and agree that this project and the contribution
+    are public and that a record of the contribution (including all
+    personal information I submit with it, including my sign-off) is
+    maintained indefinitely and may be redistributed consistent with
+    this project or the open source license(s) involved.
+
+----------------------------------------
+
+TITLE: Starting openHAB in Debug Mode
+DESCRIPTION: Command to start openHAB in debug mode, enabling remote debugging on port 5005
+
+LANGUAGE: batch
+CODE:
+start.bat debug
+
+----------------------------------------
+
+TITLE: Install Add-on via Console
+DESCRIPTION: Console command to install a specific openHAB add-on
+
+LANGUAGE: sh
+CODE:
+openhab:addons install <id-as-from-list-command>
+
+----------------------------------------
+
+TITLE: Building openHAB Add-on Project
+DESCRIPTION: Command to build and validate the openHAB add-on project, running static code analysis and checking compliance with coding guidelines.
+
+LANGUAGE: bash
+CODE:
+mvn clean install
+
+----------------------------------------
+
+TITLE: Adding Embedded Dependency in Maven POM
+DESCRIPTION: Demonstrates how to add a compile-scoped dependency in the project's POM file. This method is used for dependencies that should be embedded in the resulting bundle.
+
+LANGUAGE: xml
+CODE:
+  <dependencies>
+    <dependency>
+      <groupId>foo.bar</groupId>
+      <artifactId>baz</artifactId>
+      <version>1.0.0</version>
+      <scope>compile</scope>
+    </dependency>
+  </dependencies>
+
+----------------------------------------
+
+TITLE: Ephemeris Configuration Example
+DESCRIPTION: Example configuration for Ephemeris showing how to define custom daysets and regions
+
+LANGUAGE: text
+CODE:
+country=de
+region=nw
+dayset-workday=[MONDAY,TUESDAY,WEDNESDAY,THURSDAY,FRIDAY]
+dayset-weekend=[SATURDAY,SUNDAY]
+dayset-trash=[MONDAY]
+
+----------------------------------------
+
+TITLE: Configuring APT Repository for openHAB Stable Release
+DESCRIPTION: This snippet shows the repository configuration line for DEB-based installers to access the stable openHAB release packages.
+
+LANGUAGE: shell
+CODE:
+deb https://openhab.jfrog.io/artifactory/openhab-linuxpkg stable main
+
+----------------------------------------
+
+TITLE: Fresh Installation of openHAB using YUM/DNF
+DESCRIPTION: This snippet shows the commands for a fresh installation of openHAB using YUM or DNF package managers, including removal of openHAB 2.
+
+LANGUAGE: shell
+CODE:
+sudo dnf remove openhab2
+sudo dnf install openhab
+
+----------------------------------------
+
+TITLE: Disabling Dependency Embedding in Maven POM
+DESCRIPTION: Shows how to disable embedding for a specific dependency by adding a property to the POM. This is useful when the embedded bundle's manifest doesn't properly export all needed packages.
+
+LANGUAGE: xml
+CODE:
+  <properties>
+    <dep.noembedding>netty-common</dep.noembedding>
+  </properties>
+
+----------------------------------------
+
+TITLE: Basic Items Import Statement
+DESCRIPTION: Example of importing required Java packages into a Rules DSL file
+
+LANGUAGE: java
+CODE:
+import java.net.URI
+
+----------------------------------------
+
+TITLE: Upgrading openHAB using DNF
+DESCRIPTION: This snippet shows the command to upgrade openHAB using DNF package manager on RedHat/CentOS/Fedora systems.
+
+LANGUAGE: shell
+CODE:
+sudo dnf --allowerasing install openhab
+
+----------------------------------------
+
+TITLE: Excluding Sub-Bundle Features from Aggregation
+DESCRIPTION: Shows how to exclude sub-bundle feature.xml files from the feature aggregation process in the openhab-addons/pom.xml file.
+
+LANGUAGE: xml
+CODE:
+<exclude name="**/org.openhab.binding.mqtt*/**/feature.xml"/>
+
+----------------------------------------
+
+TITLE: Styling CSS for openHAB Introduction Page
+DESCRIPTION: CSS styling for the introduction page that includes media queries for responsive design and custom styling for welcome heading and logo.
+
+LANGUAGE: CSS
+CODE:
+@media (min-width: 720px) {
+  .intro-logo {
+    float: left;
+    padding: 30px;
+  }
+}
+h1.welcome {
+  font-family: 'Open Sans', sans-serif;
+  font-weight: 300;
+  font-size: 36pt;
+  margin-top: 0 !important;
+}
+
+----------------------------------------
+
+TITLE: Parsing Unit of Measurement in openHAB Expression
+DESCRIPTION: Expression example showing how to parse a numeric value from an Item with Unit of Measurement to perform comparisons. Returns a color based on humidity threshold.
+
+LANGUAGE: javascript
+CODE:
+=(Number.parseFloat(items.MainFloor_Humidity.state) < 35) ? "red": "blue"
+
+----------------------------------------
+
+TITLE: Upgrading openHAB using APT
+DESCRIPTION: This snippet demonstrates the commands to upgrade openHAB using APT package manager on Debian/Ubuntu systems.
+
+LANGUAGE: shell
+CODE:
+sudo apt update
+sudo apt install openhab
+
+----------------------------------------
+
+TITLE: IP Discovery Service Example
+DESCRIPTION: Example XML configuration for a WiZ binding using IP-based device discovery. Shows how to configure broadcast discovery with specific timing and matching parameters.
+
+LANGUAGE: xml
+CODE:
+<?xml version=\"1.0\" encoding=\"UTF-8\"?>
+<addon:addon id=\"wiz\" xmlns:xsi=\"http://www.w3.org/2001/XMLSchema-instance\"
+  xmlns:addon=\"https://openhab.org/schemas/addon/v1.0.0\"
+  xsi:schemaLocation=\"https://openhab.org/schemas/addon/v1.0.0 https://openhab.org/schemas/addon-1.0.0.xsd\">
+
+  <type>binding</type>
+  <name>WiZ Binding</name>
+  <description>Binding for WiZ smart devices.</description>
+  <connection>local</connection>
+
+  <discovery-methods>
+    <discovery-method>
+      <service-type>ip</service-type>
+      <discovery-parameters>
+        <discovery-parameter>
+          <name>type</name>
+          <value>ipBroadcast</value>
+        </discovery-parameter>
+        <discovery-parameter>
+          <name>destPort</name>
+          <value>38899</value>
+        </discovery-parameter>
+        <discovery-parameter>
+          <name>requestPlain</name>
+          <value>{\"method\":\"registration\",\"id\":1,\"params\":{\"phoneIp\":\"$srcIp\",\"register\":false,\"phoneMac\":\"$srcMac\"}}</value>
+        </discovery-parameter>
+        <discovery-parameter>
+          <name>fmtMac</name>
+          <value>%02X</value>
+        </discovery-parameter>
+        <discovery-parameter>
+          <name>timeoutMs</name>
+          <value>5000</value>
+        </discovery-parameter>
+      </discovery-parameters>
+      <match-properties>
+        <match-property>
+          <name>response</name>
+          <regex>.*</regex>
+        </match-property>
+      </match-properties>
+    </discovery-method>
+  </discovery-methods>
+
+</addon:addon>
+
+----------------------------------------
+
+TITLE: Defining a Sitemap with Nested Elements in Java
+DESCRIPTION: Example of a sitemap definition with nested elements inside a Text element.
+
+LANGUAGE: Java
+CODE:
+sitemap demo label="My home automation" {
+    Frame label="Demo" {
+        Text item=LR_Multimedia_Summary label="Multimedia [%s]" icon="video" {
+            Selection item=LR_TV_Channel mappings=[0="off", 1="DasErste", 2="BBC One", 3="Cartoon Network"]
+            Slider item=LR_TV_Volume
+        }
+    }
+}
+
+----------------------------------------
+
+TITLE: Upgrading openHAB using YUM
+DESCRIPTION: This snippet provides the command to upgrade openHAB using YUM package manager on older RedHat/CentOS/Fedora systems.
+
+LANGUAGE: shell
+CODE:
+sudo yum swap openhab2 openhab
+
+----------------------------------------
+
+TITLE: Timer Rule in Jython (Python)
+DESCRIPTION: Jython implementation of a timer rule that demonstrates Python class definition and automation manager integration.
+
+LANGUAGE: python
+CODE:
+scriptExtension.importPreset("RuleSupport")
+scriptExtension.importPreset("RuleSimple")
+
+class myRule(SimpleRule):
+    def execute(self, module, inputs):
+        print "This is a 'hello world!' from Jython rule."
+
+sRule = myRule()
+sRule.setTriggers([
+    TriggerBuilder.create()
+        .withId("aTimerTrigger")
+        .withTypeUID("timer.GenericCronTrigger")
+        .withConfiguration(
+            Configuration({
+                "cronExpression": "0 * * * * ?"
+            })).build()
+    ])
+
+automationManager.addRule(sRule)
+
+----------------------------------------
+
+TITLE: Sample openHAB Feature List Output
+DESCRIPTION: Example output showing available openHAB add-ons with their versions and installation status
+
+LANGUAGE: text
+CODE:
+openhab-binding-mqtt                      | 3.0.0.M5         |          | Started     | openhab-addons-3.0.0.M5 | MQTT Binding
+openhab-binding-netatmo                   | 3.0.0.M5         |          | Started     | openhab-addons-3.0.0.M5 | Netatmo Binding
+openhab-binding-onewire                   | 3.0.0.M5         |          | Uninstalled | openhab-addons-3.0.0.M5 | OneWire Binding
+...\nopenhab-binding-network                   | 3.0.0.M5         |          | Uninstalled | openhab-addons-3.0.0.M5 | Network Binding
+
+----------------------------------------
+
+TITLE: Timer Rule in Groovy
+DESCRIPTION: Groovy implementation of a timer rule showcasing Groovy-specific syntax and openHAB automation integration.
+
+LANGUAGE: groovy
+CODE:
+import org.openhab.core.automation.*
+import org.openhab.core.automation.module.script.rulesupport.shared.simple.*
+import org.openhab.core.config.core.Configuration
+
+scriptExtension.importPreset("RuleSupport")
+scriptExtension.importPreset("RuleSimple")
+
+def sRule = new SimpleRule() {
+    Object execute(Action module, Map<String, ?> inputs) {
+        println("Hello World from Groovy")
+    }
+}
+sRule.setTriggers([
+    TriggerBuilder.create()
+        .withId("aTimerTrigger")
+        .withTypeUID("timer.GenericCronTrigger")
+        .withConfiguration(new Configuration([cronExpression: "0 * * * * ?"]))
+        .build()
+    ])
+
+automationManager.addRule(sRule)
+
+----------------------------------------
+
+TITLE: Comparing Configuration Methods in openHAB
+DESCRIPTION: A table comparing different configuration tasks and methods in openHAB, including file-based, Main UI, and console options. It provides recommendations for each task.
+
+LANGUAGE: markdown
+CODE:
+<table class="centered highlight">
+  <thead>
+    <tr>
+      <th data-field="task">Configuration Task</th>
+      <th data-field="files">via text files</th>
+      <th data-field="mainui">in Main UI</th>
+      <th data-field="karaf">openHAB console</th>
+      <th data-field="recommendation">Recommendation</th>
+    </tr>
+  </thead>
+
+  <tbody>
+    <tr>
+      <td>Auto-Discover Things and Items</td>
+      <td>❌</td>
+      <td>✔️</td>
+      <td>✔️</td>
+      <td>Main UI<br/>Do not autocreate Items</td>
+    </tr>
+    <tr>
+      <td>Define and manage Things</td>
+      <td>✔️</td>
+      <td>✔️</td>
+      <td>✔️</td>
+      <td>Main UI</td>
+    </tr>
+    <tr>
+      <td>Define and manage Groups and Items</td>
+      <td>✔️</td>
+      <td>✔️</td>
+      <td>(✔️)</td>
+      <td>for starters:<br>Use the semantic model in UI<br>advanced users:<br>import items in UI to use the semantic model<br>only stick with *.items files if you know how to handle tagging and groups for the model</td>
+    </tr>
+    <tr>
+      <td>Define GUI</td>
+      <td>sitemaps only</td>
+      <td>✔️<br>includes YAML view</td>
+      <td>✔️</td>
+      <td>Main UI<br>sitemaps/*.sitemap files</td>
+    </tr>
+    <tr>
+      <td>Define Transformations</td>
+      <td>✔️</td>
+      <td>❌</td>
+      <td>❌</td>
+      <td>transform/*.map*.js files</td>
+    </tr>
+    <tr>
+      <td>Define Persistence</td>
+      <td>✔️</td>
+      <td>❌</td>
+      <td>❌</td>
+      <td>persistence/*.persist files</td>
+    </tr>
+    <tr>
+      <td>Define Rules</td>
+      <td>✔️</td>
+      <td>✔️</td>
+      <td>❌</td>
+      <td>for starters:<br>Main UI and Blockly<br>(graphically create JS code)<br>for advanced users:<br>rules/*.rules files<br>for rules DSL and JSR223</td>
+    </tr>
+    <tr>
+      <td>Manage Z-Wave Devices</td>
+      <td>❌</td>
+      <td>✔️</td>
+      <td>❌</td>
+      <td>Main UI</td>
+    </tr>
+    <tr>
+      <td>Modify openHAB Settings/Services</td>
+      <td>✔️</td>
+      <td>✔️</td>
+      <td>✔️</td>
+      <td>Main UI</td>
+    </tr>
+    <tr>
+      <td>Install Add-ons</td>
+      <td>✔️</td>
+      <td>✔️</td>
+      <td>✔️</td>
+      <td>Main UI</td>
+    </tr>
+  </tbody>
+</table>
+
+----------------------------------------
+
+TITLE: Formatting Group Members String Example
+DESCRIPTION: Example output format when logging group members, showing item properties in a structured format
+
+LANGUAGE: json
+CODE:
+GF_IndirectLights (Type=GroupItem, BaseType=SwitchItem, Members=9, State=OFF, Label=Indirekten Lichter, Category=light, Tags=[Lightbulb], Groups=[Lights]),LichterOG (Type=GroupItem, BaseType=SwitchItem, Members=4, State=ON, Label=Lichter OG, Category=light, Groups=[Lights]),LichterEG (Type=GroupItem, BaseType=SwitchItem, Members=5, State=ON, Label=Lichter EG, Category=light, Groups=[Lights])
+
+----------------------------------------
+
+TITLE: Retrieving USB Device Information in Linux
+DESCRIPTION: This shell command retrieves detailed information about a USB device connected to /dev/ttyACM0. It's useful for identifying the necessary attributes to create udev rules for persistent device naming.
+
+LANGUAGE: shell
+CODE:
+udevadm info -a -p $(udevadm info -q path -n /dev/ttyACM0)
+
+----------------------------------------
+
+TITLE: Sample Network Binding Documentation URL
+DESCRIPTION: Example URL showing the documentation path for the Network Binding
+
+LANGUAGE: text
+CODE:
+https://www.openhab.org/addons/bindings/network/
+
+----------------------------------------
+
+TITLE: Configuring Network Device in JsonDB
+DESCRIPTION: Example JSON configuration for a network device thing named 'ISP_Gateway' with channels for online status and time monitoring. The configuration includes properties like hostname, refresh interval, port, and timeout settings.
+
+LANGUAGE: json
+CODE:
+{
+  "network:device:172_16_13_254": {
+    "class": "org.openhab.core.thing.internal.ThingImpl",
+    "value": {
+      "label": "ISP_Gateway",
+      "channels": [
+        {
+          "acceptedItemType": "Switch",
+          "kind": "STATE",
+          "uid": {
+            "segments": [
+              "network",
+              "device",
+              "172_16_13_254",
+              "online"
+            ]
+          },
+          "channelTypeUID": {
+            "segments": [
+              "network",
+              "online"
+            ]
+          },
+          "configuration": {
+            "properties": {}
+          },
+          "properties": {},
+          "defaultTags": []
+        },
+        {
+          "acceptedItemType": "Number",
+          "kind": "STATE",
+          "uid": {
+          "segments": [
+              "network",
+              "device",
+              "172_16_13_254",
+              "time"
+            ]
+          },
+          "channelTypeUID": {
+            "segments": [
+              "network",
+              "time"
+            ]
+          },
+          "configuration": {
+            "properties": {}
+          },
+          "properties": {},
+          "defaultTags": []
+        }
+      ],
+      "configuration": {
+        "properties": {
+          "hostname": "172.16.13.254",
+          "refresh_interval": 60000,
+          "port": 0,
+          "dhcplisten": false,
+          "retry": 1,
+          "timeout": 5000,
+          "use_system_ping": false
+        }
+      },
+      "properties": {},
+      "uid": {
+          "segments": [
+          "network",
+          "device",
+          "172_16_13_254"
+        ]
+      },
+      "thingTypeUID": {
+        "segments": [
+          "network",
+          "device"
+        ]
+      }
+    }
+  }
+}
+
+----------------------------------------
+
+TITLE: List Add-ons via Console
+DESCRIPTION: Console command to list all available openHAB add-ons
+
+LANGUAGE: sh
+CODE:
+openhab:addons list
+
+----------------------------------------
+
+TITLE: Changing Console Password via Shell Command
+DESCRIPTION: Shell command to modify the console authentication password in the users.properties file.
+
+LANGUAGE: shell
+CODE:
+sudo sed -i -e "s/openhab = .*,/openhab = securePassword,/g" /var/lib/openhab/etc/users.properties
+
+----------------------------------------
+
+TITLE: Checking Audio Sources in openHAB Console
+DESCRIPTION: Console command to list available audio sources in openHAB.
+
+LANGUAGE: text
+CODE:
+openhab> openhab:audio sources
+* System Microphone (javasound)
+
+----------------------------------------
+
+TITLE: Listing Bundles in openHAB Console
+DESCRIPTION: Shows how to list all installed bundles with their IDs, states, versions and names using the bundle:list command.
+
+LANGUAGE: text
+CODE:
+openhab> bundle:list
+START LEVEL 100 , List Threshold: 50
+ ID | State    | Lvl | Version               | Name
+-----------------------------------------------------------------------------------------------------
+ 22 │ Active │  80 │ 2.10.3                  │ Jackson-annotations
+ 23 │ Active │  80 │ 2.10.3                  │ Jackson-core
+ 24 │ Active │  80 │ 2.10.3                  │ jackson-databind
+ 25 │ Active │  80 │ 2.10.3                  │ Jackson-dataformat-YAML
+ 26 │ Active │  80 │ 2.10.3                  │ Jackson datatype: JSR310
+ 27 │ Active │  80 │ 2.8.2.v20180104-1110    │ Gson: Google Json Library for Java
+...
+209 | Active |  80 | 3.0.0                   | openHAB Add-ons :: Bundles :: Network Binding
+
+----------------------------------------
+
+TITLE: Defining Number Item with Unit Metadata in openHAB
+DESCRIPTION: Example of defining a Number item with a Speed dimension and setting a custom unit (mm/h) using metadata in openHAB.
+
+LANGUAGE: shell
+CODE:
+Number:Speed "Rainfall" { unit="mm/h" }
+
+----------------------------------------
+
+TITLE: Installing and Updating Bundles via URI
+DESCRIPTION: Shows how to install and update bundles using a URI source, including examples with both remote and local file URLs.
+
+LANGUAGE: text
+CODE:
+openhab> bundle:install https://github.com/myrepy/my-binding/raw/main/org.openhab.binding.my-3.4.0-SNAPSHOT.jar
+
+openhab> bundle:list | grep My
+
+303 | Active   |  80 | 3.4.0                 | openHAB Add-ons :: Bundles :: My Binding
+
+openhab> bundle:update 303 https://github.com/myrepy/my-binding/raw/main/org.openhab.binding.my-3.4.1-SNAPSHOT.jar
+
+----------------------------------------
+
+TITLE: Defining ChannelType with Temperature Dimension in openHAB
+DESCRIPTION: XML configuration for defining a channel type with a temperature dimension, including item type, label, description, and state pattern with unit placeholder.
+
+LANGUAGE: xml
+CODE:
+<channel-type id="temperature">
+    <item-type>Number:Temperature</item-type>
+    <label>Temperature</label>
+    <description>Current temperature</description>
+    <state readOnly="true" pattern="%.1f %unit%" />
+</channel-type>
+
+----------------------------------------
+
+TITLE: Starting and Stopping Bundles in openHAB
+DESCRIPTION: Demonstrates the commands for stopping and starting bundles using their ID numbers, showing the state changes in the bundle list.
+
+LANGUAGE: text
+CODE:
+openhab> bundle:stop 209
+openhab> bundle:list
+...
+209 | Resolved |  80 | 3.0.0                 | openHAB Add-ons :: Bundles :: Network Binding
+
+openhab> bundle:start 209
+openhab> bundle:list
+...
+209 | Active   |  80 | 3.0.0                 | openHAB Add-ons :: Bundles :: Network Binding
+
+----------------------------------------
+
+TITLE: Window Open Reminder in JavaScript
+DESCRIPTION: JavaScript rule that sends a notification when a window has been left open for an hour
+
+LANGUAGE: javascript
+CODE:
+const { rules, triggers, items, actions } = require('openhab');
+
+rules.JSRule({
+  name: 'Window open reminder',
+  description: 'Remind you that the window is open for an hour',
+  triggers: [
+    triggers.GroupStateChangeTrigger('gWindows', 'OPEN')
+  ],
+  execute: (event) => {
+      const windowName = event.itemName;
+      const windowState = event.newState;
+      const generateNotificationFunction = (windowName) => {
+          return function () {
+              const window = items.getItem(windowName);
+              if (window.state === 'OPEN') {
+                  actions.NotificationAction.sendBroadcastNotification(`${window.label} is open for an hour!`);
+              }
+          }
+      }
+      setTimeout(generateNotificationFunction(windowName), 3600 * 1000);
+  }
+});
+
+----------------------------------------
+
+TITLE: YAML Constants and Custom Functions
+DESCRIPTION: Example demonstrating how to define and use constants and custom functions in widgets.
+
+LANGUAGE: yaml
+CODE:
+- component: oh-context
+  config:
+    constants:
+      modeColor:
+        heat: orange
+        cool: blue
+        auto: green
+        off: white
+  slots:
+    default:
+      - component: Label
+        config:
+          text: =@@hvacModeItem
+          style:
+            background: =const.modeColor[@@hvacModeItem] || 'red'
+
+----------------------------------------
+
+TITLE: Defining Thing Status State Machine - PlantUML
+DESCRIPTION: PlantUML diagram definition that visualizes the state transitions for OpenHAB Thing statuses. Shows the complete lifecycle including initialization, normal operation states (online/offline/unknown), and removal process. Uses custom styling for visual clarity.
+
+LANGUAGE: plantuml
+CODE:
+' State diagram for Thing Status Concept
+@startuml
+skinparam state {
+  BackgroundColor White
+  BorderColor Grey
+  ArrowColor #01324D
+  StartColor #01324D
+  EndColor #01324D
+}
+[*] -up-> UNINITIALIZED
+UNINITIALIZED -right-> INITIALIZING
+INITIALIZING -left-> UNINITIALIZED
+INITIALIZING -right-> initialized
+
+state initialized {
+ ONLINE -right-> OFFLINE
+ ONLINE --> UNKNOWN
+ OFFLINE -left-> ONLINE
+ OFFLINE --> UNKNOWN
+ UNKNOWN --> ONLINE
+ UNKNOWN --> OFFLINE
+}
+
+initialized -left-> UNINITIALIZED
+
+state removal {
+ [*] --> REMOVING
+ REMOVING --> REMOVED
+ REMOVED --> [*]  
+}
+@enduml
+
+----------------------------------------
+
+TITLE: Defining Dynamic Colors in Java
+DESCRIPTION: Example of using labelcolor, valuecolor, and iconcolor parameters for dynamic coloring.
+
+LANGUAGE: Java
+CODE:
+Text item=Temperature labelcolor=[>0="blue"] valuecolor=[22="green"] iconcolor=[22="green"]
+Text item=NumberItem labelcolor=[>0 AND <50="yellow", >=50="green", "gray"] valuecolor=[>0 AND <50="yellow", >=50="green", "gray"]
+
+----------------------------------------
+
+TITLE: Filtered Log Monitoring in Karaf Console
+DESCRIPTION: Demonstrates how to apply filters to the log:tail command to show only specific package logging, in this case filtering for ItemResource logs.
+
+LANGUAGE: shell
+CODE:
+openhab> log:tail org.openhab.io.rest.core.item.ItemResource
+20:36:52.879 [DEBUG] [thome.io.rest.core.item.ItemResource] - Received HTTP POST request at 'items/Light_FF_Bath_Ceiling' with value 'ON'.
+20:36:53.545 [DEBUG] [thome.io.rest.core.item.ItemResource] - Received HTTP POST request at 'items/Light_FF_Bath_Ceiling' with value 'OFF'.
+
+----------------------------------------
+
+TITLE: Complex HTML Component Example - YAML
+DESCRIPTION: Shows complex HTML hierarchy construction using nested components and styling.
+
+LANGUAGE: yaml
+CODE:
+- component: div
+  config:
+    style:
+      font-style: italic
+  slots:
+    default:
+      - component: Content
+        config:
+          text: "This text starts with italics "
+      - component: span
+        config:
+          content: but then becomes BOLD!
+          style:
+            font-weight: bold
+
+----------------------------------------
+
+TITLE: Setting Log Levels in Karaf Console
+DESCRIPTION: Shows the command syntax for setting log levels for specific packages in the Karaf console.
+
+LANGUAGE: text
+CODE:
+log:set LEVEL package.subpackage
+
+----------------------------------------
+
+TITLE: Table Compatibility Matrix
+DESCRIPTION: HTML table showing compatibility between different Page types and where they can be designed, viewed and stored.
+
+LANGUAGE: html
+CODE:
+|Type|Designed in|Viewed in|Stored in|
+|----|-----------|---------|----------|
+|Home|main UI|main UI|JSON DB|
+|Sitemap|main UI or .sitemap file|Basic UI, iOS/Android apps and others|Configuration folder or JSON DB|
+|Layout|main UI|main UI|JSON DB|
+|Map|main UI|main UI|JSON DB|
+|Floorplan|main UI|main UI|JSON DB|
+|Chart|main UI|main UI|JSON DB|
+|Tabbed|main UI|main UI|JSON DB|
+
+----------------------------------------
+
+TITLE: Sample URL Configuration for openHAB Local Connection
+DESCRIPTION: Example URL format for connecting to a local openHAB instance using HTTPS protocol and custom port.
+
+LANGUAGE: plaintext
+CODE:
+https://openhab.local:8443
+
+----------------------------------------
+
+TITLE: YAML Page Component Structure Example
+DESCRIPTION: Example of YAML structure showing a standard page component configuration with visibility and styling options.
+
+LANGUAGE: yaml
+CODE:
+config:
+  visibleTo:
+    - role:administrator
+    - role:user
+    - user:userid
+  pageStyle: "background-color: #f4f4f4;"
+  modalStyle: "width: 90%;"
+
+----------------------------------------
+
+TITLE: Sample URL Configuration for openHAB Remote Connection
+DESCRIPTION: Example URL format for connecting to the openHAB cloud service for remote access.
+
+LANGUAGE: plaintext
+CODE:
+https://myopenhab.org
+
+----------------------------------------
+
+TITLE: Configuring Static Image Path in OpenHAB Floorplan
+DESCRIPTION: Example of the URL path format for referencing static images in OpenHAB floorplan pages. Images should be stored in the /conf/html directory structure.
+
+LANGUAGE: bash
+CODE:
+/static/floorplan/FloorPlan3Dsmall.jpg
+
+----------------------------------------
+
+TITLE: Logging Motion Detection in JavaScript
+DESCRIPTION: Basic console logging implementation to track motion detection events.
+
+LANGUAGE: javascript
+CODE:
+console.info('Motion was detected');
+
+----------------------------------------
+
+TITLE: Markdown Documentation Structure
+DESCRIPTION: Markdown structure defining the layout and content hierarchy of the openHAB developer tools documentation page
+
+LANGUAGE: markdown
+CODE:
+---
+layout: documentation
+title: Developer Tools
+---
+
+# Developer Tools
+
+----------------------------------------
+
+TITLE: Sending Commands to Items in JavaScript
+DESCRIPTION: Implementation showing how to send commands to openHAB items using the Items API.
+
+LANGUAGE: javascript
+CODE:
+console.info('Motion was detected');
+items.getItem('FrontPorchLight').sendCommand('ON');
+
+----------------------------------------
+
+TITLE: Redefining CSS Variable for Component Styling in YAML
+DESCRIPTION: This snippet demonstrates how to redefine a CSS variable for a component and its descendants using YAML syntax. It sets the button border color to red.
+
+LANGUAGE: yaml
+CODE:
+style:
+  --f7-button-border-color: rgb(255, 0, 0)
+
+----------------------------------------
+
+TITLE: Modified Rule Configuration in YAML
+DESCRIPTION: Modified version of the basic rule YAML to set vIsCloudy to OFF when cloudiness is below 50%
+
+LANGUAGE: yaml
+CODE:
+triggers:
+  - id: "1"
+    configuration:
+      itemName: vCloudiness
+      event: changed
+    type: core.ItemStateChangeTrigger
+conditions:
+  - id: "2"
+    configuration:
+      itemName: vCloudiness
+      operator: LT
+      state: 50 %
+    type: core.ItemStateCondition
+  - id: "3"
+    configuration:
+      itemName: vIsCloudy
+      operator: NE
+      state: OFF
+    type: core.ItemStateCondition
+actions:
+  - id: "4"
+    configuration:
+      command: OFF
+      itemName: vIsCloudy
+    type: core.ItemCommandAction
+
+----------------------------------------
+
+TITLE: Basic Markdown Document Structure for Transformation Settings
+DESCRIPTION: Markdown document structure defining the layout and content for transformation settings documentation in OpenHAB.
+
+LANGUAGE: markdown
+CODE:
+---
+layout: documentation
+title: Settings - Transformations
+---
+
+# Settings - Transformations
+
+----------------------------------------
+
+TITLE: Initializing Basic Light List Widget in YAML
+DESCRIPTION: This YAML snippet defines a basic custom widget for a light switch, using the oh-toggle-item component. It sets up the icon, color, and title based on the item's state.
+
+LANGUAGE: yaml
+CODE:
+value: oh-toggle-item
+config:
+  icon: f7:lightbulb
+  iconColor: '=(items.AllLights.state == "ON") ? "yellow" : "gray"'
+  title: All Lights
+  color: '=(items.AllLights.state == "ON") ? "yellow" : "gray"'
+  item: AllLights
+
+----------------------------------------
+
+TITLE: YAML Frontmatter Configuration
+DESCRIPTION: YAML configuration block defining the documentation layout and title
+
+LANGUAGE: yaml
+CODE:
+---
+layout: documentation
+title: Main UI
+---
+
+----------------------------------------
+
+TITLE: Navigating to Specific Tabs Using Page Routes in openHAB
+DESCRIPTION: Demonstrates how to programmatically navigate to specific tabs within a tabbed page using route URLs. This can be used with UI Command Items or cloud notification actions.
+
+LANGUAGE: markdown
+CODE:
+/page/MyTabbedPage/0  # Navigate to "Isometric View" tab
+/page/MyTabbedPage/1  # Navigate to "Kitchen Picture" tab
+/pages/MyTabbedPage/2  # Navigate to "Plan" tab
+
+----------------------------------------
+
+TITLE: Enclosing UI Content in Markdown
+DESCRIPTION: Demonstrates how to enclose content intended for display in the UI using special comments. This ensures that only the relevant content is shown in the sidebar help.
+
+LANGUAGE: markdown
+CODE:
+<!-- START MAINUI SIDEBAR DOC - DO NOT REMOVE -->
+Lorem ipsum dolor sit amet, consectetur adipisici elit, ...
+<!-- END MAINUI SIDEBAR DOC - DO NOT REMOVE -->
+
+----------------------------------------
+
+TITLE: Defining Dynamic Visibility in Java
+DESCRIPTION: Example of using the visibility parameter to conditionally show/hide elements.
+
+LANGUAGE: Java
+CODE:
+Text item=BatteryWarning visibility=[Battery_Level<30]
+Switch item=CinemaLight label="Cinema light" visibility=[TV_Power==ON]
+Switch item=LawnSprinkler visibility=[Day_Time=="Morning", Day_Time=="Afternoon", Temperature>19]
+
+----------------------------------------
+
+TITLE: Embedding Framework7 Icons in Markdown
+DESCRIPTION: Shows how to embed Framework7 icons into UI-rendered documentation using special comments. Includes examples of setting icon colors and best practices for icon descriptions.
+
+LANGUAGE: markdown
+CODE:
+Add ... using the <!--F7:blue plus_circle_fill --> plus button ...
+
+----------------------------------------
+
+TITLE: Basic Component Configuration - YAML
+DESCRIPTION: Demonstrates basic component configuration structure using an oh-toggle component with item binding.
+
+LANGUAGE: yaml
+CODE:
+- component: oh-toggle
+  config:
+    item: mySwitchItem
+
+----------------------------------------
+
+TITLE: Testing Web Audio Command in openHAB Console
+DESCRIPTION: Command to test web audio functionality by playing an audio file through the web browser sink.
+
+LANGUAGE: text
+CODE:
+audio play webaudio barking.mp3
+
+----------------------------------------
+
+TITLE: Component Slots Example - YAML
+DESCRIPTION: Shows how to use component slots to create nested hierarchical structures in widgets.
+
+LANGUAGE: yaml
+CODE:
+- component: oh-list
+  slots:
+    default:
+      - component: oh-list-item
+
+----------------------------------------
+
+TITLE: Groups Array Example
+DESCRIPTION: Example of groups array format returned by getItemAttributes
+
+LANGUAGE: json
+CODE:
+[plannedTimes, timers]
+
+----------------------------------------
+
+TITLE: Text-to-Speech Command in openHAB Rules
+DESCRIPTION: Example of using the say action for text-to-speech through the web audio sink in rules.
+
+LANGUAGE: text
+CODE:
+say("Hello world!", "voicerss:enUS", "webaudio")
+
+----------------------------------------
+
+TITLE: Days Until Holiday Block
+DESCRIPTION: Blockly block that calculates the number of days until a specified holiday. Returns the number of days as an integer, or -1 if the holiday is not found.
+
+
+
+----------------------------------------
+
+TITLE: Retrieving Sitemaps Using REST GET - Bash
+DESCRIPTION: Example of using curl to retrieve a list of all sitemaps using an HTTP GET request to the openHAB REST API.
+
+LANGUAGE: bash
+CODE:
+curl -X GET --header "Accept: application/json" "http://{openHAB_IP}:8080/rest/sitemaps"
+
+----------------------------------------
+
+TITLE: Installing required Node.js and Ruby versions
+DESCRIPTION: Commands to install the specific versions of Node.js and Ruby required for building the documentation locally.
+
+LANGUAGE: shell
+CODE:
+nvm install 16.20.1
+rvm install ruby-3.3.2
+
+----------------------------------------
+
+TITLE: Updating openHAB Manually on Linux/macOS
+DESCRIPTION: This snippet provides the command to update openHAB manually to version 3.0.0 on Linux or macOS systems.
+
+LANGUAGE: shell
+CODE:
+sudo ./runtime/bin/update 3.0.0
+
+----------------------------------------
+
+TITLE: Building and serving documentation preview locally
+DESCRIPTION: Command to build and serve a local preview of the openHAB documentation using npm.
+
+LANGUAGE: shell
+CODE:
+npm run serve-preview
+
+----------------------------------------
+
+TITLE: Configuring Jekyll Redirect for OpenHAB Contributing Page
+DESCRIPTION: Sets up a redirect using Jekyll front matter to send users from an old contributing page to a new location in the appendix. Includes a comment for maintainers about the file's creation date.
+
+LANGUAGE: yaml
+CODE:
+---
+layout: redirected
+sitemap: false
+redirect_to: /appendix/contributing.html
+---
+
+LANGUAGE: html
+CODE:
+<!-- Note to authors: This file was created in December 2016. Feel free to remove it after a few months... -->
+
+----------------------------------------
+
+TITLE: Creating Ordered and Unordered Lists in Markdown
+DESCRIPTION: Demonstrates how to create ordered and unordered lists in markdown, including nested and loose lists. Shows proper indentation and formatting for different list types.
+
+LANGUAGE: markdown
+CODE:
+An ordered list:
+
+1. Some text
+1. Some more text
+
+An unordered list:
+
+- Some text
+- Some more text
+
+An unordered loose list (applied if bigger or with nested lists):
+
+- Some text
+  - An indented item, making the list "loose"
+
+- Some more text
+
+- And even more text that could also stretch over multiple lines
+
+----------------------------------------
+
+TITLE: Configuring Jekyll Redirect for OpenHAB Documentation
+DESCRIPTION: This YAML front matter sets up a redirect from the current page to the OpenHAB configuration editors documentation. It disables sitemap inclusion and specifies the target URL for redirection.
+
+LANGUAGE: yaml
+CODE:
+---
+layout: redirected
+sitemap: false
+redirect_to: /configuration/editors.html
+---

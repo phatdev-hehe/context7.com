@@ -1,0 +1,457 @@
+TITLE: Implementing Rate Limiting Middleware in Next.js with Upstash
+DESCRIPTION: This middleware function implements rate limiting for API endpoints using Upstash Ratelimit and Redis. It limits requests to the '/api' endpoint based on the client's IP address and redirects excessive requests to a blocked endpoint. The middleware also adds rate limit information to response headers.
+
+LANGUAGE: typescript
+CODE:
+import { Ratelimit } from "@upstash/ratelimit";
+import { Redis } from "@upstash/redis";
+import { type NextFetchEvent, type NextRequest, NextResponse } from "next/server";
+
+const ratelimit = new Ratelimit({
+  redis: Redis.fromEnv(),
+  limiter: Ratelimit.fixedWindow(10, "10s"),
+  ephemeralCache: new Map(),
+  prefix: "@upstash/ratelimit",
+  analytics: true,
+});
+
+export default async function middleware(
+  request: NextRequest,
+  context: NextFetchEvent,
+): Promise<Response | undefined> {
+  const ip = request.ip ?? "127.0.0.1";
+
+  const { success, pending, limit, remaining } = await ratelimit.limit(ip);
+  // we use context.waitUntil since analytics: true.
+  // see https://upstash.com/docs/oss/sdks/ts/ratelimit/gettingstarted#serverless-environments
+  context.waitUntil(pending);
+
+  const res = success
+    ? NextResponse.next()
+    : NextResponse.redirect(new URL("/api/blocked", request.url));
+
+    res.headers.set("X-RateLimit-Success", success.toString());
+    res.headers.set("X-RateLimit-Limit", limit.toString());
+    res.headers.set("X-RateLimit-Remaining", remaining.toString());
+
+  return res;
+}
+
+export const config = {
+  matcher: "/api",
+};
+
+----------------------------------------
+
+TITLE: Using Extended Rate Limit Parameters with IP, User Agent, and Country in TypeScript
+DESCRIPTION: This snippet demonstrates how to use the limit method with additional parameters such as IP address, user agent, and country for more precise rate limiting. The response includes a reason parameter that indicates why a request was allowed or blocked.
+
+LANGUAGE: tsx
+CODE:
+const { success, limit, remaining, pending, reason } = await ratelimit.limit(
+  identifier, {
+    ip: ipAddress,
+    userAgent: userAgent,
+    country: country
+  }
+);
+
+----------------------------------------
+
+TITLE: Initializing Ratelimit with Protection Enabled in TypeScript
+DESCRIPTION: This code initializes the Upstash Redis client with rate limiting protection enabled. It sets up a sliding window rate limit of 10 requests per 10 seconds, with analytics and protection features turned on.
+
+LANGUAGE: tsx
+CODE:
+const ratelimit = new Ratelimit({
+  redis: Redis.fromEnv(),
+  limiter: Ratelimit.slidingWindow(10, "10 s"),
+  prefix: "@upstash/ratelimit",
+  analytics: true,
+  enableProtection: true
+});
+
+----------------------------------------
+
+TITLE: Implementing Rate Limiting in a Remix Route with @upstash/ratelimit
+DESCRIPTION: This code demonstrates how to set up rate limiting in a Remix application using @upstash/ratelimit and @upstash/redis. It creates a rate limiter that restricts users to 10 requests per 60 seconds, identifies users by IP address, and returns rate limit information in both the response body and headers.
+
+LANGUAGE: tsx
+CODE:
+import { json } from "@remix-run/node";
+import type { LoaderArgs } from "@remix-run/node";
+import { useLoaderData } from "@remix-run/react";
+import { Ratelimit } from "@upstash/ratelimit";
+import { Redis } from "@upstash/redis";
+
+const ratelimit = new Ratelimit({
+  redis: Redis.fromEnv(),
+  limiter: Ratelimit.fixedWindow(10, "60 s"),
+  analytics: true,
+});
+
+export const loader = async (args: LoaderArgs) => {
+  // getting the ip can be different depending on your hosting provider
+  const ip = args.request.headers.get("X-Forwarded-For") ?? args.request.headers.get("x-real-ip");
+  const identifier = ip ?? "global";
+  const { success, limit, remaining, reset } = await ratelimit.limit(identifier);
+  return json(
+    {
+      success,
+      limit,
+      remaining,
+      reset,
+      identifier,
+    },
+    {
+      headers: {
+        "X-RateLimit-Limit": limit.toString(),
+        "X-RateLimit-Remaining": remaining.toString(),
+        "X-RateLimit-Reset": reset.toString(),
+      },
+    },
+  );
+};
+
+export default function Index() {
+  const ratelimitResponse = useLoaderData<typeof loader>();
+
+  return (
+    <div style={{ fontFamily: "system-ui, sans-serif", lineHeight: "1.4" }}>
+      <h1>Welcome to @upstash/ratelimit in Remix app</h1>
+      <code>
+        <pre>{JSON.stringify(ratelimitResponse, null, 2)}</pre>
+      </code>
+    </div>
+  );
+}
+
+----------------------------------------
+
+TITLE: Implementing Rate Limiting for Vercel Edge API in TypeScript
+DESCRIPTION: This code defines a Vercel Edge API route with rate limiting functionality. It uses the @upstash/ratelimit package with Upstash Redis to limit requests to 10 per 10-second window. The API returns the rate limit status including success, limit, and remaining requests.
+
+LANGUAGE: typescript
+CODE:
+export const runtime = 'edge';
+
+export const dynamic = 'force-dynamic';
+
+import { waitUntil } from '@vercel/functions';
+import { Ratelimit } from "@upstash/ratelimit";
+import { Redis } from "@upstash/redis";
+
+// Create a new ratelimiter
+const ratelimit = new Ratelimit({
+  redis: Redis.fromEnv(),
+  limiter: Ratelimit.slidingWindow(10, "10 s"),
+  prefix: "@upstash/ratelimit",
+  analytics: true
+});
+
+export async function GET(request: Request) {
+
+  const identifier = "api";
+  const { success, limit, remaining, pending } = await ratelimit.limit(identifier);
+  const response = {
+    success: success,
+    limit: limit, 
+    remaining: remaining
+  }
+
+  // pending is a promise for handling the analytics submission
+  waitUntil(pending)
+    
+  if (!success) {
+    return new Response(JSON.stringify(response), { status: 429 });
+  }
+  return new Response(JSON.stringify(response));
+}
+
+----------------------------------------
+
+TITLE: Implementing Rate Limiting in Next.js API Route with Upstash
+DESCRIPTION: This code implements a rate-limited API endpoint using Upstash Ratelimit and Redis in a Next.js App Router. It configures a sliding window rate limiter that allows 10 requests per 10 seconds window and returns appropriate success or error responses.
+
+LANGUAGE: typescript
+CODE:
+export const runtime = 'nodejs';
+
+export const dynamic = 'force-dynamic';
+
+import { waitUntil } from '@vercel/functions';
+import { Ratelimit } from "@upstash/ratelimit";
+import { Redis } from "@upstash/redis";
+
+// Create a new ratelimiter
+const ratelimit = new Ratelimit({
+  redis: Redis.fromEnv(),
+  limiter: Ratelimit.slidingWindow(10, "10 s"),
+  prefix: "@upstash/ratelimit",
+  analytics: true
+});
+
+export async function GET(request: Request) {
+
+  const identifier = "api";
+  const { success, limit, remaining, pending } = await ratelimit.limit(identifier);
+  const response = {
+    success: success,
+    limit: limit, 
+    remaining: remaining
+  }
+
+  // pending is a promise for handling the analytics submission
+  waitUntil(pending)
+    
+  if (!success) {
+    return new Response(JSON.stringify(response), { status: 429 });
+  }
+  return new Response(JSON.stringify(response));
+}
+
+----------------------------------------
+
+TITLE: Implementing Rate Limiting API Endpoint in Next.js Edge Runtime
+DESCRIPTION: A Next.js API route that implements rate limiting using Upstash Ratelimit and Redis. It creates a sliding window rate limiter that allows 10 requests per 10 seconds and returns appropriate HTTP responses based on limit status.
+
+LANGUAGE: tsx
+CODE:
+export const runtime = 'edge';
+
+export const dynamic = 'force-dynamic';
+
+import { Ratelimit } from "@upstash/ratelimit";
+import { Redis } from "@upstash/redis";
+
+// Create a new ratelimiter
+const ratelimit = new Ratelimit({
+  redis: Redis.fromEnv(),
+  limiter: Ratelimit.slidingWindow(10, "10 s"),
+  prefix: "@upstash/ratelimit",
+});
+
+export async function GET(request: Request) {
+
+  const identifier = "api";
+  const { success, limit, remaining } = await ratelimit.limit(identifier);
+  const response = {
+    success: success,
+    limit: limit, 
+    remaining: remaining
+  }
+    
+  if (!success) {
+    return new Response(JSON.stringify(response), { status: 429 });
+  }
+  return new Response(JSON.stringify(response));
+}
+
+----------------------------------------
+
+TITLE: Basic Usage of Upstash Rate Limit with Redis
+DESCRIPTION: Example demonstrating how to create and use a rate limiter with a sliding window of 10 requests per 10 seconds. Shows importing dependencies, initializing the rate limiter, and checking if a request should be allowed.
+
+LANGUAGE: ts
+CODE:
+import { Ratelimit } from "@upstash/ratelimit"; // for deno: see above
+import { Redis } from "@upstash/redis"; // see below for cloudflare and fastly adapters
+
+// Create a new ratelimiter, that allows 10 requests per 10 seconds
+const ratelimit = new Ratelimit({
+  redis: Redis.fromEnv(),
+  limiter: Ratelimit.slidingWindow(10, "10 s"),
+  analytics: true,
+  /**
+   * Optional prefix for the keys used in redis. This is useful if you want to share a redis
+   * instance with other applications and want to avoid key collisions. The default prefix is
+   * "@upstash/ratelimit"
+   */
+  prefix: "@upstash/ratelimit",
+});
+
+// Use a constant string to limit all requests with a single ratelimit
+// Or use a userID, apiKey or ip address for individual limits.
+const identifier = "api";
+const { success } = await ratelimit.limit(identifier);
+
+if (!success) {
+  return "Unable to process at this time";
+}
+doExpensiveCalculation();
+return "Here you go!";
+
+----------------------------------------
+
+TITLE: Setting up environment variables for local development
+DESCRIPTION: Creates a .dev.vars file with Upstash Redis credentials for local testing. This file should be placed in the cloudflare-workers directory and includes the REST URL and token for connecting to Upstash Redis.
+
+LANGUAGE: plaintext
+CODE:
+// .dev.vars
+UPSTASH_REDIS_REST_URL="****"
+UPSTASH_REDIS_REST_TOKEN="****"
+
+----------------------------------------
+
+TITLE: Setting environment secrets for Cloudflare deployment
+DESCRIPTION: Commands to securely store Upstash Redis credentials as Cloudflare Worker secrets. These commands prompt for the secret values and save them for use during deployment.
+
+LANGUAGE: bash
+CODE:
+npx wrangler secret put UPSTASH_REDIS_REST_URL
+npx wrangler secret put UPSTASH_REDIS_REST_TOKEN
+
+----------------------------------------
+
+TITLE: Importing Upstash Rate Limit in Deno
+DESCRIPTION: Example of importing the Ratelimit class from the Upstash Rate Limit package in a Deno environment.
+
+LANGUAGE: ts
+CODE:
+import { Ratelimit } from "https://cdn.skypack.dev/@upstash/ratelimit@latest";
+
+----------------------------------------
+
+TITLE: Initializing Cloudflare Pages Next.js Project
+DESCRIPTION: Command to bootstrap a Next.js project with Cloudflare Pages using the c3 tool. This creates the initial project structure compatible with Cloudflare's infrastructure.
+
+LANGUAGE: bash
+CODE:
+npm create cloudflare@latest cloudflare-pages -- --framework=next
+
+----------------------------------------
+
+TITLE: Deploying Rate-Limited Next.js Application to Vercel
+DESCRIPTION: Terminal command for deploying the Next.js application with rate limiting to Vercel after installing the Vercel CLI and setting the required Upstash Redis environment variables.
+
+LANGUAGE: bash
+CODE:
+vercel deploy
+
+----------------------------------------
+
+TITLE: Deploying to Cloudflare Pages
+DESCRIPTION: Command to deploy the Next.js application to Cloudflare Pages. This should be executed after setting the required Upstash Redis environment variables in the Cloudflare Dashboard.
+
+LANGUAGE: bash
+CODE:
+npm run deploy
+
+----------------------------------------
+
+TITLE: Deploying the Rate Limiting Example to Vercel
+DESCRIPTION: Command to deploy the rate limiting project to Vercel after installing Vercel CLI and setting the required environment variables.
+
+LANGUAGE: bash
+CODE:
+vercel deploy
+
+----------------------------------------
+
+TITLE: Deploying Next.js Rate Limiting Example to Vercel
+DESCRIPTION: Command to deploy the rate limiting example to Vercel after installing the Vercel CLI and setting the required Upstash Redis environment variables in the Vercel project settings.
+
+LANGUAGE: bash
+CODE:
+vercel deploy
+
+----------------------------------------
+
+TITLE: Deploying to Cloudflare Workers
+DESCRIPTION: Command to deploy the project to Cloudflare Workers. This uploads the worker code and makes it available in production.
+
+LANGUAGE: bash
+CODE:
+npx wrangler deploy
+
+----------------------------------------
+
+TITLE: Running the app locally with Wrangler
+DESCRIPTION: Command to start the app in local development mode using Wrangler CLI. This runs the Cloudflare Worker locally for testing purposes.
+
+LANGUAGE: bash
+CODE:
+npx wrangler dev
+
+----------------------------------------
+
+TITLE: Running Next.js Rate Limiting Example Locally
+DESCRIPTION: Command to run the rate limiting example locally after setting up Upstash Redis and configuring the necessary environment variables for Redis connection.
+
+LANGUAGE: bash
+CODE:
+npm run dev
+
+----------------------------------------
+
+TITLE: Running the Rate Limiting Example Locally with npm
+DESCRIPTION: Command to run the rate limiting example locally after setting up the required Upstash Redis environment variables.
+
+LANGUAGE: bash
+CODE:
+npm run dev
+
+----------------------------------------
+
+TITLE: Running Next.js Application Locally with Upstash Integration
+DESCRIPTION: Terminal command for starting the Next.js development server locally after setting up Upstash Redis environment variables.
+
+LANGUAGE: bash
+CODE:
+npm run dev
+
+----------------------------------------
+
+TITLE: Running Deno application with environment variables
+DESCRIPTION: Command to run the up-to-date Deno application locally with proper permissions for network and environment variables. Requires setting UPSTASH_REDIS_REST_URL and UPSTASH_REDIS_REST_TOKEN environment variables first.
+
+LANGUAGE: bash
+CODE:
+deno run --allow-net --allow-env main.ts
+
+----------------------------------------
+
+TITLE: Running Next.js Development Server
+DESCRIPTION: Commands to start the Next.js development server using different package managers. This allows developers to test the application locally before deployment.
+
+LANGUAGE: bash
+CODE:
+npm run dev
+# or
+yarn dev
+# or
+pnpm dev
+# or
+bun dev
+
+----------------------------------------
+
+TITLE: Running Tests for Upstash Rate Limit Library
+DESCRIPTION: Command to run tests for the Upstash Rate Limit library after setting up the required environment variables.
+
+LANGUAGE: bash
+CODE:
+pnpm test
+
+----------------------------------------
+
+TITLE: Installing Upstash Rate Limit with npm
+DESCRIPTION: Command to install the @upstash/ratelimit package using npm.
+
+LANGUAGE: bash
+CODE:
+npm install @upstash/ratelimit
+
+----------------------------------------
+
+TITLE: Running Next.js Development Server
+DESCRIPTION: Commands to start the Next.js development server using different package managers.
+
+LANGUAGE: bash
+CODE:
+npm run dev
+# or
+yarn dev
+# or
+pnpm dev

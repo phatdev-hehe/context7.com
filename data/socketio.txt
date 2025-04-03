@@ -1,0 +1,2051 @@
+TITLE: Initializing Socket.IO Server Namespace in JavaScript
+DESCRIPTION: This snippet demonstrates how to declare and handle connections to a Socket.IO namespace on the server side.
+
+LANGUAGE: javascript
+CODE:
+// declare the namespace
+const namespace = io.of("/admin");
+// handle the connection to the namespace
+namespace.on("connection", (socket) => {
+  // ...
+});
+
+----------------------------------------
+
+TITLE: Express Integration with Socket.IO
+DESCRIPTION: Example of integrating Socket.IO with an Express.js application.
+
+LANGUAGE: javascript
+CODE:
+const app = require('express')();
+const server = require('http').createServer(app);
+const io = require('socket.io')(server);
+io.on('connection', () => { /* … */ });
+server.listen(3000);
+
+----------------------------------------
+
+TITLE: Socket.IO Installation Commands
+DESCRIPTION: Commands for installing Socket.IO using npm or yarn package managers.
+
+LANGUAGE: bash
+CODE:
+// with npm
+npm install socket.io
+
+// with yarn
+yarn add socket.io
+
+----------------------------------------
+
+TITLE: Basic Socket.IO Event Handling in JavaScript
+DESCRIPTION: Demonstrates basic Socket.IO server-side event handling including connection events, custom events, and broadcasting.
+
+LANGUAGE: javascript
+CODE:
+io.on('connection', socket => {
+  socket.emit('request', /* … */); // emit an event to the socket
+  io.emit('broadcast', /* … */); // emit an event to all connected sockets
+  socket.on('reply', () => { /* … */ }); // listen to the event
+});
+
+----------------------------------------
+
+TITLE: Attaching Engine.IO to HTTP Server
+DESCRIPTION: Demonstrates how to integrate Engine.IO with an existing HTTP server to handle WebSocket connections and messages.
+
+LANGUAGE: javascript
+CODE:
+const engine = require('engine.io');
+const http = require('http').createServer().listen(3000);
+const server = engine.attach(http);
+
+server.on('connection', socket => {
+  socket.on('message', data => { });
+  socket.on('close', () => { });
+});
+
+----------------------------------------
+
+TITLE: Configuring Socket.IO Server with Passport Authentication
+DESCRIPTION: This snippet shows how to set up the Socket.IO server to use session middleware and Passport authentication. It includes a custom middleware to apply authentication only during the handshake process.
+
+LANGUAGE: javascript
+CODE:
+function onlyForHandshake(middleware) {
+  return (req, res, next) => {
+    const isHandshake = req._query.sid === undefined;
+    if (isHandshake) {
+      middleware(req, res, next);
+    } else {
+      next();
+    }
+  };
+}
+
+io.engine.use(onlyForHandshake(sessionMiddleware));
+io.engine.use(onlyForHandshake(passport.session()));
+io.engine.use(
+  onlyForHandshake((req, res, next) => {
+    if (req.user) {
+      next();
+    } else {
+      res.writeHead(401);
+      res.end();
+    }
+  }),
+);
+
+----------------------------------------
+
+TITLE: Connecting to Socket.IO Namespaces in JavaScript Client
+DESCRIPTION: This code shows how to connect to different Socket.IO namespaces from the client side, including the main namespace and a custom namespace.
+
+LANGUAGE: javascript
+CODE:
+// reach the main namespace
+const socket1 = io();
+// reach the "/admin" namespace (with the same underlying WebSocket connection)
+const socket2 = io("/admin");
+// handle the connection to the namespace
+socket2.on("connect", () => {
+  // ...
+});
+
+----------------------------------------
+
+TITLE: Implementing Socket.IO with Node.js Cluster
+DESCRIPTION: Example showing how to set up Socket.IO with Node.js cluster module for load distribution across multiple CPU cores. Includes primary process setup, worker forking, and server initialization.
+
+LANGUAGE: javascript
+CODE:
+import cluster from "node:cluster";
+import process from "node:process";
+import { availableParallelism } from "node:os";
+import { setupPrimary, NodeClusterEngine } from "@socket.io/cluster-engine";
+import { createServer } from "node:http";
+import { Server } from "socket.io";
+
+if (cluster.isPrimary) {
+  console.log(`Primary ${process.pid} is running`);
+
+  const numCPUs = availableParallelism();
+
+  // fork workers
+  for (let i = 0; i < numCPUs; i++) {
+    cluster.fork();
+  }
+
+  // setup connection within the cluster
+  setupPrimary();
+
+  // needed for packets containing Buffer objects (you can ignore it if you only send plaintext objects)
+  cluster.setupPrimary({
+    serialization: "advanced",
+  });
+
+  cluster.on("exit", (worker, code, signal) => {
+    console.log(`worker ${worker.process.pid} died`);
+  });
+} else {
+  const httpServer = createServer((req, res) => {
+    res.writeHead(404).end();
+  });
+
+  const engine = new NodeClusterEngine();
+
+  engine.attach(httpServer, {
+    path: "/socket.io/"
+  });
+
+  const io = new Server();
+
+  io.bind(engine);
+
+  // workers will share the same port
+  httpServer.listen(3000);
+
+  console.log(`Worker ${process.pid} started`);
+}
+
+----------------------------------------
+
+TITLE: Initializing Socket.IO Namespaces in JavaScript
+DESCRIPTION: Demonstrates how to create and connect to Socket.IO namespaces on both server and client sides.
+
+LANGUAGE: javascript
+CODE:
+// server-side
+const nsp = io.of("/admin");
+nsp.on("connect", socket => {});
+
+// client-side
+const socket1 = io(); // default namespace
+const socket2 = io("/admin");
+socket2.on("connect", () => {});
+
+----------------------------------------
+
+TITLE: Implementing Socket.IO with Node.js Cluster and Redis Combined
+DESCRIPTION: Example showing how to combine Node.js cluster and Redis for maximum scalability. Includes cluster worker management, Redis connection setup, and server initialization.
+
+LANGUAGE: javascript
+CODE:
+import cluster from "node:cluster";
+import process from "node:process";
+import { availableParallelism } from "node:os";
+import { createClient } from "redis";
+import { setupPrimaryWithRedis, NodeClusterEngine } from "@socket.io/cluster-engine";
+import { createServer } from "node:http";
+import { Server } from "socket.io";
+
+if (cluster.isPrimary) {
+  console.log(`Primary ${process.pid} is running`);
+
+  const numCPUs = availableParallelism();
+
+  // fork workers
+  for (let i = 0; i < numCPUs; i++) {
+    cluster.fork();
+  }
+
+  const pubClient = createClient();
+  const subClient = pubClient.duplicate();
+
+  await Promise.all([
+    pubClient.connect(),
+    subClient.connect(),
+  ]);
+
+  // setup connection between and within the clusters
+  setupPrimaryWithRedis(pubClient, subClient);
+
+  // needed for packets containing Buffer objects (you can ignore it if you only send plaintext objects)
+  cluster.setupPrimary({
+    serialization: "advanced",
+  });
+
+  cluster.on("exit", (worker, code, signal) => {
+    console.log(`worker ${worker.process.pid} died`);
+  });
+} else {
+  const httpServer = createServer((req, res) => {
+    res.writeHead(404).end();
+  });
+
+  const engine = new NodeClusterEngine();
+
+  engine.attach(httpServer, {
+    path: "/socket.io/"
+  });
+
+  const io = new Server();
+
+  io.bind(engine);
+
+  // workers will share the same port
+  httpServer.listen(3000);
+
+  console.log(`Worker ${process.pid} started`);
+}
+
+----------------------------------------
+
+TITLE: Standalone Socket.IO Server Setup
+DESCRIPTION: Basic setup for a standalone Socket.IO server using Node.js HTTP server.
+
+LANGUAGE: javascript
+CODE:
+const server = require('http').createServer();
+const io = require('socket.io')(server);
+io.on('connection', client => {
+  client.on('event', data => { /* … */ });
+  client.on('disconnect', () => { /* … */ });
+});
+server.listen(3000);
+
+----------------------------------------
+
+TITLE: Socket.IO EVENT Packet Structure in JSON
+DESCRIPTION: This JSON structure shows an EVENT packet in the Socket.IO protocol, used for transmitting data without binary content.
+
+LANGUAGE: json
+CODE:
+{
+  "type": 2,
+  "nsp": "/",
+  "data": ["hello", 1]
+}
+
+----------------------------------------
+
+TITLE: Fastify Integration with Socket.IO
+DESCRIPTION: Example of integrating Socket.IO with a Fastify application using the fastify-socket.io plugin.
+
+LANGUAGE: javascript
+CODE:
+const app = require('fastify')();
+app.register(require('fastify-socket.io'));
+app.ready().then(() => {
+    app.io.on('connection', () => { /* … */ });
+})
+app.listen(3000);
+
+----------------------------------------
+
+TITLE: Encoding and Decoding a Packet in JavaScript using socket.io-parser
+DESCRIPTION: This snippet demonstrates how to use the socket.io-parser to encode a packet and then decode it. It shows the process of creating an encoder, defining a packet, encoding it, and then using a decoder to retrieve the original packet data.
+
+LANGUAGE: javascript
+CODE:
+var parser = require('socket.io-parser');
+var encoder = new parser.Encoder();
+var packet = {
+  type: parser.EVENT,
+  data: 'test-packet',
+  id: 13
+};
+encoder.encode(packet, function(encodedPackets) {
+  var decoder = new parser.Decoder();
+  decoder.on('decoded', function(decodedPacket) {
+    // decodedPacket.type == parser.EVENT
+    // decodedPacket.data == 'test-packet'
+    // decodedPacket.id == 13
+  });
+
+  for (var i = 0; i < encodedPackets.length; i++) {
+    decoder.add(encodedPackets[i]);
+  }
+});
+
+----------------------------------------
+
+TITLE: Implementing Acknowledgements in Socket.IO
+DESCRIPTION: This example demonstrates how to implement acknowledgements in Socket.IO, allowing bidirectional confirmation of received messages.
+
+LANGUAGE: javascript
+CODE:
+// on one side
+socket.emit("hello", "foo", (arg) => {
+  console.log("received", arg);
+});
+
+// on the other side
+socket.on("hello", (arg, ack) => {
+  ack("bar");
+});
+
+----------------------------------------
+
+TITLE: Encoding and Decoding Packets with Engine.io Parser
+DESCRIPTION: Example demonstrating basic packet encoding and decoding using engine.io-parser with Buffer data.
+
+LANGUAGE: javascript
+CODE:
+const parser = require("engine.io-parser");
+const data = Buffer.from([ 1, 2, 3, 4 ]);
+
+parser.encodePacket({ type: "message", data }, encoded => {
+  const decodedData = parser.decodePacket(encoded); // decodedData === data
+});
+
+----------------------------------------
+
+TITLE: Implementing Socket.IO Acknowledgements in JavaScript
+DESCRIPTION: Shows how to use acknowledgements in Socket.IO to confirm receipt of emitted events.
+
+LANGUAGE: javascript
+CODE:
+// on one side
+socket.emit("hello", 1, () => { console.log("received"); });
+// on the other side
+socket.on("hello", (a, cb) => { cb(); });
+
+----------------------------------------
+
+TITLE: Starting Docker Containers for Chat Application
+DESCRIPTION: Command to start the Socket.IO nodes, nginx proxy, and redis backend using Docker Compose. This creates a distributed chat system with load balancing.
+
+LANGUAGE: bash
+CODE:
+$ docker-compose up -d
+
+----------------------------------------
+
+TITLE: Demonstrating Socket.IO Namespace Usage in JavaScript
+DESCRIPTION: This snippet shows how to create and connect to namespaces in Socket.IO, both on the server-side and client-side.
+
+LANGUAGE: javascript
+CODE:
+// server-side
+const nsp = io.of("/admin");
+nsp.on("connect", socket => {});
+
+// client-side
+const socket1 = io(); // default namespace
+const socket2 = io("/admin");
+socket2.on("connect", () => {});
+
+----------------------------------------
+
+TITLE: Koa Integration with Socket.IO
+DESCRIPTION: Example of integrating Socket.IO with a Koa application.
+
+LANGUAGE: javascript
+CODE:
+const app = require('koa')();
+const server = require('http').createServer(app.callback());
+const io = require('socket.io')(server);
+io.on('connection', () => { /* … */ });
+server.listen(3000);
+
+----------------------------------------
+
+TITLE: Implementing Socket.IO Event Acknowledgement in JavaScript
+DESCRIPTION: This code demonstrates how to use event acknowledgement in Socket.IO, showing both the emitting and receiving sides.
+
+LANGUAGE: javascript
+CODE:
+// on one side
+socket.emit("hello", 1, () => { console.log("received"); });
+// on the other side
+socket.on("hello", (a, cb) => { cb(); });
+
+----------------------------------------
+
+TITLE: Node.js Engine.IO Implementation
+DESCRIPTION: Basic Node.js implementation of Engine.IO client with event handling.
+
+LANGUAGE: javascript
+CODE:
+const { Socket } = require('engine.io-client');
+const socket = new Socket('ws://localhost');
+socket.on('open', () => {
+  socket.on('message', (data) => {});
+  socket.on('close', () => {});
+});
+
+----------------------------------------
+
+TITLE: Socket.IO CONNECT Packet Structure in JSON
+DESCRIPTION: Illustrates the structure of a CONNECT packet in Socket.IO protocol.
+
+LANGUAGE: json
+CODE:
+{
+  "type": 0,
+  "nsp": "/admin"
+}
+
+----------------------------------------
+
+TITLE: Parsing JWT Token in Socket.IO Server
+DESCRIPTION: This server-side code demonstrates how to parse and authenticate the JWT token sent by the client. It uses Passport's authenticate method for JWT strategy during the handshake process.
+
+LANGUAGE: javascript
+CODE:
+io.engine.use((req, res, next) => {
+  const isHandshake = req._query.sid === undefined;
+  if (isHandshake) {
+    passport.authenticate("jwt", { session: false })(req, res, next);
+  } else {
+    next();
+  }
+});
+
+----------------------------------------
+
+TITLE: Setting up Socket.IO Cluster with Redis
+DESCRIPTION: Commands for starting the Redis server and running the Socket.IO cluster example. Includes steps to launch the Redis server via Docker Compose, start the Socket.IO server cluster, and run the client application.
+
+LANGUAGE: bash
+CODE:
+# start the redis server
+$ docker compose up -d
+
+# run the server
+$ node server.js
+
+# run the client
+$ node client.js
+
+----------------------------------------
+
+TITLE: Enabling Debug Logging in Socket.io Client
+DESCRIPTION: Command to enable all client debug output in the browser console. This setting persists across page reloads and allows filtering of debug messages by scope.
+
+LANGUAGE: javascript
+CODE:
+localStorage.debug = '*';
+
+----------------------------------------
+
+TITLE: Installing Dependencies for Socket.IO Development
+DESCRIPTION: Command to install all dependencies for Socket.IO development using npm. Requires Node.js version 18+ and npm version 7+.
+
+LANGUAGE: bash
+CODE:
+npm ci
+
+----------------------------------------
+
+TITLE: Handling Binary Data with Engine.IO
+DESCRIPTION: Example of sending and receiving binary data using Engine.IO client with blob binary type.
+
+LANGUAGE: html
+CODE:
+<script src="/path/to/engine.io.js"></script>
+<script>
+  const socket = eio('ws://localhost/');
+  socket.binaryType = 'blob';
+  socket.on('open', () => {
+    socket.send(new Int8Array(5));
+    socket.on('message', (blob) => {});
+    socket.on('close', () => {});
+  });
+</script>
+
+----------------------------------------
+
+TITLE: Initializing Engine.IO Server with Port Listening
+DESCRIPTION: Creates an Engine.IO server instance that listens on a specified port and handles both UTF-8 string and binary data transmission.
+
+LANGUAGE: javascript
+CODE:
+const engine = require('engine.io');
+const server = engine.listen(80);
+
+server.on('connection', socket => {
+  socket.send('utf 8 string');
+  socket.send(Buffer.from([0, 1, 2, 3, 4, 5])); // binary data
+});
+
+----------------------------------------
+
+TITLE: Encoding HTTP Long-Polling Packets in Engine.IO
+DESCRIPTION: Demonstrates the format for encoding multiple Engine.IO packets in a single HTTP long-polling payload, including both plaintext and binary data.
+
+LANGUAGE: plaintext
+CODE:
+4hello\x1e2\x1e4world
+
+with:
+
+4      => message packet type
+hello  => message payload
+\x1e   => separator
+2      => ping packet type
+\x1e   => separator
+4      => message packet type
+world  => message payload
+
+----------------------------------------
+
+TITLE: Engine.IO Handshake Response JSON Structure
+DESCRIPTION: Defines the JSON structure of the handshake response sent by the server during the Engine.IO connection establishment.
+
+LANGUAGE: json
+CODE:
+{
+  "sid": "lv_VI97HAXpY6yYWAAAC",
+  "upgrades": ["websocket"],
+  "pingInterval": 25000,
+  "pingTimeout": 20000,
+  "maxPayload": 1000000
+}
+
+----------------------------------------
+
+TITLE: Running Socket.IO with Postgres Adapter Example
+DESCRIPTION: This code snippet shows the bash commands to start a Postgres server using Docker Compose, run a Socket.IO cluster, and execute a client. It demonstrates the setup process for using the @socket.io/postgres-adapter.
+
+LANGUAGE: bash
+CODE:
+# start the postgres server
+$ docker compose up -d
+
+# run the cluster
+$ node cluster.js
+
+# run the client
+$ node client.js
+
+----------------------------------------
+
+TITLE: Configuring Engine.IO Server in JavaScript
+DESCRIPTION: Provides a JavaScript configuration example for setting up an Engine.IO server to pass all compliance tests.
+
+LANGUAGE: javascript
+CODE:
+import { listen } from "engine.io";
+
+const server = listen(3000, {
+  pingInterval: 300,
+  pingTimeout: 200,
+  maxPayload: 1e6,
+  cors: {
+    origin: "*"
+  }
+});
+
+server.on("connection", socket => {
+  socket.on("data", (...args) => {
+    socket.send(...args);
+  });
+});
+
+----------------------------------------
+
+TITLE: Installing and Running Socket.IO Express Session Example
+DESCRIPTION: Commands to install dependencies and start the application. The server will run on port 3000 by default, with an option to specify a custom port through the PORT environment variable.
+
+LANGUAGE: bash
+CODE:
+$ npm install
+$ npm start
+
+----------------------------------------
+
+TITLE: Running Socket.IO Chat Application with Docker Compose
+DESCRIPTION: This command uses Docker Compose to start the Socket.IO chat application in detached mode. It sets up all necessary services defined in the docker-compose.yml file.
+
+LANGUAGE: bash
+CODE:
+$ docker-compose up -d
+
+----------------------------------------
+
+TITLE: Starting Socket.IO Server with Yarn
+DESCRIPTION: Starts the Socket.IO server for real-time communication in the application.
+
+LANGUAGE: bash
+CODE:
+yarn start-server
+
+----------------------------------------
+
+TITLE: Scaling Socket.IO Server Instances with Docker Compose
+DESCRIPTION: This command scales the Socket.IO server to multiple instances (7 in this example) using Docker Compose. It demonstrates how to horizontally scale the application for improved performance and load handling.
+
+LANGUAGE: bash
+CODE:
+$ docker-compose up -d --scale=server=7
+
+----------------------------------------
+
+TITLE: Implementing Socket.IO with Redis
+DESCRIPTION: Example demonstrating Socket.IO setup with Redis for horizontal scaling. Shows Redis client creation, connection establishment, and server setup.
+
+LANGUAGE: javascript
+CODE:
+import { createServer } from "node:http";
+import { createClient } from "redis";
+import { RedisEngine } from "@socket.io/cluster-engine";
+import { Server } from "socket.io";
+
+const httpServer = createServer((req, res) => {
+  res.writeHead(404).end();
+});
+
+const pubClient = createClient();
+const subClient = pubClient.duplicate();
+
+await Promise.all([
+  pubClient.connect(),
+  subClient.connect(),
+]);
+
+const engine = new RedisEngine(pubClient, subClient);
+
+engine.attach(httpServer, {
+  path: "/socket.io/"
+});
+
+const io = new Server();
+
+io.bind(engine);
+
+httpServer.listen(3000);
+
+----------------------------------------
+
+TITLE: Launching Docker Compose Stack
+DESCRIPTION: Command to start the Docker Compose stack which includes four Socket.IO nodes and HAProxy for load balancing. The setup uses Redis for message broadcasting across nodes.
+
+LANGUAGE: bash
+CODE:
+$ docker-compose up -d
+
+----------------------------------------
+
+TITLE: Running Socket.IO Private Messaging Server
+DESCRIPTION: Commands to navigate to the server directory, install dependencies, and start the server for the Socket.IO private messaging project.
+
+LANGUAGE: shell
+CODE:
+cd server
+npm install
+npm start
+
+----------------------------------------
+
+TITLE: Scaling Client Containers
+DESCRIPTION: Commands to scale up the number of client containers for testing and view their logs. This helps in testing the load balancing and routing functionality.
+
+LANGUAGE: bash
+CODE:
+$ docker-compose up -d --scale=client=10 client
+# and then
+$ docker-compose logs client
+
+----------------------------------------
+
+TITLE: Installing and Running Socket.IO Application
+DESCRIPTION: Commands for installing dependencies and starting both the Socket.IO server and client. Requires Node.js version 12.17.0 or higher.
+
+LANGUAGE: bash
+CODE:
+# install the dependencies
+$ npm ci
+
+# start the server
+$ node server.js
+
+# start the client
+$ node client.js
+
+----------------------------------------
+
+TITLE: Starting Docker Compose for Socket.IO Chat Application
+DESCRIPTION: This command starts the Docker Compose setup for the Socket.IO chat application. It launches four Socket.IO nodes, an httpd proxy, and a Redis backend in detached mode.
+
+LANGUAGE: bash
+CODE:
+$ docker-compose up -d
+
+----------------------------------------
+
+TITLE: Building Nuxt 3 for Production
+DESCRIPTION: Commands to build the Nuxt 3 application for production deployment using different package managers.
+
+LANGUAGE: bash
+CODE:
+# npm
+npm run build
+
+# pnpm
+pnpm run build
+
+# yarn
+yarn build
+
+# bun
+bun run build
+
+----------------------------------------
+
+TITLE: Installing and Running Socket.IO Connection State Recovery Example
+DESCRIPTION: Shell commands for setting up and running the Socket.IO Connection State Recovery example. Instructions include choosing module syntax, installing dependencies, and starting the server.
+
+LANGUAGE: shell
+CODE:
+# choose your module syntax (either ES modules or CommonJS)
+$ cd esm/
+
+# install the dependencies
+$ npm i
+
+# start the server
+$ node index.js
+
+----------------------------------------
+
+TITLE: Starting Nuxt 3 Development Server
+DESCRIPTION: Commands to start the development server on http://localhost:3000 using various package managers.
+
+LANGUAGE: bash
+CODE:
+# npm
+npm run dev
+
+# pnpm
+pnpm run dev
+
+# yarn
+yarn dev
+
+# bun
+bun run dev
+
+----------------------------------------
+
+TITLE: Installing and Starting Socket.IO Chat Demo
+DESCRIPTION: Commands to install dependencies and start the Socket.IO chat demo server. After running these commands, the chat application will be accessible at http://localhost:3000.
+
+LANGUAGE: bash
+CODE:
+$ npm i
+$ npm start
+
+----------------------------------------
+
+TITLE: Running Next.js Development Server
+DESCRIPTION: Commands to start the Next.js development server using various package managers. This allows developers to run the project locally for development and testing.
+
+LANGUAGE: bash
+CODE:
+npm run dev
+# or
+yarn dev
+# or
+pnpm dev
+# or
+bun dev
+
+----------------------------------------
+
+TITLE: Installing and Running the Passport Authentication Example
+DESCRIPTION: Commands to install dependencies and start the application. The server runs on localhost:3000 by default, with an optional PORT environment variable.
+
+LANGUAGE: bash
+CODE:
+$ npm ci && npm start
+
+----------------------------------------
+
+TITLE: Setting up and running Socket.IO WebTransport example using Shell commands
+DESCRIPTION: This code snippet provides a series of shell commands to set up and run a Socket.IO WebTransport example. It includes steps for generating a self-signed certificate, installing dependencies, starting the server, and opening a Chrome browser.
+
+LANGUAGE: shell
+CODE:
+# generate a self-signed certificate
+$ ./generate_cert.sh
+
+# install dependencies
+$ npm i
+
+# start the server
+$ node index.js
+
+# open a Chrome browser
+$ ./open_chrome.sh
+
+----------------------------------------
+
+TITLE: Installing and Building Socket.IO Server with WebPack
+DESCRIPTION: Command sequence for installing dependencies, building the project with WebPack, and starting the server. Includes notes about optional performance-related dependencies.
+
+LANGUAGE: bash
+CODE:
+$ npm i
+$ npm run build
+$ npm start
+
+----------------------------------------
+
+TITLE: Setting up and Running Socket.IO Server
+DESCRIPTION: This snippet demonstrates how to navigate to the server directory, install dependencies, and start the Socket.IO server.
+
+LANGUAGE: bash
+CODE:
+$ cd server
+
+# install the dependencies
+$ npm i
+
+# start the server
+$ npm start
+
+----------------------------------------
+
+TITLE: Starting Next.js Development Server
+DESCRIPTION: Commands to start the Next.js development server using different package managers including npm, yarn, pnpm, and bun. The server will run on localhost:3000 by default.
+
+LANGUAGE: bash
+CODE:
+npm run dev
+# or
+yarn dev
+# or
+pnpm dev
+# or
+bun dev
+
+----------------------------------------
+
+TITLE: Socket.IO JSON Parse Performance Results
+DESCRIPTION: Console output showing benchmark results for four JSON parsing scenarios: small JSON, large JSON, small JSON with binary data, and large JSON with binary data. Results are measured in operations per second with statistical variance.
+
+LANGUAGE: text
+CODE:
+small json parse                x 67,893 ops/sec ±4.30% (76 runs sampled)
+big json parse                  x  1,507 ops/sec ±1.72% (82 runs sampled)
+json with small binary parse    x 62,367 ops/sec ±6.03% (74 runs sampled)
+json with big binary parse      x    572 ops/sec ±1.25% (86 runs sampled)
+
+----------------------------------------
+
+TITLE: Running the Angular Frontend for Socket.IO CRUD Application
+DESCRIPTION: These commands navigate to the Angular client directory, install dependencies, and start the frontend application.
+
+LANGUAGE: bash
+CODE:
+cd angular-client
+npm install
+npm start
+
+----------------------------------------
+
+TITLE: Current Socket.IO Performance Metrics
+DESCRIPTION: Benchmark results showing operations per second for the current Socket.IO implementation, measuring encoding and decoding performance for both packets and payloads in string and binary formats.
+
+LANGUAGE: plaintext
+CODE:
+encode packet as string x 175,944 ops/sec ±5.64% (25 runs sampled)
+encode packet as binary x 176,945 ops/sec ±16.60% (51 runs sampled)
+encode payload as string x 47,836 ops/sec ±9.84% (34 runs sampled)
+encode payload as binary x 123,987 ops/sec ±22.03% (53 runs sampled)
+decode packet from string x 27,680,068 ops/sec ±0.92% (89 runs sampled)
+decode packet from binary x 7,747,089 ops/sec ±1.65% (83 runs sampled)
+decode payload from string x 198,908 ops/sec ±27.95% (23 runs sampled)
+decode payload from binary x 179,574 ops/sec ±41.32% (23 runs sampled)
+
+----------------------------------------
+
+TITLE: Running the Socket.IO Server for CRUD Application
+DESCRIPTION: These commands navigate to the server directory, install dependencies, and start the Socket.IO server for the CRUD application.
+
+LANGUAGE: bash
+CODE:
+cd server
+npm install
+npm start
+
+----------------------------------------
+
+TITLE: Installing Dependencies and Starting Socket.IO Collaborative Whiteboard
+DESCRIPTION: This command installs the necessary dependencies and starts the Socket.IO collaborative whiteboard application. It uses npm for package management and assumes a package.json file is present with the correct scripts defined.
+
+LANGUAGE: bash
+CODE:
+$ npm ci && npm start
+
+----------------------------------------
+
+TITLE: Installing and Running Socket.io TODO Application
+DESCRIPTION: Commands to set up and run the Socket.io TODO application using Docker Compose. Includes container initialization, dependency installation, and application startup.
+
+LANGUAGE: bash
+CODE:
+$ docker-compose up -d
+$ npm install
+$ npm start
+
+----------------------------------------
+
+TITLE: Handling Close Event with Details
+DESCRIPTION: Example of listening to the 'close' event with additional details for debugging.
+
+LANGUAGE: javascript
+CODE:
+socket.on("close", (reason, details) => {
+  console.log(reason); // "transport error"
+
+  // in that case, details is an error object
+  console.log(details.message); "xhr post error"
+  console.log(details.description); // 413 (the HTTP status of the response)
+
+  // details.context refers to the XMLHttpRequest object
+  console.log(details.context.status); // 413
+  console.log(details.context.responseText); // ""
+});
+
+----------------------------------------
+
+TITLE: Running Socket.IO Cluster Example (Bash)
+DESCRIPTION: Commands to run the Socket.IO cluster example server and client. The server script creates multiple Socket.IO servers, one per CPU core, all listening on port 3000. The client script connects to these servers.
+
+LANGUAGE: bash
+CODE:
+# run the server
+$ node server.js
+
+# run the client
+$ node client.js
+
+----------------------------------------
+
+TITLE: Using Emitter as a prototype mixin in JavaScript
+DESCRIPTION: Example of applying Emitter as a mixin to a prototype, enabling event emitting for all instances of a class.
+
+LANGUAGE: javascript
+CODE:
+import { Emitter } from '@socket.io/component-emitter';
+
+Emitter(User.prototype);
+
+----------------------------------------
+
+TITLE: Starting Angular Development Server
+DESCRIPTION: Command to run the Angular development server, which serves the application on localhost:4200 and provides auto-reload functionality.
+
+LANGUAGE: Shell
+CODE:
+ng serve
+
+----------------------------------------
+
+TITLE: HTML Integration for Browserify Bundle
+DESCRIPTION: HTML code showing how to include the browserified engine.io-parser bundle in a web page.
+
+LANGUAGE: html
+CODE:
+<script src="/path/to/bundle.js"></script>
+
+----------------------------------------
+
+TITLE: Running Socket.IO Server
+DESCRIPTION: Command to start the Socket.IO server, which handles real-time communication for the TodoMVC application.
+
+LANGUAGE: Shell
+CODE:
+npm run start:server
+
+----------------------------------------
+
+TITLE: Sending JWT in Socket.IO Client Headers
+DESCRIPTION: This snippet shows how to send a JWT token in the headers when initializing a Socket.IO client connection. The token is included in the 'extraHeaders' option.
+
+LANGUAGE: javascript
+CODE:
+const socket = io({
+  extraHeaders: {
+    authorization: `bearer token`
+  }
+});
+
+----------------------------------------
+
+TITLE: Generating Angular Components
+DESCRIPTION: Angular CLI command to scaffold new components, directives, pipes, services, classes, guards, interfaces, enums, or modules.
+
+LANGUAGE: Shell
+CODE:
+ng generate component component-name
+
+----------------------------------------
+
+TITLE: Installing Dependencies for Socket.IO Latency Test
+DESCRIPTION: This command installs the necessary Node.js dependencies for the Socket.IO latency testing project using npm (Node Package Manager).
+
+LANGUAGE: Shell
+CODE:
+$ npm install
+
+----------------------------------------
+
+TITLE: Building Angular Project
+DESCRIPTION: Command to build the Angular project, with an option for production builds. Output is stored in the 'dist/' directory.
+
+LANGUAGE: Shell
+CODE:
+ng build
+
+----------------------------------------
+
+TITLE: Setting up and running Socket.IO project using npm and Node.js
+DESCRIPTION: This snippet demonstrates how to link the Socket.IO library locally and start the project. It uses npm to create a symlink to the local Socket.IO directory and then runs the main application file using Node.js.
+
+LANGUAGE: bash
+CODE:
+$ npm link ../..
+$ node index.js
+
+----------------------------------------
+
+TITLE: Running Angular Unit Tests
+DESCRIPTION: Command to execute unit tests using the Karma test runner.
+
+LANGUAGE: Shell
+CODE:
+ng test
+
+----------------------------------------
+
+TITLE: Installing and Running Socket.IO Custom Parsers
+DESCRIPTION: Command to install dependencies and start the Socket.IO parser comparison project.
+
+LANGUAGE: bash
+CODE:
+$ npm i && npm start
+
+----------------------------------------
+
+TITLE: Compiling TypeScript for All Socket.IO Workspaces
+DESCRIPTION: Command to compile TypeScript for all workspaces in the Socket.IO project using npm workspaces feature.
+
+LANGUAGE: bash
+CODE:
+npm run compile -ws --if-present
+
+----------------------------------------
+
+TITLE: Previewing Nuxt 3 Production Build
+DESCRIPTION: Commands to locally preview the production build using various package managers before deployment.
+
+LANGUAGE: bash
+CODE:
+# npm
+npm run preview
+
+# pnpm
+pnpm run preview
+
+# yarn
+yarn preview
+
+# bun
+bun run preview
+
+----------------------------------------
+
+TITLE: Compiling TypeScript for Specific Socket.IO Workspace
+DESCRIPTION: Command to compile TypeScript for a specific workspace (e.g., socket.io) in the Socket.IO project.
+
+LANGUAGE: bash
+CODE:
+npm run compile --workspace=socket.io
+
+----------------------------------------
+
+TITLE: Installing Dependencies for Nuxt 3 Project
+DESCRIPTION: Commands for installing project dependencies using different package managers including npm, pnpm, yarn, and bun.
+
+LANGUAGE: bash
+CODE:
+# npm
+npm install
+
+# pnpm
+pnpm install
+
+# yarn
+yarn install
+
+# bun
+bun install
+
+----------------------------------------
+
+TITLE: Applying Code Formatting to All Socket.IO Workspaces
+DESCRIPTION: Command to apply code formatting using Prettier to all workspaces in the Socket.IO project.
+
+LANGUAGE: bash
+CODE:
+npm run format:fix -ws
+
+----------------------------------------
+
+TITLE: Installing Socket.IO Cluster Engine via NPM
+DESCRIPTION: Command to install the Socket.IO cluster engine package using npm package manager.
+
+LANGUAGE: bash
+CODE:
+npm i @socket.io/cluster-engine
+
+----------------------------------------
+
+TITLE: Applying Code Formatting to Specific Socket.IO Workspace
+DESCRIPTION: Command to apply code formatting using Prettier to a specific workspace (e.g., socket.io) in the Socket.IO project.
+
+LANGUAGE: bash
+CODE:
+npm run format:fix --workspace=socket.io
+
+----------------------------------------
+
+TITLE: Using _emitReserved Method in JavaScript
+DESCRIPTION: Demonstrates the usage of the renamed _emitReserved method in version 4.0.0. This change was made to enable proper code mangling.
+
+LANGUAGE: javascript
+CODE:
+import { Emitter } from "@socket.io/component-emitter";
+
+class MyEmitter extends Emitter {
+  foo() {
+    this._emitReserved("input");
+  }
+}
+
+----------------------------------------
+
+TITLE: Running Tests for All Socket.IO Workspaces
+DESCRIPTION: Command to run tests for all workspaces in the Socket.IO project using npm workspaces feature.
+
+LANGUAGE: bash
+CODE:
+npm test -ws
+
+----------------------------------------
+
+TITLE: Updating Emitter Usage in JavaScript
+DESCRIPTION: Shows the change in importing and using the Emitter class in version 3.0.0. The export changed from default to named, requiring an update in import statements.
+
+LANGUAGE: javascript
+CODE:
+// before
+import Emitter from "@socket.io/component-emitter"
+
+// after
+import { Emitter } from "@socket.io/component-emitter"
+
+----------------------------------------
+
+TITLE: Running Tests for Specific Socket.IO Workspace
+DESCRIPTION: Command to run tests for a specific workspace (e.g., socket.io) in the Socket.IO project.
+
+LANGUAGE: bash
+CODE:
+npm test --workspace=socket.io
+
+----------------------------------------
+
+TITLE: Installing @socket.io/component-emitter via npm
+DESCRIPTION: Command to install the @socket.io/component-emitter package using npm.
+
+LANGUAGE: bash
+CODE:
+$ npm i @socket.io/component-emitter
+
+----------------------------------------
+
+TITLE: Installing Conventional Changelog CLI for Socket.IO
+DESCRIPTION: Command to install the conventional-changelog-cli package globally for generating changelogs in the Socket.IO project.
+
+LANGUAGE: bash
+CODE:
+npm i -g conventional-changelog-cli
+
+----------------------------------------
+
+TITLE: Generating Changelog for Engine.IO Client
+DESCRIPTION: Commands to navigate to the engine.io-client package directory and generate a changelog using conventional-changelog-cli.
+
+LANGUAGE: bash
+CODE:
+cd packages/engine.io-client
+conventional-changelog -p angular --tag-prefix "engine.io-client@" --commit-path .
+
+----------------------------------------
+
+TITLE: Running Angular Development Server
+DESCRIPTION: Starts a development server for the Angular project. The application will be accessible at http://localhost:4200/ and will automatically reload on file changes.
+
+LANGUAGE: bash
+CODE:
+ng serve
+
+----------------------------------------
+
+TITLE: Running Tests with Yarn
+DESCRIPTION: Launches the test runner in interactive watch mode, allowing for continuous testing during development.
+
+LANGUAGE: bash
+CODE:
+yarn test
+
+----------------------------------------
+
+TITLE: Generating Angular Components and Other Structures
+DESCRIPTION: Uses Angular CLI to generate new components, directives, pipes, services, classes, guards, interfaces, enums, or modules.
+
+LANGUAGE: bash
+CODE:
+ng generate component component-name
+
+----------------------------------------
+
+TITLE: Running End-to-End Tests
+DESCRIPTION: Command to run end-to-end tests using Protractor.
+
+LANGUAGE: Shell
+CODE:
+ng e2e
+
+----------------------------------------
+
+TITLE: Building Angular Project
+DESCRIPTION: Builds the Angular project for production. The compiled files will be stored in the 'dist/' directory.
+
+LANGUAGE: bash
+CODE:
+ng build
+
+----------------------------------------
+
+TITLE: Running NestJS Tests
+DESCRIPTION: Commands for running different types of tests including unit tests, end-to-end tests, and generating test coverage reports.
+
+LANGUAGE: bash
+CODE:
+# unit tests
+$ npm run test
+
+# e2e tests
+$ npm run test:e2e
+
+# test coverage
+$ npm run test:cov
+
+----------------------------------------
+
+TITLE: Running Angular Unit Tests
+DESCRIPTION: Executes unit tests for the Angular project using Karma test runner.
+
+LANGUAGE: bash
+CODE:
+ng test
+
+----------------------------------------
+
+TITLE: Cloning and Setting Up Development Environment
+DESCRIPTION: Shell commands for cloning the repository and installing dependencies for development.
+
+LANGUAGE: shell
+CODE:
+git clone git://github.com/socketio/engine.io-parser.git
+cd engine.io-parser
+npm ci
+
+----------------------------------------
+
+TITLE: Accessing Angular CLI Help
+DESCRIPTION: Displays help information for Angular CLI commands and options.
+
+LANGUAGE: bash
+CODE:
+ng help
+
+----------------------------------------
+
+TITLE: Building Browserify Bundle
+DESCRIPTION: Shell command for building the browserify bundle from the application code.
+
+LANGUAGE: shell
+CODE:
+browserify app.js > bundle.js
+
+----------------------------------------
+
+TITLE: Running Development Server for Vue.js Client
+DESCRIPTION: This command compiles and hot-reloads the Vue.js client for development purposes, allowing real-time updates during coding.
+
+LANGUAGE: shell
+CODE:
+yarn serve
+
+----------------------------------------
+
+TITLE: Installing Engine.io Parser Package
+DESCRIPTION: Shell command for installing the engine.io-parser package via npm.
+
+LANGUAGE: shell
+CODE:
+npm install engine.io-parser
+
+----------------------------------------
+
+TITLE: Building Vue.js Client for Production
+DESCRIPTION: This command compiles and minifies the Vue.js client project for production deployment, optimizing the code for performance.
+
+LANGUAGE: shell
+CODE:
+yarn build
+
+----------------------------------------
+
+TITLE: Linting and Fixing Vue.js Client Files
+DESCRIPTION: This command runs the linter to check for code style issues and automatically fixes them where possible, ensuring code quality and consistency.
+
+LANGUAGE: shell
+CODE:
+yarn lint
+
+----------------------------------------
+
+TITLE: Starting Metro Bundler in React Native
+DESCRIPTION: Commands to start the Metro JavaScript bundler for React Native development using either npm or yarn.
+
+LANGUAGE: bash
+CODE:
+# using npm
+npm start
+
+# OR using Yarn
+yarn start
+
+----------------------------------------
+
+TITLE: Launching Android App in React Native
+DESCRIPTION: Commands to start the Android application using either npm or yarn package managers.
+
+LANGUAGE: bash
+CODE:
+# using npm
+npm run android
+
+# OR using Yarn
+yarn android
+
+----------------------------------------
+
+TITLE: Launching iOS App in React Native
+DESCRIPTION: Commands to start the iOS application using either npm or yarn package managers.
+
+LANGUAGE: bash
+CODE:
+# using npm
+npm run ios
+
+# OR using Yarn
+yarn ios
+
+----------------------------------------
+
+TITLE: Setting up Socket.IO Server
+DESCRIPTION: Commands to install dependencies and start the Socket.IO server from the server directory.
+
+LANGUAGE: bash
+CODE:
+cd server
+
+npm install
+
+npm start
+
+----------------------------------------
+
+TITLE: Installing NestJS Dependencies
+DESCRIPTION: Command to install all required NPM dependencies for the NestJS project.
+
+LANGUAGE: bash
+CODE:
+$ npm install
+
+----------------------------------------
+
+TITLE: Running NestJS Application
+DESCRIPTION: Commands for running the NestJS application in different modes including development, watch mode, and production.
+
+LANGUAGE: bash
+CODE:
+# development
+$ npm run start
+
+# watch mode
+$ npm run start:dev
+
+# production mode
+$ npm run start:prod
+
+----------------------------------------
+
+TITLE: Installing and Running Socket.IO Client with NW.js
+DESCRIPTION: This snippet shows how to install dependencies and start the NW.js client application for a Socket.IO project.
+
+LANGUAGE: bash
+CODE:
+# install the dependencies
+$ npm i
+
+# start the app
+$ nw .
+
+----------------------------------------
+
+TITLE: Starting React Development Server with Yarn
+DESCRIPTION: Runs the React app in development mode, opening it in the browser at http://localhost:3000. The page will automatically reload on edits, and lint errors will be displayed in the console.
+
+LANGUAGE: bash
+CODE:
+yarn start
+
+----------------------------------------
+
+TITLE: Building React App for Production with Yarn
+DESCRIPTION: Creates a production build of the React app in the 'build' folder, optimizing for performance with minification and hashing.
+
+LANGUAGE: bash
+CODE:
+yarn build
+
+----------------------------------------
+
+TITLE: Ejecting from Create React App with Yarn
+DESCRIPTION: Ejects the project from Create React App, exposing all configurations and dependencies for full customization. This is a one-way operation and should be used with caution.
+
+LANGUAGE: bash
+CODE:
+yarn eject
+
+----------------------------------------
+
+TITLE: Configuring Default Robot Access Rules
+DESCRIPTION: Sets up default access rules for web crawlers using the robots.txt standard format. This configuration allows unrestricted access to all user agents.
+
+LANGUAGE: robotstxt
+CODE:
+User-agent: *
+Disallow:
+
+----------------------------------------
+
+TITLE: Socket.IO Version Support Table
+DESCRIPTION: Markdown table showing which Socket.IO versions are currently supported for security updates
+
+LANGUAGE: markdown
+CODE:
+| Version | Supported          |
+|---------|--------------------|\n| 4.x     | :white_check_mark: |
+| 3.x     | :white_check_mark: |
+| 2.4.x   | :white_check_mark: |
+| < 2.4.0 | :x:                |
+
+----------------------------------------
+
+TITLE: Socket.IO Package Changelog Table in Markdown
+DESCRIPTION: A markdown table listing all Socket.IO related packages and their corresponding changelog file locations within the monorepo structure.
+
+LANGUAGE: markdown
+CODE:
+| Package                        | Changelog                                               |
+|--------------------------------|---------------------------------------------------------|
+| `engine.io`                    | [link](packages/engine.io/CHANGELOG.md)                 |
+| `engine.io-client`             | [link](packages/engine.io-client/CHANGELOG.md)          |
+| `engine.io-parser`             | [link](packages/engine.io-parser/CHANGELOG.md)          |
+| `socket.io`                    | [link](packages/socket.io/CHANGELOG.md)                 |
+| `socket.io-adapter`            | [link](packages/socket.io-adapter/CHANGELOG.md)         |
+| `socket.io-client`             | [link](packages/socket.io-client/CHANGELOG.md)          |
+| `@socket.io/cluster-engine`    | [link](packages/socket.io-cluster-engine/CHANGELOG.md)  |
+| `@socket.io/component-emitter` | [link](packages/socket.io-component-emitter/History.md) |
+| `socket.io-parser`             | [link](packages/socket.io-parser/CHANGELOG.md)          |
+
+----------------------------------------
+
+TITLE: Implementing Custom Cluster Adapter in JavaScript
+DESCRIPTION: Example of extending the ClusterAdapterWithHeartbeat class to implement a custom adapter with pub/sub functionality.
+
+LANGUAGE: JavaScript
+CODE:
+class MyAdapter extends ClusterAdapterWithHeartbeat {
+  constructor(nsp, pubSub, opts) {
+    super(nsp, opts);
+    this.pubSub = pubSub;
+    pubSub.subscribe("main-channel", (message) => this.onMessage(message));
+    pubSub.subscribe("specific-channel#" + this.uid, (response) => this.onResponse(response));
+  }
+
+  doPublish(message) {
+    return this.pubSub.publish("main-channel", message);
+  }
+
+  doPublishResponse(requesterUid, response) {
+    return this.pubSub.publish("specific-channel#" + requesterUid, response);
+  }
+}
+
+----------------------------------------
+
+TITLE: Displaying Compatibility Table in Markdown
+DESCRIPTION: This code snippet shows a markdown table that outlines the compatibility between different versions of the adapter and Socket.IO server.
+
+LANGUAGE: markdown
+CODE:
+| Adapter version | Socket.IO server version |
+|-----------------| ------------------------ |
+| 1.x.x           | 1.x.x / 2.x.x            |
+| 2.x.x           | 3.x.x                    |
+
+----------------------------------------
+
+TITLE: Using Emitter as an instance in JavaScript
+DESCRIPTION: Example of creating and using an Emitter instance to emit events.
+
+LANGUAGE: javascript
+CODE:
+import { Emitter } from '@socket.io/component-emitter';
+
+var emitter = new Emitter;
+emitter.emit('something');
+
+----------------------------------------
+
+TITLE: Using Emitter as a mixin in JavaScript
+DESCRIPTION: Example of using Emitter as a mixin to add event emitting capabilities to a plain object.
+
+LANGUAGE: javascript
+CODE:
+import { Emitter } from '@socket.io/component-emitter';
+
+var user = { name: 'tobi' };
+Emitter(user);
+
+user.emit('im a user');
+
+----------------------------------------
+
+TITLE: Socket.io Parser Changelog Table
+DESCRIPTION: A markdown table listing all released versions of Socket.io Parser with their corresponding release dates
+
+LANGUAGE: markdown
+CODE:
+| Version                                                                                                     | Release date   |
+|-------------------------------------------------------------------------------------------------------------|----------------|
+
+----------------------------------------
+
+TITLE: Encoding and Decoding a Packet with Binary Data in JavaScript using socket.io-parser
+DESCRIPTION: This example shows how to use socket.io-parser to encode and decode a packet containing binary data. It demonstrates creating a packet with Buffer and Blob objects, encoding it, and then decoding it back to its original form with binary data intact.
+
+LANGUAGE: javascript
+CODE:
+var parser = require('socket.io-parser');
+var encoder = new parser.Encoder();
+var packet = {
+  type: parser.BINARY_EVENT,
+  data: {i: new Buffer(1234), j: new Blob([new ArrayBuffer(2)])},
+  id: 15
+};
+encoder.encode(packet, function(encodedPackets) {
+  var decoder = new parser.Decoder();
+  decoder.on('decoded', function(decodedPacket) {
+    // decodedPacket.type == parser.BINARY_EVENT
+    // Buffer.isBuffer(decodedPacket.data.i) == true
+    // Buffer.isBuffer(decodedPacket.data.j) == true
+    // decodedPacket.id == 15
+  });
+
+  for (var i = 0; i < encodedPackets.length; i++) {
+    decoder.add(encodedPackets[i]);
+  }
+});
+
+----------------------------------------
+
+TITLE: Parser v2/Protocol v3 Performance Metrics
+DESCRIPTION: Benchmark results showing operations per second for Socket.IO parser v2/protocol v3, measuring encoding and decoding performance for both packets and payloads in string and binary formats.
+
+LANGUAGE: plaintext
+CODE:
+encode packet as string x 228,038 ops/sec ±9.28% (40 runs sampled)
+encode packet as binary x 163,392 ops/sec ±8.72% (67 runs sampled)
+encode payload as string x 73,457 ops/sec ±14.83% (56 runs sampled)
+encode payload as binary x 71,400 ops/sec ±3.63% (75 runs sampled)
+decode packet from string x 22,712,325 ops/sec ±3.14% (90 runs sampled)
+decode packet from binary x 4,849,781 ops/sec ±1.27% (87 runs sampled)
+decode payload from string x 82,514 ops/sec ±49.93% (22 runs sampled)
+decode payload from binary x 149,206 ops/sec ±25.90% (76 runs sampled)
+
+----------------------------------------
+
+TITLE: Browserify Integration with Engine.io Parser
+DESCRIPTION: Example showing how to use engine.io-parser with browserify, including handling of binary data and multiple packet types.
+
+LANGUAGE: javascript
+CODE:
+const parser = require("engine.io-parser");
+
+const testBuffer = new Int8Array(10);
+for (let i = 0; i < testBuffer.length; i++) testBuffer[i] = i;
+
+const packets = [{ type: "message", data: testBuffer.buffer }, { type: "message", data: "hello" }];
+
+parser.encodePayload(packets, encoded => {
+  parser.decodePayload(encoded,
+    (packet, index, total) => {
+      const isLast = index + 1 == total;
+      if (!isLast) {
+        const buffer = new Int8Array(packet.data); // testBuffer
+      } else {
+        const message = packet.data; // "hello"
+      }
+    });
+});
+
+----------------------------------------
+
+TITLE: Manual Request Handling in Engine.IO
+DESCRIPTION: Shows how to manually handle HTTP upgrade requests and standard HTTP requests with Engine.IO server instance.
+
+LANGUAGE: javascript
+CODE:
+const engine = require('engine.io');
+const server = new engine.Server();
+
+server.on('connection', socket => {
+  socket.send('hi');
+});
+
+// ...
+httpServer.on('upgrade', (req, socket, head) => {
+  server.handleUpgrade(req, socket, head);
+});
+
+httpServer.on('request', (req, res) => {
+  server.handleRequest(req, res);
+});
+
+----------------------------------------
+
+TITLE: Engine.IO Client Implementation
+DESCRIPTION: Client-side implementation showing how to establish connection and handle events using Engine.IO.
+
+LANGUAGE: html
+CODE:
+<script src="/path/to/engine.io.js"></script>
+<script>
+  const socket = new eio.Socket('ws://localhost/');
+  socket.on('open', () => {
+    socket.on('message', data => {});
+    socket.on('close', () => {});
+  });
+</script>
+
+----------------------------------------
+
+TITLE: Running Socket.IO Latency Test Server
+DESCRIPTION: This command starts the Node.js server for the Socket.IO latency test. After execution, the server will be accessible via a web browser.
+
+LANGUAGE: Shell
+CODE:
+$ node index
+
+----------------------------------------
+
+TITLE: Initializing Standalone Engine.IO Client
+DESCRIPTION: Basic setup of Engine.IO client using standalone script include. Demonstrates connection establishment and basic event handling.
+
+LANGUAGE: html
+CODE:
+<script src="/path/to/engine.io.js"></script>
+<script>
+  // eio = Socket
+  const socket = eio('ws://localhost');
+  socket.on('open', () => {
+    socket.on('message', (data) => {});
+    socket.on('close', () => {});
+  });
+</script>
+
+----------------------------------------
+
+TITLE: Implementing Engine.IO with Browserify
+DESCRIPTION: Setup process for using Engine.IO with Browserify, including package installation, code implementation, and bundle creation.
+
+LANGUAGE: bash
+CODE:
+$ npm install engine.io-client
+
+LANGUAGE: javascript
+CODE:
+const { Socket } = require('engine.io-client');
+const socket = new Socket('ws://localhost');
+socket.on('open', () => {
+  socket.on('message', (data) => {});
+  socket.on('close', () => {});
+});
+
+LANGUAGE: bash
+CODE:
+$ browserify app.js > bundle.js
+
+LANGUAGE: html
+CODE:
+<script src="/path/to/bundle.js"></script>
+
+----------------------------------------
+
+TITLE: Node.js Engine.IO with SSL Certificates
+DESCRIPTION: Implementation of Engine.IO client in Node.js with SSL certificate configuration.
+
+LANGUAGE: javascript
+CODE:
+const opts = {
+  key: fs.readFileSync('test/fixtures/client.key'),
+  cert: fs.readFileSync('test/fixtures/client.crt'),
+  ca: fs.readFileSync('test/fixtures/ca.crt')
+};
+
+const { Socket } = require('engine.io-client');
+const socket = new Socket('ws://localhost', opts);
+socket.on('open', () => {
+  socket.on('message', (data) => {});
+  socket.on('close', () => {});
+});
+
+----------------------------------------
+
+TITLE: Node.js Engine.IO with Custom Headers
+DESCRIPTION: Example of adding custom headers to Engine.IO client connections in Node.js.
+
+LANGUAGE: javascript
+CODE:
+const opts = {
+  extraHeaders: {
+    'X-Custom-Header-For-My-Project': 'my-secret-access-token',
+    'Cookie': 'user_session=NI2JlCKF90aE0sJZD9ZzujtdsUqNYSBYxzlTsvdSUe35ZzdtVRGqYFr0kdGxbfc5gUOkR9RGp20GVKza; path=/; expires=Tue, 07-Apr-2015 18:18:08 GMT; secure; HttpOnly'
+  }
+};
+
+const { Socket } = require('engine.io-client');
+const socket = new Socket('ws://localhost', opts);
+socket.on('open', () => {
+  socket.on('message', (data) => {});
+  socket.on('close', () => {});
+});
+
+----------------------------------------
+
+TITLE: Initializing Socket with Custom Transport Options
+DESCRIPTION: Example of creating a Socket instance with custom transport options, including WebSocket and disabling the trailing slash.
+
+LANGUAGE: javascript
+CODE:
+import { Socket, XHR, WebSocket } from "engine.io-client";
+
+const socket = new Socket({
+  transports: [XHR, WebSocket],
+  addTrailingSlash: false
+});
+
+----------------------------------------
+
+TITLE: Using Native Timer Functions
+DESCRIPTION: Example of creating a Socket instance with the option to use native timer functions.
+
+LANGUAGE: javascript
+CODE:
+import { Socket } from "engine.io-client";
+
+const socket = new Socket("https://example.com", {
+  useNativeTimers: true
+});
+
+----------------------------------------
+
+TITLE: Engine.IO Sample HTTP Session Request
+DESCRIPTION: Example of an initial handshake request showing the protocol setup and open packet structure.
+
+LANGUAGE: http
+CODE:
+GET /engine.io/?EIO=3&transport=polling&t=N8hyd6w
+< HTTP/1.1 200 OK
+< Content-Type: text/plain; charset=UTF-8
+96:0{"sid":"lv_VI97HAXpY6yYWAAAC","upgrades":["websocket"],"pingInterval":25000,"pingTimeout":5000}
+
+----------------------------------------
+
+TITLE: Encoding Binary Data in HTTP Long-Polling for Engine.IO
+DESCRIPTION: Shows how binary data is encoded in Engine.IO packets for HTTP long-polling transport, using base64 encoding and a binary prefix.
+
+LANGUAGE: plaintext
+CODE:
+4hello\x1ebAQIDBA==
+
+with:
+
+4         => message packet type
+hello     => message payload
+\x1e      => separator
+b         => binary prefix
+AQIDBA==  => buffer <01 02 03 04> encoded as base64
+
+----------------------------------------
+
+TITLE: Encoding WebSocket Packets in Engine.IO
+DESCRIPTION: Illustrates the format for encoding Engine.IO packets in WebSocket frames, showing a simple message packet.
+
+LANGUAGE: plaintext
+CODE:
+4hello
+
+with:
+
+4      => message packet type
+hello  => message payload (UTF-8 encoded)
+
+----------------------------------------
+
+TITLE: Socket.IO CONNECT Packet Structure in JSON
+DESCRIPTION: This JSON structure represents a CONNECT packet in the Socket.IO protocol, used for connecting to a namespace.
+
+LANGUAGE: json
+CODE:
+{
+  "type": 0,
+  "nsp": "/admin"
+}
+
+----------------------------------------
+
+TITLE: Socket.IO CONNECT Packet with Authentication in JSON
+DESCRIPTION: This JSON structure shows a CONNECT packet with additional authentication information included in the namespace field.
+
+LANGUAGE: json
+CODE:
+{
+  "type": 0,
+  "nsp": "/admin?token=1234&uid=abcd"
+}
+
+----------------------------------------
+
+TITLE: Socket.IO DISCONNECT Packet Structure in JSON
+DESCRIPTION: This JSON structure represents a DISCONNECT packet in the Socket.IO protocol, used for disconnecting from a namespace.
+
+LANGUAGE: json
+CODE:
+{
+  "type": 1,
+  "nsp": "/admin"
+}
+
+----------------------------------------
+
+TITLE: Socket.IO EVENT Packet with Acknowledgement in JSON
+DESCRIPTION: This JSON structure demonstrates an EVENT packet with an acknowledgement id, used for transmitting data and requesting acknowledgement.
+
+LANGUAGE: json
+CODE:
+{
+  "type": 2,
+  "nsp": "/admin",
+  "data": ["project:delete", 123],
+  "id": 456
+}
+
+----------------------------------------
+
+TITLE: Socket.IO ACK Packet Structure in JSON
+DESCRIPTION: This JSON structure represents an ACK packet in the Socket.IO protocol, used for acknowledging received EVENT or BINARY_EVENT packets.
+
+LANGUAGE: json
+CODE:
+{
+  "type": 3,
+  "nsp": "/admin",
+  "data": [],
+  "id": 456
+}
+
+----------------------------------------
+
+TITLE: Socket.IO ERROR Packet Structure in JSON
+DESCRIPTION: This JSON structure shows an ERROR packet in the Socket.IO protocol, used by the server to indicate a refused connection to a namespace.
+
+LANGUAGE: json
+CODE:
+{
+  "type": 4,
+  "nsp": "/admin",
+  "data": "Not authorized"
+}
+
+----------------------------------------
+
+TITLE: Socket.IO CONNECT Packet with Authentication in JSON
+DESCRIPTION: Shows how additional authentication information can be included in a CONNECT packet.
+
+LANGUAGE: json
+CODE:
+{
+  "type": 0,
+  "nsp": "/admin?token=1234&uid=abcd"
+}
+
+----------------------------------------
+
+TITLE: Socket.IO EVENT Packet Structure in JSON
+DESCRIPTION: Demonstrates the structure of an EVENT packet in Socket.IO protocol, including an optional acknowledgement ID.
+
+LANGUAGE: json
+CODE:
+{
+  "type": 2,
+  "nsp": "/admin",
+  "data": ["project:delete", 123],
+  "id": 456
+}
+
+----------------------------------------
+
+TITLE: Configuring Socket.IO Server for Test Suite
+DESCRIPTION: This code snippet shows the configuration for a Socket.IO server to pass all tests in the provided test suite. It includes setup for connections, events, and namespaces.
+
+LANGUAGE: javascript
+CODE:
+import { Server } from "socket.io";
+
+const io = new Server(3000, {
+  pingInterval: 300,
+  pingTimeout: 200,
+  maxPayload: 1000000,
+  connectTimeout: 1000,
+  cors: {
+    origin: "*"
+  }
+});
+
+io.on("connection", (socket) => {
+  socket.emit("auth", socket.handshake.auth);
+
+  socket.on("message", (...args) => {
+    socket.emit.apply(socket, ["message-back", ...args]);
+  });
+
+  socket.on("message-with-ack", (...args) => {
+    const ack = args.pop();
+    ack(...args);
+  })
+});
+
+io.of("/custom").on("connection", (socket) => {
+  socket.emit("auth", socket.handshake.auth);
+});
+
+----------------------------------------
+
+TITLE: Stopping Individual Server Node
+DESCRIPTION: Command to stop a specific server node in the Docker Compose stack. Used to demonstrate failover capabilities and client reconnection to other available nodes.
+
+LANGUAGE: bash
+CODE:
+$ docker-compose stop server-george
+
+----------------------------------------
+
+TITLE: Stopping a Specific Socket.IO Node
+DESCRIPTION: This command demonstrates how to stop a specific Socket.IO node (in this case, 'server-george') while the application is running. This showcases the system's ability to handle node failures and client reconnections.
+
+LANGUAGE: bash
+CODE:
+$ docker-compose stop server-george
+
+----------------------------------------
+
+TITLE: Stopping Individual Server Node
+DESCRIPTION: Command to stop a specific Socket.IO server node for testing failover capabilities. The client should automatically reconnect to another available node.
+
+LANGUAGE: bash
+CODE:
+$ docker-compose stop server-george
+
+----------------------------------------
+
+TITLE: Installing and Building Socket.IO with WebPack
+DESCRIPTION: Terminal commands to install dependencies and run the WebPack build process for Socket.IO browser implementation.
+
+LANGUAGE: shell
+CODE:
+$ npm i
+$ npm run build

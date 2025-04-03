@@ -1,0 +1,1910 @@
+TITLE: Basic Kombu Messaging Example with Connection Context Manager
+DESCRIPTION: Demonstrates basic usage of Kombu including setting up exchanges, queues, producers and consumers using the connection context manager. Shows how to publish and consume messages with JSON serialization.
+
+LANGUAGE: python
+CODE:
+from kombu import Connection, Exchange, Queue
+
+media_exchange = Exchange('media', 'direct', durable=True)
+video_queue = Queue('video', exchange=media_exchange, routing_key='video')
+
+def process_media(body, message):
+    print(body)
+    message.ack()
+
+# connections
+with Connection('amqp://guest:guest@localhost//') as conn:
+
+    # produce
+    producer = conn.Producer(serializer='json')
+    producer.publish({'name': '/tmp/lolcat1.avi', 'size': 1301013},
+                      exchange=media_exchange, routing_key='video',
+                      declare=[video_queue])
+
+    # consume
+    with conn.Consumer(video_queue, callbacks=[process_media]) as consumer:
+        # Process messages and handle events on all channels
+        while True:
+            conn.drain_events()
+
+----------------------------------------
+
+TITLE: Hello World Publisher-Consumer Implementation in Python using Kombu
+DESCRIPTION: Basic example showing how to publish and consume messages through a message broker (RabbitMQ) using Kombu. Consists of two parts: a publisher that sends messages and a consumer that receives them.
+
+LANGUAGE: python
+CODE:
+# Reference to hello_publisher.py
+
+LANGUAGE: python
+CODE:
+# Reference to hello_consumer.py
+
+----------------------------------------
+
+TITLE: Complete Consumer Implementation Example
+DESCRIPTION: Full example demonstrating consumer setup, callback registration, and event draining with timeout.
+
+LANGUAGE: python
+CODE:
+from kombu import Connection, Consumer, Queue
+
+def callback(body, message):
+    print('RECEIVED MESSAGE: {0!r}'.format(body))
+    message.ack()
+
+queue1 = Queue('queue1', routing_key='queue1')
+queue2 = Queue('queue2', routing_key='queue2')
+
+with Connection('amqp://') as conn:
+    with conn.channel() as channel:
+        consumer = Consumer(conn, [queue1, queue2], accept=['json'])
+        consumer.register_callback(callback)
+        with consumer:
+            conn.drain_events(timeout=1)
+
+----------------------------------------
+
+TITLE: Implementing a Logging System with Kombu SimpleQueue in Python
+DESCRIPTION: Demonstrates a complete example of a logging system using Kombu's SimpleQueue. It includes methods for sending log messages, processing them, and a practical usage example.
+
+LANGUAGE: python
+CODE:
+import socket
+import datetime
+from time import time
+from kombu import Connection
+
+
+class Logger:
+
+    def __init__(self, connection, queue_name='log_queue',
+            serializer='json', compression=None):
+        self.queue = connection.SimpleQueue(queue_name)
+        self.serializer = serializer
+        self.compression = compression
+
+    def log(self, message, level='INFO', context={}):
+        self.queue.put({'message': message,
+                        'level': level,
+                        'context': context,
+                        'hostname': socket.gethostname(),
+                        'timestamp': time()},
+                        serializer=self.serializer,
+                        compression=self.compression)
+
+    def process(self, callback, n=1, timeout=1):
+        for i in xrange(n):
+            log_message = self.queue.get(block=True, timeout=1)
+            entry = log_message.payload # deserialized data.
+            callback(entry)
+            log_message.ack() # remove message from queue
+
+    def close(self):
+        self.queue.close()
+
+
+if __name__ == '__main__':
+    from contextlib import closing
+
+    with Connection('amqp://guest:guest@localhost:5672//') as conn:
+        with closing(Logger(conn)) as logger:
+
+            # Send message
+            logger.log('Error happened while encoding video',
+                        level='ERROR',
+                        context={'filename': 'cutekitten.mpg'})
+
+            # Consume and process message
+
+            # This is the callback called when a log message is
+            # received.
+            def dump_entry(entry):
+                date = datetime.datetime.fromtimestamp(entry['timestamp'])
+                print('[%s %s %s] %s %r' % (date,
+                                            entry['hostname'],
+                                            entry['level'],
+                                            entry['message'],
+                                            entry['context']))
+
+            # Process a single message using the callback above.
+            logger.process(dump_entry, n=1)
+
+----------------------------------------
+
+TITLE: ConsumerMixin Implementation
+DESCRIPTION: Example of implementing a consumer using the ConsumerMixin class for simplified consumer creation.
+
+LANGUAGE: python
+CODE:
+from kombu.mixins import ConsumerMixin
+
+class C(ConsumerMixin):
+
+    def __init__(self, connection):
+        self.connection = connection
+
+    def get_consumers(self, Consumer, channel):
+        return [
+            Consumer(channel, callbacks=[self.on_message], accept=['json']),
+        ]
+
+    def on_message(self, body, message):
+        print('RECEIVED MESSAGE: {0!r}'.format(body))
+        message.ack()
+
+C(connection).run()
+
+----------------------------------------
+
+TITLE: Creating and Managing Kombu Connections in Python
+DESCRIPTION: Demonstrates how to create, connect, check status, and close a Kombu connection using the default AMQP transport. Also shows best practices for connection management using context managers.
+
+LANGUAGE: python
+CODE:
+>>> from kombu import Connection
+>>> connection = Connection('amqp://guest:guest@localhost:5672//')
+
+>>> connection.connect()
+
+>>> connection.connected
+True
+
+>>> connection.close()
+
+>>> connection.release()
+
+with Connection() as connection:
+    # work with connection
+
+----------------------------------------
+
+TITLE: ConsumerProducerMixin RPC Implementation
+DESCRIPTION: Example showing how to implement an RPC worker using ConsumerProducerMixin for handling requests and publishing responses.
+
+LANGUAGE: python
+CODE:
+from kombu import Producer, Queue
+from kombu.mixins import ConsumerProducerMixin
+
+rpc_queue = Queue('rpc_queue')
+
+class Worker(ConsumerProducerMixin):
+
+    def __init__(self, connection):
+        self.connection = connection
+
+    def get_consumers(self, Consumer, channel):
+        return [Consumer(
+            queues=[rpc_queue],
+            on_message=self.on_request,
+            accept={'application/json'},
+            prefetch_count=1,
+        )]
+
+    def on_request(self, message):
+        n = message.payload['n']
+        print(' [.] fib({0})'.format(n))
+        result = fib(n)
+
+        self.producer.publish(
+            {'result': result},
+            exchange='', routing_key=message.properties['reply_to'],
+            correlation_id=message.properties['correlation_id'],
+            serializer='json',
+            retry=True,
+        )
+        message.ack()
+
+----------------------------------------
+
+TITLE: Creating a Producer in Python using Kombu Connection
+DESCRIPTION: Demonstrates how to create a producer using a Kombu Connection object. This is a basic way to initialize a producer for publishing messages.
+
+LANGUAGE: python
+CODE:
+>>> producer = connection.Producer()
+
+----------------------------------------
+
+TITLE: Publishing with Retries in Kombu
+DESCRIPTION: Demonstrates how to publish messages with retry functionality to handle intermittent failures. It includes setting a retry flag and specifying a retry policy.
+
+LANGUAGE: python
+CODE:
+>>> producer.publish({'hello': 'world', ..., retry=True})
+
+LANGUAGE: python
+CODE:
+>>> producer.publish(
+...     {'hello': 'world'}, ...,
+...     retry=True,
+...     retry_policy={
+...         'interval_start': 0, # First retry immediately,
+...         'interval_step': 2,  # then increase by 2s for every retry.
+...         'interval_max': 30,  # but don't exceed 30s between retries.
+...         'max_retries': 30,   # give up after 30 tries.
+...     },
+... )
+
+----------------------------------------
+
+TITLE: Simple Task Queue Implementation with Priority Support
+DESCRIPTION: Implementation of a basic task queue system using pickle serialization and multiple queues for priority support. Includes queue definitions, worker processing, task definitions, and client interaction.
+
+LANGUAGE: python
+CODE:
+# Reference to queues.py
+
+LANGUAGE: python
+CODE:
+# Reference to worker.py
+
+LANGUAGE: python
+CODE:
+# Reference to tasks.py
+
+LANGUAGE: python
+CODE:
+# Reference to client.py
+
+----------------------------------------
+
+TITLE: Implementing Consumer with Failover in Python
+DESCRIPTION: Shows how to implement a Consumer with failover functionality using a custom consume function and the ensure() method.
+
+LANGUAGE: python
+CODE:
+>>> from kombu import *
+>>> import socket
+
+>>> def callback(body, message):
+...     print(body)
+...     message.ack()
+
+
+>>> queue = Queue('queue', routing_key='queue')
+>>> with Connection('amqp://broker1:5672;amqp://broker2:5672') as conn:
+...     def consume():
+...         while True:
+...             try:
+...                 conn.drain_events(timeout=1)
+...             except socket.timeout:
+...                 pass
+...     with conn.channel() as channel:
+...         consumer = Consumer(channel, queue)
+...         consumer.register_callback(callback)
+...         with consumer:
+...             while True:
+...                 consume = conn.ensure(conn, consume)
+...                 consume()
+
+----------------------------------------
+
+TITLE: Setting Serialization Method in Kombu Producer
+DESCRIPTION: These snippets demonstrate how to set the serialization method for a Kombu producer, either on a per-producer basis or per message.
+
+LANGUAGE: python
+CODE:
+>>> producer = Producer(channel,
+...                     exchange=exchange,
+...                     serializer='yaml')
+
+LANGUAGE: python
+CODE:
+>>> producer.publish(message, routing_key=rkey,
+...                  serializer='pickle')
+
+----------------------------------------
+
+TITLE: Implementing Producer with Retry Functionality
+DESCRIPTION: Demonstrates how to create a Producer with automatic retry functionality using the retry parameter in the publish method.
+
+LANGUAGE: python
+CODE:
+>>> from kombu import *
+>>> with Connection('amqp://broker1:5672;amqp://broker2:5672') as conn:
+...     with conn.channel() as channel:
+...         producer = conn.Producer()
+...         producer = Producer(channel)
+...         producer.publish(
+...             {'hello': 'world'}, routing_key='queue', retry=True
+...         )
+
+----------------------------------------
+
+TITLE: Enabling Multiple Serialization Formats in Kombu Consumer
+DESCRIPTION: This snippet demonstrates how to explicitly enable multiple serialization formats in a Kombu consumer using the 'accept' argument.
+
+LANGUAGE: python
+CODE:
+Consumer(conn, [queue], accept=['json', 'pickle', 'msgpack'])
+
+----------------------------------------
+
+TITLE: Declaring Entities when Publishing in Kombu
+DESCRIPTION: Shows how to declare necessary entities (exchange, queue) when publishing messages. This is crucial when using retries to ensure the message is delivered even if the broker restarts.
+
+LANGUAGE: python
+CODE:
+>>> from kombu import Exchange, Queue
+>>> task_queue = Queue('tasks', Exchange('tasks'), routing_key='tasks')
+
+>>> producer.publish(
+...     {'hello': 'world'}, ...,
+...     retry=True,
+...     exchange=task_queue.exchange,
+...     routing_key=task_queue.routing_key,
+...     declare=[task_queue],  # declares exchange, queue and binds.
+... )
+
+----------------------------------------
+
+TITLE: Implementing Operation Failover with Kombu's ensure() Method
+DESCRIPTION: Demonstrates how to use the ensure() method to implement operation failover for a Producer's publish method. It retries the operation on failure, with a custom error callback.
+
+LANGUAGE: python
+CODE:
+>>> from kombu import Connection, Producer
+>>> conn = Connection('amqp://')
+>>> producer = Producer(conn)
+>>> def errback(exc, interval):
+...     logger.error('Error: %r', exc, exc_info=1)
+...     logger.info('Retry in %s seconds.', interval)
+>>> publish = conn.ensure(producer, producer.publish,
+...                       errback=errback, max_retries=3)
+>>> publish({'hello': 'world'}, routing_key='dest')
+
+----------------------------------------
+
+TITLE: Creating Consumer with Connection
+DESCRIPTION: Shows how to create a consumer using a Connection object to consume from a single queue.
+
+LANGUAGE: python
+CODE:
+queue = Queue('queue', routing_key='queue')
+consumer = connection.Consumer(queue)
+
+----------------------------------------
+
+TITLE: Publishing Messages Using Producer Pool in Kombu
+DESCRIPTION: Shows how to use the producer pool to publish a message to a news exchange. This example demonstrates creating an exchange, preparing a message, and publishing it with various options.
+
+LANGUAGE: python
+CODE:
+from kombu import Connection, Exchange
+from kombu.pools import producers
+
+# The exchange we send our news articles to.
+news_exchange = Exchange('news')
+
+# The article we want to send
+article = {'title': 'No cellular coverage on the tube for 2012',
+           'ingress': 'yadda yadda yadda'}
+
+# The broker where our exchange is.
+connection = Connection('amqp://guest:guest@localhost:5672//')
+
+with producers[connection].acquire(block=True) as producer:
+    producer.publish(
+        article,
+        exchange=news_exchange,
+        routing_key='domestic',
+        declare=[news_exchange],
+        serializer='json',
+        compression='zlib')
+
+----------------------------------------
+
+TITLE: Using autoretry() for Methods Requiring Channel Refresh
+DESCRIPTION: Shows how to use the autoretry() method for operations that require a channel refresh during failover, such as Queue.declare().
+
+LANGUAGE: python
+CODE:
+>>> import kombu
+>>> conn = kombu.Connection('amqp://broker1:5672;amqp://broker2:5672')
+>>> conn.connect()
+>>> q = kombu.Queue('test_queue')
+
+>>> declare = conn.autoretry(q.declare)
+>>> declare()
+
+----------------------------------------
+
+TITLE: Creating Custom Pool Groups in Kombu
+DESCRIPTION: Illustrates how to create and use custom connection and producer pool groups in Kombu. This example sets up pools with a custom limit and demonstrates acquiring a connection from the custom pool.
+
+LANGUAGE: python
+CODE:
+from kombu import pools
+from kombu import Connection
+
+connections = pools.Connections(limit=100)
+producers = pools.Producers(limit=connections.limit)
+
+connection = Connection('amqp://guest:guest@localhost:5672//')
+
+with connections[connection].acquire(block=True):
+    # ...
+
+----------------------------------------
+
+TITLE: Acquiring and Releasing Connections in Kombu
+DESCRIPTION: Demonstrates how to acquire and release a connection from the default connection pool in Kombu. This example uses a Redis connection and prints the connection URI.
+
+LANGUAGE: python
+CODE:
+from kombu import Connection
+from kombu.pools import connections
+
+connection = Connection('redis://localhost:6379')
+
+with connections[connection].acquire(block=True) as conn:
+    print('Got connection: {0!r}'.format(connection.as_uri()))
+
+----------------------------------------
+
+TITLE: Publishing Messages with Kombu Producer
+DESCRIPTION: Illustrates how to publish messages using a Kombu Producer. It includes setting up an exchange, specifying routing keys, and declaring necessary entities.
+
+LANGUAGE: python
+CODE:
+>>> from kombu import Exchange
+
+>>> exchange = Exchange('name', type='direct')
+
+>>> producer.publish(
+...      {'hello': 'world'},  # message to send
+...      exchange=exchange,   # destination exchange
+...      routing_key='rk',    # destination routing key,
+...      declare=[exchange],  # make sure exchange is declared,
+... )
+
+----------------------------------------
+
+TITLE: Exchange Binding Operations in Kombu
+DESCRIPTION: Shows how to bind exchanges to connections and perform operations on bound exchanges using Python's interactive shell.
+
+LANGUAGE: python
+CODE:
+>>> exchange = Exchange('tasks', 'direct')
+
+>>> connection = Connection()
+>>> bound_exchange = exchange(connection)
+>>> bound_exchange.delete()
+
+# the original exchange is not affected, and stays unbound.
+>>> exchange.delete()
+raise NotBoundError: Can't call delete on Exchange not bound to
+    a channel.
+
+----------------------------------------
+
+TITLE: Creating Consumer with Channel
+DESCRIPTION: Demonstrates creating a consumer directly using a channel or connection with context managers.
+
+LANGUAGE: python
+CODE:
+queue = Queue('queue', routing_key='queue')
+with Connection('amqp://') as conn:
+    with conn.channel() as channel:
+        consumer = Consumer(channel, queue)
+
+----------------------------------------
+
+TITLE: Instantiating a Kombu Producer with Channel or Connection
+DESCRIPTION: Shows how to directly instantiate a Producer by passing either a channel or a connection. This method provides more control over the producer's underlying connection.
+
+LANGUAGE: python
+CODE:
+>>> with Connection('amqp://') as conn:
+...     with conn.channel() as channel:
+...          producer = Producer(channel)
+
+----------------------------------------
+
+TITLE: Implementing Consumer Callback
+DESCRIPTION: Example of implementing a callback function for message handling and registering it with the consumer.
+
+LANGUAGE: python
+CODE:
+def callback(body, message):
+    print(body)
+    message.ack()
+
+consumer.register_callback(callback)
+
+----------------------------------------
+
+TITLE: Registering Custom Serializer using Setuptools Entry-Points
+DESCRIPTION: These snippets demonstrate how to register a custom serializer in Kombu using Setuptools entry-points, including the setup.py configuration and the module implementation.
+
+LANGUAGE: python
+CODE:
+from setuptools import setup
+
+setup(
+    entry_points={
+        'kombu.serializers': [
+            'my_serializer = my_module.serializer:register_args'
+        ]
+    }
+)
+
+LANGUAGE: python
+CODE:
+register_args = (my_encoder, my_decoder, 'application/x-mimetype', 'utf-8')
+
+----------------------------------------
+
+TITLE: Creating SimpleQueue with Kombu Connection in Python
+DESCRIPTION: Demonstrates how to create a SimpleQueue using a Kombu connection. This snippet shows the simplest way to create a queue for basic messaging needs.
+
+LANGUAGE: python
+CODE:
+>>> queue = connection.SimpleQueue('myqueue')
+>>> # ... do something with queue
+>>> queue.close()
+
+----------------------------------------
+
+TITLE: Implementing Pidbox Node in Python
+DESCRIPTION: Demonstrates how to set up a node that listens for incoming messages. Creates a connection, initializes state, and runs an event loop to process messages.
+
+LANGUAGE: python
+CODE:
+>>> connection = kombu.Connection()
+>>> state = {'beat': beat,
+                     'connection': connection}
+>>> consumer = mailbox(connection).Node(hostname).listen()
+>>> try:
+...     while True:
+...         connection.drain_events(timeout=1)
+... finally:
+...     consumer.cancel()
+
+----------------------------------------
+
+TITLE: Using Pidbox Client API in Python
+DESCRIPTION: Shows how to use the client API to send messages. Demonstrates both asynchronous casting and synchronous calls with timeout.
+
+LANGUAGE: python
+CODE:
+>>> mailbox.cast('reload_schedule')   # cast is async.
+>>> info = celerybeat.call('connection_info', timeout=1)
+
+----------------------------------------
+
+TITLE: Transport Class Definition - Python Transport
+DESCRIPTION: Base Transport class defining the interface for message transport implementations, including connection management, channel operations, and error handling capabilities.
+
+
+
+----------------------------------------
+
+TITLE: Creating and Managing Queues in Python with Kombu
+DESCRIPTION: Example showing how to create a queue bound to an exchange, including queue declaration, binding, and management operations.
+
+LANGUAGE: python
+CODE:
+>>> science_news = Queue('science_news',
+...                      exchange=news_exchange,
+...                      routing_key='news.science')
+>>> bound_science_news = science_news(channel)
+
+LANGUAGE: python
+CODE:
+>>> bound_science_news.declare()
+>>> bound_science_news.purge()
+>>> bound_science_news.delete()
+
+----------------------------------------
+
+TITLE: Creating and Using Exchange in Python with Kombu
+DESCRIPTION: Example demonstrating how to create, bind and use an Exchange object in Kombu. Shows declaration, message publishing and deletion operations.
+
+LANGUAGE: python
+CODE:
+>>> news_exchange = Exchange('news', type='topic')
+>>> bound_exchange = news_exchange(channel)
+>>> bound_exchange.declare()
+>>> bound_exchange.publish(
+...     'Cure for cancer found!',
+...     routing_key='news.science',
+... )
+>>> bound_exchange.delete()
+
+----------------------------------------
+
+TITLE: Creating Mailbox and Handlers in Python
+DESCRIPTION: Shows how to create a mailbox instance and define message handlers for reload_schedule and connection_info operations. The handlers are decorated with @mailbox.handler and can access shared state.
+
+LANGUAGE: python
+CODE:
+>>> mailbox = pidbox.Mailbox('celerybeat', type='direct')
+
+>>> @mailbox.handler
+>>> def reload_schedule(state, **kwargs):
+...     state['beat'].reload_schedule()
+
+>>> @mailbox.handler
+>>> def connection_info(state, **kwargs):
+...     return {'connection': state['connection'].info()}
+
+----------------------------------------
+
+TITLE: Installing Kombu using pip
+DESCRIPTION: This command installs Kombu using pip, the recommended Python package installer. It fetches the package from PyPI and installs it in the current Python environment.
+
+LANGUAGE: console
+CODE:
+$ pip install kombu
+
+----------------------------------------
+
+TITLE: Basic Message Queue Implementation with Kombu
+DESCRIPTION: Demonstrates basic message queue setup with producer and consumer using AMQP connection. Shows how to create exchanges, queues, publish messages, and process them with callbacks.
+
+LANGUAGE: python
+CODE:
+from kombu import Connection, Exchange, Queue
+
+media_exchange = Exchange('media', 'direct', durable=True)
+video_queue = Queue('video', exchange=media_exchange, routing_key='video')
+
+def process_media(body, message):
+    print(body)
+    message.ack()
+
+# connections
+with Connection('amqp://guest:guest@localhost//') as conn:
+
+    # produce
+    producer = conn.Producer(serializer='json')
+    producer.publish({'name': '/tmp/lolcat1.avi', 'size': 1301013},
+                      exchange=media_exchange, routing_key='video',
+                      declare=[video_queue])
+
+    # consume
+    with conn.Consumer(video_queue, callbacks=[process_media]) as consumer:
+        # Process messages and handle events on all channels
+        while True:
+            conn.drain_events()
+
+----------------------------------------
+
+TITLE: Manual Channel Handling in Kombu
+DESCRIPTION: Shows how to manually handle channels in Kombu for more granular control over message processing and connection management.
+
+LANGUAGE: python
+CODE:
+with connection.channel() as channel:
+    producer = Producer(channel, ...)
+    consumer = Consumer(channel)
+
+----------------------------------------
+
+TITLE: Connection and Consumer Management without Context Managers
+DESCRIPTION: Demonstrates how to manage Kombu connections and consumers without using 'with' statements, including proper cleanup.
+
+LANGUAGE: python
+CODE:
+from kombu import Connection, Consumer
+
+connection = Connection()
+    # ...
+connection.release()
+
+consumer = Consumer(channel_or_connection, ...)
+consumer.register_callback(my_callback)
+consumer.consume()
+    # ....
+consumer.cancel()
+
+----------------------------------------
+
+TITLE: Publishing Raw Data without Serialization in Kombu
+DESCRIPTION: This snippet shows how to publish raw data (a JPEG image) without serialization in Kombu, specifying content type and encoding.
+
+LANGUAGE: python
+CODE:
+>>> with open('~/my_picture.jpg', 'rb') as fh:
+...     producer.publish(fh.read(),
+                     content_type='image/jpeg',
+                     content_encoding='binary',
+                     routing_key=rkey)
+
+----------------------------------------
+
+TITLE: Initializing Connection with Multiple Broker URLs in Python
+DESCRIPTION: Creates a Connection object with multiple broker URLs for automatic failover. Kombu automatically selects a healthy node from the list when connecting.
+
+LANGUAGE: python
+CODE:
+>>> conn = Connection(
+...     'amqp://guest:guest@broken.example.com;guest:guest@healthy.example.com'
+... )
+>>> conn.connect()
+>>> conn
+<Connection: amqp://guest:**@healthy.example.com at 0x6fffff751710>
+
+----------------------------------------
+
+TITLE: Specifying Dependency Requirements for Kombu Transport Options
+DESCRIPTION: This snippet defines the required libraries and their versions for various transport options in the Kombu project. It includes specifications for Redis, MongoDB, Zookeeper, SQS (Amazon Simple Queue Service), and Qpid transports.
+
+LANGUAGE: plaintext
+CODE:
+# redis transport
+redis>=4.5.2,!=5.0.2,!=4.5.5
+
+# MongoDB transport
+pymongo==4.10.1
+
+# Zookeeper transport
+kazoo==2.10.0
+
+# SQS transport
+boto3>=1.26.143
+
+# Qpid transport
+qpid-python>=0.26
+qpid-tools>=0.26
+
+----------------------------------------
+
+TITLE: Setting Failover Strategy for Connection in Python
+DESCRIPTION: Demonstrates how to set a failover strategy when creating a Connection object. The 'round-robin' strategy is used in this example.
+
+LANGUAGE: python
+CODE:
+>>> Connection(
+...     'amqp://broker1.example.com;amqp://broker2.example.com',
+...     failover_strategy='round-robin'
+... )
+
+----------------------------------------
+
+TITLE: Creating a Custom Pickle Serializer with Buffer Object Support
+DESCRIPTION: This snippet shows how to create a custom pickle serializer that supports both strings and Python's old-style buffer objects, which is required for custom serializers in Kombu.
+
+LANGUAGE: python
+CODE:
+import pickle
+from io import BytesIO
+from kombu import serialization
+
+
+def loads(s):
+    return pickle.load(BytesIO(s))
+
+serialization.register(
+    'my_pickle', pickle.dumps, loads,
+    content_type='application/x-pickle2',
+    content_encoding='binary',
+)
+
+----------------------------------------
+
+TITLE: Viewing Available Failover Strategies in Kombu
+DESCRIPTION: Shows how to access the list of available failover strategies defined in the kombu.connection module.
+
+LANGUAGE: python
+CODE:
+>>> import kombu
+>>> kombu.connection.failover_strategies
+{'round-robin': <class 'itertools.cycle'>, 'shuffle': <function shufflecycle at 0x6fffff8547a0>}
+
+----------------------------------------
+
+TITLE: Native Delayed Delivery Configuration in Kombu
+DESCRIPTION: Example demonstrating how to set up and use native delayed delivery functionality in Kombu, including queue and exchange declarations and delayed message publishing.
+
+LANGUAGE: python
+CODE:
+# Reference to delayed_infra.py
+
+----------------------------------------
+
+TITLE: Bypassing Routing with Anon-Exchange in Kombu
+DESCRIPTION: Demonstrates how to deliver messages directly to a queue, bypassing the broker's routing mechanisms by using the anon-exchange. This is done by setting the exchange to an empty string and the routing key to the queue name.
+
+LANGUAGE: python
+CODE:
+>>> producer.publish(
+...     {'hello': 'world'},
+...     exchange='',
+...     routing_key=task_queue.name,
+... )
+
+----------------------------------------
+
+TITLE: Defining Default Transport Constant in Python
+DESCRIPTION: Defines the DEFAULT_TRANSPORT constant, which specifies the default transport used when no transport is explicitly specified in Kombu.
+
+LANGUAGE: Python
+CODE:
+DEFAULT_TRANSPORT
+
+----------------------------------------
+
+TITLE: Specifying Serializer for Message Publishing in Kombu
+DESCRIPTION: Shows how to specify a different serializer when publishing messages. By default, JSON is used for non-string objects, but this example demonstrates using pickle as the serializer.
+
+LANGUAGE: python
+CODE:
+>>> producer.publish({'hello': 'world'}, serializer='pickle')
+
+----------------------------------------
+
+TITLE: Importing Redis Transport Module in Python
+DESCRIPTION: This snippet shows how to import the Redis transport module in Kombu. It's a crucial step for using Redis as a message broker in Kombu-based applications.
+
+LANGUAGE: Python
+CODE:
+from kombu.transport import redis
+
+----------------------------------------
+
+TITLE: Creating SimpleBuffer with Kombu Connection and Channel in Python
+DESCRIPTION: Shows how to create a SimpleBuffer using a Kombu connection and channel. This method provides more control over the queue creation process.
+
+LANGUAGE: python
+CODE:
+>>> from kombu.simple import SimpleBuffer
+
+>>> channel = connection.channel()
+>>> queue = SimpleBuffer(channel, 'mybuffer')
+>>> # ... do something with queue
+>>> channel.close()
+>>> queue.close()
+
+----------------------------------------
+
+TITLE: Initializing Basic Consumer with Accept Parameter
+DESCRIPTION: Example showing how to create a consumer with specific message format acceptance settings. Demonstrates setting up a consumer to accept various serialization formats like JSON, pickle, msgpack and YAML.
+
+LANGUAGE: python
+CODE:
+Consumer(conn, accept=['json', 'pickle', 'msgpack', 'yaml'])
+
+----------------------------------------
+
+TITLE: Configuring Celery with SQS in Python
+DESCRIPTION: Shows how to configure Celery to work with SQS as a broker, including setting a queue name prefix and creating a custom Task class with application context.
+
+LANGUAGE: python
+CODE:
+from celery import Celery
+def make_celery(app):
+    celery = Celery(
+        app.import_name,
+        broker="sqs://",
+        broker_transport_options={
+            "queue_name_prefix": "{SERVICE_ENV}-{SERVICE_NAME}-"
+        },
+    )
+    task_base = celery.Task
+
+    class ContextTask(task_base):
+        abstract = True
+
+        def __call__(self, *args, **kwargs):
+            with app.app_context():
+                return task_base.__call__(self, *args, **kwargs)
+
+    celery.Task = ContextTask
+
+    return celery
+
+----------------------------------------
+
+TITLE: Configuring SQS Queue with Back-off Policy in Python
+DESCRIPTION: Example configuration for SQS queues with back-off policy settings. Demonstrates how to set up queue URLs, credentials, retry delays, and specify tasks for back-off policy application.
+
+LANGUAGE: python
+CODE:
+broker_transport_options = {
+    'predefined_queues': {
+        'my-q': {
+            'url': 'https://ap-southeast-2.queue.amazonaws.com/123456/my-q',
+            'access_key_id': 'xxx',
+            'secret_access_key': 'xxx',
+            'backoff_policy': {1: 10, 2: 20, 3: 40, 4: 80, 5: 320, 6: 640},
+            'backoff_tasks': ['svc.tasks.tasks.task1']
+        }
+    }
+}
+
+----------------------------------------
+
+TITLE: Message Class Definition - Python Transport
+DESCRIPTION: Base Message class providing core messaging attributes and methods for message handling including acknowledgment, rejection, requeuing and payload decoding.
+
+
+
+----------------------------------------
+
+TITLE: Defining Transport Aliases Dictionary in Python
+DESCRIPTION: Defines the TRANSPORT_ALIASES constant, which is a mapping of transport aliases to their corresponding class names in Kombu.
+
+LANGUAGE: Python
+CODE:
+TRANSPORT_ALIASES
+
+----------------------------------------
+
+TITLE: Declaring get_transport_cls Function in Python
+DESCRIPTION: Declares the get_transport_cls function, which is likely used to retrieve the transport class based on a given transport name or alias in Kombu.
+
+LANGUAGE: Python
+CODE:
+get_transport_cls
+
+----------------------------------------
+
+TITLE: Specifying Kombu Project Dependencies
+DESCRIPTION: This snippet defines the dependencies required for the Kombu project. It includes version specifications for various libraries and tools, with conditional requirements based on Python version and operating system platform.
+
+LANGUAGE: plaintext
+CODE:
+pytest-cov==5.0.0; python_version<"3.9"
+pytest-cov==6.0.0; python_version>="3.9"
+codecov==2.1.13; sys_platform == 'win32'
+librabbitmq>=2.0.0; sys_platform == 'win32'
+-r extras/redis.txt
+pymongo>=4.1.1; sys_platform != 'win32'
+-r extras/yaml.txt
+-r extras/msgpack.txt
+-r extras/azureservicebus.txt
+-r extras/azurestoragequeues.txt
+boto3>=1.26.143; sys_platform != 'win32'
+urllib3>=1.26.16; sys_platform != 'win32'
+-r extras/consul.txt
+-r extras/zookeeper.txt
+-r extras/brotli.txt
+-r extras/zstd.txt
+-r extras/sqlalchemy.txt
+-r extras/etcd.txt
+-r extras/gcpubsub.txt
+
+----------------------------------------
+
+TITLE: Declaring resolve_transport Function in Python
+DESCRIPTION: Declares the resolve_transport function, which is likely used to resolve and return the appropriate transport based on given parameters in Kombu.
+
+LANGUAGE: Python
+CODE:
+resolve_transport
+
+----------------------------------------
+
+TITLE: Importing kombu.serialization Module in Python
+DESCRIPTION: This snippet demonstrates how to import the kombu.serialization module in Python. It sets up the current module for documentation purposes.
+
+LANGUAGE: python
+CODE:
+.. currentmodule:: kombu.serialization
+
+.. automodule:: kombu.serialization
+
+----------------------------------------
+
+TITLE: Documenting SerializerNotInstalled Exception in Python
+DESCRIPTION: This snippet shows how to document the SerializerNotInstalled exception in the kombu.serialization module using Sphinx autodoc.
+
+LANGUAGE: python
+CODE:
+.. autoexception:: SerializerNotInstalled
+
+----------------------------------------
+
+TITLE: Documenting Serialization Functions in Python
+DESCRIPTION: This snippet demonstrates how to document the dumps, loads, and raw_encode functions in the kombu.serialization module using Sphinx autodoc.
+
+LANGUAGE: python
+CODE:
+.. autofunction:: dumps
+
+.. autofunction:: loads
+
+.. autofunction:: raw_encode
+
+----------------------------------------
+
+TITLE: Documenting Registry Functions in Python
+DESCRIPTION: This snippet shows how to document the register and unregister functions, as well as the registry data in the kombu.serialization module using Sphinx autodoc.
+
+LANGUAGE: python
+CODE:
+.. autofunction:: register
+.. autofunction:: unregister
+
+.. autodata:: registry
+
+----------------------------------------
+
+TITLE: Documenting Etcd Channel Class in Python
+DESCRIPTION: This snippet shows the documentation structure for the Channel class in the kombu.transport.etcd module. It uses Sphinx autodoc to generate documentation from the class docstrings.
+
+LANGUAGE: reStructuredText
+CODE:
+.. autoclass:: Channel
+    :members:
+    :undoc-members:
+
+----------------------------------------
+
+TITLE: RST Documentation Structure for Kombu Message Module
+DESCRIPTION: ReStructuredText documentation formatting for the kombu.message module, including table of contents and module autodoc directives.
+
+LANGUAGE: rst
+CODE:
+==========================================================
+ Message Objects - ``kombu.message``
+==========================================================
+
+.. contents::
+    :local:
+.. currentmodule:: kombu.message
+
+.. automodule:: kombu.message
+    :members:
+    :undoc-members:
+
+----------------------------------------
+
+TITLE: Documenting Etcd Transport Class in Python
+DESCRIPTION: This snippet shows the documentation structure for the Transport class in the kombu.transport.etcd module. It uses Sphinx autodoc to generate documentation from the class docstrings.
+
+LANGUAGE: reStructuredText
+CODE:
+.. autoclass:: Transport
+    :members:
+    :undoc-members:
+
+----------------------------------------
+
+TITLE: Documenting Publisher Class in Python for Kombu Compatibility
+DESCRIPTION: Autoclass documentation for the Publisher class in the kombu.compat module. This class is recommended to be replaced with kombu.Producer.
+
+LANGUAGE: python
+CODE:
+.. autoclass:: Publisher
+    :members:
+    :undoc-members:
+    :inherited-members:
+
+----------------------------------------
+
+TITLE: Documenting Consumer Class in Python for Kombu Compatibility
+DESCRIPTION: Autoclass documentation for the Consumer class in the kombu.compat module. This class is recommended to be replaced with kombu.Consumer.
+
+LANGUAGE: python
+CODE:
+.. autoclass:: Consumer
+    :members:
+    :undoc-members:
+    :inherited-members:
+
+----------------------------------------
+
+TITLE: Documenting ConsumerSet Class in Python for Kombu Compatibility
+DESCRIPTION: Autoclass documentation for the ConsumerSet class in the kombu.compat module. This class is also recommended to be replaced with kombu.Consumer.
+
+LANGUAGE: python
+CODE:
+.. autoclass:: ConsumerSet
+    :members:
+    :undoc-members:
+    :inherited-members:
+
+----------------------------------------
+
+TITLE: Importing Consul Transport Module in Python
+DESCRIPTION: This snippet demonstrates how to import the Consul transport module in Kombu. It's used to set up the current module for documentation purposes.
+
+LANGUAGE: python
+CODE:
+.. currentmodule:: kombu.transport.consul
+
+----------------------------------------
+
+TITLE: Documenting Consul Transport Class in Python
+DESCRIPTION: This snippet shows the documentation structure for the Transport class in the Consul transport module. It uses Sphinx autodoc to generate class documentation including all members and undocumented members.
+
+LANGUAGE: python
+CODE:
+.. autoclass:: Transport
+    :members:
+    :undoc-members:
+
+----------------------------------------
+
+TITLE: Documenting Consul Channel Class in Python
+DESCRIPTION: This snippet demonstrates the documentation structure for the Channel class in the Consul transport module. It uses Sphinx autodoc to generate class documentation including all members and undocumented members.
+
+LANGUAGE: python
+CODE:
+.. autoclass:: Channel
+    :members:
+    :undoc-members:
+
+----------------------------------------
+
+TITLE: Documenting Azure Service Bus Transport Module in Python
+DESCRIPTION: This snippet uses Sphinx documentation syntax to generate documentation for the Azure Service Bus Transport module in Kombu. It includes directives for documenting the module itself, as well as the Transport and Channel classes.
+
+LANGUAGE: restructuredtext
+CODE:
+.. currentmodule:: kombu.transport.azureservicebus
+
+.. automodule:: kombu.transport.azureservicebus
+
+    .. contents::
+        :local:
+
+    Transport
+    ---------
+
+    .. autoclass:: Transport
+        :members:
+        :undoc-members:
+
+    Channel
+    -------
+
+    .. autoclass:: Channel
+        :members:
+        :undoc-members:
+
+----------------------------------------
+
+TITLE: Specifying librabbitmq Dependency for kombu in Python
+DESCRIPTION: Defines the required version of librabbitmq (2.0.0 or higher) for the kombu project, applicable only for Python versions below 3.11. This constraint ensures compatibility with older Python versions while allowing flexibility for newer ones.
+
+LANGUAGE: Python
+CODE:
+librabbitmq>=2.0.0; python_version < '3.11'
+
+----------------------------------------
+
+TITLE: RestructuredText Documentation Structure for Azure Storage Queues Transport
+DESCRIPTION: RST markup for documenting the Azure Storage Queues transport module structure, including automodule and autoclass directives for Transport and Channel classes.
+
+LANGUAGE: rst
+CODE:
+========================================================================
+ Azure Storage Queues Transport - ``kombu.transport.azurestoragequeues``
+========================================================================
+
+.. currentmodule:: kombu.transport.azurestoragequeues
+
+.. automodule:: kombu.transport.azurestoragequeues
+
+    .. contents::
+        :local:
+
+    Transport
+    ---------
+
+    .. autoclass:: Transport
+        :members:
+        :undoc-members:
+
+    Channel
+    -------
+
+    .. autoclass:: Channel
+        :members:
+        :undoc-members:
+
+----------------------------------------
+
+TITLE: RST Documentation Structure for Kombu Filesystem Transport
+DESCRIPTION: ReStructuredText documentation layout defining the structure for Kombu's filesystem transport module documentation, including automodule and autoclass directives for Transport and Channel classes.
+
+LANGUAGE: rst
+CODE:
+========================================================
+ File-system Transport - ``kombu.transport.filesystem``
+========================================================
+
+.. currentmodule:: kombu.transport.filesystem
+
+.. automodule:: kombu.transport.filesystem
+
+    .. contents::
+        :local:
+
+    Transport
+    ---------
+
+    .. autoclass:: Transport
+        :members:
+        :undoc-members:
+
+    Channel
+    -------
+
+    .. autoclass:: Channel
+        :members:
+        :undoc-members:
+
+----------------------------------------
+
+TITLE: RST Documentation Structure for Kombu Functional Utils
+DESCRIPTION: ReStructuredText documentation template that sets up the documentation structure for Kombu's functional utilities module, including table of contents and module autodoc directives.
+
+LANGUAGE: rst
+CODE:
+==========================================================
+ Functional-style Utilities - ``kombu.utils.functional``
+==========================================================
+
+.. contents::
+    :local:
+.. currentmodule:: kombu.utils.functional
+
+.. automodule:: kombu.utils.functional
+    :members:
+    :undoc-members:
+
+----------------------------------------
+
+TITLE: Documenting QPid Transport Module Structure in RST
+DESCRIPTION: ReStructuredText documentation layout for the kombu.transport.qpid module, defining the structure for autodocumenting Transport, Connection, Channel, and Message classes.
+
+LANGUAGE: restructuredtext
+CODE:
+===================================================
+ Apache QPid Transport - ``kombu.transport.qpid``
+===================================================
+
+.. currentmodule:: kombu.transport.qpid
+
+.. automodule:: kombu.transport.qpid
+
+    .. contents::
+        :local:
+
+    Transport
+    ---------
+
+    .. autoclass:: Transport
+        :members:
+        :undoc-members:
+
+    Connection
+    ----------
+
+    .. autoclass:: Connection
+        :members:
+        :undoc-members:
+
+    Channel
+    -------
+
+    .. autoclass:: Channel
+        :members:
+        :undoc-members:
+
+    Message
+    -------
+
+    .. autoclass:: Message
+        :members:
+        :undoc-members:
+
+----------------------------------------
+
+TITLE: Defining RST Documentation Structure for Zookeeper Transport
+DESCRIPTION: ReStructuredText documentation layout defining the structure for documenting Zookeeper transport module components including Transport and Channel classes. Uses automodule and autoclass directives for automatic documentation generation.
+
+LANGUAGE: rst
+CODE:
+======================================================
+ Zookeeper Transport - ``kombu.transport.zookeeper``
+======================================================
+
+.. currentmodule:: kombu.transport.zookeeper
+
+.. automodule:: kombu.transport.zookeeper
+
+    .. contents::
+        :local:
+
+    Transport
+    ---------
+
+    .. autoclass:: Transport
+        :members:
+        :undoc-members:
+
+    Channel
+    -------
+
+    .. autoclass:: Channel
+        :members:
+        :undoc-members:
+
+----------------------------------------
+
+TITLE: Specifying zstandard Dependency Version
+DESCRIPTION: Declares a dependency on version 0.23.0 of the zstandard compression library using pip requirements file format.
+
+LANGUAGE: plaintext
+CODE:
+zstandard==0.23.0
+
+----------------------------------------
+
+TITLE: RST Documentation Structure for Kombu Pools
+DESCRIPTION: ReStructuredText formatting for the kombu.pools module documentation, including table of contents and module autodoc directives.
+
+LANGUAGE: rst
+CODE:
+==========================================================
+ Connection/Producer Pools - ``kombu.pools``
+==========================================================
+
+.. contents::
+    :local:
+.. currentmodule:: kombu.pools
+
+.. automodule:: kombu.pools
+    :members:
+    :undoc-members:
+
+----------------------------------------
+
+TITLE: MongoDB Transport RST Documentation Structure
+DESCRIPTION: ReStructuredText documentation layout for the MongoDB transport module, defining the module structure and class documentation blocks.
+
+LANGUAGE: rst
+CODE:
+=================================================
+ MongoDB Transport - ``kombu.transport.mongodb``
+=================================================
+
+.. currentmodule:: kombu.transport.mongodb
+
+.. automodule:: kombu.transport.mongodb
+
+    .. contents::
+        :local:
+
+    Transport
+    ---------
+
+    .. autoclass:: Transport
+        :members:
+        :undoc-members:
+
+    Channel
+    -------
+
+    .. autoclass:: Channel
+        :members:
+        :undoc-members:
+
+----------------------------------------
+
+TITLE: Documenting Async HTTP Client Interface in reStructuredText
+DESCRIPTION: This snippet sets up the documentation structure for the kombu.asynchronous.http.base module. It includes a title, table of contents, current module specification, and automodule directive for generating comprehensive documentation.
+
+LANGUAGE: reStructuredText
+CODE:
+===============================================================
+ Async HTTP Client Interface - ``kombu.asynchronous.http.base``
+===============================================================
+
+.. contents::
+    :local:
+.. currentmodule:: kombu.asynchronous.http.base
+
+.. automodule:: kombu.asynchronous.http.base
+    :members:
+    :undoc-members:
+
+----------------------------------------
+
+TITLE: Configuring Sphinx Documentation for Urllib3 HTTP Client Pool in Kombu
+DESCRIPTION: This ReStructuredText snippet sets up the documentation structure for the urllib3 HTTP client pool module in Kombu. It defines the table of contents, sets the current module, and configures the automodule directive to include all members and undocumented members.
+
+LANGUAGE: restructuredtext
+CODE:
+============================================================
+ Urllib3 HTTP Client Pool - ``kombu.asynchronous.http.urllib3_client``
+============================================================
+
+.. contents::
+    :local:
+.. currentmodule:: kombu.asynchronous.http.urllib3_client
+
+.. automodule:: kombu.asynchronous.http.urllib3_client
+    :members:
+    :undoc-members:
+
+----------------------------------------
+
+TITLE: Defining Sphinx Documentation Structure for Kombu Timer Module
+DESCRIPTION: This snippet sets up the structure for Sphinx documentation of the kombu.asynchronous.timer module. It includes a table of contents, sets the current module, and configures automodule directives for comprehensive API documentation.
+
+LANGUAGE: reStructuredText
+CODE:
+==========================================================
+ Timer - ``kombu.asynchronous.timer``
+==========================================================
+
+.. contents::
+    :local:
+.. currentmodule:: kombu.asynchronous.timer
+
+.. automodule:: kombu.asynchronous.timer
+    :members:
+    :undoc-members:
+
+----------------------------------------
+
+TITLE: Defining Sphinx Documentation Structure for Kombu Asynchronous Semaphore
+DESCRIPTION: This snippet sets up the structure for Sphinx documentation of the kombu.asynchronous.semaphore module. It includes a table of contents, sets the current module, and configures the automodule directive to document all members and undocumented members.
+
+LANGUAGE: reStructuredText
+CODE:
+==========================================================
+ Semaphores - ``kombu.asynchronous.semaphore``
+==========================================================
+
+.. contents::
+    :local:
+.. currentmodule:: kombu.asynchronous.semaphore
+
+.. automodule:: kombu.asynchronous.semaphore
+    :members:
+    :undoc-members:
+
+----------------------------------------
+
+TITLE: Restructuredtext Module Documentation
+DESCRIPTION: RestructuredText directives for documenting the kombu.utils.scheduling module, including table of contents and automodule configuration.
+
+LANGUAGE: restructuredtext
+CODE:
+.. contents::
+    :local:
+.. currentmodule:: kombu.utils.scheduling
+
+.. automodule:: kombu.utils.scheduling
+    :members:
+    :undoc-members:
+
+----------------------------------------
+
+TITLE: RST Documentation Structure for kombu.utils.imports
+DESCRIPTION: Sphinx documentation structure defining the module documentation layout using reStructuredText format. Includes section headers, table of contents directive, and module documentation directives.
+
+LANGUAGE: rst
+CODE:
+==========================================================
+ Module Importing Utilities - ``kombu.utils.imports``
+==========================================================
+
+.. contents::
+    :local:
+.. currentmodule:: kombu.utils.imports
+
+.. automodule:: kombu.utils.imports
+    :members:
+    :undoc-members:
+
+----------------------------------------
+
+TITLE: RST Documentation Structure for Kombu Debug Module
+DESCRIPTION: ReStructuredText documentation format defining the structure and auto-documentation settings for the Kombu debug utilities module. Uses sphinx directives to generate documentation from module docstrings.
+
+LANGUAGE: rst
+CODE:
+==========================================================
+ Debugging Utilities - ``kombu.utils.debug``
+==========================================================
+
+.. contents::
+    :local:
+.. currentmodule:: kombu.utils.debug
+
+.. automodule:: kombu.utils.debug
+    :members:
+    :undoc-members:
+
+----------------------------------------
+
+TITLE: Defining Table of Contents in reStructuredText for Kombu User Guide
+DESCRIPTION: This snippet defines the table of contents for the Kombu user guide using reStructuredText syntax. It includes metadata such as release version and date, and lists the main sections of the guide.
+
+LANGUAGE: reStructuredText
+CODE:
+============
+ User Guide
+============
+
+:Release: |version|
+:Date: |today|
+
+.. toctree::
+    :maxdepth: 2
+
+    introduction
+    connections
+    producers
+    consumers
+    examples
+    simple
+    pools
+    serialization
+    failover
+
+----------------------------------------
+
+TITLE: Defining Kombu Documentation Structure with Sphinx toctree
+DESCRIPTION: This snippet uses Sphinx's toctree directive to structure the documentation for Kombu. It defines two main sections with different depth levels and includes standard Sphinx indices for navigation.
+
+LANGUAGE: restructuredtext
+CODE:
+.. toctree::
+    :maxdepth: 2
+
+    introduction
+    userguide/index
+
+.. toctree::
+    :maxdepth: 1
+
+    faq
+    reference/index
+    changelog
+
+
+Indices and tables
+==================
+
+* :ref:`genindex`
+* :ref:`modindex`
+* :ref:`search`
+
+----------------------------------------
+
+TITLE: Including Changelog File in RST
+DESCRIPTION: ReStructuredText directive to include external Changelog file from parent directory
+
+LANGUAGE: rst
+CODE:
+.. include:: ../Changelog.rst
+
+----------------------------------------
+
+TITLE: Installing Kombu using easy_install
+DESCRIPTION: This command installs Kombu using easy_install, an older Python package installer. While functional, pip is generally preferred for most modern Python installations.
+
+LANGUAGE: console
+CODE:
+$ easy_install kombu
+
+----------------------------------------
+
+TITLE: Installing Kombu from source
+DESCRIPTION: These commands demonstrate how to install Kombu from a source tarball. It involves building the package and then installing it, typically requiring root privileges for system-wide installation.
+
+LANGUAGE: console
+CODE:
+$ python setup.py build
+# python setup.py install # as root
+
+----------------------------------------
+
+TITLE: Manual Channel Handling in Kombu
+DESCRIPTION: Shows how to manually handle channels in Kombu using the channel context manager, creating producers and consumers with explicit channel management.
+
+LANGUAGE: python
+CODE:
+with connection.channel() as channel:
+    producer = Producer(channel, ...)
+    consumer = Consumer(channel)
+
+----------------------------------------
+
+TITLE: Object Management Without Context Managers
+DESCRIPTION: Demonstrates how to manage Kombu objects without using context managers, showing proper cleanup of connections and consumers.
+
+LANGUAGE: python
+CODE:
+from kombu import Connection, Consumer, Producer
+
+connection = Connection()
+    # ...
+connection.release()
+
+consumer = Consumer(channel_or_connection, ...)
+consumer.register_callback(my_callback)
+consumer.consume()
+    # ....
+consumer.cancel()
+
+----------------------------------------
+
+TITLE: Displaying Supported Versions Table in Markdown
+DESCRIPTION: This snippet shows a markdown table that lists the supported and unsupported versions of the Kombu project. It uses checkmarks and x marks to indicate support status.
+
+LANGUAGE: markdown
+CODE:
+| Version | Supported          |
+| ------- | ------------------ |
+| 5.5.x   | :white_check_mark: |
+| 5.4.x   | :x:                |
+| 5.3.x   | :x:                |
+| 5.2.x   | :x:                |
+| 5.1.x   | :x:                |
+| < 5.0   | :x:                |
+
+----------------------------------------
+
+TITLE: Defining Python Package Dependencies for Kombu
+DESCRIPTION: This snippet lists the required Python packages and their version specifications for the Kombu project. It includes testing tools like pytest and hypothesis, as well as development tools like pre-commit, with version constraints that vary based on the Python version.
+
+LANGUAGE: Plain Text
+CODE:
+hypothesis<7
+Pyro4==4.82
+pytest-freezer==0.4.9
+pytest-sugar==1.0.0
+pytest==8.3.5
+pre-commit>=3.5.0,<3.8.0; python_version < '3.9'
+pre-commit>=4.0.1; python_version >= '3.9'
+
+----------------------------------------
+
+TITLE: Specifying Python Package Dependencies for Kombu
+DESCRIPTION: This snippet lists the required Python packages and their versions for the Kombu project. It includes tools for building, testing, linting, and documentation generation.
+
+LANGUAGE: Plain Text
+CODE:
+setuptools>=47.0.0
+wheel>=0.29.0
+flake8==7.1.2
+tox>=4.4.8
+sphinx2rst>=1.0
+bumpversion==0.6.0
+pydocstyle==6.3.0
+mypy==1.14.1
+
+----------------------------------------
+
+TITLE: Specifying Kombu Project Dependencies
+DESCRIPTION: This snippet lists the dependencies required for the Kombu project. It includes a Git repository for Sphinx Celery documentation and references to additional requirement files for various backends.
+
+LANGUAGE: plaintext
+CODE:
+git+https://github.com/celery/sphinx_celery.git
+-r extras/redis.txt
+-r extras/mongodb.txt
+-r extras/sqlalchemy.txt
+-r extras/azureservicebus.txt
+-r extras/sqs.txt
+
+----------------------------------------
+
+TITLE: Specifying PyYAML Dependency Requirement
+DESCRIPTION: Defines the minimum version requirement for the PyYAML package. Requires PyYAML version 3.10 or higher to be installed.
+
+LANGUAGE: txt
+CODE:
+PyYAML>=3.10
+
+----------------------------------------
+
+TITLE: Specifying SQLAlchemy Version Requirements
+DESCRIPTION: Defines the version constraints for SQLAlchemy dependency. Requires SQLAlchemy version to be at least 1.4.48 but strictly less than 2.1, ensuring compatibility with the Kombu project.
+
+LANGUAGE: text
+CODE:
+sqlalchemy>=1.4.48,<2.1
+
+----------------------------------------
+
+TITLE: Specifying Dependencies for Kombu Project
+DESCRIPTION: Defines the minimum required versions of boto3 and urllib3 libraries. Boto3 version 1.26.143 or higher and urllib3 version 1.26.16 or higher are required for compatibility.
+
+LANGUAGE: text
+CODE:
+boto3>=1.26.143
+urllib3>=1.26.16
+
+----------------------------------------
+
+TITLE: Specifying SoftLayer Messaging Dependency Version
+DESCRIPTION: Defines the minimum required version (1.0.3) of the softlayer_messaging package needed for Kombu integration.
+
+LANGUAGE: txt
+CODE:
+softlayer_messaging>=1.0.3
+
+----------------------------------------
+
+TITLE: Specifying Redis Dependency Version Constraints
+DESCRIPTION: Defines the version requirements for Redis package compatibility. Requires version 4.5.2 or higher, excludes versions 4.5.5 and 5.0.2, and must be no higher than 5.2.1.
+
+LANGUAGE: plaintext
+CODE:
+redis>=4.5.2,!=4.5.5,!=5.0.2,<=5.2.1
+
+----------------------------------------
+
+TITLE: Specifying Qpid Dependencies
+DESCRIPTION: Defines the minimum version requirements for Qpid Python libraries needed by Kombu. Requires qpid-python and qpid-tools packages, both version 0.26 or higher.
+
+LANGUAGE: plaintext
+CODE:
+qpid-python>=0.26
+qpid-tools>=0.26
+
+----------------------------------------
+
+TITLE: Specifying Pyro4 Dependency for Kombu Project
+DESCRIPTION: This snippet defines a dependency on Pyro4 version 4.82. It is likely part of a requirements file for the Kombu project, specifying the exact version of Pyro4 needed for compatibility or functionality reasons.
+
+LANGUAGE: plaintext
+CODE:
+pyro4==4.82
+
+----------------------------------------
+
+TITLE: Specifying msgpack Dependency Version for Kombu
+DESCRIPTION: This line specifies that the Kombu project requires version 1.1.0 of the msgpack library. It is likely part of a requirements.txt file or similar dependency specification document.
+
+LANGUAGE: plaintext
+CODE:
+msgpack==1.1.0
+
+----------------------------------------
+
+TITLE: Specifying pymongo Dependency for Kombu
+DESCRIPTION: This line specifies that the Kombu project requires pymongo version 4.1.1 or higher. It ensures compatibility with the MongoDB driver used in the project.
+
+LANGUAGE: plaintext
+CODE:
+pymongo>=4.1.1
+
+----------------------------------------
+
+TITLE: Configuring Extra Package Index for Kombu Installation on Windows
+DESCRIPTION: This configuration line adds an extra package index URL to pip for installing Kombu. It specifically targets Windows wheels from a temporary Anaconda repository.
+
+LANGUAGE: pip
+CODE:
+--extra-index-url https://pypi.anaconda.org/nehaljwani/simple # Temporary index for Windows wheels
+
+----------------------------------------
+
+TITLE: Specifying Python Package Dependencies for Kombu Project
+DESCRIPTION: This snippet defines the required Python packages and their versions for the Kombu project. It includes Google Cloud PubSub (version 2.18.4 or higher), Google Cloud Monitoring (version 2.16.0 or higher), gRPC (version 1.67.0), and Protocol Buffers (version 4.25.5).
+
+LANGUAGE: plaintext
+CODE:
+google-cloud-pubsub>=2.18.4
+google-cloud-monitoring>=2.16.0
+grpcio==1.67.0
+protobuf==4.25.5
+
+----------------------------------------
+
+TITLE: Specifying Python-etcd Package Version Requirement
+DESCRIPTION: Defines the minimum required version of the python-etcd package as 0.4.3 or higher.
+
+LANGUAGE: text
+CODE:
+python-etcd>=0.4.3
+
+----------------------------------------
+
+TITLE: Specifying pycouchdb Dependency Version
+DESCRIPTION: Defines the exact version requirement for the pycouchdb library that the project depends on. Uses pip requirements.txt format to specify version 1.16.0.
+
+LANGUAGE: plaintext
+CODE:
+pycouchdb==1.16.0
+
+----------------------------------------
+
+TITLE: Specifying python-consul2 Dependency for Kombu
+DESCRIPTION: This line specifies that the Kombu project requires version 0.1.5 of the python-consul2 library. It uses the standard Python package requirement format.
+
+LANGUAGE: plaintext
+CODE:
+python-consul2==0.1.5
+
+----------------------------------------
+
+TITLE: Specifying Confluent Kafka Dependency for Kombu
+DESCRIPTION: This snippet defines the dependency on the confluent-kafka library with a minimum version of 2.2.0. It ensures that the Kombu project uses a compatible version of the Confluent Kafka client.
+
+LANGUAGE: Text
+CODE:
+confluent-kafka>=2.2.0
+
+----------------------------------------
+
+TITLE: Specifying Brotli Dependencies for Kombu
+DESCRIPTION: This snippet defines the Brotli-related dependencies for the Kombu project, differentiating between PyPy and CPython implementations. It specifies version requirements for each implementation.
+
+LANGUAGE: plaintext
+CODE:
+brotlipy>=0.7.0;platform_python_implementation=="PyPy"
+brotli>=1.0.9;platform_python_implementation=="CPython"
+
+----------------------------------------
+
+TITLE: Specifying Azure Service Bus Dependency for Kombu
+DESCRIPTION: This snippet defines the minimum required version of the Azure Service Bus library for the Kombu project. It specifies that version 7.10.0 or higher is needed.
+
+LANGUAGE: plaintext
+CODE:
+azure-servicebus>=7.10.0
+
+----------------------------------------
+
+TITLE: Displaying Kombu Project Badges in reStructuredText
+DESCRIPTION: A set of badge/shield declarations in reStructuredText format that show the project's build status, test coverage, license, wheel availability, Python version support, and implementation support. Each badge includes an image reference and target URL.
+
+LANGUAGE: reStructuredText
+CODE:
+.. |build-status| image:: https://github.com/celery/kombu/actions/workflows/ci.yaml/badge.svg
+    :alt: Build status
+    :target: https://github.com/celery/kombu/actions/workflows/ci.yml
+
+.. |coverage| image:: https://codecov.io/github/celery/kombu/coverage.svg?branch=main
+    :target: https://codecov.io/github/celery/kombu?branch=main
+
+.. |license| image:: https://img.shields.io/pypi/l/kombu.svg
+    :alt: BSD License
+    :target: https://opensource.org/licenses/BSD-3-Clause
+
+.. |wheel| image:: https://img.shields.io/pypi/wheel/kombu.svg
+    :alt: Kombu can be installed via wheel
+    :target: https://pypi.org/project/kombu/
+
+.. |pyversion| image:: https://img.shields.io/pypi/pyversions/kombu.svg
+    :alt: Supported Python versions.
+    :target: https://pypi.org/project/kombu/
+
+.. |pyimp| image:: https://img.shields.io/pypi/implementation/kombu.svg
+    :alt: Support Python implementations.
+    :target: https://pypi.org/project/kombu/
+
+----------------------------------------
+
+TITLE: Specifying Kazoo Dependency for Kombu
+DESCRIPTION: This line specifies that the Kombu project requires the kazoo library version 2.8.0 or higher. It's likely part of a requirements or dependency file for the project.
+
+LANGUAGE: Text
+CODE:
+kazoo>=2.8.0

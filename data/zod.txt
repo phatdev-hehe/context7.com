@@ -1,0 +1,353 @@
+TITLE: Creating an Object Schema in Zod
+DESCRIPTION: Shows how to define an object schema and extract the inferred type.
+
+LANGUAGE: typescript
+CODE:
+import { z } from "zod";
+
+const User = z.object({
+  username: z.string(),
+});
+
+User.parse({ username: "Ludwig" });
+
+// extract the inferred type
+type User = z.infer<typeof User>;
+// { username: string }
+
+----------------------------------------
+
+TITLE: Creating an Object Schema in Zod
+DESCRIPTION: This example shows how to define an object schema and extract its inferred type.
+
+LANGUAGE: typescript
+CODE:
+import { z } from "zod";
+
+const User = z.object({
+  username: z.string(),
+});
+
+User.parse({ username: "Ludwig" });
+
+// extract the inferred type
+type User = z.infer<typeof User>;
+// { username: string }
+
+----------------------------------------
+
+TITLE: Object Schema Methods in Zod
+DESCRIPTION: Shows various methods available on object schemas like extend, merge, pick, and omit.
+
+LANGUAGE: typescript
+CODE:
+const BaseTeacher = z.object({ students: z.array(z.string()) });
+const HasID = z.object({ id: z.string() });
+
+const Teacher = BaseTeacher.merge(HasID);
+type Teacher = z.infer<typeof Teacher>; // => { students: string[], id: string }
+
+const Recipe = z.object({
+  id: z.string(),
+  name: z.string(),
+  ingredients: z.array(z.string()),
+});
+
+const JustTheName = Recipe.pick({ name: true });
+const NoIDRecipe = Recipe.omit({ id: true });
+
+----------------------------------------
+
+TITLE: Creating a Simple String Schema in Zod
+DESCRIPTION: Demonstrates how to create a basic string schema and use it for parsing and safe parsing.
+
+LANGUAGE: typescript
+CODE:
+import { z } from "zod";
+
+// creating a schema for strings
+const mySchema = z.string();
+
+// parsing
+mySchema.parse("tuna"); // => "tuna"
+mySchema.parse(12); // => throws ZodError
+
+// "safe" parsing (doesn't throw error if validation fails)
+mySchema.safeParse("tuna"); // => { success: true; data: "tuna" }
+mySchema.safeParse(12); // => { success: false; error: ZodError }
+
+----------------------------------------
+
+TITLE: Creating a Simple String Schema in Zod
+DESCRIPTION: This snippet demonstrates how to create a basic string schema and use it for parsing and safe parsing.
+
+LANGUAGE: typescript
+CODE:
+import { z } from "zod";
+
+// creating a schema for strings
+const mySchema = z.string();
+
+// parsing
+mySchema.parse("tuna"); // => "tuna"
+mySchema.parse(12); // => throws ZodError
+
+// "safe" parsing (doesn't throw error if validation fails)
+mySchema.safeParse("tuna"); // => { success: true; data: "tuna" }
+mySchema.safeParse(12); // => { success: false; error: ZodError }
+
+----------------------------------------
+
+TITLE: Custom Error Map Implementation
+DESCRIPTION: Example of implementing a custom error map to customize validation error messages.
+
+LANGUAGE: typescript
+CODE:
+import { z } from "zod";
+
+const customErrorMap: z.ZodErrorMap = (issue, ctx) => {
+  if (issue.code === z.ZodIssueCode.invalid_type) {
+    if (issue.expected === "string") {
+      return { message: "bad type!" };
+    }
+  }
+  if (issue.code === z.ZodIssueCode.custom) {
+    return { message: `less-than-${(issue.params || {}).minimum}` };
+  }
+  return { message: ctx.defaultError };
+};
+
+z.setErrorMap(customErrorMap);
+
+----------------------------------------
+
+TITLE: Defining Custom Error Messages in Zod Schemas (TypeScript)
+DESCRIPTION: Demonstrates how to add custom error messages to Zod schemas for invalid types and required fields. This feature allows for more specific error handling in schema validation.
+
+LANGUAGE: typescript
+CODE:
+const name = z.string({
+  invalid_type_error: "Name must be string",
+  required_error: "Name is required",
+});
+
+----------------------------------------
+
+TITLE: Chaining Transformations and Refinements in Zod 3
+DESCRIPTION: Shows how to interleave transformations and refinements in Zod 3 using the ZodEffects class, allowing for complex validation and transformation chains.
+
+LANGUAGE: typescript
+CODE:
+const test = z
+  .string()
+  .transform((val) => val.length)
+  .refine((val) => val > 5, { message: "Input is too short" })
+  .transform((val) => val * 2);
+
+test.parse("12characters"); // => 24
+
+----------------------------------------
+
+TITLE: Defining Primitive Types in Zod
+DESCRIPTION: This snippet shows how to define various primitive types using Zod schemas.
+
+LANGUAGE: typescript
+CODE:
+import { z } from "zod";
+
+// primitive values
+z.string();
+z.number();
+z.bigint();
+z.boolean();
+z.date();
+z.symbol();
+
+// empty types
+z.undefined();
+z.null();
+z.void(); // accepts undefined
+
+// catch-all types
+// allows any value
+z.any();
+z.unknown();
+
+// never type
+// allows no values
+z.never();
+
+----------------------------------------
+
+TITLE: Coercion for Primitives in Zod
+DESCRIPTION: Demonstrates how to use coercion for primitive types like strings.
+
+LANGUAGE: typescript
+CODE:
+const schema = z.coerce.string();
+schema.parse("tuna"); // => "tuna"
+schema.parse(12); // => "12"
+
+----------------------------------------
+
+TITLE: Using Coercion for Primitives in Zod
+DESCRIPTION: This example demonstrates how to use coercion for primitive types in Zod.
+
+LANGUAGE: typescript
+CODE:
+const schema = z.coerce.string();
+schema.parse("tuna"); // => "tuna"
+schema.parse(12); // => "12"
+
+schema.parse(12); // => "12"
+schema.parse(true); // => "true"
+schema.parse(undefined); // => "undefined"
+schema.parse(null); // => "null"
+
+----------------------------------------
+
+TITLE: Defining Record Schemas with Key Validation in Zod (TypeScript)
+DESCRIPTION: Shows how to create record schemas in Zod with separate validation for keys and values. This allows for more precise typing of record-like objects.
+
+LANGUAGE: typescript
+CODE:
+const schema = z.record(z.number(), z.boolean());
+type schema = z.infer<typeof schema>; // Record<number, boolean>
+
+const schema = z.record(z.enum(["Tuna", "Trout"]), z.boolean());
+type schema = z.infer<typeof schema>; // Record<"Tuna" | "Trout", boolean>
+
+----------------------------------------
+
+TITLE: Creating Partial Object Schemas in Zod (TypeScript)
+DESCRIPTION: Demonstrates how to create a partial object schema in Zod, making specific fields optional. This is useful for creating schemas with a mix of required and optional fields.
+
+LANGUAGE: typescript
+CODE:
+const user = z.object({
+  name: z.string(),
+  age: z.number(),
+});
+
+const optionalNameUser = user.partial({ name: true });
+// { name?: string; age: number; }
+
+----------------------------------------
+
+TITLE: Defining Tuples with Rest Parameters in Zod (TypeScript)
+DESCRIPTION: Illustrates the creation of a tuple schema with rest parameters using Zod. This allows for flexible tuple definitions with a fixed start and variable-length end.
+
+LANGUAGE: typescript
+CODE:
+const myTuple = z.tuple([z.string(), z.number()]).rest(z.boolean());
+type t1 = z.output<typeof myTuple>; // [string, number, ...boolean[]]
+
+----------------------------------------
+
+TITLE: Person Schema Validation Example
+DESCRIPTION: Example of a Person schema with validation rules for names and address.
+
+LANGUAGE: typescript
+CODE:
+const person = z.object({
+  names: z.array(z.string()).nonempty(),
+  address: z
+    .object({
+      line1: z.string(),
+      zipCode: z.number().min(10000),
+    })
+    .strict(),
+});
+
+----------------------------------------
+
+TITLE: Error Handling with Try-Catch
+DESCRIPTION: Example demonstrating how to handle validation errors using try-catch with ZodError.
+
+LANGUAGE: typescript
+CODE:
+try {
+  person.parse({
+    names: ["Dave", 12],
+    address: {
+      line1: "123 Maple Ave",
+      zipCode: 123,
+      extra: "other stuff",
+    },
+  });
+} catch (err) {
+  if (err instanceof z.ZodError) {
+    console.log(err.issues);
+  }
+}
+
+----------------------------------------
+
+TITLE: Using Custom Error Maps in Zod Schemas (TypeScript)
+DESCRIPTION: Shows how to apply a custom error map to a Zod schema. This allows for more granular control over error messages throughout the schema.
+
+LANGUAGE: typescript
+CODE:
+const name = z.string({ errorMap: myErrorMap });
+
+----------------------------------------
+
+TITLE: Creating a Zod Transformer in TypeScript
+DESCRIPTION: Demonstrates the new syntax for creating transformers in Zod 3, which simplifies the process by using the .transform() method directly on Zod schemas.
+
+LANGUAGE: typescript
+CODE:
+z.string().transform((val) => val.length);
+
+----------------------------------------
+
+TITLE: Defining ZodError Class in TypeScript
+DESCRIPTION: Basic structure of the ZodError class which extends Error and contains an array of ZodIssues.
+
+LANGUAGE: typescript
+CODE:
+class ZodError extends Error {
+  issues: ZodIssue[];
+}
+
+----------------------------------------
+
+TITLE: Creating ZodError Instance
+DESCRIPTION: Example showing how to create a new instance of ZodError.
+
+LANGUAGE: typescript
+CODE:
+import * as z from "zod";
+
+const myError = new z.ZodError([]);
+
+----------------------------------------
+
+TITLE: Development Setup Commands for Zod
+DESCRIPTION: Terminal commands for setting up the development environment, including cloning the repository and installing dependencies
+
+LANGUAGE: sh
+CODE:
+git clone git@github.com:{your_username}/zod.git
+
+----------------------------------------
+
+TITLE: Updating Git Branch from Master to Main
+DESCRIPTION: Commands to update local git repository after the default branch was changed from 'master' to 'main' as of May 15th, 2024
+
+LANGUAGE: sh
+CODE:
+git branch -m master main   # rename local branch
+git fetch origin   # fetch from remote
+git branch -u origin/main main   # set upstream
+git remote set-head origin -a   # update remote
+
+----------------------------------------
+
+TITLE: Setting Default Crawler Access Rules in robots.txt
+DESCRIPTION: Basic robots.txt configuration that specifies default access rules for all web crawlers. Uses wildcard user-agent (*) and empty disallow directive to permit full site access.
+
+LANGUAGE: txt
+CODE:
+User-agent: *
+Disallow: 

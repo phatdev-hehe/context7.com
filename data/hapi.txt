@@ -1,0 +1,2009 @@
+TITLE: Basic Authentication Implementation in Hapi.js
+DESCRIPTION: Complete example of implementing basic authentication using @hapi/basic plugin with user validation and bcrypt password comparison.
+
+LANGUAGE: javascript
+CODE:
+'use strict';
+
+const Bcrypt = require('bcrypt');
+const Hapi = require('@hapi/hapi');
+
+const users = {
+    john: {
+        username: 'john',
+        password: '$2a$10$iqJSHD.BGr0E2IxQwYgJmeP3NvhPrXAeLSaGCj6IR/XU5QtjVu5Tm',   // 'secret'
+        name: 'John Doe',
+        id: '2133d32a'
+    }
+};
+
+const validate = async (request, username, password) => {
+
+    const user = users[username];
+    if (!user) {
+        return { credentials: null, isValid: false };
+    }
+
+    const isValid = await Bcrypt.compare(password, user.password);
+    const credentials = { id: user.id, name: user.name };
+
+    return { isValid, credentials };
+};
+
+const start = async () => {
+
+    const server = Hapi.server({ port: 4000 });
+
+    await server.register(require('@hapi/basic'));
+
+    server.auth.strategy('simple', 'basic', { validate });
+
+    server.route({
+        method: 'GET',
+        path: '/',
+        options: {
+            auth: 'simple'
+        },
+        handler: function (request, h) {
+
+            return 'welcome';
+        }
+    });
+
+    await server.start();
+
+    console.log('server running at: ' + server.info.uri);
+};
+
+start();
+
+----------------------------------------
+
+TITLE: Implementing Cookie-Based Authentication Strategy in Hapi.js
+DESCRIPTION: Example of registering a cookie-based authentication strategy using the @hapi/cookie plugin with basic configuration and validation.
+
+LANGUAGE: javascript
+CODE:
+server.auth.strategy('session', 'cookie', {
+    name: 'sid-example',
+    password: '!wsYhFA*C2U6nz=Bu^%A@^F#SF3&kSR6',
+    isSecure: false
+});
+
+----------------------------------------
+
+TITLE: Payload Validation for Blog Post Route
+DESCRIPTION: Route configuration demonstrating payload validation for a blog post creation endpoint.
+
+LANGUAGE: javascript
+CODE:
+server.route({
+    method: 'POST',
+    path: '/post',
+    handler: function (request, h) {
+
+        return 'Blog post added';
+    },
+    options: {
+        validate: {
+            payload: Joi.object({
+                post: Joi.string().min(1).max(140),
+                date: Joi.date().required()
+            })
+        }
+    }
+});
+
+----------------------------------------
+
+TITLE: Hapi Route Testing Example
+DESCRIPTION: Example test file demonstrating how to test a Hapi route using lab test runner and code assertion library. Shows setup, teardown, and route testing patterns.
+
+LANGUAGE: javascript
+CODE:
+'use strict';
+
+const Lab = require('@hapi/lab');
+const { expect } = require('@hapi/code');
+const { afterEach, beforeEach, describe, it } = exports.lab = Lab.script();
+const { init } = require('../lib/server');
+
+describe('GET /', () => {
+    let server;
+
+    beforeEach(async () => {
+        server = await init();
+    });
+
+    afterEach(async () => {
+        await server.stop();
+    });
+
+    it('responds with 200', async () => {
+        const res = await server.inject({
+            method: 'get',
+            url: '/'
+        });
+        expect(res.statusCode).to.equal(200);
+    });
+});
+
+----------------------------------------
+
+TITLE: Defining a Basic Route in hapi
+DESCRIPTION: Demonstrates how to define a simple route with a GET method, path, and handler function that returns a string response.
+
+LANGUAGE: javascript
+CODE:
+server.route({
+    method: 'GET',
+    path: '/',
+    handler: function (request, h) {
+
+        return 'Hello World!';
+    }
+});
+
+----------------------------------------
+
+TITLE: Combining Client and Server Caching in hapi
+DESCRIPTION: This snippet demonstrates how to combine server-side caching using server methods with client-side caching by setting the Last-Modified header based on the cache timestamp.
+
+LANGUAGE: javascript
+CODE:
+const start = async () => {
+
+    const server = Hapi.server();
+
+    server.method('sum', add, {
+        cache: {
+            cache: 'my_cache',
+            expiresIn: 10 * 1000,
+            generateTimeout: 2000,
+            getDecoratedValue: true
+        }
+    });
+
+    server.route({
+        path: '/add/{a}/{b}',
+        method: 'GET',
+        handler: async function (request, h) {
+
+            const { a, b } = request.params;
+            const { value, cached } = await server.methods.sum(a, b);
+            const lastModified = cached ? new Date(cached.stored) : new Date();
+
+            return h.response(value)
+                .header('Last-modified', lastModified.toUTCString());
+        }
+    });
+
+    await server.start();
+
+};
+
+----------------------------------------
+
+TITLE: Creating Basic Hapi Plugin
+DESCRIPTION: Demonstrates creation of a simple Hapi plugin with name, version and register function. Includes a basic route handler.
+
+LANGUAGE: javascript
+CODE:
+'use strict';
+
+const myPlugin = {
+    name: 'myPlugin',
+    version: '1.0.0',
+    register: async function (server, options) {
+
+        // Create a route for example
+
+        server.route({
+            method: 'GET',
+            path: '/test',
+            handler: function (request, h) {
+
+                return 'hello, world';
+            }
+        });
+
+        // etc ...
+        await someAsyncMethods();
+    }
+};
+
+----------------------------------------
+
+TITLE: Cookie Authentication with Login Form in Hapi.js
+DESCRIPTION: Extended example showing cookie-based authentication with login form handling and session management.
+
+LANGUAGE: javascript
+CODE:
+'use strict';
+
+const Bcrypt = require('bcrypt');
+const Hapi = require('@hapi/hapi');
+
+const users = [
+    {
+        username: 'john',
+        password: '$2a$10$iqJSHD.BGr0E2IxQwYgJmeP3NvhPrXAeLSaGCj6IR/XU5QtjVu5Tm',   // 'secret'
+        name: 'John Doe',
+        id: '2133d32a'
+    }
+];
+
+const start = async () => {
+
+    const server = Hapi.server({ port: 4000 });
+
+    await server.register(require('@hapi/cookie'));
+
+    server.auth.strategy('session', 'cookie', {
+        cookie: {
+            name: 'sid-example',
+            password: '!wsYhFA*C2U6nz=Bu^%A@^F#SF3&kSR6',
+            isSecure: false
+        },
+        redirectTo: '/login',
+        validate: async (request, session) => {
+
+            const account = await users.find(
+                (user) => (user.id === session.id)
+            );
+
+            if (!account) {
+
+                return { isValid: false };
+            }
+
+            return { isValid: true, credentials: account };
+        }
+    });
+
+    server.auth.default('session');
+
+    server.route([
+        {
+            method: 'GET',
+            path: '/',
+            handler: function (request, h) {
+
+                return 'Welcome to the restricted home page!';
+            }
+        },
+        {
+            method: 'GET',
+            path: '/login',
+            handler: function (request, h) {
+
+                return ` <html>
+                            <head>
+                                <title>Login page</title>
+                            </head>
+                            <body>
+                                <h3>Please Log In</h3>
+                                <form method="post" action="/login">
+                                    Username: <input type="text" name="username"><br>
+                                    Password: <input type="password" name="password"><br/>
+                                <input type="submit" value="Login"></form>
+                            </body>
+                        </html>`;
+            },
+            options: {
+                auth: false
+            }
+        },
+        {
+            method: 'POST',
+            path: '/login',
+            handler: async (request, h) => {
+
+                const { username, password } = request.payload;
+                const account = users.find(
+                    (user) => user.username === username
+                );
+
+                if (!account || !(await Bcrypt.compare(password, account.password))) {
+
+                    return h.redirect('/login');
+        }
+
+                request.cookieAuth.set({ id: account.id });
+
+                return h.redirect('/');
+             },
+             options: {
+                 auth: {
+                     mode: 'try'
+                 }
+             }
+        }
+    ]);
+
+    await server.start();
+
+    console.log('server running at: ' + server.info.uri);
+};
+
+start();
+
+----------------------------------------
+
+TITLE: Default Route Validation Configuration in Hapi
+DESCRIPTION: Default validation object schema used by Hapi routes for various validation types.
+
+LANGUAGE: json5
+CODE:
+{ 
+    headers: true, 
+    params: true, 
+    query: true, 
+    payload: true, 
+    state: true, 
+    failAction: 'error'
+ }
+
+----------------------------------------
+
+TITLE: Creating a Static File Server with hapi and inert
+DESCRIPTION: This snippet demonstrates how to set up a basic static file server using hapi and the inert plugin. It configures the server to serve files from a public directory and handle directory listings.
+
+LANGUAGE: javascript
+CODE:
+const Path = require('path');
+const Hapi = require('@hapi/hapi');
+const Inert = require('@hapi/inert');
+
+const init = async () => {
+
+    const server = new Hapi.Server({
+        port: 3000,
+        routes: {
+            files: {
+                relativeTo: Path.join(__dirname, 'public')
+            }
+        }
+    });
+
+    await server.register(Inert);
+
+    server.route({
+        method: 'GET',
+        path: '/{param*}',
+        handler: {
+            directory: {
+                path: '.',
+                redirectToSlash: true
+            }
+        }
+    });
+
+    await server.start();
+
+    console.log('Server running at:', server.info.uri);
+};
+
+init();
+
+----------------------------------------
+
+TITLE: Listening for Log Events in Hapi
+DESCRIPTION: Demonstrates how to listen for log events emitted by the Hapi server. This example listens for error events and logs them to the console.
+
+LANGUAGE: javascript
+CODE:
+server.events.on('log', (event, tags) => {
+
+    if (tags.error) {
+        console.log(`Server error: ${event.error ? event.error.message : 'unknown'}`);
+    }
+});
+
+----------------------------------------
+
+TITLE: Configuring Cookie State in Hapi.js
+DESCRIPTION: Demonstrates how to configure server-side cookie settings using server.state(). Sets up a cookie named 'data' with security options, encoding, and validation settings.
+
+LANGUAGE: javascript
+CODE:
+server.state('data', {
+    ttl: null,
+    isSecure: true,
+    isHttpOnly: true,
+    encoding: 'base64json',
+    clearInvalid: true,
+    strictHeader: true
+});
+
+----------------------------------------
+
+TITLE: Configuring Vision Template Engine in Hapi.js
+DESCRIPTION: Basic server setup code demonstrating how to register and configure the Vision plugin with Handlebars templating engine.
+
+LANGUAGE: javascript
+CODE:
+'use strict';
+
+const Path = require('path');
+const Hapi = require('@hapi/hapi');
+const Hoek = require('@hapi/hoek');
+
+const start = async () => {
+
+    const server = Hapi.server();
+
+    await server.register(require('@hapi/vision'));
+
+    server.views({
+        engines: {
+            html: require('handlebars')
+        },
+        relativeTo: __dirname,
+        path: 'templates'
+    });
+
+    await server.start();
+};
+
+start();
+
+----------------------------------------
+
+TITLE: Configuring Route Options with Validation in hapi
+DESCRIPTION: Demonstrates how to set up route options, including authentication and payload validation using Joi.
+
+LANGUAGE: javascript
+CODE:
+server.route({
+    method: 'POST',
+    path: '/signup',
+    handler: function (request, h) {
+
+        const payload = request.payload;
+
+        return `Welcome ${payload.username}!`;
+    },
+    options: {
+        auth: false,
+        validate: {
+            payload: {
+                username: Joi.string().min(1).max(20),
+                password: Joi.string().min(7)
+            }
+        }
+    }
+});
+
+----------------------------------------
+
+TITLE: Using Server Methods for Caching in hapi
+DESCRIPTION: This example shows how to use server methods in hapi for caching, which reduces boilerplate code compared to using Catbox policies directly.
+
+LANGUAGE: javascript
+CODE:
+const start = async () => {
+
+    const server = Hapi.server();
+
+    server.method('sum', add, {
+        cache: {
+            cache: 'my_cache',
+            expiresIn: 10 * 1000,
+            generateTimeout: 2000
+        }
+    });
+
+    server.route({
+        path: '/add/{a}/{b}',
+        method: 'GET',
+        handler: async function (request, h) {
+
+            const { a, b } = request.params;
+            return await server.methods.sum(a, b);
+        }
+    });
+
+    await server.start();
+
+};
+
+start();
+
+----------------------------------------
+
+TITLE: Configuring Testable Hapi Server
+DESCRIPTION: Server setup that allows for testing by exporting initialize and start functions separately. Includes basic route configuration and error handling.
+
+LANGUAGE: javascript
+CODE:
+'use strict';
+
+const Hapi = require('@hapi/hapi');
+
+const server = Hapi.server({
+    port: 3000,
+    host: 'localhost'
+});
+
+server.route({
+  method: 'GET',
+  path: '/',
+  handler: function () {
+
+      return 'Hello World!';
+  }
+});
+
+exports.init = async () => {
+
+    await server.initialize();
+    return server;
+};
+
+exports.start = async () => {
+
+    await server.start();
+    console.log(`Server running at: ${server.info.uri}`);
+    return server;
+};
+
+process.on('unhandledRejection', (err) => {
+
+    console.log(err);
+    process.exit(1);
+});
+
+----------------------------------------
+
+TITLE: Handling 404 Errors in hapi
+DESCRIPTION: Shows how to set up a catch-all route to handle 404 errors with a custom response.
+
+LANGUAGE: javascript
+CODE:
+'use strict';
+
+const Hapi = require('@hapi/hapi');
+
+const internals = {};
+
+const init = async () => {
+
+    const server = Hapi.server({
+        port: 3000,
+        host: 'localhost'
+    });
+
+    server.route({
+        method: '*',
+        path: '/{any*}',
+        handler: function (request, h) {
+            return h.response('404 Error! Page Not Found!').code(404);
+        }
+    });
+
+    await server.start();
+    console.log('Server running on %s', server.info.uri);
+};
+
+init();
+
+----------------------------------------
+
+TITLE: Authentication with Twitter in hapi using bell
+DESCRIPTION: Demonstrates how to set up Twitter authentication in hapi using the bell plugin. It shows how to register the plugin, configure the auth strategy, and set up the auth route.
+
+LANGUAGE: javascript
+CODE:
+const Hapi = require('@hapi/hapi');
+const Bell = require('@hapi/bell');
+
+const server = Hapi.server({ port: 8000 });
+
+await server.register(Bell);
+
+server.auth.strategy('twitter', 'bell', {
+    provider: 'twitter',
+    password: 'cookie_encryption_password_secure',
+    clientId: TWITTER_CONSUMER_KEY,
+    clientSecret: TWITTER_CONSUMER_SECRET,
+    isSecure: false
+});
+
+server.route({
+    method: '*', 
+    path: '/auth/twitter',            // The callback endpoint registered with the provider
+    handler: function (request, h) {
+
+        if (!request.auth.isAuthenticated) {
+            return `Authentication failed due to: ${request.auth.error.message}`;
+        }
+        
+        // Perform any account lookup or registration, setup local session,
+        // and redirect to the application. The third-party credentials are
+        // stored in request.auth.credentials. Any query parameters from
+        // the initial request are passed back via request.auth.credentials.query.
+
+        return h.redirect('/home');
+    },
+    options: {
+        auth: {
+          strategy: 'twitter',
+          mode: 'try'
+        }
+    }
+});
+
+----------------------------------------
+
+TITLE: Response Validation with Sample Rate
+DESCRIPTION: Route configuration showing response validation with schema and sampling configuration.
+
+LANGUAGE: javascript
+CODE:
+const bookSchema = Joi.object({
+    title: Joi.string().required(),
+    author: Joi.string().required(),
+    isbn: Joi.string().length(10),
+    pageCount: Joi.number(),
+    datePublished: Joi.date().iso()
+});
+
+server.route({
+    method: 'GET',
+    path: '/books',
+    handler: async function (request, h) {
+
+        return await getBooks();
+    },
+    options: {
+        response: {
+            sample: 50,
+            schema: Joi.array().items(bookSchema)
+        }
+    }
+});
+
+----------------------------------------
+
+TITLE: Loading Multiple Plugins
+DESCRIPTION: Shows different methods of loading single and multiple plugins in Hapi
+
+LANGUAGE: javascript
+CODE:
+const start = async function () {
+
+    const server = Hapi.server();
+
+    // load one plugin
+
+    await server.register(require('myplugin'));
+
+    // load multiple plugins
+
+    await server.register([require('myplugin'), require('yourplugin')]);
+};
+
+----------------------------------------
+
+TITLE: Defining a Route with Multi-Segment Parameters in hapi
+DESCRIPTION: Shows how to use multi-segment parameters in the path and process them in the handler function.
+
+LANGUAGE: javascript
+CODE:
+server.route({
+    method: 'GET',
+    path: '/hello/{user*2}',
+    handler: function (request, h) {
+
+        const userParts = request.params.user.split('/');
+
+        return `Hello ${userParts[0]} ${userParts[1]}!`;
+    }
+});
+
+----------------------------------------
+
+TITLE: Configuring Relative Paths for Static File Serving in hapi
+DESCRIPTION: This snippet demonstrates how to configure a base path for serving static files and use relative paths with h.file() method. It sets up a server with a route to serve a JPEG image.
+
+LANGUAGE: javascript
+CODE:
+'use strict';
+
+const Hapi = require('@hapi/hapi');
+const Path = require('path');
+
+const start = async () => {
+
+    const server = Hapi.server({
+        routes: {
+            files: {
+                relativeTo: Path.join(__dirname, 'public')
+            }
+        }
+    });
+
+    await server.register(require('@hapi/inert'));
+
+    server.route({
+        method: 'GET',
+        path: '/picture.jpg',
+        handler: function (request, h) {
+
+            return h.file('picture.jpg');
+        }
+    });
+
+    await server.start();
+
+    console.log('Server running at:', server.info.uri);
+};
+
+start();
+
+----------------------------------------
+
+TITLE: Headers Validation in Hapi Route
+DESCRIPTION: Example showing how to validate request headers while allowing unknown headers.
+
+LANGUAGE: javascript
+CODE:
+server.route({
+    method: 'GET',
+    path:'/hello/{name}',
+    handler: (request, h) => {
+
+       return  `Hello ${request.params.name}!`;
+    },
+    options: {
+        validate: {
+            headers: Joi.object({
+                cookie: Joi.string().required()
+            }),
+            options: {
+                allowUnknown: true
+            }
+        }
+    }
+});
+
+----------------------------------------
+
+TITLE: Path Parameters Validation in Hapi Route
+DESCRIPTION: Route configuration showing path parameter validation using Joi schema.
+
+LANGUAGE: javascript
+CODE:
+server.route({
+    method: 'GET',
+    path: '/hello/{name}',
+    handler: function (request, h) {
+
+        return `Hello ${request.params.name}!`;
+    },
+    options: {
+        validate: {
+            params: Joi.object({
+                name: Joi.string().min(3).max(10)
+            })
+        }
+    }
+});
+
+----------------------------------------
+
+TITLE: Logging Request Error in Hapi Route Handler
+DESCRIPTION: Demonstrates how to use request.log() to log an error event within a Hapi route handler. This method is used for logging in the context of a specific request.
+
+LANGUAGE: javascript
+CODE:
+server.route({
+    method: 'GET',
+    path: '/',
+    handler: function (request, h) {
+
+        request.log('error', 'Event error');
+        return 'Hello World';
+    }
+});
+
+----------------------------------------
+
+TITLE: Error Handling with boom in hapi
+DESCRIPTION: Shows how to use the boom module for error handling in hapi. It demonstrates how to throw a custom 404 error.
+
+LANGUAGE: javascript
+CODE:
+throw Boom.notFound('Page not found');
+
+----------------------------------------
+
+TITLE: Query Parameters Validation with Joi Options
+DESCRIPTION: Example of validating query parameters with additional Joi options for schema configuration.
+
+LANGUAGE: javascript
+CODE:
+options: {
+    validate: {
+        query: Joi.object({
+            limit: Joi.number().integer().min(1).max(100).default(10)
+        }).options({ stripUnknown: true });
+    }
+}
+
+----------------------------------------
+
+TITLE: Creating External Module Plugin
+DESCRIPTION: Shows how to create a Hapi plugin as an external module using package.json for metadata
+
+LANGUAGE: javascript
+CODE:
+'use strict';
+
+exports.plugin = {
+    pkg: require('./package.json'),
+    register: async function (server, options) {
+
+        // Create a route for example
+
+        server.route({
+            method: 'GET',
+            path: '/test',
+            handler: function (request, h) {
+
+                return 'hello, world';
+            }
+        });
+
+        // etc...
+        await someAsyncMethods();
+    }
+};
+
+----------------------------------------
+
+TITLE: Defining a Route with Named Parameters in hapi
+DESCRIPTION: Illustrates how to use named parameters in the path and access them in the handler function.
+
+LANGUAGE: javascript
+CODE:
+server.route({
+    method: 'GET',
+    path: '/hello/{user}',
+    handler: function (request, h) {
+
+        return `Hello ${request.params.user}!`;
+    }
+});
+
+----------------------------------------
+
+TITLE: Implementing Catbox Policy for Caching in hapi
+DESCRIPTION: This snippet demonstrates how to create and use a Catbox policy for caching the result of a function call in a hapi route handler.
+
+LANGUAGE: javascript
+CODE:
+const start = async () => {
+
+    const server = Hapi.server();
+
+    const add = async (a, b) => {
+
+        await Hoek.wait(1000);   // Simulate some slow I/O
+
+        return Number(a) + Number(b);
+    };
+
+    const sumCache = server.cache({
+        cache: 'my_cache',
+        expiresIn: 10 * 1000,
+        segment: 'customSegment',
+        generateFunc: async (id) => {
+
+            return await add(id.a, id.b);
+        },
+        generateTimeout: 2000
+    });
+
+    server.route({
+        path: '/add/{a}/{b}',
+        method: 'GET',
+        handler: async function (request, h) {
+
+            const { a, b } = request.params;
+            const id = `${a}:${b}`;
+
+            return await sumCache.get({ id, a, b });
+        }
+    });
+
+    await server.start();
+
+    console.log('Server running at:', server.info.uri);
+};
+
+start();
+
+----------------------------------------
+
+TITLE: Input Validation with Joi in hapi
+DESCRIPTION: Shows how to perform input validation in hapi using the Joi module. It demonstrates validating a blog post's length in the route configuration.
+
+LANGUAGE: javascript
+CODE:
+const Joi = require('joi')
+
+server.route({
+    method: 'POST',
+    path: '/post',
+    handler: (request, h) => {
+
+        return 'Blog post added!';
+    },
+    options: {
+        validate: {
+            payload: Joi.object({
+                post: Joi.string().max(140)
+            })
+        }
+    }
+});
+
+----------------------------------------
+
+TITLE: Accessing Query Parameters in hapi Route Handler
+DESCRIPTION: Demonstrates how to access query parameters in the route handler function.
+
+LANGUAGE: javascript
+CODE:
+server.route({
+    method: 'GET',
+    path: '/',
+    handler: function (request, h) {
+
+        return `Hello ${request.query.name}!`;
+    }
+});
+
+----------------------------------------
+
+TITLE: Configuring Cache-Control Header in hapi Route
+DESCRIPTION: This snippet demonstrates how to set the Cache-Control header for a route in hapi, including the ability to override the expiration time using a route parameter.
+
+LANGUAGE: javascript
+CODE:
+server.route({
+    path: '/hapi/{ttl?}',
+    method: 'GET',
+    handler: function (request, h) {
+
+        const response = h.response({ be: 'hapi' });
+
+        if (request.params.ttl) {
+            response.ttl(request.params.ttl);
+        }
+
+        return response;
+    },
+    options: {
+        cache: {
+            expiresIn: 30 * 1000,
+            privacy: 'private'
+        }
+    }
+});
+
+----------------------------------------
+
+TITLE: Configuring Query String Parsing with qs Module in hapi
+DESCRIPTION: Shows how to use the qs module to parse complex query structures in hapi.
+
+LANGUAGE: javascript
+CODE:
+const Hapi = require('@hapi/hapi');
+const Qs = require('qs');
+
+const server = Hapi.server({
+    port: 3000,
+    host: 'localhost',
+    query: {
+        parser: (query) => Qs.parse(query)
+    }
+});
+
+server.route({
+    method: 'GET',
+    path: '/',
+    handler: function (request, h) {
+
+        return request.query;
+    }
+});
+
+const init = async () => {
+
+    await server.start();
+    console.log('Server running on %s', server.info.uri);
+};
+
+process.on('unhandledRejection', (err) => {
+
+    console.log(err);
+    process.exit(1);
+});
+
+init();
+
+----------------------------------------
+
+TITLE: Accessing Request Payload in hapi Route Handler
+DESCRIPTION: Illustrates how to access the request payload in the route handler function.
+
+LANGUAGE: javascript
+CODE:
+server.route({
+    method: 'POST',
+    path: '/signup',
+    handler: function (request, h) {
+
+        const payload = request.payload;
+
+        return `Welcome ${payload.username}!`;
+    }
+});
+
+----------------------------------------
+
+TITLE: Setting Last-Modified Header in hapi Response
+DESCRIPTION: This example shows how to set the Last-Modified header in a hapi response, which is useful for implementing conditional GET requests.
+
+LANGUAGE: javascript
+CODE:
+return h.response(result)
+    .header('Last-Modified', lastModified.toUTCString());
+
+----------------------------------------
+
+TITLE: Setting Cookies in Route Handler
+DESCRIPTION: Demonstrates how to set a cookie within a route handler using the response toolkit. Sets a 'data' cookie with a JSON value.
+
+LANGUAGE: javascript
+CODE:
+server.route({
+    method: 'GET',
+    path: '/',
+    handler: function (request, h) {
+
+        h.state('data', { firstVisit: false });
+        return h.response('Hello');
+    }
+});
+
+----------------------------------------
+
+TITLE: Chained Cookie Setting in Response
+DESCRIPTION: Shows how to set a cookie using method chaining on the response object. Alternative approach to setting cookies.
+
+LANGUAGE: javascript
+CODE:
+return h.response('Hello').state('data', { firstVisit: false });
+
+----------------------------------------
+
+TITLE: Setting Cookie with Custom Encoding
+DESCRIPTION: Example of setting a cookie with custom encoding options, overriding the default configuration.
+
+LANGUAGE: javascript
+CODE:
+return h.response('Hello').state('data', 'test', { encoding: 'none' });
+
+----------------------------------------
+
+TITLE: Accessing Cookie Value
+DESCRIPTION: Shows how to access a cookie's value from the request.state object within a handler.
+
+LANGUAGE: javascript
+CODE:
+const value = request.state.data;
+// console.log(value) will give you { firstVisit : false }
+
+----------------------------------------
+
+TITLE: Clearing Cookie in Hapi.js
+DESCRIPTION: Demonstrates how to clear a cookie using the unstate() method on the response object.
+
+LANGUAGE: javascript
+CODE:
+return h.response('Bye').unstate('data');
+
+----------------------------------------
+
+TITLE: Configuring Server for Cookie Handling in Hapi
+DESCRIPTION: This snippet demonstrates how to configure the server to handle cookies using the server.state() method. It sets up a cookie named 'data' with specific security and encoding options.
+
+LANGUAGE: javascript
+CODE:
+server.state('data', {
+    ttl: null,
+    isSecure: true,
+    isHttpOnly: true,
+    encoding: 'base64json',
+    clearInvalid: false, // remove invalid cookies
+    strictHeader: true // don't allow violations of RFC 6265
+});
+
+----------------------------------------
+
+TITLE: Configuring Route-Level Cookie Behavior in Hapi
+DESCRIPTION: This JSON5 snippet shows how to configure cookie behavior at the route level. It specifies options for parsing cookies and handling failures.
+
+LANGUAGE: json5
+CODE:
+{
+    config: {
+        state: {
+            parse: true,        // 解析 cookies 并储存在 request.state
+            failAction: 'error' // 也可以为 'ignore' 或者 'log'
+        }
+    }
+}
+
+----------------------------------------
+
+TITLE: Setting a Cookie Using Response Toolkit in Hapi
+DESCRIPTION: This snippet demonstrates how to set a cookie using the response toolkit in Hapi. It sets a cookie named 'data' with a JSON value.
+
+LANGUAGE: javascript
+CODE:
+h.state('data', { firstVisit: false });
+return h.response('Hello');
+
+----------------------------------------
+
+TITLE: Setting a Cookie Using Response Object in Hapi
+DESCRIPTION: This snippet shows an alternative way to set a cookie using the response object in Hapi, allowing for method chaining.
+
+LANGUAGE: javascript
+CODE:
+return h.response('Hello').state('data', { firstVisit: false });
+
+----------------------------------------
+
+TITLE: Setting a Cookie with Custom Encoding in Hapi
+DESCRIPTION: This snippet demonstrates how to set a cookie with custom encoding options, overriding the default server configuration.
+
+LANGUAGE: javascript
+CODE:
+return h.response('Hello').state('data', 'test', { encoding: 'none' });
+
+----------------------------------------
+
+TITLE: Accessing Cookie Value in Hapi Request Handler
+DESCRIPTION: This snippet shows how to access the value of a cookie within a request handler or lifecycle method in Hapi.
+
+LANGUAGE: javascript
+CODE:
+const value = request.state.data;
+// console.log(value) 将会得到 { firstVisit : false }
+
+----------------------------------------
+
+TITLE: Clearing a Cookie in Hapi
+DESCRIPTION: This snippet demonstrates how to clear a cookie using the unstate() method on the response object in Hapi.
+
+LANGUAGE: javascript
+CODE:
+return h.response('Bye').unstate('data');
+
+----------------------------------------
+
+TITLE: Creating a Server in Express vs hapi
+DESCRIPTION: Demonstrates how to create and start a server in Express compared to hapi. Express uses a simple app.listen() call, while hapi creates a server object and uses an async init function.
+
+LANGUAGE: javascript
+CODE:
+var express = require('express');
+var app = express();
+
+app.listen(3000, function () {
+  console.log('Server is running on port 3000');
+}));
+
+LANGUAGE: javascript
+CODE:
+const Hapi = require('@hapi/hapi');
+
+const init = async () => {
+
+    const server = Hapi.server({
+        port: 3000,
+        host: 'localhost'
+    });
+
+    await server.start();
+    console.log('Server running on port 3000');
+};
+
+init();
+
+----------------------------------------
+
+TITLE: Defining Routes in Express vs hapi
+DESCRIPTION: Shows how to define a basic route in Express and hapi. Express uses app.METHOD(PATH, HANDLER) structure, while hapi uses server.route() with an object containing method, path, and handler properties.
+
+LANGUAGE: javascript
+CODE:
+app.get('/hello', function (req, res) {  
+  res.send('Hello World!');
+});
+
+LANGUAGE: javascript
+CODE:
+server.route({
+    method: 'GET',
+    path:'/hello',
+    handler: (request, h) => {
+
+      return 'Hello World!';
+    }
+});
+
+----------------------------------------
+
+TITLE: Handling Parameters in Express vs hapi
+DESCRIPTION: Illustrates how to handle route parameters in Express and hapi. Express uses ':' for parameters, while hapi uses curly braces {}.
+
+LANGUAGE: javascript
+CODE:
+app.get('/hello/:name', function (req, res) {
+
+    const name = req.params.name
+    res.send('Hello ' + name);
+}); 
+
+LANGUAGE: javascript
+CODE:
+server.route({
+    method: 'GET',
+    path: '/hello/{name}',
+    handler: function (request, h) {
+
+        const name = request.params.name;
+        return 'Hello ' + name
+    }
+});
+
+----------------------------------------
+
+TITLE: Creating a Plugin in hapi
+DESCRIPTION: Shows how to create a basic plugin in hapi. Plugins in hapi are objects with name and register properties, where register is an async function that sets up the plugin functionality.
+
+LANGUAGE: javascript
+CODE:
+const getDate = {
+    name: 'getDate',
+    version: '1.0.0',
+    register: async function (server, options) {
+
+        const currentDate = function() {
+
+            const date = new Date();
+            return date;
+        };
+
+        server.decorate('toolkit', 'getDate', currentDate);
+    }
+};
+
+----------------------------------------
+
+TITLE: Serving Static Files with inert in hapi
+DESCRIPTION: Demonstrates how to serve static files in hapi using the inert plugin. It shows how to configure the server and set up a route to serve files from a directory.
+
+LANGUAGE: javascript
+CODE:
+const server = new Hapi.Server({
+    port: 3000,
+    routes: {
+        files: {
+            relativeTo: Path.join(__dirname, 'public')
+        }
+    }
+});
+
+await server.register(require('@hapi/inert'));
+
+server.route({
+    method: 'GET',
+    path: '/{param*}',
+    handler: {
+        directory: {
+            path: '.'
+        }
+    }
+});
+
+----------------------------------------
+
+TITLE: Creating a Server in Express vs hapi
+DESCRIPTION: Demonstrates how to create and start a basic server in Express compared to hapi.
+
+LANGUAGE: JavaScript
+CODE:
+var express = require('express');
+var app = express();
+
+app.listen(3000, function () {
+  console.log('Server is running on port 3000');
+}));
+
+LANGUAGE: JavaScript
+CODE:
+const Hapi = require('@hapi/hapi');
+
+const init = async () => {
+
+    const server = Hapi.server({
+        port: 3000,
+        host: 'localhost'
+    });
+
+    await server.start();
+    console.log('Server running on port 3000');
+};
+
+init();
+
+----------------------------------------
+
+TITLE: Defining Routes in Express vs hapi
+DESCRIPTION: Shows how to define a basic route in Express and the equivalent in hapi.
+
+LANGUAGE: JavaScript
+CODE:
+app.get('/hello', function (req, res) {  
+  res.send('Hello World!');
+});
+
+LANGUAGE: JavaScript
+CODE:
+server.route({
+    method: 'GET',
+    path:'/hello',
+    handler: (request, h) => {
+
+      return 'Hello World!';
+    }
+});
+
+----------------------------------------
+
+TITLE: Creating a Plugin in hapi
+DESCRIPTION: Demonstrates how to create a basic plugin in hapi, which is analogous to middleware in Express.
+
+LANGUAGE: JavaScript
+CODE:
+const getDate = {
+    name: 'getDate',
+    version: '1.0.0',
+    register: async function (server, options) {
+
+        const currentDate = function() {
+
+            const date = new Date();
+            return date;
+        };
+
+        server.decorate('toolkit', 'getDate', currentDate);
+    }
+};
+
+----------------------------------------
+
+TITLE: Setting Up Views in Express vs hapi
+DESCRIPTION: Compares setting up view engines in Express and hapi.
+
+LANGUAGE: JavaScript
+CODE:
+app.set('view engine', 'pug');
+
+LANGUAGE: JavaScript
+CODE:
+await server.register(require('@hapi/vision'));
+
+server.views({
+    engines: {
+        pug: require('pug')
+    },
+    relativeTo: __dirname,
+    path: 'views'
+});
+
+----------------------------------------
+
+TITLE: Serving Static Files in Express vs hapi
+DESCRIPTION: Shows how to serve static files in Express and the equivalent in hapi using the inert plugin.
+
+LANGUAGE: JavaScript
+CODE:
+app.use(express.static('/public'));
+
+LANGUAGE: JavaScript
+CODE:
+const server = new Hapi.Server({
+    port: 3000,
+    routes: {
+        files: {
+            relativeTo: Path.join(__dirname, 'public')
+        }
+    }
+});
+
+await server.register(require('@hapi/inert'));
+
+server.route({
+    method: 'GET',
+    path: '/{param*}',
+    handler: {
+        directory: {
+            path: '.'
+        }
+    }
+});
+
+----------------------------------------
+
+TITLE: Error Handling in Express vs hapi
+DESCRIPTION: Demonstrates error handling in Express compared to using boom in hapi.
+
+LANGUAGE: JavaScript
+CODE:
+res.status(400).send({status: 404, error: "Page not found"});
+
+LANGUAGE: JavaScript
+CODE:
+throw Boom.notFound('Page not found');
+
+----------------------------------------
+
+TITLE: Using h.file() Method to Serve Static Files in hapi
+DESCRIPTION: This snippet shows how to use the h.file() method provided by the inert plugin to serve a static file. It sets up a route to serve a JPEG image from a specific path.
+
+LANGUAGE: javascript
+CODE:
+const start = async () => {
+
+    const server = Hapi.server();
+
+    await server.register(require('@hapi/inert'));
+
+    server.route({
+        method: 'GET',
+        path: '/picture.jpg',
+        handler: function (request, h) {
+
+            return h.file('/path/to/picture.jpg');
+        }
+    });
+
+    await server.start();
+
+    console.log('Server running at:', server.info.uri);
+};
+
+start();
+
+----------------------------------------
+
+TITLE: Configuring File Handler with Options in hapi
+DESCRIPTION: This snippet demonstrates how to use the file handler with various options in hapi. It shows how to set Content-Disposition headers, override filenames, and enable compressed file lookup.
+
+LANGUAGE: javascript
+CODE:
+server.route({
+    method: 'GET',
+    path: '/script.js',
+    handler: {
+        file: {
+            path: 'script.js',
+            filename: 'client.js', // override the filename in the Content-Disposition header
+            mode: 'attachment', // specify the Content-Disposition is an attachment
+            lookupCompressed: true // allow looking for script.js.gz if the request allows it
+        }
+    }
+});
+
+----------------------------------------
+
+TITLE: Setting Up a Directory Handler in hapi
+DESCRIPTION: This snippet shows how to configure a directory handler in hapi to serve multiple files from a specified directory. It includes options for setting index files and enabling directory listings.
+
+LANGUAGE: javascript
+CODE:
+server.route({
+    method: 'GET',
+    path: '/{param*}',
+    handler: {
+        directory: {
+            path: 'directory-path-here',
+            index: ['index.html', 'default.html'],
+            listing: true
+        }
+    }
+});
+
+----------------------------------------
+
+TITLE: Installing inert Plugin for Hapi
+DESCRIPTION: Shows how to install the inert plugin as a dependency for the Hapi project.
+
+LANGUAGE: bash
+CODE:
+npm install --save inert
+
+----------------------------------------
+
+TITLE: Using reply.file() to Serve Static Files in Hapi
+DESCRIPTION: Demonstrates how to register the inert plugin and use reply.file() to serve a static file in a Hapi route handler.
+
+LANGUAGE: javascript
+CODE:
+server.register(require('inert'), (err) => {
+
+    if (err) {
+        throw err;
+    }
+
+    server.route({
+        method: 'GET',
+        path: '/picture.jpg',
+        handler: function (request, reply) {
+            reply.file('/path/to/picture.jpg');
+        }
+    });
+
+    server.start((err) => {
+
+        if (err) {
+            throw err;
+        }
+
+        console.log('Servidor rodando em:', server.info.uri);
+    });
+});
+
+----------------------------------------
+
+TITLE: Configuring Relative Paths for Static File Serving in Hapi
+DESCRIPTION: Shows how to set up a base path for serving static files and use relative paths in route handlers.
+
+LANGUAGE: javascript
+CODE:
+'use strict';
+
+const Path = require('path');
+const Hapi = require('hapi');
+
+const server = new Hapi.Server({
+    connections: {
+        routes: {
+            files: {
+                relativeTo: Path.join(__dirname, 'public')
+            }
+        }
+    }
+});
+
+server.register(require('inert'), (err) => {
+
+    if (err) {
+        throw err;
+    }
+
+    server.route({
+        method: 'GET',
+        path: '/picture.jpg',
+        handler: function (request, reply) {
+            reply.file('path/to/picture.jpg');
+        }
+    });
+
+    server.start((err) => {
+
+        if (err) {
+            throw err;
+        }
+
+        console.log('Server running at:', server.info.uri);
+    });
+});
+
+----------------------------------------
+
+TITLE: Using File Handler in Hapi Routes
+DESCRIPTION: Demonstrates how to use the file handler in Hapi routes for serving static files.
+
+LANGUAGE: javascript
+CODE:
+server.route({
+    method: 'GET',
+    path: '/picture.jpg',
+    handler: {
+        file: 'picture.jpg'
+    }
+});
+
+----------------------------------------
+
+TITLE: Dynamic File Handling in Hapi Routes
+DESCRIPTION: Shows how to use a function to dynamically determine the file path in a Hapi route handler.
+
+LANGUAGE: javascript
+CODE:
+server.route({
+    method: 'GET',
+    path: '/{filename}',
+    handler: {
+        file: function (request) {
+            return request.params.filename;
+        }
+    }
+});
+
+----------------------------------------
+
+TITLE: Advanced File Handler Options in Hapi
+DESCRIPTION: Demonstrates advanced options for the file handler, including Content-Disposition and compressed file lookup.
+
+LANGUAGE: javascript
+CODE:
+server.route({
+    method: 'GET',
+    path: '/script.js',
+    handler: {
+        file: {
+            path: 'script.js',
+            filename: 'client.js', // sobreescreve o nome do arquivo no cabeçalho Content-Disposition
+            mode: 'attachment', // especifica o Content-Disposition com um anexo
+            lookupCompressed: true // permite olhar para script.js.gz se a requisição permitir isso
+        }
+    }
+});
+
+----------------------------------------
+
+TITLE: Using Directory Handler in Hapi
+DESCRIPTION: Shows how to use the directory handler to serve multiple files from a specified path.
+
+LANGUAGE: javascript
+CODE:
+server.route({
+    method: 'GET',
+    path: '/{param*}',
+    handler: {
+        directory: {
+            path: 'public'
+        }
+    }
+});
+
+----------------------------------------
+
+TITLE: Configuring Directory Handler Options in Hapi
+DESCRIPTION: Demonstrates how to configure options for the directory handler, including directory listing and index files.
+
+LANGUAGE: javascript
+CODE:
+server.route({
+    method: 'GET',
+    path: '/{param*}',
+    handler: {
+        directory: {
+            path: 'public',
+            listing: true
+        }
+    }
+});
+
+----------------------------------------
+
+TITLE: Query Parameters Validation for Posts Route
+DESCRIPTION: Example of validating query parameters for a posts endpoint with limits and defaults.
+
+LANGUAGE: javascript
+CODE:
+server.route({
+    method: 'GET',
+    path: '/posts',
+    handler: function (request, h) {
+
+        return posts.slice(0, request.query.limit);
+    },
+    options: {
+        validate: {
+            query: Joi.object({
+                limit: Joi.number().integer().min(1).max(100).default(10)
+            })
+        }
+    }
+});
+
+----------------------------------------
+
+TITLE: Defining a Route with Multiple HTTP Methods in hapi
+DESCRIPTION: Shows how to create a route that responds to both PUT and POST requests with the same handler function.
+
+LANGUAGE: javascript
+CODE:
+server.route({
+    method: ['PUT', 'POST'],
+    path: '/',
+    handler: function (request, h) {
+
+        return 'I did something!';
+    }
+});
+
+----------------------------------------
+
+TITLE: Defining a Route with Optional Parameters in hapi
+DESCRIPTION: Demonstrates how to make a path parameter optional and provide a default value if it's not provided.
+
+LANGUAGE: javascript
+CODE:
+server.route({
+    method: 'GET',
+    path: '/hello/{user?}',
+    handler: function (request, h) {
+
+        const user = request.params.user ? request.params.user : 'stranger';
+
+        return `Hello ${user}!`;
+    }
+});
+
+----------------------------------------
+
+TITLE: Plugin Registration with Options
+DESCRIPTION: Demonstrates how to register plugins with custom options and access those options within the plugin
+
+LANGUAGE: javascript
+CODE:
+const start = async function () {
+
+    await server.register({
+        plugin: require('myplugin'),
+        options: {
+            name: 'Bob'
+        }
+    });
+};
+
+----------------------------------------
+
+TITLE: Fortune Helper Function Implementation
+DESCRIPTION: Example of a view helper function that returns random fortune messages for use in templates.
+
+LANGUAGE: javascript
+CODE:
+module.exports = function () {
+
+    const fortunes = [
+        'Heisenberg may have slept here...',
+        'Wanna buy a duck?',
+        'Say no, then negotiate.',
+        'Time and tide wait for no man.',
+        'To teach is to learn.',
+        'Never ask the barber if you need a haircut.',
+        'You will forget that you ever knew me.',
+        'You will be run over by a beer truck.',
+        'Fortune favors the lucky.',
+        'Have a nice day!'
+    ];
+
+    const x = Math.floor(Math.random() * fortunes.length);
+    return fortunes[x];
+};
+
+----------------------------------------
+
+TITLE: Fortune Template Using Handlebars
+DESCRIPTION: HTML template that demonstrates using the fortune helper function in a Handlebars template.
+
+LANGUAGE: html
+CODE:
+<h1>Your fortune</h1>
+<p>{{fortune}}</p>
+
+----------------------------------------
+
+TITLE: Complete Server Implementation with Fortune Helper
+DESCRIPTION: Full server implementation showing Vision configuration, helper registration, and route handling for fortune display.
+
+LANGUAGE: javascript
+CODE:
+'use strict';
+
+const Hapi = require('@hapi/hapi');
+
+const start = async () => {
+
+    const server = Hapi.server({ port: 8080 });
+
+    await server.register(require('@hapi/vision'));
+
+    server.views({
+        engines: {
+            html: require('handlebars')
+        },
+        relativeTo: __dirname,
+        path: 'templates',
+        helpersPath: 'helpers'
+    });
+
+    server.route({
+        method: 'GET',
+        path: '/',
+        handler: function (request, h) {
+
+            return h.view('index');
+        }
+    });
+
+    await server.start();
+};
+
+start();
+
+----------------------------------------
+
+TITLE: Logging Server Event in Hapi
+DESCRIPTION: Shows how to use server.log() to log an event at the server level, outside the context of a specific request. This example logs a test error event.
+
+LANGUAGE: javascript
+CODE:
+const Hapi = require('@hapi/hapi');
+const server = Hapi.server({ port: 80 });
+
+server.log(['test', 'error'], 'Test event');
+
+----------------------------------------
+
+TITLE: Configuring Log Collection for Hapi Route
+DESCRIPTION: Shows how to enable log collection for a specific route in Hapi. This allows retrieval of all logs for a particular request using request.logs.
+
+LANGUAGE: javascript
+CODE:
+server.route({
+    method: 'GET',
+    path: '/',
+    options: {
+        log: {
+            collect: true
+        }
+    },
+    handler: function (request, h) {
+
+        return 'hello';
+    }
+});
+
+----------------------------------------
+
+TITLE: Logging Error with Tags in Hapi (JavaScript)
+DESCRIPTION: Demonstrates how to use server.log method with multiple tags to log an error when retrieving data from a database.
+
+LANGUAGE: javascript
+CODE:
+server.log(['error', 'database', 'read']);
+
+----------------------------------------
+
+TITLE: Configuring Hapi Server for Error Logging (JavaScript)
+DESCRIPTION: Shows how to configure a Hapi server to display request events based on tags, specifically for logging any errors in a request.
+
+LANGUAGE: javascript
+CODE:
+const server = new Hapi.Server({ debug: { request: ['error'] } });
+
+----------------------------------------
+
+TITLE: Setting ETag Header in hapi Response
+DESCRIPTION: This snippet demonstrates how to set the ETag header in a hapi response, which is used for cache validation.
+
+LANGUAGE: javascript
+CODE:
+return h.response(result).etag('xxxxxxxxx');
+
+----------------------------------------
+
+TITLE: Configuring Catbox Redis Client in hapi
+DESCRIPTION: This example shows how to configure a Catbox Redis client in a hapi server for server-side caching.
+
+LANGUAGE: javascript
+CODE:
+'use strict';
+
+const Hapi = require('@hapi/hapi');
+const CatboxRedis = require('@hapi/catbox-redis');
+
+const server = Hapi.server({
+    port: 8000,
+    cache: [
+        {
+            name: 'my_cache',
+            provider: {
+                constructor: CatboxRedis,
+                options: {
+                    partition : 'my_cached_data',
+                    host: 'redis-cluster.domain.com',
+                    port: 6379,
+                    database: 0,
+                    tls: {}
+                }
+            }
+        }
+    ]
+});
+
+----------------------------------------
+
+TITLE: Server Entry Point
+DESCRIPTION: Main entry point for starting the Hapi server in production mode.
+
+LANGUAGE: javascript
+CODE:
+`use strict`;
+
+const { start } = require('lib/server');
+
+start();
+
+----------------------------------------
+
+TITLE: NPM Script Configuration for Testing
+DESCRIPTION: Package.json configuration to run lab tests with verbose output for all test files matching the .test.js pattern.
+
+LANGUAGE: json
+CODE:
+  "scripts": {
+    "test": "lab -v **/*.test.js"
+  }
+
+----------------------------------------
+
+TITLE: Setting GitHub Token Environment Variable
+DESCRIPTION: Configuration step for adding the GitHub access token to the .env file. The token requires repo status and public_repo permissions.
+
+LANGUAGE: bash
+CODE:
+GITHUB_TOKEN = "YOUR TOKEN"
+
+----------------------------------------
+
+TITLE: Development Server Commands
+DESCRIPTION: Commands for installing dependencies, running the development server with hot reloading, and building static content.
+
+LANGUAGE: bash
+CODE:
+npm install
+
+LANGUAGE: bash
+CODE:
+npm run dev
+
+LANGUAGE: bash
+CODE:
+npm run static
+
+----------------------------------------
+
+TITLE: Docker Build Commands
+DESCRIPTION: Sequence of commands for building the Docker image with static content. Requires running generate first to create the dist folder.
+
+LANGUAGE: bash
+CODE:
+npm install
+npm run generate
+npm run docker-build

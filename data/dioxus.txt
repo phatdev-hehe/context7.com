@@ -1,0 +1,3545 @@
+TITLE: Complete Counter App Example with Dioxus
+DESCRIPTION: A complete example of a simple counter application built with Dioxus. It demonstrates component creation, state management with the use_signal hook, and event handling with click events to increment and decrement the counter.
+
+LANGUAGE: rust
+CODE:
+use dioxus::prelude::*;
+
+fn main() {
+    dioxus::launch(App);
+}
+
+#[component]
+fn App() -> Element {
+    let mut count = use_signal(|| 0);
+
+    rsx! {
+        div { "Count: {count}" }
+        button { onclick: move |_| count += 1, "Increment" }
+        button { onclick: move |_| count -= 1, "Decrement" }
+    }
+}
+
+----------------------------------------
+
+TITLE: Creating a Simple Counter Component with Dioxus
+DESCRIPTION: This example demonstrates how to create a basic counter application using Dioxus. It uses signals for state management and shows how to handle user interactions through button clicks to increment and decrement a counter value.
+
+LANGUAGE: rust
+CODE:
+fn app() -> Element {
+    let mut count = use_signal(|| 0);
+
+    rsx! {
+        h1 { "High-Five counter: {count}" }
+        button { onclick: move |_| count += 1, "Up high!" }
+        button { onclick: move |_| count -= 1, "Down low!" }
+    }
+}
+
+----------------------------------------
+
+TITLE: Building a Simple Counter Component with Dioxus in Rust
+DESCRIPTION: This snippet demonstrates how to create a basic counter application with Dioxus, showcasing the signal-based state management and RSX syntax for declaring UI components. It includes buttons to increment and decrement a counter value displayed in a heading.
+
+LANGUAGE: rust
+CODE:
+fn app() -> Element {
+    let mut count = use_signal(|| 0);
+
+    rsx! {
+        h1 { "High-Five counter: {count}" }
+        button { onclick: move |_| count += 1, "Up high!" }
+        button { onclick: move |_| count -= 1, "Down low!" }
+    }
+}
+
+----------------------------------------
+
+TITLE: Basic Dioxus Counter Application Example in Rust
+DESCRIPTION: A simple example of a counter application built with Dioxus. It demonstrates the use of signals for state management and the rsx! macro for declarative UI construction. The UI includes a counter display and buttons to increment and decrement the count.
+
+LANGUAGE: rust
+CODE:
+fn app() -> Element {
+    let mut count = use_signal(|| 0);
+
+    rsx! {
+        h1 { "High-Five counter: {count}" }
+        button { onclick: move |_| count += 1, "Up high!" }
+        button { onclick: move |_| count -= 1, "Down low!" }
+    }
+}
+
+----------------------------------------
+
+TITLE: Initializing a Basic Dioxus Application
+DESCRIPTION: A minimal example demonstrating how to launch a Dioxus application. This includes the main entry point and a simple App component that renders a hello world message using the rsx! macro.
+
+LANGUAGE: rust
+CODE:
+use dioxus::prelude::*;
+
+fn main() {
+    dioxus::launch(App);
+}
+
+// The #[component] attribute streamlines component creation.
+// It's not required, but highly recommended. For example, UpperCamelCase components will not generate a warning.
+#[component]
+fn App() -> Element {
+    rsx! { "hello world!" }
+}
+
+----------------------------------------
+
+TITLE: Creating a Basic Dioxus Application
+DESCRIPTION: Demonstrates how to create a minimal Dioxus application with a main function that launches the App component. The component uses the #[component] attribute and returns an Element with a simple text message.
+
+LANGUAGE: rust
+CODE:
+use dioxus::prelude::*;
+
+fn main() {
+    dioxus::launch(App);
+}
+
+// The #[component] attribute streamlines component creation.
+// It's not required, but highly recommended. It will lint incorrect component definitions and help you create props structs.
+#[component]
+fn App() -> Element {
+    rsx! { "hello world!" }
+}
+
+----------------------------------------
+
+TITLE: Building a Complete Counter Application
+DESCRIPTION: A complete example of a Dioxus counter application that combines components, templates, and hooks. The app tracks a count state and provides buttons to increment and decrement the value.
+
+LANGUAGE: rust
+CODE:
+use dioxus::prelude::*;
+
+fn main() {
+    dioxus::launch(App);
+}
+
+#[component]
+fn App() -> Element {
+    let mut count = use_signal(|| 0);
+
+    rsx!(
+        div { "Count: {count}" }
+        button { onclick: move |_| count += 1, "Increment" }
+        button { onclick: move |_| count -= 1, "Decrement" }
+    )
+}
+
+----------------------------------------
+
+TITLE: Using use_resource() to fetch weather data reactively in Dioxus
+DESCRIPTION: This example shows how to create a resource that fetches weather data based on a location signal. The resource automatically re-fetches when the location changes, and the UI updates accordingly with loading, error, and success states.
+
+LANGUAGE: rust
+CODE:
+use dioxus::prelude::*;
+
+async fn get_weather(location: &WeatherLocation) -> Result<String, String> {
+    Ok("Sunny".to_string())
+}
+
+fn app() -> Element {
+    let country = use_signal(|| WeatherLocation {
+        city: "Berlin".to_string(),
+        country: "Germany".to_string(),
+        coordinates: (52.5244, 13.4105),
+    });
+
+    // Because the resource's future subscribes to `country` by reading it (`country.read()`),
+    // every time `country` changes the resource's future will run again and thus provide a new value.
+    let current_weather = use_resource(move || async move { get_weather(&country()).await });
+
+    rsx! {
+        // the value of the resource can be polled to
+        // conditionally render elements based off if it's future
+        // finished (Some(Ok(_)), errored Some(Err(_)),
+        // or is still running (None)
+        match &*current_weather.read_unchecked() {
+            Some(Ok(weather)) => rsx! { WeatherElement { weather } },
+            Some(Err(e)) => rsx! { p { "Loading weather failed, {e}" } },
+            None =>  rsx! { p { "Loading..." } }
+        }
+    }
+}
+
+#[derive(Clone)]
+struct WeatherLocation {
+    city: String,
+    country: String,
+    coordinates: (f64, f64),
+}
+
+#[component]
+fn WeatherElement(weather: String) -> Element {
+    rsx! { p { "The weather is {weather}" } }
+}
+
+----------------------------------------
+
+TITLE: Reading and Writing to a Signal in Rust with Dioxus
+DESCRIPTION: Demonstrates basic Signal usage patterns in Dioxus, showing how to read and write values using blocks to manage borrows. Signals are similar to Rc<RefCell<T>> but optimized for UI development.
+
+LANGUAGE: rust
+CODE:
+# use dioxus::prelude::*;
+let mut signal = use_signal(|| 0);
+
+{
+    // This will read the value (we use a block to make sure the read is dropped before the write. You can read more about this in the next section)
+    let read = signal.read();
+    // Just like refcell, read you can deref the read to get the inner &T reference
+    match &*read {
+        &0 => println!("read is 0"),
+        &1 => println!("read is 1"),
+        _ => println!("read is something else ({read})"),
+    }
+}
+
+// This will write to the value
+let mut write = signal.write();
+// Again, we can deref the write to get the inner &mut T reference
+*write += 1;
+
+----------------------------------------
+
+TITLE: Building a Minimal Fullstack Dioxus Application in Rust
+DESCRIPTION: A concise example showing how to build a fullstack application with Dioxus in under 30 lines of code. Demonstrates the use of server functions to fetch data from the server and display it in the UI.
+
+LANGUAGE: rust
+CODE:
+#![allow(non_snake_case)]
+use dioxus::prelude::*;
+
+fn main() {
+    dioxus::launch(App);
+}
+
+#[component]
+fn App() -> Element {
+    let mut meaning = use_signal(|| None);
+
+    rsx! {
+        h1 { "Meaning of life: {meaning:?}" }
+        button {
+            onclick: move |_| async move {
+                if let Ok(data) = get_meaning("life the universe and everything".into()).await {
+                    meaning.set(data);
+                }
+            },
+            "Run a server function"
+        }
+    }
+}
+
+#[server]
+async fn get_meaning(of: String) -> Result<Option<u32>, ServerFnError> {
+    Ok(of.contains("life").then(|| 42))
+}
+
+----------------------------------------
+
+TITLE: Implementing Type-safe Routing with Dioxus Router in Rust
+DESCRIPTION: A complete example showing how to configure routes using the Routable derive macro, define route components, and implement navigation between routes. This demonstrates nested routes, layouts, and parameterized routes.
+
+LANGUAGE: rust
+CODE:
+use dioxus::prelude::*;
+use dioxus_router::prelude::*;
+use std::str::FromStr;
+
+#[rustfmt::skip]
+#[derive(Clone, Debug, PartialEq, Routable)]
+enum Route {
+    #[nest("/blog")]
+        #[layout(Blog)]
+            #[route("/")]
+            BlogList {},
+
+            #[route("/:blog_id")]
+            BlogPost { blog_id: usize },
+        #[end_layout]
+    #[end_nest]
+    #[route("/")]
+    Index {},
+}
+
+#[component]
+fn App() -> Element {
+    rsx! {
+        Router::<Route> { }
+    }
+}
+
+#[component]
+fn Index() -> Element {
+    rsx! {
+        h1 { "Index" }
+        Link {
+            to: Route::BlogList {},
+            "Go to the blog"
+        }
+    }
+}
+
+#[component]
+fn Blog() -> Element {
+    rsx! {
+        h1 { "Blog" }
+        Outlet::<Route> { }
+    }
+}
+
+#[component]
+fn BlogList() -> Element {
+    rsx! {
+        h2 { "List of blog posts" }
+        Link {
+            to: Route::BlogPost { blog_id: 0 },
+            "Blog post 1"
+        }
+        Link {
+            to: Route::BlogPost { blog_id: 1 },
+            "Blog post 2"
+        }
+    }
+}
+
+#[component]
+fn BlogPost(blog_id: usize) -> Element {
+    rsx! {
+        h2 { "Blog Post" }
+    }
+}
+
+----------------------------------------
+
+TITLE: Creating a Complex Component with Dynamic Content
+DESCRIPTION: A more complex component example that combines variable interpolation, class attributes, and iterative rendering with a for loop. This demonstrates how to build UI structures with dynamic content.
+
+LANGUAGE: rust
+CODE:
+#[component]
+fn App() -> Element {
+    let name = "dave";
+    rsx! {
+        h1 { "Hello, {name}!" }
+        div { class: "my-class", id: "my-id",
+            for i in 0..5 {
+                div { "FizzBuzz: {i}" }
+            }
+        }
+    }
+}
+
+----------------------------------------
+
+TITLE: Creating a Component With Props in Rust Using Dioxus
+DESCRIPTION: Example of creating a component that accepts a String prop using the #[component] macro. The component interpolates the prop value in the rendered output.
+
+LANGUAGE: rust
+CODE:
+#[component]
+fn GreetBob(bob: String) -> Element {
+    rsx! { "hello, {bob}" }
+}
+
+----------------------------------------
+
+TITLE: Creating Derived State with use_memo in Dioxus
+DESCRIPTION: This example demonstrates how to create derived state using use_memo. The double_count memo automatically updates whenever the count signal changes, showing the reactive relationship between them.
+
+LANGUAGE: rust
+CODE:
+use dioxus::prelude::*;
+
+let mut count = use_signal(|| 0);
+let double_count = use_memo(move || count() * 2);
+
+// Now whenever we read double_count, we know it is always twice the value of count
+println!("{}", double_count); // Prints "2"
+
+// After we write to count, the reactive context will rerun and double_count will be updated automatically
+count += 1;
+
+println!("{}", double_count); // Prints "4"
+
+----------------------------------------
+
+TITLE: Using Context for State Management in Dioxus
+DESCRIPTION: Shows how to use context in Dioxus to share state with child components without explicitly passing props. This approach creates a context provider in a parent component that makes state available to all descendants, providing a balance between global state and explicit prop passing.
+
+LANGUAGE: rust
+CODE:
+# use dioxus::prelude::*;
+#[derive(Clone, Copy)]
+struct MyState {
+    count: Signal<i32>
+}
+
+fn ParentComponent() -> Element {
+    // Use context provider provides an unique type to all children of this component
+    use_context_provider(|| MyState { count: Signal::new(0) });
+
+    rsx! {
+        // IncrementButton will have access to the count without explicitly passing it through props
+        IncrementButton {}
+    }
+}
+
+#[component]
+fn IncrementButton() -> Element {
+    // Use context gets the value from a parent component
+    let mut count = use_context::<MyState>().count;
+
+    rsx! {
+        button {
+            onclick: move |_| count += 1,
+            "Increment"
+        }
+    }
+}
+
+----------------------------------------
+
+TITLE: Using Signal Helper Methods in Dioxus
+DESCRIPTION: Shows convenient helper methods for Signals in Dioxus, including function call syntax for cloning values, direct display, and methods for operating on collection types like Vec without explicit read operations.
+
+LANGUAGE: rust
+CODE:
+# use dioxus::prelude::*;
+let mut signal = use_signal(|| 0);
+// This will clone the value
+let clone: i32 = signal();
+
+// You can directly display the signal
+println!("{}", signal);
+
+let signal_vec = use_signal(|| vec![1, 2, 3]);
+// And use vec methods like .get and .len without reading the signal explicitly
+let first = signal_vec.get(0);
+let last = signal_vec.last();
+let len = signal_vec.len();
+
+// You can also iterate over signals directly
+for i in signal_vec.iter() {
+    println!("{}", i);
+}
+
+----------------------------------------
+
+TITLE: Default Props in Dioxus Components
+DESCRIPTION: Shows how to use the #[props(default)] attribute to make fields optional with default values, including specifying explicit default values for props.
+
+LANGUAGE: rust
+CODE:
+#[derive(Props, PartialEq, Clone)]
+struct ButtonProps {
+    // The default attributes makes your field optional in the component and uses the default value if it is not set.
+    #[props(default)]
+    text: String,
+
+    /// You can also set an explicit default value instead of using the `Default` implementation.
+    #[props(default = "red".to_string())]
+    color: String,
+}
+
+fn Button(props: ButtonProps) -> Element {
+    rsx! {
+        button {
+            color: props.color,
+            "{props.text}"
+        }
+    }
+}
+
+rsx! {
+    // You can skip setting props that have a default value when you use the component.
+    Button {}
+};
+
+----------------------------------------
+
+TITLE: Asynchronous Derived State with use_resource in Dioxus
+DESCRIPTION: This example shows how to use use_resource to create asynchronous derived state. The resource subscribes to the count signal and reruns whenever count changes, fetching new data from the server.
+
+LANGUAGE: rust
+CODE:
+use dioxus::prelude::*;
+
+let count = use_signal(|| 0);
+let double_count = use_resource(move || async move {
+    // Start a request to the server. We are reading the value of count to format it into the url
+    // Since we are reading count, this resource will "subscribe" to changes to count (when count changes, the resource will rerun)
+    let response = reqwest::get(format!("https://myserver.com/doubleme?count={count}")).await.unwrap();
+    response.text().await.unwrap()
+});
+
+----------------------------------------
+
+TITLE: Implementing Basic Effects with use_effect in Dioxus
+DESCRIPTION: A basic example demonstrating how to use the use_effect hook in Dioxus to run code after rendering. This snippet shows a component that updates a canvas element based on a reactive count value.
+
+LANGUAGE: rust
+CODE:
+# use dioxus::prelude::*;
+fn MyComponent() -> Element {
+    let mut count = use_signal(|| 0);
+
+    use_effect(move || {
+        // Effects are reactive like memos, and resources. If you read a value inside the effect, the effect will rerun when that value changes
+        let count = count.read();
+
+        // You can use the count value to update the DOM manually
+        document::eval(&format!(
+            r#"var c = document.getElementById(\"dioxus-canvas\");
+var ctx = c.getContext(\"2d\");
+ctx.font = \"30px Arial\";
+ctx.fillText(\"{count}\", 10, 50);"#
+        ));
+    });
+
+    rsx! {
+        button {
+            // When you click the button, count will be incremented and the effect will rerun
+            onclick: move |_| count += 1,
+            "Increment"
+        }
+        canvas {
+            id: "dioxus-canvas",
+        }
+    }
+}
+
+----------------------------------------
+
+TITLE: Using Hooks for State Management
+DESCRIPTION: Demonstrates using hooks for state management in a component. The use_signal hook creates a reactive signal that can be used to render dynamic content that updates when the state changes.
+
+LANGUAGE: rust
+CODE:
+#[component]
+fn App() -> Element {
+    let name = use_signal(|| "world");
+
+    rsx! { "hello {name}!" }
+}
+
+----------------------------------------
+
+TITLE: Component Composition with Props
+DESCRIPTION: Shows how to compose components by creating an App component that includes a Header component with title and color props. Demonstrates the pattern for passing properties between components.
+
+LANGUAGE: rust
+CODE:
+# use dioxus::prelude::*;
+# #[component] fn Header(title: String, color: String) -> Element { todo!() }
+#[component]
+fn App() -> Element {
+    rsx! {
+        Header {
+            title: "My App",
+            color: "red",
+        }
+    }
+}
+
+----------------------------------------
+
+TITLE: Conditional Rendering with If Statements in Dioxus
+DESCRIPTION: Demonstrates how to use if statements for conditional rendering in rsx!. The example shows how to conditionally render different elements based on boolean values.
+
+LANGUAGE: rust
+CODE:
+let first_boolean = true;
+let second_boolean = false;
+rsx! {
+    if first_boolean {
+        div {
+            "first"
+        }
+    }
+
+    if second_boolean {
+        "second"
+    }
+};
+
+----------------------------------------
+
+TITLE: Children Props in Dioxus Components
+DESCRIPTION: Shows how to accept RSX children in components using the 'children' field in Props, which allows for simpler and more intuitive component usage with nested content.
+
+LANGUAGE: rust
+CODE:
+#[derive(PartialEq, Clone, Props)]
+struct ClickableProps {
+    href: String,
+    children: Element,
+}
+
+fn Clickable(props: ClickableProps) -> Element {
+    rsx! {
+        a {
+            href: "{props.href}",
+            class: "fancy-button",
+            {props.children}
+        }
+    }
+}
+
+LANGUAGE: rust
+CODE:
+rsx! {
+    Clickable {
+        href: "https://www.youtube.com/watch?v=C-M2hs3sXGo",
+        "How to "
+        i { "not" }
+        " be seen"
+    }
+};
+
+----------------------------------------
+
+TITLE: Managing Event Lifetimes with State in Dioxus
+DESCRIPTION: Shows how to use Dioxus signals with event handlers. Since signals are Copy, they can be moved into static closures, allowing state to be updated when events are triggered.
+
+LANGUAGE: rust
+CODE:
+# use dioxus::prelude::*;
+let mut count = use_signal(|| 0);
+
+rsx! {
+    button {
+        // Since we added the `move` keyword, the closure will move the `count` signal into the closure
+        onclick: move |_| {
+            // This will panic because the `count` signal is not in scope
+            count.set(count() + 1);
+        },
+        "Click me"
+    }
+};
+
+----------------------------------------
+
+TITLE: Rendering a VirtualDom with Dioxus SSR
+DESCRIPTION: Demonstrates the process of creating a VirtualDom from an app function, rebuilding it in place, and then rendering it to HTML using the SSR renderer.
+
+LANGUAGE: rust
+CODE:
+# use dioxus::prelude::*;
+# fn app() -> Element { todo!() }
+let mut vdom = VirtualDom::new(app);
+vdom.rebuild_in_place();
+
+let content = dioxus_ssr::render(&vdom);
+
+----------------------------------------
+
+TITLE: Working with Children Props in Dioxus Components
+DESCRIPTION: Example showing how to create components that accept child elements using the children prop, allowing for more HTML-like component composition.
+
+LANGUAGE: rust
+CODE:
+#[component]
+fn Clickable(
+    href: String,
+    children: Element,
+) -> Element {
+    rsx! {
+        a {
+            href: "{href}",
+            class: "fancy-button",
+            {children}
+        }
+    }
+}
+
+LANGUAGE: rust
+CODE:
+rsx! {
+    Clickable {
+        href: "https://www.youtube.com/watch?v=C-M2hs3sXGo",
+        "How to "
+        i { "not" }
+        " be seen"
+    }
+};
+
+----------------------------------------
+
+TITLE: Computing Derived Data with use_memo in Dioxus
+DESCRIPTION: Demonstrates using use_memo to create reactive computed values from signals. The memo will only recalculate when dependent signals change, providing efficient derived state management for Dioxus components.
+
+LANGUAGE: rust
+CODE:
+use dioxus::prelude::*;
+use dioxus_signals::*;
+
+#[component]
+fn App() -> Element {
+    let mut signal = use_signal(|| 0);
+    let doubled = use_memo(move || signal * 2);
+
+    rsx! {
+        button {
+            onclick: move |_| signal += 1,
+            "Increase"
+        }
+        Child {
+            signal: doubled
+        }
+    }
+}
+
+#[component]
+fn Child(signal: ReadOnlySignal<usize>) -> Element {
+    rsx! {
+        "{signal}"
+    }
+}
+
+----------------------------------------
+
+TITLE: Using Hooks for State Management
+DESCRIPTION: Shows how to use the use_signal hook to create and access component state. This example demonstrates the creation of a name signal that can be referenced in the RSX template.
+
+LANGUAGE: rust
+CODE:
+# use dioxus::prelude::*;
+#[component]
+fn App() -> Element {
+    // The use signal hook runs once when the component is created and then returns the current value every run after the first
+    let name = use_signal(|| "world");
+
+    rsx! { "hello {name}!" }
+}
+
+----------------------------------------
+
+TITLE: Handling Non-Copy Data in Dioxus Event Handlers
+DESCRIPTION: Demonstrates techniques for using non-Copy data like strings in event handlers. Shows how to clone data before moving it into closures or directly moving the data when it won't be needed again.
+
+LANGUAGE: rust
+CODE:
+# use dioxus::prelude::*;
+// String is not `Copy`
+let string = "hello world".to_string();
+
+rsx! {
+    button {
+        // The string only has one owner. We could move it into this closure, but since we want to use the string in other closures later, we will clone it instead
+        onclick: {
+            // Clone the string in a new block
+            let string = string.clone();
+            // Then move the cloned string into the closure
+            move |_| println!("{}", string)
+        },
+        "Print hello world"
+    }
+    button {
+        // We don't use the string after this closure, so we can just move it into the closure directly
+        onclick: move |_| println!("{}", string),
+        "Print hello world again"
+    }
+};
+
+----------------------------------------
+
+TITLE: Working with Optional Props in Dioxus Components
+DESCRIPTION: Example showing how Option<T> fields are automatically treated as optional props with None as the default value, and how to override this behavior with #[props(!optional)].
+
+LANGUAGE: rust
+CODE:
+#[component]
+fn Button(
+    // Since the `text` field is optional, you don't need to set it when you use the component.
+    text: Option<String>,
+) -> Element {
+    rsx! {
+        button { {text.unwrap_or("button".to_string())} }
+    }
+}
+
+rsx! {
+    Button {}
+};
+
+LANGUAGE: rust
+CODE:
+#[component]
+fn Button(
+    // You can use the `!optional` attribute on a field with the type `Option<T>` to make it required.
+    #[props(!optional)]
+    text: Option<String>,
+) -> Element {
+    rsx! {
+        button { {text.unwrap_or("button".to_string())} }
+    }
+}
+
+rsx! {
+    Button {
+        text: None
+    }
+};
+
+----------------------------------------
+
+TITLE: Making Non-Reactive State Reactive with use_reactive in Dioxus
+DESCRIPTION: This snippet demonstrates how to use the use_reactive hook to make non-reactive state reactive. It's useful when working with state that can't be directly made reactive, such as random values.
+
+LANGUAGE: rust
+CODE:
+use dioxus::prelude::*;
+
+let state = rand::random::<i32>();
+
+// You can make the state reactive by wrapping it in use_reactive
+let doubled = use_memo(use_reactive!(|state| state * 2));
+
+----------------------------------------
+
+TITLE: Optional Props with Option<T> in Dioxus
+DESCRIPTION: Demonstrates how to create optional props using Option<T> with automatic None default, and shows how to make an Option field required using #[props(!optional)].
+
+LANGUAGE: rust
+CODE:
+#[derive(Props, PartialEq, Clone)]
+struct ButtonProps {
+    // Since the `text` field is optional, you don't need to set it when you use the component.
+    text: Option<String>,
+}
+
+fn Button(props: ButtonProps) -> Element {
+    rsx! {
+        button { {props.text.unwrap_or("button".to_string())} }
+    }
+}
+
+rsx! {
+    Button {}
+};
+
+LANGUAGE: rust
+CODE:
+#[derive(Props, PartialEq, Clone)]
+struct ButtonProps {
+    /// You can use the `!optional` attribute on a field with the type `Option<T>` to make it required.
+    #[props(!optional)]
+    text: Option<String>,
+}
+
+fn Button(props: ButtonProps) -> Element {
+    rsx! {
+        button { {props.text.unwrap_or("button".to_string())} }
+    }
+}
+
+rsx! {
+    Button {
+        text: None
+    }
+};
+
+----------------------------------------
+
+TITLE: Reading a Memo in Dioxus Components
+DESCRIPTION: Demonstrates how to create and read a memo in a Dioxus component. The example shows creating a memo that computes half of a count signal's value, and how components subscribe to the memo's result.
+
+LANGUAGE: rust
+CODE:
+# use dioxus::prelude::*;
+
+fn app() -> Element {
+    let mut count = use_signal(|| 0);
+    // The memo will rerun any time we write to the count signal
+    let halved = use_memo(move || count() / 2);
+
+    rsx! {
+        // When we read the value of memo, the current component will subscribe to the result of the memo. It will only rerun when the result of the memo changes.
+        "{halved}"
+        button {
+            onclick: move |_| {
+                count += 1;
+            },
+            "Increment"
+        }
+    }
+}
+
+----------------------------------------
+
+TITLE: Using Default Props in Dioxus Components
+DESCRIPTION: Example demonstrating how to set default values for component props using the #[props(default)] attribute. Includes both implicit defaults and explicit default values.
+
+LANGUAGE: rust
+CODE:
+#[component]
+fn Button(
+    // The default attributes makes your field optional in the component and uses the default value if it is not set.
+    #[props(default)]
+    text: String,
+    // You can also set an explicit default value instead of using the `Default` implementation.
+    #[props(default = "red".to_string())]
+    color: String,
+) -> Element {
+    rsx! {
+        button {
+            color: color,
+            "{text}"
+        }
+    }
+}
+
+rsx! {
+    // You can skip setting props that have a default value when you use the component.
+    Button {}
+};
+
+----------------------------------------
+
+TITLE: Incorrect Hook Usage in Event Handlers
+DESCRIPTION: Shows why hooks should not be called inside event handlers in Dioxus. Event handlers execute outside the normal component rendering flow, violating hook ordering requirements.
+
+LANGUAGE: rust
+CODE:
+# use dioxus::prelude::*;
+fn App() -> Element {
+    rsx! {
+        button {
+            onclick: move |_| {
+                // ❌ Calling the event handler will change the order of the hooks
+                use_signal(|| "hello world".to_string());
+            },
+            "Click me"
+        }
+    }
+}
+
+----------------------------------------
+
+TITLE: Basic Props Implementation in Dioxus
+DESCRIPTION: Demonstrates how to define a basic Props struct with the #[derive(Props)] macro to create a Button component that accepts text and color properties.
+
+LANGUAGE: rust
+CODE:
+#[derive(Props, PartialEq, Clone)]
+struct ButtonProps {
+    /// The text of the button
+    text: String,
+
+    /// The color of the button
+    color: String,
+}
+
+fn Button(props: ButtonProps) -> Element {
+    rsx! {
+        button {
+            color: props.color,
+            "{props.text}"
+        }
+    }
+}
+
+rsx! {
+    // Any fields you defined on the props struct will be turned into props for the component.
+    Button {
+        text: "Click me!",
+        color: "red",
+    }
+};
+
+----------------------------------------
+
+TITLE: Using clone() for non-Copy types in multiple async blocks
+DESCRIPTION: Fixed component using string.clone() to create separate instances of a non-Copy type, allowing different async blocks to have their own owned values.
+
+LANGUAGE: rust
+CODE:
+# use dioxus::prelude::*;
+// `MyComponent` accepts a string which doesn't implement `Copy`
+#[component]
+fn MyComponent(string: String) -> Element {
+    use_hook(move || {
+        // ✅ The string only has one owner. We could move it into this closure, but since we want to use the string in other closures later, we will clone it instead
+        spawn({
+            // Clone the string in a new block
+            let string = string.clone();
+            // Then move the cloned string into the async block
+            async move {
+                println!("{}", string);
+            }
+        });
+        // ✅ We don't use the string after this closure, so we can just move it into the closure directly
+        spawn(async move {
+            println!("{}", string);
+        })
+    });
+
+    todo!()
+}
+
+----------------------------------------
+
+TITLE: Including Raw Expressions in Dioxus RSX
+DESCRIPTION: Demonstrates how to include raw Rust expressions within rsx! markup. The example shows inserting a variable directly and using an iterator with map to generate multiple elements dynamically.
+
+LANGUAGE: rust
+CODE:
+let name = "World";
+rsx! {
+    div {
+        // Text can be converted into a dynamic node in rsx
+        {name}
+    }
+    // Iterators can also be converted into dynamic nodes
+    {(0..10).map(|n| n * n).map(|number| rsx! { div { "{number}" } })}
+};
+
+----------------------------------------
+
+TITLE: Using ReadOnlySignal for Copy types in Dioxus
+DESCRIPTION: Fixed component using ReadOnlySignal<String> which implements Copy, allowing the same data to be used in multiple async blocks without ownership issues.
+
+LANGUAGE: rust
+CODE:
+# use dioxus::prelude::*;
+// `MyComponent` accepts `ReadOnlySignal<String>` which implements `Copy`
+#[component]
+fn MyComponent(string: ReadOnlySignal<String>) -> Element {
+    use_hook(move || {
+        // ✅ Because the `string` signal is `Copy`, we can copy it into the async task while still having access to it elsewhere
+        spawn(async move {
+            println!("{}", string);
+        });
+        // ✅ Since `string` is `Copy`, we can copy it into another async task
+        spawn(async move {
+            println!("{}", string);
+        })
+    });
+
+    todo!()
+}
+
+----------------------------------------
+
+TITLE: Iterating with For Loops in Dioxus RSX
+DESCRIPTION: Shows how to use for loops to render multiple elements from a collection. The example iterates over a vector of numbers and creates a div for each number.
+
+LANGUAGE: rust
+CODE:
+let numbers = vec![1, 2, 3];
+rsx! {
+    for number in numbers {
+        div {
+            "{number}"
+        }
+    }
+};
+
+----------------------------------------
+
+TITLE: Using 'move' keyword with async blocks in Dioxus
+DESCRIPTION: Fixed component that properly uses the 'move' keyword with the async block to ensure the signal is moved into the async block, making it available even after the function returns.
+
+LANGUAGE: rust
+CODE:
+use dioxus::prelude::*;
+
+fn App() -> Element {
+    let signal = use_signal(|| 0);
+
+    use_hook(move || {
+        // ✅ The `move` keyword tells rust it can move the `state` signal into the async block. Since the async block owns the signal state, it can read it even after the function returns
+        spawn(async move {
+            println!("{}", signal());
+        })
+    });
+
+    todo!()
+}
+
+----------------------------------------
+
+TITLE: Using Components in Dioxus RSX
+DESCRIPTION: Shows how to render custom components within rsx! markup. The example defines a HelloWorld component and then uses it within a div element, demonstrating component composition.
+
+LANGUAGE: rust
+CODE:
+#[component]
+fn HelloWorld() -> Element {
+    rsx! { "hello world!" }
+}
+
+rsx! {
+    div {
+        HelloWorld {}
+    }
+};
+
+----------------------------------------
+
+TITLE: Fixing Lifetime Issues with async blocks in Dioxus
+DESCRIPTION: Example of a broken component where an async block borrows a value owned by the current function, causing a compiler error. The issue occurs when the async block tries to access data that may not live long enough.
+
+LANGUAGE: rust
+CODE:
+use dioxus::prelude::*;
+
+fn App() -> Element {
+    let signal = use_signal(|| 0);
+
+    use_hook(move || {
+        // ❌ The task may run at any point and reads the value of the signal, but the signal is dropped at the end of the function
+        spawn(async {
+            println!("{}", signal());
+        })
+    });
+
+    todo!()
+}
+
+----------------------------------------
+
+TITLE: Using Raw Attributes in Dioxus
+DESCRIPTION: Shows how to include custom attributes that aren't in the HTML spec using the raw attribute syntax. The example sets a data-count attribute by surrounding the attribute name with quotes.
+
+LANGUAGE: rust
+CODE:
+rsx! {
+    div {
+        // Set the data-count attribute to "1"
+        "data-count": "1"
+    }
+};
+
+----------------------------------------
+
+TITLE: Correct Async Memo Pattern in Dioxus
+DESCRIPTION: Demonstrates the proper way to use memos with async code by cloning the memo value rather than holding a reference over an await point. This approach prevents potential runtime panics during memo updates.
+
+LANGUAGE: rust
+CODE:
+# use dioxus::prelude::*;
+# async fn sleep(delay: u32) {}
+async fn double_me_async(value: u32) -> u32 {
+    sleep(100).await;
+    value * 2
+}
+let mut signal = use_signal(|| 0);
+let halved = use_memo(move || signal() / 2);
+
+let doubled = use_resource(move || async move {
+    // Calling the memo will clone the inner value
+    let halved = halved();
+    double_me_async(halved).await;
+});
+
+rsx!{
+    "{doubled:?}"
+    button {
+        onclick: move |_| {
+            signal += 1;
+        },
+        "Increment"
+    }
+};
+
+----------------------------------------
+
+TITLE: Adding Attributes to Elements in Dioxus
+DESCRIPTION: Shows how to add key-value attributes to elements in rsx!. The example sets a static class attribute and a dynamically formatted width attribute using a variable.
+
+LANGUAGE: rust
+CODE:
+let width = 100;
+rsx! {
+    div {
+        // Set the class attribute to "my-class"
+        class: "my-class",
+        // attribute strings are automatically formatted with the format macro
+        width: "{width}px",
+    }
+};
+
+----------------------------------------
+
+TITLE: Incorrect Hook Usage in Loops
+DESCRIPTION: Demonstrates why hooks should not be placed inside loops in Dioxus components. Changing loop boundaries can alter hook execution order, causing unpredictable behavior.
+
+LANGUAGE: rust
+CODE:
+# use dioxus::prelude::*;
+fn App() -> Element {
+    let number = use_signal(|| 1);
+    // ❌ Changing the loop will change the order of the hooks
+    for i in 0..number() {
+        let string = use_signal(|| "hello world".to_string());
+    }
+
+    todo!()
+}
+
+----------------------------------------
+
+TITLE: Rendering Web Components in Dioxus
+DESCRIPTION: Shows how Dioxus automatically renders elements with hyphens as untyped web components. This example renders a custom div-component element that contains a standard div.
+
+LANGUAGE: rust
+CODE:
+rsx! {
+    div-component {
+        div {}
+    }
+};
+
+----------------------------------------
+
+TITLE: Creating Basic Elements with RSX in Dioxus
+DESCRIPTION: Demonstrates how to create nested divs using the rsx! macro in Dioxus. The example shows the basic structure of creating element hierarchies with braces surrounding attributes and children.
+
+LANGUAGE: rust
+CODE:
+rsx! {
+    div {
+        div {}
+    }
+};
+
+----------------------------------------
+
+TITLE: Including Text Content in Dioxus RSX
+DESCRIPTION: Demonstrates how to include text content in rsx! markup. The example shows both static strings and formatted strings that incorporate variables using curly braces.
+
+LANGUAGE: rust
+CODE:
+let name = "World";
+rsx! {
+    div {
+        "Hello World"
+        // Just like attributes, you can included formatted segments inside your text
+        "Hello {name}"
+    }
+};
+
+----------------------------------------
+
+TITLE: Implementing HTML Elements with Attributes in Dioxus
+DESCRIPTION: Example of how HTML elements and their attributes are implemented in Dioxus. Shows a 'base' element with 'href' and 'target' attributes defined as constants on the element struct.
+
+LANGUAGE: rust
+CODE:
+struct base;
+impl DioxusElement for base {
+    const TAG_NAME: &'static str = "base";
+    const NAME_SPACE: Option<&'static str> = None;
+}
+impl base {
+    const href: (&'static str, Option<'static str>, bool) = ("href", None, false);
+    const target: (&'static str, Option<'static str>, bool) = ("target", None, false);
+}
+
+----------------------------------------
+
+TITLE: Sending Data to JavaScript from Dioxus
+DESCRIPTION: Shows how to pass data to JavaScript code by formatting values into the JavaScript string or by sending values to the Eval channel. This example demonstrates sending a sequence of values from Rust to JavaScript.
+
+LANGUAGE: rust
+CODE:
+use dioxus::prelude::*;
+
+fn app() -> Element {
+    rsx! {
+        button {
+            onclick: move |_| {
+                // You can pass initial data to the eval function by formatting it into the JavaScript code.
+                const LOOP_COUNT: usize = 10;
+                let eval = document::eval(&format!(r#"for(let i = 0; i < {LOOP_COUNT}; i++) {{
+                    // You can receive values asynchronously with the the `await dioxus.recv()` method.
+                    let value = await dioxus.recv();
+                    console.log("Received", value);
+                }}"#));
+
+                // You can send values from rust to the JavaScript code with the `send` method on the object returned by `eval`.
+                for i in 0..LOOP_COUNT {
+                    eval.send(i).unwrap();
+                }
+            },
+            "Log Count"
+        }
+    }
+}
+
+----------------------------------------
+
+TITLE: Implementing the DioxusElement Trait for HTML Elements
+DESCRIPTION: Shows how to implement the DioxusElement trait for HTML elements in Dioxus. Elements are implemented as zero-sized structs with TAG_NAME and NAME_SPACE constant properties.
+
+LANGUAGE: rust
+CODE:
+struct div;
+impl DioxusElement for div {
+    const TAG_NAME: &'static str = "div";
+    const NAME_SPACE: Option<&'static str> = None;
+}
+
+----------------------------------------
+
+TITLE: Receiving Data from JavaScript in Dioxus
+DESCRIPTION: Demonstrates how to receive values sent from JavaScript code back to Rust. The example shows JavaScript sending a sequence of values which are then received and processed in Rust code.
+
+LANGUAGE: rust
+CODE:
+use dioxus::prelude::*;
+
+fn app() -> Element {
+    rsx! {
+        button {
+            onclick: move |_| async move {
+                // You can send values from rust to the JavaScript code by using the `send` method on the object returned by `eval`.
+                let mut eval = document::eval(r#"for(let i = 0; i < 10; i++) {
+                    // You can send values asynchronously with the `dioxus.send()` method.
+                    dioxus.send(i);
+                }"#);
+
+                // You can receive values from the JavaScript code with the `recv` method on the object returned by `eval`.
+                for _ in 0..10 {
+                    let value: i32 = eval.recv().await.unwrap();
+                    println!("Received {}", value);
+                }
+            },
+            "Log Count"
+        }
+    }
+}
+
+----------------------------------------
+
+TITLE: Creating Custom Elements in Dioxus using AR Namespace Example
+DESCRIPTION: Example of how to use a custom namespace (AR in this case) with Dioxus rsx! macro. This demonstrates how Dioxus can support alternative element sets beyond HTML.
+
+LANGUAGE: rust
+CODE:
+use ar_namespace::*;
+
+rsx! {
+    magic_div {
+        magic_header {}
+        magic_paragraph {
+            on_magic_click: move |event| {
+                //
+            }
+        }
+    }
+}
+
+----------------------------------------
+
+TITLE: Creating Typed Web Components in Dioxus
+DESCRIPTION: Demonstrates how to wrap a web component in a custom component to add type checking. The example creates a MyDivComponent that takes a width parameter and passes it to the underlying div-component.
+
+LANGUAGE: rust
+CODE:
+#[component]
+fn MyDivComponent(width: i64) -> Element {
+    rsx! {
+        div-component {
+            "width": width
+        }
+    }
+}
+
+----------------------------------------
+
+TITLE: DOM Interaction with eval in Dioxus
+DESCRIPTION: Shows how to properly interact with the DOM using eval in Dioxus applications. This demonstrates the correct pattern of using eval inside use_effect to ensure the DOM has been mounted before interacting with it.
+
+LANGUAGE: rust
+CODE:
+use dioxus::prelude::*;
+
+const SCRIPT: &str = r#"
+    let element = document.getElementById("my-element");
+    element.innerHTML = "Hello World";
+    return element.getAttribute("data-count");
+"#;
+
+fn app() -> Element {
+    // ❌ You shouldn't run eval in the body of a component. This will run before the component has been mounted
+    // document::eval(SCRIPT);
+
+    // ✅ You should run eval inside an effect or event. This will run after the component has been mounted
+    use_effect(move || {
+        spawn(async {
+            let count = document::eval(SCRIPT).await;
+            println!("Count is {:?}", count);
+        });
+    });
+
+
+    rsx! {
+        div {
+            id: "my-element",
+            "data-count": "123",
+        }
+    }
+}
+
+----------------------------------------
+
+TITLE: Signal Lifecycle and Anti-pattern in Dioxus Component Tree
+DESCRIPTION: Shows how Signals are tied to the component that created them and demonstrates an anti-pattern of passing Signals up the component tree, which can lead to ownership issues if the child component is dropped.
+
+LANGUAGE: rust
+CODE:
+# use dioxus::prelude::*;
+fn MyComponent() -> Element {
+    let child_signal = use_signal(|| None);
+
+    rsx! {
+        IncrementButton {
+            child_signal
+        }
+    }
+}
+
+#[component]
+fn IncrementButton(mut child_signal: Signal<Option<Signal<i32>>>) -> Element {
+    let signal_owned_by_child = use_signal(|| 0);
+    // Don't do this: it may cause issues if you drop the child component
+    child_signal.set(Some(signal_owned_by_child));
+
+    todo!()
+}
+
+----------------------------------------
+
+TITLE: Basic JavaScript Execution in Dioxus using eval
+DESCRIPTION: Demonstrates how to use the eval function to execute JavaScript code and retrieve the result. The example shows executing console.log and returning a value from JavaScript back to Rust.
+
+LANGUAGE: rust
+CODE:
+use dioxus::prelude::*;
+
+fn App() -> Element {
+    rsx! {
+        button {
+            onclick: move |_| async move {
+                // Eval is a global function you can use anywhere inside Dioxus. It will execute the given JavaScript code.
+                let result = document::eval(r#"console.log("Hello World");
+                return "Hello World";"#);
+
+                // You can use the `await` keyword to wait for the result of the JavaScript code.
+                println!("{:?}", result.await);
+            },
+            "Log Hello World"
+        }
+    }
+}
+
+----------------------------------------
+
+TITLE: Basic Reactive Props in Dioxus Components
+DESCRIPTION: Example of a simple component with non-reactive props, showing how changes to props cause component reruns but don't affect internal reactive hooks.
+
+LANGUAGE: rust
+CODE:
+#[component]
+fn Counter(count: i32) -> Element {
+    rsx! {
+        div {
+            "Count: {count}"
+        }
+    }
+}
+
+LANGUAGE: rust
+CODE:
+#[component]
+fn Counter(count: i32) -> Element {
+    // We can use a memo to calculate the doubled count. Since this memo will only be created the first time the component is run and `count` is not reactive, it will never update when `count` changes.
+    let doubled_count = use_memo(move || count * 2);
+    rsx! {
+        div {
+            "Count: {count}"
+            "Doubled Count: {doubled_count}"
+        }
+    }
+}
+
+----------------------------------------
+
+TITLE: Handling Head Components with Suspense in Dioxus
+DESCRIPTION: This example shows how head components behave in fullstack rendering with suspense boundaries. It demonstrates that components within suspense boundaries will only render on the client after hydration, which can affect SEO visibility.
+
+LANGUAGE: rust
+CODE:
+# use dioxus::prelude::*;
+# #[component]
+# fn LoadData(children: Element) -> Element { unimplemented!() }
+fn App() -> Element {
+    rsx! {
+        // This will render in SSR
+        document::Title { "My Page" }
+        SuspenseBoundary {
+            fallback: |_| rsx! { "Loading..." },
+            LoadData {
+                // This will only be rendered on the client after hydration so it may not be visible to search engines
+                document::Meta { name: "description", content: "My Page" }
+            }
+        }
+    }
+}
+
+----------------------------------------
+
+TITLE: Converting Props with Into Trait in Dioxus
+DESCRIPTION: Example demonstrating the use of #[props(into)] attribute to automatically convert input types using the Into trait, allowing more flexible prop types.
+
+LANGUAGE: rust
+CODE:
+#[component]
+fn Button(
+    // You can use the `into` attribute on a field to convert types you pass in with the Into trait.
+    #[props(into)]
+    number: u64,
+) -> Element {
+    rsx! {
+        button { "{number}" }
+    }
+}
+
+rsx! {
+    Button {
+        // Because we used the into attribute, we can pass in any type that implements Into<u64>
+        number: 10u8
+    }
+};
+
+----------------------------------------
+
+TITLE: Implementing Meta Redirect in Dioxus
+DESCRIPTION: This example demonstrates how to use the document::Meta component to create a page that automatically redirects to the Dioxus homepage after 10 seconds without requiring JavaScript.
+
+LANGUAGE: rust
+CODE:
+# use dioxus::prelude::*;
+fn RedirectToDioxusHomepageWithoutJS() -> Element {
+    rsx! {
+        // You can use the meta component to render a meta tag into the head of the page
+        // This meta tag will redirect the user to the dioxuslabs homepage in 10 seconds
+        document::Meta {
+            http_equiv: "refresh",
+            content: "10;url=https://dioxuslabs.com",
+        }
+    }
+}
+
+----------------------------------------
+
+TITLE: Extending Props with Element Attributes in Dioxus
+DESCRIPTION: Shows how to extend component props with GlobalAttributes or element-specific attributes using the #[props(extends)] attribute, allowing for the reuse of HTML element attributes.
+
+LANGUAGE: rust
+CODE:
+#[derive(Props, PartialEq, Clone)]
+struct CardProps {
+    /// You can use the `extends` attribute on a field with the type `Vec<Attribute>` to extend the props with all the attributes from an element or the global element attributes.
+    #[props(extends = GlobalAttributes)]
+    attributes: Vec<Attribute>,
+}
+
+#[component]
+fn Card(props: CardProps) -> Element {
+    rsx! {
+        // Instead of copying over every single attribute, we can just spread the attributes from the props into the element.
+        div { ..props.attributes, "card" }
+    }
+}
+
+rsx! {
+    // Since we extend global attributes, you can use any attribute that would normally appear on elements.
+    Card {
+        width: "10px",
+        height: "10px",
+        color: "red",
+    }
+};
+
+LANGUAGE: rust
+CODE:
+#[derive(Props, PartialEq, Clone)]
+struct ButtonProps {
+    #[props(extends = GlobalAttributes, extends = button)]
+    attributes: Vec<Attribute>,
+}
+
+#[component]
+fn Button(props: ButtonProps) -> Element {
+    rsx! {
+        button { ..props.attributes, "button" }
+    }
+}
+
+rsx! {
+    Button {
+        // A global attribute
+        width: "10px",
+        // A button specific attribute
+        disabled: true,
+    }
+};
+
+----------------------------------------
+
+TITLE: Basic Dioxus Desktop Application Structure
+DESCRIPTION: Minimal example of a Dioxus Desktop application. Shows how to set up a basic application with a simple UI component that displays "hello world!".
+
+LANGUAGE: rust
+CODE:
+// main.rs
+use dioxus::prelude::*;
+
+fn main() {
+    dioxus_desktop::launch(app);
+}
+
+fn app() -> Element {
+    rsx! {
+        div {
+            "hello world!"
+        }
+    }
+}
+
+----------------------------------------
+
+TITLE: Adding Dioxus Dependencies
+DESCRIPTION: Shell commands to add the required Dioxus packages to the project. Adds the core Dioxus library and the desktop renderer feature.
+
+LANGUAGE: shell
+CODE:
+$ cargo add dioxus
+$ cargo add dioxus-desktop
+
+----------------------------------------
+
+TITLE: Creating a New Dioxus Desktop Project
+DESCRIPTION: Shell commands to initialize a new Dioxus Desktop project. Creates a new binary project with Cargo and adds the necessary Dioxus dependencies.
+
+LANGUAGE: shell
+CODE:
+$ cargo new --bin demo
+$ cd app
+
+----------------------------------------
+
+TITLE: Fixing Static Lifetime Error in Dioxus Event Handlers with 'move' Keyword
+DESCRIPTION: Demonstrates how to solve the 'function requires argument type to outlive `'static`' error in Dioxus event handlers by adding the 'move' keyword to closures. This allows the closure to take ownership of values rather than trying to borrow them.
+
+LANGUAGE: rust
+CODE:
+fn App() -> Element {
+    // Signals are `Copy` which makes them very easy to move into `'static` closures like event handlers
+    let state = use_signal(|| "hello world".to_string());
+
+    rsx! {
+        button {
+            // ❌ Without `move`, rust will try to borrow the `state` signal which fails because the state signal is dropped at the end of the function
+            onclick: |_| {
+                println!("You clicked the button! The state is: {state}");
+            },
+            "Click me"
+        }
+    }
+    // The state signal is dropped here, but the event handler still needs to access it
+}
+
+LANGUAGE: rust
+CODE:
+fn App() -> Element {
+    let state = use_signal(|| "hello world".to_string());
+
+    rsx! {
+        button {
+            // ✅ The `move` keyword tells rust it can move the `state` signal into the closure. Since the closure owns the signal state, it can read it even after the function returns
+            onclick: move |_| {
+                println!("You clicked the button! The state is: {state}");
+            },
+            "Click me"
+        }
+    }
+}
+
+----------------------------------------
+
+TITLE: Creating a Basic Dioxus Application in Rust
+DESCRIPTION: This example shows how to create a simple Dioxus application by defining a root component function that returns an Element, creating a VirtualDom instance, and generating DOM mutations. It demonstrates the minimal code needed to start a Dioxus application.
+
+LANGUAGE: rust
+CODE:
+# use dioxus::dioxus_core::Mutations;
+use dioxus::prelude::*;
+
+// First, declare a root component
+fn app() -> Element {
+    rsx!{
+        div { "hello world" }
+    }
+}
+
+fn main() {
+    // Next, create a new VirtualDom using this app as the root component.
+    let mut dom = VirtualDom::new(app);
+
+    // The initial render of the dom will generate a stream of edits for the real dom to apply
+    let mutations = dom.rebuild_to_vec();
+}
+
+----------------------------------------
+
+TITLE: Formatted String Props in Dioxus
+DESCRIPTION: Demonstrates how to use formatted strings in props that accept the String type, allowing for dynamic string interpolation in component props.
+
+LANGUAGE: rust
+CODE:
+#[derive(Props, PartialEq, Clone)]
+struct ButtonProps {
+    text: String,
+}
+
+fn Button(props: ButtonProps) -> Element {
+    rsx! {
+        button { "{props.text}" }
+    }
+}
+
+let name = "Bob";
+rsx! {
+    Button {
+        // You can use formatted strings in props that accept String just like you would in an element.
+        text: "Hello {name}!"
+    }
+};
+
+----------------------------------------
+
+TITLE: Sample Dioxus Configuration File
+DESCRIPTION: A minimal example of a Dioxus.toml configuration file with only the mandatory fields, used to configure a Dioxus project with basic settings like name, platform, and web resources.
+
+LANGUAGE: toml
+CODE:
+[application]
+name = "project-name"
+# Currently supported platforms: web, desktop
+default_platform = "web"
+
+[web.app]
+title = "Hello"
+
+[web.resource.dev]
+
+----------------------------------------
+
+TITLE: Chaining Memos in Dioxus
+DESCRIPTION: Shows how to chain multiple memos together where one memo depends on another. The example demonstrates creating a doubled memo that depends on a halved memo, which itself depends on a count signal.
+
+LANGUAGE: rust
+CODE:
+# use dioxus::prelude::*;
+
+fn app() -> Element {
+    let mut count = use_signal(|| 0);
+    // The memo will rerun any time we write to the count signal
+    let halved = use_memo(move || count() / 2);
+    // This will rerun any time the halved value changes
+    let doubled = use_memo(move || 2 * halved());
+
+    rsx! {
+        "{doubled}"
+        button {
+            onclick: move |_| {
+                count += 1;
+            },
+            "Increment"
+        }
+    }
+}
+
+----------------------------------------
+
+TITLE: Installing Dioxus CLI from Local Folder
+DESCRIPTION: Command to install dioxus-cli from a local folder, though with a note that it may fail to build projects in debug profile due to an issue under investigation.
+
+LANGUAGE: shell
+CODE:
+cargo install --path .
+
+----------------------------------------
+
+TITLE: Server-Side Rendering Example with Dioxus
+DESCRIPTION: Demonstrates a basic server-side rendering implementation where a Dioxus component is rendered to HTML on the server. This example creates a simple component, renders it, and verifies the output.
+
+LANGUAGE: rust
+CODE:
+# use dioxus::prelude::*;
+fn App() -> Element {
+  rsx! { div { "hello world!" } }
+}
+let mut vdom = VirtualDom::new(App);
+vdom.rebuild_in_place();
+let text = dioxus_ssr::render(&vdom);
+assert_eq!(text, "<div>hello world!</div>")
+
+----------------------------------------
+
+TITLE: Installing Dioxus CLI Development Version from Git
+DESCRIPTION: Command to install the latest development version of dioxus-cli directly from the GitHub repository, for users who need the latest features and bug fixes (though may have more bugs).
+
+LANGUAGE: shell
+CODE:
+cargo install --git https://github.com/DioxusLabs/dioxus dioxus-cli
+
+----------------------------------------
+
+TITLE: Pre-rendering with Hydration Support in Dioxus SSR
+DESCRIPTION: Shows how to enable pre-rendering with hydration support. This generates element nodes with Element IDs that can be used by the client-side renderer to attach virtual nodes during hydration.
+
+LANGUAGE: rust
+CODE:
+# use dioxus::prelude::*;
+# fn App() -> Element { todo!() }
+let mut vdom = VirtualDom::new(App);
+
+vdom.rebuild_in_place();
+
+let mut renderer = dioxus_ssr::Renderer::new();
+renderer.pre_render = true;
+
+let text = renderer.render(&vdom);
+
+----------------------------------------
+
+TITLE: Installing Dioxus CLI from Cargo Registry
+DESCRIPTION: Command to install the stable version of dioxus-cli using Cargo, which is the recommended installation method for most users.
+
+LANGUAGE: shell
+CODE:
+cargo install dioxus-cli
+
+----------------------------------------
+
+TITLE: Rendering a Dioxus Component to HTML Using SSR
+DESCRIPTION: Demonstrates how to create a simple Dioxus component and render it to HTML using the SSR renderer. The example creates a VirtualDom, rebuilds it, and then renders it to a string.
+
+LANGUAGE: rust
+CODE:
+# use dioxus::prelude::*;
+fn app() -> Element {
+  rsx!{
+    div {"hello world!"}
+  }
+}
+
+let mut vdom = VirtualDom::new(app);
+vdom.rebuild_in_place();
+
+let text = dioxus_ssr::render(&vdom);
+assert_eq!(text, "<div>hello world!</div>")
+
+----------------------------------------
+
+TITLE: Safe Async Signal Pattern in Dioxus
+DESCRIPTION: Demonstrates the recommended pattern for using Signals with async code by cloning values from the Signal, performing async operations, and then updating the Signal with the final result.
+
+LANGUAGE: rust
+CODE:
+# use dioxus::prelude::*;
+# async fn sleep(delay: u32) {}
+async fn double_me_async(value: u32) -> u32 {
+    sleep(100).await;
+    value * 2
+}
+let mut signal = use_signal(|| 0);
+
+use_future(move || async move {
+    // Clone the value out of the signal
+    let current_value = signal();
+    // Run the async work
+    let new_value = double_me_async(current_value).await;
+    // Set the signal to the new value
+    signal.set(new_value);
+});
+
+rsx! {
+    // This read will not panic because the write is never held over an await point
+    "{signal}"
+};
+
+----------------------------------------
+
+TITLE: Using the VirtualDom with Event Handling in Rust
+DESCRIPTION: This snippet demonstrates the core loop for working with the VirtualDom, handling events, and rendering changes. It creates a VirtualDom instance, then enters a loop where it processes events from a renderer and updates the UI accordingly.
+
+LANGUAGE: rust
+CODE:
+# tokio::runtime::Runtime::new().unwrap().block_on(async {
+use dioxus_core::prelude::*;
+use dioxus_core::*;
+
+let mut vdom = VirtualDom::new(app);
+let real_dom = SomeRenderer::new();
+
+loop {
+    tokio::select! {
+        evt = real_dom.event() => {
+            let evt = Event::new(evt, true);
+            vdom.runtime().handle_event("onclick", evt, ElementId(0))
+        },
+        _ = vdom.wait_for_work() => {}
+    }
+    vdom.render_immediate(&mut real_dom.apply())
+}
+
+# fn app() -> Element { VNode::empty() }
+# struct SomeRenderer; impl SomeRenderer { fn new() -> SomeRenderer { SomeRenderer } async fn event(&self) -> std::rc::Rc<dyn std::any::Any> { unimplemented!() } fn apply(&self) -> Mutations { Mutations::default() } }
+# });
+
+----------------------------------------
+
+TITLE: Problematic Async Signal Usage in Dioxus
+DESCRIPTION: Shows an anti-pattern when using Signals with async code. Holding a Signal borrow over an await point can lead to runtime panics due to borrow checking violations.
+
+LANGUAGE: rust
+CODE:
+# use dioxus::prelude::*;
+# async fn sleep(delay: u32) {}
+async fn double_me_async(value: &mut u32) {
+    sleep(100).await;
+    *value *= 2;
+}
+let mut signal = use_signal(|| 0);
+
+use_future(move || async move {
+    // Don't hold reads or writes over await points
+    let mut write = signal.write();
+    // While the future is waiting for the async work to finish, the write will be open
+    double_me_async(&mut write).await;
+});
+
+rsx!{
+    // This read may panic because the write is still active while the future is waiting for the async work to finish
+    "{signal}"
+};
+
+----------------------------------------
+
+TITLE: Using Components with Curly Brace Syntax
+DESCRIPTION: Demonstrates how to use components with a React-like curly brace syntax within the rsx! macro. This is an alternative style for components that begin with an uppercase letter.
+
+LANGUAGE: rust
+CODE:
+rsx! {
+    Header { title: "My App" }
+}
+
+----------------------------------------
+
+TITLE: Safe Signal Access Patterns in Dioxus
+DESCRIPTION: Demonstrates safe patterns for accessing Signals by using block scopes to manage borrow lifetimes and with_* helper methods to read and write in a controlled scope.
+
+LANGUAGE: rust
+CODE:
+# use dioxus::prelude::*;
+let mut signal = use_signal(|| 0);
+{
+    // Since this read is inside a block that ends before we write to the signal, the signal will be dropped before the write and it will not panic
+    let read = signal.read();
+    println!("{}", read);
+}
+signal += 1;
+
+// Or you can use the with and with_write methods which only read or write to the signal inside the closure
+signal.with(|read| println!("{}", read));
+// Since the read only lasts as long as the closure, this will not panic
+signal.with_mut(|write| *write += 1);
+
+----------------------------------------
+
+TITLE: Advanced Asset Management with Manganis in Rust
+DESCRIPTION: Shows various ways to collect, optimize, and transform assets using Manganis. Examples include collecting arbitrary files, optimizing images, resizing images at compile time, and converting images to web-friendly formats like AVIF.
+
+LANGUAGE: rust
+CODE:
+use manganis::{ImageFormat, ImageAssetOptions, Asset, asset, ImageSize};
+// You can collect arbitrary files. Absolute paths are resolved relative to the package root
+const _: Asset = asset!("/assets/script.js");
+
+// You can collect images which will be automatically optimized
+pub const PNG_ASSET: Asset =
+    asset!("/assets/image.png");
+// Resize the image at compile time to make the assets smaller
+pub const RESIZED_PNG_ASSET: Asset =
+    asset!("/assets/image.png", ImageAssetOptions::new().with_size(ImageSize::Manual { width: 52, height: 52 }));
+// Or convert the image at compile time to a web friendly format
+pub const AVIF_ASSET: Asset = asset!("/assets/image.png", ImageAssetOptions::new().with_format(ImageFormat::Avif));
+
+----------------------------------------
+
+TITLE: Signal Runtime Borrow Checking in Dioxus
+DESCRIPTION: Illustrates how Signals enforce borrow checking at runtime similar to RefCell. Demonstrates a panic scenario when attempting to read and write simultaneously to a Signal.
+
+LANGUAGE: rust
+CODE:
+# use dioxus::prelude::*;
+let mut signal = use_signal(|| 0);
+// If you create a read and hold it while you write to the signal, it will panic
+let read = signal.read_unchecked();
+// This will panic
+signal += 1;
+println!("{}", read);
+
+----------------------------------------
+
+TITLE: Basic Asset Declaration in Rust with Manganis
+DESCRIPTION: Demonstrates how to declare a basic asset using the Manganis asset macro. The asset will be processed and given a new file name that can be served by a CLI tool. Any package depending on this library can collect this asset.
+
+LANGUAGE: rust
+CODE:
+use manganis::{Asset, asset};
+const AVIF_ASSET: Asset = manganis::asset!("/assets/image.png");
+
+----------------------------------------
+
+TITLE: Using use_resource() with non-reactive dependencies in Dioxus
+DESCRIPTION: This example demonstrates how to use use_resource() with non-reactive Rust values using the use_reactive() hook. It also shows how to work with both non-reactive and reactive component props.
+
+LANGUAGE: rust
+CODE:
+# use dioxus::prelude::*;
+# async fn sleep(delay: u32) {}
+#[component]
+fn Comp(count: u32) -> Element {
+    // We manually add the resource to the dependencies list with the `use_reactive` hook
+    // Any time `count` changes, the resource will rerun
+    let new_count = use_resource(use_reactive!(|(count,)| async move {
+        sleep(100).await;
+        count + 1
+    }));
+    rsx! { "{new_count:?}" }
+}
+
+// If your value is already reactive, you never need to call `use_reactive` manually
+// Instead of manually adding count to the dependencies list, you can make your prop reactive by wrapping it in `ReadOnlySignal`
+#[component]
+fn ReactiveComp(count: ReadOnlySignal<u32>) -> Element {
+    // Because `count` is reactive, the resource knows to rerun when `count` changes automatically
+    let new_count = use_resource(move || async move {
+        sleep(100).await;
+        count() + 1
+    });
+    rsx! { "{new_count:?}" }
+}
+
+----------------------------------------
+
+TITLE: Using Integrated Logger in Dioxus v0.6
+DESCRIPTION: Shows how to use the logger that's integrated directly into Dioxus v0.6. This example demonstrates that the logger API is now accessible through dioxus::logger namespace rather than a separate crate.
+
+LANGUAGE: rust
+CODE:
+use dioxus::prelude::*;
+use dioxus::logger::tracing::{Level, info};
+
+fn main() {
+  dioxus::logger::init(Level::INFO).expect("logger failed to init");
+  dioxus::launch(App);
+}
+
+#[component]
+fn App() -> Element {
+  info!("App rendered");
+  rsx! {
+    p { "hi" }
+  }
+}
+
+----------------------------------------
+
+TITLE: Demonstrating resource reactivity with signal updates in Dioxus
+DESCRIPTION: This example illustrates the reactive behavior of resources in Dioxus. It shows how a resource automatically reruns when its signal dependencies are updated, including handling of pending, done, and stopped states.
+
+LANGUAGE: rust
+CODE:
+# use dioxus::prelude::*;
+// Create a new count signal
+let mut count = use_signal(|| 1);
+// Create a new resource that doubles the value of count
+let double_count = use_resource(move || async move {
+    // Start a request to the server. We are reading the value of count in the format macro
+    // Reading the value of count makes the resource "subscribe" to changes to count (when count changes, the resource will rerun)
+    let response = reqwest::get(format!("https://myserver.com/doubleme?count={count}")).await.unwrap();
+    response.text().await.unwrap()
+});
+
+// Resource can be read in a way that is similar to signals, but they have a bit of extra information about the state of the resource future.
+
+// Calling .state() on a resource will return a Signal<UseResourceState> with information about the current status of the resource
+println!("{:?}", double_count.state().read()); // Prints "UseResourceState::Pending"
+
+// You can also try to get the last resolved value of the resource with the .value() method
+println!("{:?}", double_count.read()); // Prints "None"
+
+// Wait for the resource to finish and get the value
+std::thread::sleep(std::time::Duration::from_secs(1));
+
+// Now if we read the state, we will see that it is done
+println!("{:?}", double_count.state().read()); // Prints "UseResourceState::Done"
+
+// And we can get the value
+println!("{:?}", double_count.read()); // Prints "Some(2)"
+
+// Now if we write to count, the resource will rerun
+count += 1; // count is now 2
+
+// Wait for the resource to finish and get the value
+std::thread::sleep(std::time::Duration::from_secs(1));
+
+// Now if we read the state, we will see that it is done
+println!("{:?}", double_count.state().read()); // Prints "UseResourceState::Done"
+
+// And we can get the value
+println!("{:?}", double_count.read()); // Prints "Some(4)"
+
+// One more case, what happens if we write to the resource while it is in progress?
+// The resource will rerun and the value will be None
+count += 1; // count is now 3
+
+// If we write to a value the resource subscribes to again, it will cancel the current future and start a new one
+count += 1; // count is now 4
+
+println!("{:?}", double_count.state().read()); // Prints "UseResourceState::Stopped"
+println!("{:?}", double_count.read()); // Prints the last resolved value "Some(4)"
+
+// After we wait for the resource to finish, we will get the value of only the latest future
+std::thread::sleep(std::time::Duration::from_secs(1));
+
+println!("{:?}", double_count.state().read()); // Prints "UseResourceState::Done"
+
+println!("{:?}", double_count.read()); // Prints "Some(8)"
+
+----------------------------------------
+
+TITLE: Adding Dioxus Logger Dependency for Dioxus v0.5
+DESCRIPTION: Shows how to add the dioxus-logger crate as a dependency in the Cargo.toml file for Dioxus applications using v0.5 or earlier versions.
+
+LANGUAGE: toml
+CODE:
+[dependencies]
+dioxus-logger = "0.5"
+
+----------------------------------------
+
+TITLE: Using Effects with Non-Reactive Dependencies in Dioxus
+DESCRIPTION: This example shows how to use use_reactive to explicitly add non-reactive dependencies to an effect in Dioxus. Signal values are automatically tracked, but other values need to be manually specified.
+
+LANGUAGE: rust
+CODE:
+# use dioxus::prelude::*;
+# async fn sleep(delay: u32) {}
+
+#[component]
+fn Comp(count: u32) -> Element {
+    // Because the memo subscribes to `count` by adding it as a dependency, the memo will rerun every time `count` changes.
+    use_effect(use_reactive((&count,), |(count,)| println!("Manually manipulate the dom") ));
+
+    todo!()
+}
+
+----------------------------------------
+
+TITLE: Basic Usage of Dioxus Logger with Tracing in Dioxus v0.5
+DESCRIPTION: Demonstrates how to initialize the logger with an INFO level and use tracing's info macro in a simple Dioxus application. This example shows the basic pattern for logging in Dioxus applications prior to v0.6.
+
+LANGUAGE: rust
+CODE:
+use dioxus::prelude::*;
+use dioxus_logger::tracing::{Level, info};
+
+fn main() {
+  dioxus_logger::init(Level::INFO).expect("logger failed to init");
+  dioxus::launch(App);
+}
+
+#[component]
+fn App() -> Element {
+  info!("App rendered");
+  rsx! {
+    p { "hi" }
+  }
+}
+
+----------------------------------------
+
+TITLE: Hook Ordering Explanation with Example Component
+DESCRIPTION: Explains why hook ordering is important in Dioxus by showing how state is stored and retrieved. The example demonstrates how hooks are tracked and how their ordering affects state management.
+
+LANGUAGE: rust
+CODE:
+# use dioxus::prelude::*;
+fn App() -> Element {
+    let number = use_signal(|| 1); // Hook 1
+    let string = use_signal(|| "hello world".to_string()); // Hook 2
+    let doubled = use_memo(move || number() * 2); // Hook 3
+
+    todo!()
+}
+
+----------------------------------------
+
+TITLE: Running Dioxus App with Experimental WASM Splitting
+DESCRIPTION: Shell commands for serving and bundling a Dioxus application with the experimental WASM splitting feature enabled, which is required when using router splitting for code optimization.
+
+LANGUAGE: shell
+CODE:
+dx serve --experimental-wasm-split
+
+LANGUAGE: shell
+CODE:
+dx bundle --features "dioxus-router?/wasm-split"  --experimental-wasm-split
+
+----------------------------------------
+
+TITLE: Incorrect Hook Usage in Initialization Closures
+DESCRIPTION: Demonstrates incorrect hook usage within initialization closures of other hooks. These closures only execute once during component creation, causing inconsistent hook ordering.
+
+LANGUAGE: rust
+CODE:
+# use dioxus::prelude::*;
+fn App() -> Element {
+    let number = use_signal(|| {
+        // ❌ This closure will only be called when the component is first created. Running the component will change the order of the hooks
+        let string = use_signal(|| "hello world".to_string());
+        string()
+    });
+
+    todo!()
+}
+
+----------------------------------------
+
+TITLE: Extending Components with Multiple Element Attributes in Dioxus
+DESCRIPTION: Example demonstrating how to extend component props with both global attributes and specific element attributes, combining them for more comprehensive prop support.
+
+LANGUAGE: rust
+CODE:
+#[component]
+fn Button(
+    #[props(extends = GlobalAttributes, extends = button)]
+    attributes: Vec<Attribute>,
+) -> Element {
+    rsx! {
+        button { ..attributes, "button" }
+    }
+}
+
+rsx! {
+    Button {
+        // A global attribute
+        width: "10px",
+        // A button specific attribute
+        disabled: true,
+    }
+};
+
+----------------------------------------
+
+TITLE: Incorrect Hook Usage in Conditionals
+DESCRIPTION: Shows how hooks should not be used within conditional statements in Dioxus. Changing conditions can alter the order of hook execution, leading to potential panics.
+
+LANGUAGE: rust
+CODE:
+# use dioxus::prelude::*;
+fn App() -> Element {
+    let number = use_signal(|| 1);
+    // ❌ Changing the condition will change the order of the hooks
+    if number() == 1 {
+        let string = use_signal(|| "hello world".to_string());
+    }
+
+    // ❌ Changing the value you are matching will change the order of the hooks
+    match number() {
+        1 => {
+            let string = use_signal(|| "hello world".to_string());
+        },
+        _ => (),
+    }
+
+    todo!()
+}
+
+----------------------------------------
+
+TITLE: Extending Components with Global Attributes in Dioxus
+DESCRIPTION: Example showing how to extend component props with global attributes using #[props(extends = GlobalAttributes)], allowing components to accept any standard HTML attributes.
+
+LANGUAGE: rust
+CODE:
+#[component]
+fn Card(
+    // You can use the `extends` attribute on a field with the type `Vec<Attribute>` to extend the props with all the attributes from an element or the global element attributes.
+    #[props(extends = GlobalAttributes)]
+    attributes: Vec<Attribute>,
+) -> Element {
+    rsx! {
+        // Instead of copying over every single attribute, we can just spread the attributes from the props into the element.
+        div { ..attributes, "card" }
+    }
+}
+
+rsx! {
+    // Since we extend global attributes, you can use any attribute that would normally appear on elements.
+    Card {
+        width: "10px",
+        height: "10px",
+        color: "red",
+    }
+};
+
+----------------------------------------
+
+TITLE: Proper Hook Placement in Dioxus Components and Hooks
+DESCRIPTION: Demonstrates correct and incorrect placement of hooks in Dioxus components and custom hooks. Hooks should only be called from the root of a component or another hook, not inside conditional blocks.
+
+LANGUAGE: rust
+CODE:
+# use dioxus::prelude::*;
+fn App() -> Element {
+    // ✅ You can call hooks from the body of a component
+    let number = use_signal(|| 1);
+    if number() == 1 {
+        // ❌ You can run into issues if you can hooks inside other expressions inside your component
+        // If number changes from 0 to 1, the order of the hooks will be different and your app may panic
+        let string = use_signal(|| "hello world".to_string());
+    }
+
+    todo!()
+}
+
+fn use_my_hook() -> Signal<i32> {
+    // ✅ You can call hooks from the body of other hooks
+    let number = use_signal(|| 1);
+    // ❌ Again, creating hooks inside expressions inside other hooks can cause issues
+    if number() == 1 {
+        let string = use_signal(|| "hello world".to_string());
+    }
+
+    number
+}
+
+----------------------------------------
+
+TITLE: Leptos Example of Interactive List with For Component
+DESCRIPTION: Comparative example showing how the same counter list functionality would be implemented in Leptos using its For component. This demonstrates the differences in approach between Dioxus and Leptos for handling dynamic lists.
+
+LANGUAGE: rust
+CODE:
+fn Counters() -> impl IntoView {
+    let counters = RwSignal::new(vec![0; 10]);
+
+    view! {
+        <button on:click=move |_| counters.update(|n| n.push(n.len()))>"Add Counter"</button>
+        <For
+            each=move || 0..counters.with(Vec::len)
+            key=|idx| *idx
+            let:idx
+        >
+            <li>
+                <button on:click=move |_| counters.update(|n| n[idx] += 1)>
+                    {Memo::new(move |_| counters.with(|n| n[idx]))}
+                </button>
+                <button on:click=move |_| counters.update(|n| { n.remove(idx); })>
+                    "Remove"
+                </button>
+            </li>
+        </For>
+    }
+}
+
+----------------------------------------
+
+TITLE: Passing State as Props in Dioxus
+DESCRIPTION: Demonstrates passing state explicitly as component props in Dioxus. This shows how to create a Signal state in a parent component and pass it to a child component directly through props, which is the most explicit and common approach for local state management.
+
+LANGUAGE: rust
+CODE:
+# use dioxus::prelude::*;
+fn MyComponent() -> Element {
+    let count = use_signal(|| 0);
+
+    rsx! {
+        IncrementButton {
+            count
+        }
+    }
+}
+
+#[component]
+fn IncrementButton(mut count: Signal<i32>) -> Element {
+    rsx! {
+        button {
+            onclick: move |_| count += 1,
+            "Increment"
+        }
+    }
+}
+
+----------------------------------------
+
+TITLE: Interactive List Component with Counters in Dioxus
+DESCRIPTION: Example demonstrating how to implement an interactive list of counters in Dioxus. It shows how to manage a vector of counters in a signal, iterate through them with standard Rust for loops, and provide buttons to increment counters and remove items from the list.
+
+LANGUAGE: rust
+CODE:
+fn Counters() -> Element {
+    let mut counters = use_signal(|| vec![0; 10]);
+
+    rsx! {
+        button { onclick: move |_| counters.push(counters.len()), "Add Counter" }
+        ul {
+            for idx in 0..counters.len() {
+                li {
+                    button { onclick: move |_| counters.write()[idx] += 1, "{counters.index(idx)}" }
+                    button { onclick: move |_| { counters.remove(idx); }, "Remove" }
+                }
+            }
+        }
+    }
+}
+
+----------------------------------------
+
+TITLE: Memo Update Behavior and Dependencies in Dioxus
+DESCRIPTION: Illustrates how memos update when the signals they depend on change. Shows the relationship between signal updates, memo recalculation, and when dependent memos are triggered to recompute.
+
+LANGUAGE: rust
+CODE:
+# use dioxus::prelude::*;
+let mut count = use_signal(|| 1);
+// double_count will rerun when state we read inside the memo changes (count)
+let double_count = use_memo(move || count() * 2);
+
+// memos act a lot like a read only version of a signal. You can read them, display them, and move them around like any other signal
+println!("{}", double_count); // Prints "2"
+
+// But you can't write to them directly
+// Instead, any time you write to a value the memo reads, the memo will rerun
+count += 1;
+
+println!("{}", double_count); // Prints "4"
+
+// Lets create another memo that reads the value of double_count
+let double_count_plus_one = use_memo(move || double_count() + 1);
+
+println!("{}", double_count_plus_one); // Prints "5"
+
+// Now if we write to count the double_count memo will rerun
+// If that the output of double_count changes, then it will cause double_count_plus_one to rerun
+count += 1;
+
+println!("{}", double_count); // Prints "6"
+println!("{}", double_count_plus_one); // Prints "7"
+
+// However if the value of double_count doesn't change after a write, then it won't trigger double_count_plus_one to rerun
+// Since we just write the same value, the doubled value is still 6 and we don't rerun double_count_plus_one
+*count.write() = 3;
+
+println!("{}", double_count); // Prints "6"
+println!("{}", double_count_plus_one); // Prints "7"
+
+----------------------------------------
+
+TITLE: Implementing a Counter List with Leptos for Comparison
+DESCRIPTION: This code example demonstrates how to implement a similar counter list component using Leptos framework, showing the differences in syntax and approach compared to Dioxus. It uses Leptos' <For> component and signals for state management.
+
+LANGUAGE: rust
+CODE:
+fn Counters() -> impl IntoView {
+    let counters = RwSignal::new(vec![0; 10]);
+
+    view! {
+        <button on:click=move |_| counters.update(|n| n.push(n.len()))>"Add Counter"</button>
+        <For
+            each=move || 0..counters.with(Vec::len)
+            key=|idx| *idx
+            let:idx
+        >
+            <li>
+                <button on:click=move |_| counters.update(|n| n[idx] += 1)>
+                    {Memo::new(move |_| counters.with(|n| n[idx]))}
+                </button>
+                <button on:click=move |_| counters.update(|n| { n.remove(idx); })>
+                    "Remove"
+                </button>
+            </li>
+        </For>
+    }
+}
+
+----------------------------------------
+
+TITLE: Creating and Using Memos in Dioxus Components
+DESCRIPTION: Demonstrates how to create a memo that derives a value from a signal and updates automatically when the signal changes. The example shows a component that displays a value doubled from a counter signal.
+
+LANGUAGE: rust
+CODE:
+use dioxus::prelude::*;
+use dioxus_signals::*;
+
+fn App() -> Element {
+    let mut count = use_signal(|| 0);
+    // the double memo will always be equal to two times the value of count, even after count changes
+    let double = use_memo(move || count * 2);
+
+    rsx! {
+        "{double}"
+        button {
+            // When count changes, the memo will rerun and double will be updated
+            // memos rerun any time you write to a signal they read. They will only rerun values/component that depend on them if the value of the memo changes
+            onclick: move |_| count += 1,
+            "Increment"
+        }
+    }
+}
+
+----------------------------------------
+
+TITLE: Building a Counter Component with Dioxus in Rust
+DESCRIPTION: A simple counter component built with Dioxus that demonstrates signal-based state management and event handling. The component displays a counter value and provides buttons to increment and decrement it.
+
+LANGUAGE: rust
+CODE:
+fn app() -> Element {
+    let mut count = use_signal(|| 0);
+
+    rsx! {
+        h1 { "High-Five counter: {count}" }
+        button { onclick: move |_| count += 1, "Up high!" }
+        button { onclick: move |_| count -= 1, "Down low!" }
+    }
+}
+
+----------------------------------------
+
+TITLE: Implementing Async Event Handlers in Dioxus
+DESCRIPTION: Shows how to create asynchronous event handlers in Dioxus. By returning an async block from the event handler, Dioxus automatically spawns it as a task, allowing for non-blocking operations.
+
+LANGUAGE: rust
+CODE:
+use dioxus::prelude::*;
+
+fn App() -> Element {
+    rsx! {
+        button {
+            // The `onclick` event can also accept a closure that returns an async block
+            onclick: move |_| async move {
+                tokio::time::sleep(std::time::Duration::from_secs(1)).await;
+                println!("You clicked the button one second ago!");
+            },
+            "Click me"
+        }
+    }
+}
+
+----------------------------------------
+
+TITLE: Defining Identifier Array in Rust
+DESCRIPTION: An array containing two large integer values that likely serve as unique identifiers or hash values within the Dioxus project.
+
+LANGUAGE: rust
+CODE:
+[206827801705263822, 8375185156499858125]
+
+----------------------------------------
+
+TITLE: Implementing Basic Event Handlers in Dioxus
+DESCRIPTION: Demonstrates how to attach a simple event handler to a button element in Dioxus. The handler receives event data and prints it to the console when the button is clicked.
+
+LANGUAGE: rust
+CODE:
+use dioxus::prelude::*;
+
+fn App() -> Element {
+    rsx! {
+        button {
+            // The `onclick` event accepts a closure with the signature `fn(Event)`
+            onclick: |event_data| println!("clicked! I got the event data: {event_data:?}"),
+            "Click me"
+        }
+    }
+}
+
+----------------------------------------
+
+TITLE: Installing Dioxus CLI with cargo-binstall
+DESCRIPTION: Commands to install the Dioxus CLI tool (dx) using cargo-binstall, create a new Dioxus application from a template, and launch it on the desktop platform.
+
+LANGUAGE: shell
+CODE:
+# skip if you already have cargo-binstall
+cargo install cargo-binstall
+
+# install the precompiled `dx` tool
+cargo binstall dioxus-cli
+
+# create a new app, following the template
+dx new my-app && cd my-app
+
+# and then serve!
+dx serve --platform desktop
+
+----------------------------------------
+
+TITLE: Handling Moved Values in Multiple Dioxus Event Handlers
+DESCRIPTION: Shows how to resolve the 'use of moved value' error that occurs when trying to use non-Copy data in multiple closures. Provides two solutions: using ReadOnlySignal for Copy behavior or cloning data before moving it into closures.
+
+LANGUAGE: rust
+CODE:
+#[component]
+fn MyComponent(string: String) -> Element {
+    rsx! {
+        button {
+            // ❌ We are moving the string into the onclick handler which means we can't access it elsewhere
+            onclick: move |_| {
+                println!("{string}");
+            },
+            "Print hello world"
+        }
+        button {
+            // ❌ Since we already moved the string, we can't move it into the onclick handler again. This will cause a compiler error
+            onclick: move |_| {
+                println!("{string}");
+            },
+            "Print hello world again"
+        }
+    }
+}
+
+LANGUAGE: rust
+CODE:
+#[component]
+fn MyComponent(string: ReadOnlySignal<String>) -> Element {
+    rsx! {
+        button {
+            // ✅ Because the `string` signal is `Copy`, we can copy it into the closure while still having access to it elsewhere
+            onclick: move |_| println!("{}", string),
+            "Print hello world"
+        }
+        button {
+            // ✅ Since `string` is `Copy`, we can move it into the onclick handler again
+            onclick: move |_| println!("{}", string),
+            "Print hello world again"
+        }
+    }
+}
+
+LANGUAGE: rust
+CODE:
+#[component]
+fn MyComponent(string: String) -> Element {
+    rsx! {
+        button {
+            // ✅ The string only has one owner. We could move it into this closure, but since we want to use the string in other closures later, we will clone it instead
+            onclick: {
+                // Clone the string in a new block
+                let string = string.clone();
+                // Then move the cloned string into the closure
+                move |_| println!("{}", string)
+            },
+            "Print hello world"
+        }
+        button {
+            // ✅ We don't use the string after this closure, so we can just move it into the closure directly
+            onclick: move |_| println!("{}", string),
+            "Print hello world again"
+        }
+    }
+}
+
+----------------------------------------
+
+TITLE: Accessing Form Input Values in Dioxus (Rust)
+DESCRIPTION: This snippet demonstrates how to access form input values in Dioxus using the FormData API. It shows obtaining text inputs, checkboxes, radio buttons, and select values from form submission events.
+
+LANGUAGE: rust
+CODE:
+rsx! {
+    form {
+        onsubmit: move |evt| {
+            evt.prevent_default();
+            let form_data = evt.form_data();
+            // Text inputs
+            let username = form_data.get("username");
+            // Checkbox
+            let remember_me = form_data.get("remember_me").is_some();
+            // Radio buttons
+            let selected_option = form_data.get("options");
+            // Select dropdown
+            let country = form_data.get("country");
+        }
+    }
+}
+
+----------------------------------------
+
+TITLE: Using UnsyncStorage with GenerationalBox in Rust
+DESCRIPTION: Demonstrates how to create an owner from UnsyncStorage, insert a non-Copy String into it, and work with the resulting GenerationalBox. The example shows creating an owner, inserting data, and reading from the generational box.
+
+LANGUAGE: rust
+CODE:
+use generational_box::{UnsyncStorage, AnyStorage};
+
+// Create an owner for some state for a scope
+let owner = UnsyncStorage::owner();
+
+// Create some non-copy data, move it into a owner, and work with copy data
+let data: String = "hello world".to_string();
+let key = owner.insert(data);
+
+// The generational box can be read from and written to like a RefCell
+let value = key.read();
+assert_eq!(*value, "hello world");
+
+----------------------------------------
+
+TITLE: Demonstrating Tracked Values with Signals and Memos in Dioxus
+DESCRIPTION: This snippet illustrates how tracked values like signals work with reactive contexts. The count signal is a tracked value, and when read inside the memo, the reactive context subscribes to it.
+
+LANGUAGE: rust
+CODE:
+# use dioxus::prelude::*;
+// The count signal is tracked
+let count = use_signal(|| 0);
+// When you read the count signal, the reactive context subscribes to the count signal
+let double_count = use_memo(move || count() * 2);
+
+----------------------------------------
+
+TITLE: Accessing Server Context in Server Functions
+DESCRIPTION: This snippet shows how to access HTTP request information within a server function that can be called from the client. It demonstrates both a server function that accesses request headers and a component that triggers this function with a button click.
+
+LANGUAGE: rust
+CODE:
+# use dioxus::prelude::*;
+#[server]
+async fn read_headers() -> Result<(), ServerFnError> {
+    // Since we are calling this from a server function, the server context that is may be from the
+    // initial request or a request from the client
+    let context = server_context();
+    let request_parts = context.request_parts();
+    println!("headers are {:?}", request_parts.headers);
+    Ok(())
+}
+
+#[component]
+fn CallServerFunction() -> Element {
+    rsx! {
+        button {
+            // If you click the button, the server function will be called and the server context will be
+            // from the client request
+            onclick: move |_| async {
+                _ = read_headers().await
+            },
+            "Call server function"
+        }
+    }
+}
+
+----------------------------------------
+
+TITLE: Creating UI Elements with RSX Macro
+DESCRIPTION: Example showing how to use the rsx! macro to create UI elements with attributes, event listeners, and children. The snippet demonstrates the structure of a div element with a class attribute, onclick event, and an h1 child element.
+
+LANGUAGE: rust
+CODE:
+let value = "123";
+
+rsx! {
+    div {
+        class: "my-class {value}",                  // <--- attribute
+        onclick: move |_| info!("clicked!"),   // <--- listener
+        h1 { "hello world" },                       // <--- child
+    }
+}
+
+----------------------------------------
+
+TITLE: Accessing Server Context in SSR Component Rendering
+DESCRIPTION: This snippet demonstrates how to access HTTP request information during the server-side rendering of a component. It uses the server_only! macro to ensure the code only runs on the server and accesses headers from the request.
+
+LANGUAGE: rust
+CODE:
+# use dioxus::prelude::*;
+#[component]
+fn PrintHtmlRequestInfo() -> Element {
+    // The server context only exists on the server, so we need to put it behind a server_only! config
+    server_only! {
+        // Since we are calling this from a component, the server context that is returned will be from
+        // the html request for ssr rendering
+        let context = server_context();
+        let request_parts = context.request_parts();
+        println!("headers are {:?}", request_parts.headers);
+    }
+    rsx! {}
+}
+
+----------------------------------------
+
+TITLE: Defining a Simple Component with RSX
+DESCRIPTION: Shows how to define a basic component function that returns an Element. The component uses the rsx! macro to return a simple text node.
+
+LANGUAGE: rust
+CODE:
+#[component]
+fn Example() -> Element {
+    rsx!{ "hello world" }
+}
+
+----------------------------------------
+
+TITLE: Defining a Component with Props
+DESCRIPTION: Demonstrates how to create a component that accepts properties. The #[component] macro automatically creates a props struct for the Header component that accepts title and color strings.
+
+LANGUAGE: rust
+CODE:
+# use dioxus::prelude::*;
+// The component macro turns the arguments for our function into named fields we can pass in to the component in rsx
+#[component]
+fn Header(title: String, color: String) -> Element {
+    rsx! {
+        div {
+            background_color: "{color}",
+            h1 { "{title}" }
+        }
+    }
+}
+
+----------------------------------------
+
+TITLE: Creating a New Dioxus Project with a Custom Template
+DESCRIPTION: Command to create a new Dioxus project using a specific template from GitHub, rather than the default template.
+
+LANGUAGE: shell
+CODE:
+dx new --template gh:dioxuslabs/dioxus-template
+
+----------------------------------------
+
+TITLE: Creating a Component with Dynamic Content
+DESCRIPTION: Example of a Dioxus component that combines string interpolation, attributes, and for loops to create more complex UI. The component displays a greeting and a list of numbered elements.
+
+LANGUAGE: rust
+CODE:
+# use dioxus::prelude::*;
+#[component]
+fn App() -> Element {
+    let name = "dave";
+    rsx! {
+        h1 { "Hello, {name}!" }
+        div { class: "my-class", id: "my-id",
+            for i in 0..5 {
+                div { "FizzBuzz: {i}" }
+            }
+        }
+    }
+}
+
+----------------------------------------
+
+TITLE: Using For Loops in RSX
+DESCRIPTION: Demonstrates how to use for loops within the rsx! macro to create multiple child elements. The example shows creating 10 span elements containing 'hello world'.
+
+LANGUAGE: rust
+CODE:
+# use dioxus::prelude::*;
+rsx! {
+    div {
+        for _ in 0..10 {
+            span { "hello world" }
+        }
+    }
+};
+
+----------------------------------------
+
+TITLE: Using the RSX Macro for Element Creation
+DESCRIPTION: Shows how to use the rsx! macro to create elements with attributes, event listeners, and children. The example demonstrates proper syntax for attributes (placed before children) and variable interpolation.
+
+LANGUAGE: rust
+CODE:
+# use dioxus::prelude::*;
+let value = "123";
+
+rsx! {
+    div {
+        class: "my-class {value}",                  // <--- attribute
+        onclick: move |_| println!("clicked!"),   // <--- listener
+        h1 { "hello world" }                       // <--- child
+    }
+};
+
+----------------------------------------
+
+TITLE: Creating Foundational Hooks with use_hook
+DESCRIPTION: Demonstrates how to create a new foundational hook using the use_hook method. This allows for extending Dioxus with custom hook functionality.
+
+LANGUAGE: rust
+CODE:
+fn use_mut_string() -> String {
+    use_hook(|_| "Hello".to_string())
+}
+
+----------------------------------------
+
+TITLE: Creating Custom Hooks by Composition
+DESCRIPTION: Shows how to create custom hooks by composing existing hooks. The use_username hook uses the use_context hook to access a shared users context and perform a lookup operation.
+
+LANGUAGE: rust
+CODE:
+fn use_username(d: Uuid) -> bool {
+    let users = use_context::<Users>();
+    users.get(&id).map(|user| user.logged_in).ok_or(false)
+}
+
+----------------------------------------
+
+TITLE: Defining Component Props with Function Arguments
+DESCRIPTION: An alternative approach to defining component props using function arguments instead of a separate props struct. The #[component] macro automatically derives the props struct.
+
+LANGUAGE: rust
+CODE:
+#[component]
+fn Header(title: String, color: String) -> Element {
+    rsx! {
+        div {
+            background_color: "{color}"
+            h1 { "{title}" }
+        }
+    }
+}
+
+----------------------------------------
+
+TITLE: Defining Component Props with Custom Struct
+DESCRIPTION: Shows how to define a component with explicit props by creating a HeaderProps struct. This pattern allows for type-safe property passing between components.
+
+LANGUAGE: rust
+CODE:
+// The `Props` derive macro lets us add additional functionality to how props are interpreted.
+#[derive(Props, PartialEq)]
+struct HeaderProps {
+    title: String,
+    color: String,
+}
+
+#[component]
+fn Header(props: HeaderProps) -> Element {
+    rsx! {
+        div {
+            background_color: "{props.color}"
+            h1 { "{props.title}" }
+        }
+    }
+}
+
+----------------------------------------
+
+TITLE: Composing Components with Props
+DESCRIPTION: Demonstrates component composition by creating an App component that renders a Header component with title and color properties. This shows how to pass data between components.
+
+LANGUAGE: rust
+CODE:
+#[component]
+fn App() -> Element {
+    rsx! {
+        Header {
+            title: "My App",
+            color: "red",
+        }
+    }
+}
+
+----------------------------------------
+
+TITLE: Using Iterative Rendering in RSX
+DESCRIPTION: Demonstrates using for loops within the rsx! macro to create multiple child elements. This pattern allows for dynamically generating UI elements based on data collections.
+
+LANGUAGE: rust
+CODE:
+rsx! {
+    div {
+        for _ in 0..10 {
+            span { "hello world" }
+        }
+    }
+}
+
+----------------------------------------
+
+TITLE: Comparing Reactive and Non-Reactive State Patterns in Dioxus
+DESCRIPTION: This example contrasts proper reactive state using signals with non-reactive state using RefCell. It also demonstrates the correct way to handle props in components by wrapping them in ReadOnlySignal for reactivity.
+
+LANGUAGE: rust
+CODE:
+use dioxus::prelude::*;
+
+// ❌ Don't create non-reactive state
+let state = use_hook(|| std::cell::RefCell::new(0));
+
+// Computed values will get out of date if the state they depend on is not reactive
+let doubled = use_memo(move || *state.borrow() * 2);
+
+// ✅ Create reactive state
+let state = use_signal(|| 0);
+
+// Computed values will automatically keep up to date with the latest reactive state
+let doubled = use_memo(move || state() * 2);
+
+// ❌ Don't depend on non-reactive prop state in memos/resources
+#[component]
+fn MyComponent(state: i32) -> Element {
+    let doubled = use_memo(move || state * 2);
+    todo!()
+}
+
+// ✅ Wrap your props in ReadOnlySignal to make them reactive
+#[component]
+fn MyReactiveComponent(state: ReadOnlySignal<i32>) -> Element {
+    let doubled = use_memo(move || state() * 2);
+    todo!()
+}
+
+----------------------------------------
+
+TITLE: Demonstrating Reactive Contexts with use_memo in Dioxus
+DESCRIPTION: This example shows how Reactive Contexts track dependencies using a signal and a memo. When the count signal is read inside the memo, the reactive context automatically tracks this dependency.
+
+LANGUAGE: rust
+CODE:
+# use dioxus::prelude::*;
+let count = use_signal(|| 0);
+// The reactive context in the memo knows that the memo depends on the count signal
+use_memo(move || count() * 2);
+
+----------------------------------------
+
+TITLE: Error with moved values in multiple async blocks
+DESCRIPTION: Broken component demonstrating the error that occurs when trying to move the same non-Copy value into multiple async tasks. This causes a compiler error because data in Rust has a single owner.
+
+LANGUAGE: rust
+CODE:
+# use dioxus::prelude::*;
+// `MyComponent` accepts a string which cannot be copied implicitly
+#[component]
+fn MyComponent(string: String) -> Element {
+    use_hook(move || {
+        // ❌ We are moving the string into the async task which means we can't access it elsewhere
+        spawn(async move {
+            println!("{}", string);
+        });
+        // ❌ Since we already moved the string, we can't move it into our new task. This will cause a compiler error
+        spawn(async move {
+            println!("{}", string);
+        })
+    });
+
+    todo!()
+}
+
+----------------------------------------
+
+TITLE: Reactive Props in Dioxus Components
+DESCRIPTION: Demonstrates how to make props reactive using ReadOnlySignal<T> to enable automatic updates in reactive hooks when prop values change, with an alternative approach using use_reactive.
+
+LANGUAGE: rust
+CODE:
+#[component]
+fn Counter(count: i32) -> Element {
+    rsx! {
+        div {
+            "Count: {count}"
+        }
+    }
+}
+
+LANGUAGE: rust
+CODE:
+#[component]
+fn Counter(count: i32) -> Element {
+    // We can use a memo to calculate the doubled count. Since this memo will only be created the first time the component is run and `count` is not reactive, it will never update when `count` changes.
+    let doubled_count = use_memo(move || count * 2);
+    rsx! {
+        div {
+            "Count: {count}"
+            "Doubled Count: {doubled_count}"
+        }
+    }
+}
+
+LANGUAGE: rust
+CODE:
+#[component]
+fn Counter(count: ReadOnlySignal<i32>) -> Element {
+    // Since we made count reactive, the memo will automatically rerun when count changes.
+    let doubled_count = use_memo(move || count() * 2);
+    rsx! {
+        div {
+            "Count: {count}"
+            "Doubled Count: {doubled_count}"
+        }
+    }
+}
+
+LANGUAGE: rust
+CODE:
+#[component]
+fn Counter(count: i32) -> Element {
+    // We can add the count prop as an explicit dependency to every reactive hook that uses it with use_reactive.
+    // The use_reactive macro takes a closure with explicit dependencies as its argument.
+    let doubled_count = use_memo(use_reactive!(|count| count * 2));
+    rsx! {
+        div {
+            "Count: {count}"
+            "Doubled Count: {doubled_count}"
+        }
+    }
+}
+
+----------------------------------------
+
+TITLE: Converting Props with Into Trait in Dioxus
+DESCRIPTION: Shows how to use the #[props(into)] attribute to automatically convert incoming values to the correct type using the Into trait.
+
+LANGUAGE: rust
+CODE:
+#[derive(Props, PartialEq, Clone)]
+struct ButtonProps {
+    /// You can use the `into` attribute on a field to convert types you pass in with the Into trait.
+    #[props(into)]
+    number: u64,
+}
+
+fn Button(props: ButtonProps) -> Element {
+    rsx! {
+        button { "{props.number}" }
+    }
+}
+
+rsx! {
+    Button {
+        // Because we used the into attribute, we can pass in any type that implements Into<u64>
+        number: 10u8
+    }
+};
+
+----------------------------------------
+
+TITLE: Using use_reactive for Prop Dependencies in Dioxus
+DESCRIPTION: Example demonstrating how to explicitly add props as dependencies to reactive hooks using the use_reactive! macro when not using ReadOnlySignal.
+
+LANGUAGE: rust
+CODE:
+#[component]
+fn Counter(count: i32) -> Element {
+    // We can add the count prop as an explicit dependency to every reactive hook that uses it with use_reactive.
+    // The use_reactive macro takes a closure with explicit dependencies as its argument.
+    let doubled_count = use_memo(use_reactive!(|count| count * 2));
+    rsx! {
+        div {
+            "Count: {count}"
+            "Doubled Count: {doubled_count}"
+        }
+    }
+}
+
+----------------------------------------
+
+TITLE: Using ReadOnlySignal for Reactive Props in Dioxus
+DESCRIPTION: Example showing how to make props reactive by wrapping them in ReadOnlySignal, which enables reactive hooks to respond to prop changes automatically.
+
+LANGUAGE: rust
+CODE:
+#[component]
+fn Counter(count: ReadOnlySignal<i32>) -> Element {
+    // Since we made count reactive, the memo will automatically rerun when count changes.
+    let doubled_count = use_memo(move || count() * 2);
+    rsx! {
+        div {
+            "Count: {count}"
+            "Doubled Count: {doubled_count}"
+        }
+    }
+}
+
+----------------------------------------
+
+TITLE: Using Formatted Props in Dioxus Components
+DESCRIPTION: Example showing how String props can accept formatted strings with interpolated values, similar to how elements handle formatted content.
+
+LANGUAGE: rust
+CODE:
+#[component]
+fn Button(text: String,) -> Element {
+    rsx! {
+        button { "{text}" }
+    }
+}
+
+let name = "Bob";
+rsx! {
+    Button {
+        // You can use formatted strings in props that accept String just like you would in an element.
+        text: "Hello {name}!"
+    }
+};
+
+----------------------------------------
+
+TITLE: Creating a Component Without Props in Rust Using Dioxus
+DESCRIPTION: Example of creating a simple component without props using the #[component] macro. The component returns an Element rendering a static greeting.
+
+LANGUAGE: rust
+CODE:
+#[component]
+fn GreetBob() -> Element {
+    rsx! { "hello, bob" }
+}
+
+----------------------------------------
+
+TITLE: Using const-serialize for Struct and Enum Serialization in Rust
+DESCRIPTION: Example demonstrating how to use const-serialize to define serializable structures, serialize data into a ConstVec buffer, and deserialize it back, all within a const context. Shows the SerializeConst derive macro usage on structs and enums with repr(C, u8) attribute.
+
+LANGUAGE: rust
+CODE:
+use const_serialize::{deserialize_const, serialize_const, serialize_eq, ConstVec, SerializeConst};
+#[derive(Clone, Copy, Debug, PartialEq, SerializeConst)]
+struct Struct {
+    a: u32,
+    b: u8,
+    c: u32,
+    d: Enum,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, SerializeConst)]
+#[repr(C, u8)]
+enum Enum {
+    A { one: u32, two: u16 },
+    B { one: u8, two: u16 } = 15,
+}
+
+const {
+    let data = [Struct {
+        a: 0x11111111,
+        b: 0x22,
+        c: 0x33333333,
+        d: Enum::A {
+            one: 0x44444444,
+            two: 0x5555,
+        },
+    }; 3];
+    let mut buf = ConstVec::new();
+    buf = serialize_const(&data, buf);
+    let buf = buf.read();
+    let (buf, deserialized) = match deserialize_const!([Struct; 3], buf) {
+        Some(data) => data,
+        None => panic!("data mismatch"),
+    };
+    if !serialize_eq(&data, &deserialized) {
+        panic!("data mismatch");
+    }
+}
+
+----------------------------------------
+
+TITLE: Running Dioxus Tests
+DESCRIPTION: This command runs all tests in the Dioxus workspace. It executes all test files in all packages of the workspace to ensure functionality is working properly after changes.
+
+LANGUAGE: bash
+CODE:
+cargo test --workspace --tests
+
+----------------------------------------
+
+TITLE: Installing Required Dependencies for Dioxus on Linux
+DESCRIPTION: This command installs the necessary system libraries and development packages needed to build and run Dioxus on Linux. These dependencies include GTK, Cairo, Pango, GDK, and WebKit components essential for the GUI functionality.
+
+LANGUAGE: bash
+CODE:
+sudo apt install libgdk3.0-cil libatk1.0-dev libcairo2-dev libpango1.0-dev libgdk-pixbuf2.0-dev libsoup-3.0-dev libjavascriptcoregtk-4.1-dev libwebkit2gtk-4.1-dev
+
+----------------------------------------
+
+TITLE: Implementing a Dynamic List of Counters in Dioxus
+DESCRIPTION: This example shows how to create a component with a dynamic list of counters that can be added or removed. It demonstrates Dioxus' signal-based state management with array operations and event handling for modifying collection data.
+
+LANGUAGE: rust
+CODE:
+fn Counters() -> Element {
+    let mut counters = use_signal(|| vec![0; 10]);
+
+    rsx! {
+        button { onclick: move |_| counters.push(counters.len()), "Add Counter" }
+        ul {
+            for idx in 0..counters.len() {
+                li {
+                    button { onclick: move |_| counters.write()[idx] += 1, "{counters.index(idx)}" }
+                    button { onclick: move |_| { counters.remove(idx); }, "Remove" }
+                }
+            }
+        }
+    }
+}
+
+----------------------------------------
+
+TITLE: Comparing DSL Syntax Between Dioxus and Leptos
+DESCRIPTION: Code comparison showing the syntax differences between Dioxus's rsx! macro and Leptos's view! macro for creating UI elements. Demonstrates how each framework handles class attributes, boolean properties, and string interpolation.
+
+LANGUAGE: rust
+CODE:
+// dioxus
+rsx! {
+  div { class: "my-class", enabled: true, "Hello, {name}" }
+}
+
+// leptos
+view! {
+  <div class="my-class" enabled={true}>
+    "Hello "
+    {move || name()}
+  </div>
+}
+
+----------------------------------------
+
+TITLE: Basic Usage of Dioxus SSR with render_element
+DESCRIPTION: Shows how to directly render RSX nodes to HTML using the render_element API without creating a VirtualDom instance. This example generates HTML for a div containing numbered items.
+
+LANGUAGE: rust
+CODE:
+# use dioxus::prelude::*;
+let content = dioxus_ssr::render_element(rsx!{
+    div {
+        for i in 0..5 {
+            "Number: {i}"
+        }
+    }
+});
+
+----------------------------------------
+
+TITLE: Problematic Memo Passing Pattern in Dioxus
+DESCRIPTION: Shows an anti-pattern where memos are passed up the component tree from child to parent. This can cause issues because a memo's lifetime is tied to the component that created it, potentially leading to runtime errors if the child component is dropped.
+
+LANGUAGE: rust
+CODE:
+# use dioxus::prelude::*;
+fn MyComponent() -> Element {
+    let child_signal = use_signal(|| None);
+
+    rsx! {
+        IncrementButton {
+            child_signal
+        }
+    }
+}
+
+#[component]
+fn IncrementButton(mut child_signal: Signal<Option<Memo<i32>>>) -> Element {
+    let signal_owned_by_child = use_signal(|| 0);
+    let memo_owned_by_child = use_memo(move || signal_owned_by_child() * 2);
+    // Don't do this: it may cause issues if you drop the child component
+    child_signal.set(Some(memo_owned_by_child));
+
+    todo!()
+}
+
+----------------------------------------
+
+TITLE: Problematic Async Memo Pattern in Dioxus
+DESCRIPTION: Illustrates an incorrect way of using memos with async code that can lead to runtime panics. The example shows why holding a read of a memo over an await point is problematic when the memo might be updated during the await.
+
+LANGUAGE: rust
+CODE:
+# use dioxus::prelude::*;
+# async fn sleep(delay: u32) {}
+async fn double_me_async(value: &u32) -> u32 {
+    sleep(100).await;
+    *value * 2
+}
+let mut signal = use_signal(|| 0);
+let halved = use_memo(move || signal() / 2);
+
+let doubled = use_resource(move || async move {
+    // Don't hold reads over await points
+    let halved = halved.read();
+    // While the future is waiting for the async work to finish, the read will be open
+    double_me_async(&halved).await
+});
+
+rsx!{
+    "{doubled:?}"
+    button {
+        onclick: move |_| {
+            // When you write to signal, it will cause the memo to rerun which may panic because you are holding a read of the memo over an await point
+            signal += 1;
+        },
+        "Increment"
+    }
+};
+
+----------------------------------------
+
+TITLE: Using Signals with Dioxus Context API
+DESCRIPTION: Illustrates how signals work with the context API, maintaining local subscription behavior. Components that read the context signal will rerender when it changes while the provider component remains unaffected.
+
+LANGUAGE: rust
+CODE:
+use dioxus::prelude::*;
+use dioxus_signals::*;
+
+#[component]
+fn App() -> Element {
+    // Because signal is never read in this component, this component will not rerun when the signal changes
+    use_context_provider(|| Signal::new(0));
+
+    rsx! {
+        Child {}
+    }
+}
+
+#[component]
+fn Child() -> Element {
+    let signal: Signal<i32> = use_context();
+    // This component does read from the signal, so when the signal changes it will rerun
+    rsx! {
+        "{signal}"
+    }
+}
+
+----------------------------------------
+
+TITLE: Implementing Copy Semantics with Signals in Dioxus
+DESCRIPTION: Demonstrates how signals implement Copy trait regardless of inner value, allowing easy movement of data into futures or children components. This example shows how a non-Copy String can be used in async contexts through signals.
+
+LANGUAGE: rust
+CODE:
+use dioxus::prelude::*;
+use dioxus_signals::*;
+
+#[component]
+fn App() -> Element {
+    let signal = use_signal(|| "hello world".to_string());
+
+    spawn(async move {
+        // signal is Copy even though String is not copy
+        print!("{signal}");
+    });
+
+    rsx! {
+        "{signal}"
+    }
+}
+
+----------------------------------------
+
+TITLE: Extending Dioxus Elements with Custom Elements
+DESCRIPTION: Shows how to extend the default Dioxus element set with custom elements by creating a custom 'dioxus_elements' module that re-exports the built-in elements and adds new ones.
+
+LANGUAGE: rust
+CODE:
+mod dioxus_elements {
+    use dioxus::prelude::dioxus_elements::*;
+    struct my_element;
+    impl DioxusElement for my_element {
+        const TAG_NAME: &'static str = "base";
+        const NAME_SPACE: Option<&'static str> = None;
+    }
+}
+
+----------------------------------------
+
+TITLE: Running Dioxus PWA Example Locally
+DESCRIPTION: Shell commands for installing Dioxus CLI and running or building the PWA example project. These commands help developers test the PWA locally or build it for deployment.
+
+LANGUAGE: shell
+CODE:
+cargo install dioxus-cli --locked
+
+LANGUAGE: shell
+CODE:
+dx serve
+
+LANGUAGE: shell
+CODE:
+dx build --release
+
+----------------------------------------
+
+TITLE: Displaying Project Structure for Dioxus PWA Example
+DESCRIPTION: A tree view representation of the directory structure for the Dioxus PWA example project, showing key files including the service worker, manifest, and other essential components needed for PWA functionality.
+
+LANGUAGE: shell
+CODE:
+├── Cargo.toml
+├── Dioxus.toml
+├── index.html // Custom HTML is needed for this, to load the SW and manifest.
+├── LICENSE
+├── public
+│   ├── favicon.ico
+│   ├── logo_192.png
+│   ├── logo_512.png
+│   ├── manifest.json // The manifest file - edit this as you need to.
+│   └── sw.js // The service worker - you must edit this for actual projects.
+├── README.md
+└── src
+    └── main.rs
+
+----------------------------------------
+
+TITLE: Running Dioxus Examples with Cargo
+DESCRIPTION: Command for running example applications in the Dioxus project using Cargo. Most examples run through webview, so the Dioxus CLI is not required.
+
+LANGUAGE: shell
+CODE:
+cargo run --example hello_world
+
+----------------------------------------
+
+TITLE: Running the Dioxus File Explorer Example
+DESCRIPTION: Command to serve the Dioxus file explorer example application. This uses the Dioxus CLI tool to compile and run the application in development mode.
+
+LANGUAGE: shell
+CODE:
+dx serve
+
+----------------------------------------
+
+TITLE: Setting up and serving a Dioxus application with Tailwind CSS
+DESCRIPTION: Commands for running the development server with Tailwind CSS watching for changes. This setup compiles Tailwind CSS from input.css to public/tailwind.css and serves the Dioxus application.
+
+LANGUAGE: bash
+CODE:
+npx tailwindcss -i ./input.css -o ./public/tailwind.css --watch
+dx serve

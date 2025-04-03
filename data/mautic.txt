@@ -1,0 +1,439 @@
+TITLE: Programmatic Mautic Integration Sync in PHP
+DESCRIPTION: This PHP code snippet demonstrates how to programmatically push specific Mautic contacts to an integration. It can be useful for custom synchronization in campaigns, forms, or point actions.
+
+LANGUAGE: php
+CODE:
+$mauticObjectIds = new \Mautic\IntegrationsBundle\Sync\DAO\Sync\ObjectIdsDAO();
+$mauticObjectIds->addObjectId('contact', '12');
+$mauticObjectIds->addObjectId('contact', '13');
+
+$inputOptions = new Mautic\IntegrationsBundle\Sync\DAO\Sync\InputOptionsDAO(
+    [
+        'integration'      => 'Magento',
+        'disable-pull'     => true,
+        'mautic-object-id' => $mauticObjectIds,
+    ]
+);
+
+/** @var \Mautic\IntegrationsBundle\Sync\SyncService\SyncServiceInterface $syncService **/
+$syncService->processIntegrationSync($inputOptions);
+
+----------------------------------------
+
+TITLE: Configuring Symfony Messenger Transport in PHP
+DESCRIPTION: Configuration setup for Symfony messenger transport including routing, failure handling, and transport options. Demonstrates how to configure JSON serializer, queue settings, and retry strategies.
+
+LANGUAGE: php
+CODE:
+$container->loadFromExtension('framework', [
+    'messenger' => [
+        'routing'   => [
+            \Mautic\MessengerBundle\Message\PageHitNotification::class  => \Mautic\MessengerBundle\MauticMessengerTransports::HIT,
+            \Mautic\MessengerBundle\Message\EmailHitNotification::class => \Mautic\MessengerBundle\MauticMessengerTransports::HIT,
+        ],
+        'failure_transport' => 'failed',
+        'transports' => [
+            'failed' => [
+                'dsn' => 'doctrine://default?queue_name=failed',
+            ],
+            \Mautic\MessengerBundle\MauticMessengerTransports::SYNC      => 'sync://',
+            \Mautic\MessengerBundle\MauticMessengerTransports::HIT => [
+                'dsn'            => '%env(MAUTIC_MESSENGER_TRANSPORT_DSN)%',
+                'serializer'     => 'messenger.transport.jms_serializer',
+                'options'        => [
+                    'heartbeat'  => 1,
+                    'persistent' => true,
+                    'vhost'      => '/',
+                    'exchange'   => [
+                        'name'                        => 'mautic',
+                        'type'                        => 'direct',
+                        'default_publish_routing_key' => 'hit',
+                    ],
+                    'queues'     => [
+                        'hits' => [
+                            'binding_keys' => ['hit'],
+                            'arguments'    => [
+                                'x-expires' => 60 * 60 * 24 * 21 * 1000,
+                            ],
+                        ],
+                    ],
+                ],
+                'serializer'     => 'messenger.transport.native_php_serializer',
+                'retry_strategy' => [
+                    'max_retries' => 3,
+                    'delay'       => 500,
+                    'multiplier'  => 3,
+                    'max_delay'   => 0,
+                ],
+            ],
+        ],
+    ],
+]);
+
+----------------------------------------
+
+TITLE: Executing Mautic Integration Sync Command for First-Time Setup
+DESCRIPTION: This command is used to configure an integration (Magento in this example) and run the sync for the first time. It allows specifying the start date for entity synchronization, enabling control over the batch size of records to sync.
+
+LANGUAGE: bash
+CODE:
+$ bin/console mautic:integrations:sync Magento --first-time-sync --start-datetime="2019-09-12T12:00:00"
+
+----------------------------------------
+
+TITLE: Advanced Mautic Integration Sync Command with Specific Object IDs
+DESCRIPTION: This command demonstrates advanced usage of the sync command, disabling the pull process and specifying particular Mautic object IDs to sync. It allows for selective synchronization of specific contacts.
+
+LANGUAGE: bash
+CODE:
+$ bin/console mautic:integrations:sync Magento --disable-pull --mautic-object-id=contact:12 --mautic-object-id=contact:13
+
+----------------------------------------
+
+TITLE: Converting PHP Template to Twig in Mautic
+DESCRIPTION: This snippet demonstrates the conversion of a PHP template to Twig format. It includes examples of extending templates, setting block content, routing, forms, and page actions.
+
+LANGUAGE: PHP
+CODE:
+<?php
+$view->extend('MauticCoreBundle:Default:content.html.php');
+$view['slots']->set('mauticContent', 'mauticWebhook');
+$view['slots']->set('headerTitle', $view['translator']->trans('mautic.webhook.webhooks'));
+?>
+
+// ROUTING
+<a href="<?php echo $view['router']->path('/emails', ['objectAction' => 'batchDelete']); ?>">Hello world!</a>
+
+// FORMS
+<?php echo $view['form']->start($form); ?>
+<?php echo $view['form']->row($form['email']); ?>
+<?php echo $view['form']->end($form); ?>
+
+// PAGE ACTIONS
+$view['slots']->set('actions', $view->render('MauticCoreBundle:Helper:page_actions.html.php', [
+    'item'            => $item,
+    'templateButtons' => [
+        'edit'   => $view['security']->hasEntityAccess($permissions['webhook:webhooks:editown'], $permissions['webhook:webhooks:editother'], $item->getCreatedBy()),
+        'clone'  => $permissions['webhook:webhooks:create'],
+        'delete' => $view['security']->hasEntityAccess($permissions['webhook:webhooks:deleteown'], $permissions['webhook:webhooks:deleteown'], $item->getCreatedBy()),
+    ],
+    'routeBase' => 'webhook',
+]));
+
+// TODO add more examples
+
+LANGUAGE: Twig
+CODE:
+{% extends '@MauticCore/Default/content.html.twig' %}
+
+{% block headerTitle %}{% trans %}mautic.webhook.webhooks{% endtrans %}{% endblock %}
+{% block mauticContent %}mauticWebhook{% endblock %}
+
+{# ROUTING #}
+<a href="{{ path('/emails', {objectAction: 'batchDelete'}) }}">Hello world!</a>
+
+{# FORMS #}
+{{ form_start(form) }}
+{{ form_row(form.email) }}
+{{ form_end(form) }}
+
+{# PAGE ACTIONS #}
+{% block actions %}
+    {{- include(
+        '@MauticCore/Helper/page_actions.html.twig', {
+            item: item,
+            templateButtons: {
+                'edit': securityHasEntityAccess(
+                    permissions['webhook:webhooks:editown'],
+                    permissions['webhook:webhooks:editother'],
+                    item.getCreatedBy()
+                ),
+                'clone': permissions['webhook:webhooks:create'],
+                'delete': securityHasEntityAccess(
+                    permissions['webhook:webhooks:deleteown'],
+                    permissions['webhook:webhooks:deleteother'],
+                    item.getCreatedBy()
+                )
+            },
+            routeBase: 'webhook'
+    }) -}}
+{% endblock %}
+
+{# TODO add more examples #}
+
+----------------------------------------
+
+TITLE: Basic Mautic Integration Sync Command Usage
+DESCRIPTION: This command syncs all new records from and to Mautic for the specified integration (Magento). It automatically determines the start date based on previously synchronized records and uses the current time as the end date.
+
+LANGUAGE: bash
+CODE:
+$ bin/console mautic:integrations:sync Magento
+
+----------------------------------------
+
+TITLE: Using PSR-18 HTTP Client Interface in Mautic 4 (PHP)
+DESCRIPTION: Example of how to use the PSR-18 HTTP Client Interface in a Mautic 4 class. This shows the updated approach for HTTP client injection and usage in Mautic 4, which now supports PSR-18.
+
+LANGUAGE: PHP
+CODE:
+use Psr\Http\Client\ClientInterface;
+
+....
+public function __construct(
+    ClientInterface $client
+) {
+    $this->client = $client;
+}
+
+----------------------------------------
+
+TITLE: Updating Session Handling for Symfony 6
+DESCRIPTION: Example showing how to update session handling to use RequestStack instead of SessionInterface in Symfony 6.
+
+LANGUAGE: diff
+CODE:
+- use Symfony\Component\HttpFoundation\Session\SessionInterface;
++ use Symfony\Component\HttpFoundation\RequestStack;
+class NeedsSession
+{
+-   public function __construct(private SessionInterface $session) {}
++   public function __construct(private RequestStack $requestStack) {}
+
+    public function doStuff()
+    {
+-       $selected = $this->session->get('mautic.category.type', 'category');
++       $selected = $this->requestStack->getSession()->get('mautic.category.type', 'category');
+        // ...
+    }
+}
+
+----------------------------------------
+
+TITLE: Updating Request Array Access for Symfony 6
+DESCRIPTION: Example showing how to modify request array access to be compatible with Symfony 6's scalar value requirement for get() method.
+
+LANGUAGE: diff
+CODE:
+- $asset = $request->request->get('asset') ?? [];
++ $asset = $request->request->all()['asset'] ?? [];
+
+----------------------------------------
+
+TITLE: Configuring Service Injection in Mautic 4 (PHP)
+DESCRIPTION: Example of how to configure service injection for the HTTP client in Mautic 4 using the config.php file. This demonstrates the updated approach for dependency injection in Mautic 4.
+
+LANGUAGE: PHP
+CODE:
+'mautic.demo.class' => [
+    'class'     => DemoClass::class,
+    'arguments' => [
+        'mautic.http.client',
+    ],
+],
+
+----------------------------------------
+
+TITLE: Configuring Robots.txt for Mautic Installation
+DESCRIPTION: This robots.txt configuration specifies directories and files that should not be crawled by search engine bots. It helps protect sensitive areas of the Mautic installation and prevents unnecessary indexing of system files.
+
+LANGUAGE: robots.txt
+CODE:
+User-agent: *
+Disallow: /addons/
+Disallow: /plugins/
+Disallow: /app/
+Disallow: /media/dashboards/
+Disallow: /media/files/
+Disallow: /media/js/mautic-form-src.js
+Disallow: /themes/
+Disallow: /translations/
+Disallow: /vendor/
+
+----------------------------------------
+
+TITLE: Configuring Crawler Access Rules for Mautic in robots.txt
+DESCRIPTION: This snippet defines the rules for web crawlers, specifying which parts of the Mautic installation should not be indexed. It prevents access to sensitive directories and files that are not intended for public viewing or indexing.
+
+LANGUAGE: robots.txt
+CODE:
+User-agent: *
+Disallow: /addons/
+Disallow: /plugins/
+Disallow: /app/
+Disallow: /media/dashboards/
+Disallow: /media/files/
+Disallow: /media/js/mautic-form-src.js
+Disallow: /themes/
+Disallow: /translations/
+Disallow: /vendor/
+
+----------------------------------------
+
+TITLE: Starting Symfony Messenger Consumer for Email Sending
+DESCRIPTION: Command to start the Symfony Messenger consumer for sending emails, replacing the removed bin/console mautic:emails:send command.
+
+LANGUAGE: Shell
+CODE:
+bin/console messenger:consume email
+
+----------------------------------------
+
+TITLE: Running Messenger Consumer Command
+DESCRIPTION: Shell command for running the messenger consumer process for a specific transport.
+
+LANGUAGE: shell
+CODE:
+sudo -uwww-data bin/console messenger:consume hit
+
+----------------------------------------
+
+TITLE: Configuring Mautic 5 Environment
+DESCRIPTION: Example of setting environment variables for Mautic 5 development mode, replacing the removed index_dev.php file.
+
+LANGUAGE: Shell
+CODE:
+APP_ENV=dev
+APP_DEBUG=1
+
+----------------------------------------
+
+TITLE: Updating Doctrine Sort Order Constants
+DESCRIPTION: Example showing migration from deprecated ASC/DESC constants to new enum-based ordering in Doctrine queries.
+
+LANGUAGE: diff
+CODE:
+- $q->orderBy($this->getTableAlias().'.dateAdded', \Doctrine\Common\Collections\Criteria::DESC);
++ $q->orderBy($this->getTableAlias().'.dateAdded', \Doctrine\Common\Collections\Order::Descending->value);
+
+----------------------------------------
+
+TITLE: Updating configuration parameters in Mautic 3
+DESCRIPTION: Example of how to update configuration parameters in the local.php file for Mautic 3
+
+LANGUAGE: PHP
+CODE:
+'api_rate_limiter_cache' => array(
+  'adapter' => 'cache.adapter.memcached',
+  'provider' => 'memcached://memcached.local:12345'
+),
+
+----------------------------------------
+
+TITLE: Updating Response Assertions in Tests
+DESCRIPTION: Example showing the new way to assert successful responses in functional tests.
+
+LANGUAGE: diff
+CODE:
+$this->client->request('GET', '/s/campaigns/new/');
+- $response = $this->client->getResponse();
+- Assert::assertTrue($response->isOk(), $response->getContent());
++ $this->assertResponseIsSuccessful();
+
+----------------------------------------
+
+TITLE: Updating User Authentication in Tests
+DESCRIPTION: Example showing the new way to handle user authentication in functional tests.
+
+LANGUAGE: diff
+CODE:
+- $user = $this->loginUser('admin');
++ $user = $this->em->getRepository(User::class)->findOneBy(['username' => 'admin']);
++ $this->loginUser($user);
+
+----------------------------------------
+
+TITLE: Updating AJAX Request Testing
+DESCRIPTION: Example showing how to modify AJAX request creation in functional tests for compatibility with newer testing frameworks.
+
+LANGUAGE: diff
+CODE:
+- $this->client->request(Request::METHOD_POST, '/s/ajax', $payload, [], $this->createAjaxHeaders());
++ $this->setCsrfHeader();
++ $this->client->xmlHttpRequest(Request::METHOD_POST, '/s/ajax', $payload);
+
+----------------------------------------
+
+TITLE: Updating ConfigSubscriber in Mautic 3
+DESCRIPTION: Example of how to update a ConfigSubscriber for Mautic 3
+
+LANGUAGE: PHP
+CODE:
+public function onConfigGenerate(ConfigBuilderEvent $event)
+{
+    $event->addForm([
+        'bundle'     => 'EmailBundle',
+        'formType'   => ConfigType::class,
+        'formAlias'  => 'emailconfig',
+        'formTheme'  => 'MauticEmailBundle:FormTheme\Config',
+        'parameters' => $event->getParametersFromConfig('MauticEmailBundle'),
+    ]);
+}
+
+----------------------------------------
+
+TITLE: Updating MAUTIC_DEV_HOSTS environment variable
+DESCRIPTION: Example of how to update the MAUTIC_DEV_HOSTS environment variable to MAUTIC_CUSTOM_DEV_HOSTS in Mautic 3
+
+LANGUAGE: PHP
+CODE:
+$_SERVER['MAUTIC_CUSTOM_DEV_HOSTS'] = '["1.2.3.4"]';
+
+----------------------------------------
+
+TITLE: Updating Service Reference in Mautic 5 Tests
+DESCRIPTION: Example of updating the HTTP client mock handler service reference in Mautic 5 tests.
+
+LANGUAGE: PHP
+CODE:
+// Old way
+self::$container->get('mautic.http.client.mock_handler')
+
+// New way
+self::$container->get(\GuzzleHttp\Handler\MockHandler::class)
+
+----------------------------------------
+
+TITLE: Updating database fixtures in PHPUnit tests
+DESCRIPTION: Example of how to update database fixture installation in PHPUnit tests for Mautic 3
+
+LANGUAGE: PHP
+CODE:
+$this->installDatabaseFixtures([\Mautic\LeadBundle\DataFixtures\ORM\LeadFieldData::class]);
+
+----------------------------------------
+
+TITLE: Deprecated Mautic Core Components Reference
+DESCRIPTION: Reference to deprecated event constant, class, and service that should no longer be used in Mautic implementations. This includes the form build event, custom form event class, and custom form extension service.
+
+LANGUAGE: php
+CODE:
+Mautic\CoreBundle\CoreEvents::ON_FORM_TYPE_BUILD
+Mautic\CoreBundle\Event\CustomFormEvent
+'mautic.form.extension.custom' => Mautic\CoreBundle\Form\Extension\CustomFormExtension
+
+----------------------------------------
+
+TITLE: Mautic Focus Bundle Plugin Notice
+DESCRIPTION: Markdown notice indicating this is a read-only mirror repository and directing contributors to make PRs and issues against the main Mautic core repository.
+
+LANGUAGE: markdown
+CODE:
+# Mautic bundle for Focus Items plugin
+
+## This plugin is managed centrally in https://github.com/mautic/mautic/blob/head/plugins/MauticFocusBundle and this is a read-only mirror repository.
+
+**📣 Please make PRs and issues against Mautic Core, not here!**
+
+----------------------------------------
+
+TITLE: Displaying Mautic Gmail Bundle Repository Information in Markdown
+DESCRIPTION: This Markdown snippet provides essential information about the Mautic Gmail Bundle repository. It includes the project title, repository management details, and instructions for contributing.
+
+LANGUAGE: Markdown
+CODE:
+# Mautic bundle for Gmail plugin
+
+## This plugin is managed centrally in https://github.com/mautic/mautic/blob/head/plugins/MauticGmailBundle and this is a read-only mirror repository.
+
+**📣 Please make PRs and issues against Mautic Core, not here!**

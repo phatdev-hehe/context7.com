@@ -1,0 +1,5219 @@
+TITLE: Implementing Customer Onboarding Workflow in TypeScript with Upstash
+DESCRIPTION: This snippet demonstrates a customer onboarding workflow using Upstash Workflow in TypeScript. It handles user registration, sends welcome emails, and periodically checks and responds to the user's activity state.
+
+LANGUAGE: typescript
+CODE:
+import { serve } from "@upstash/workflow/nextjs"
+
+type InitialData = {
+  email: string
+}
+
+export const { POST } = serve<InitialData>(async (context) => {
+  const { email } = context.requestPayload
+
+  await context.run("new-signup", async () => {
+    await sendEmail("Welcome to the platform", email)
+  })
+
+  await context.sleep("wait-for-3-days", 60 * 60 * 24 * 3)
+
+  while (true) {
+    const state = await context.run("check-user-state", async () => {
+      return await getUserState()
+    })
+
+    if (state === "non-active") {
+      await context.run("send-email-non-active", async () => {
+        await sendEmail("Email to non-active users", email)
+      })
+    } else if (state === "active") {
+      await context.run("send-email-active", async () => {
+        await sendEmail("Send newsletter to active users", email)
+      })
+    }
+
+    await context.sleep("wait-for-1-month", 60 * 60 * 24 * 30)
+  }
+})
+
+async function sendEmail(message: string, email: string) {
+  // Implement email sending logic here
+  console.log(`Sending ${message} email to ${email}`)
+}
+
+type UserState = "non-active" | "active"
+
+const getUserState = async (): Promise<UserState> => {
+  // Implement user state logic here
+  return "non-active"
+}
+
+----------------------------------------
+
+TITLE: Implementing Evaluator-Optimizer Workflow with Upstash and OpenAI in TypeScript
+DESCRIPTION: This code snippet sets up a workflow using Upstash and OpenAI. It defines generator and evaluator agents, then implements a loop to generate content, evaluate it, and refine based on feedback. The process continues until satisfactory content is produced or the maximum number of iterations is reached.
+
+LANGUAGE: typescript
+CODE:
+import { serve } from "@upstash/workflow/nextjs";
+
+export const { POST } = serve(async (context) => {
+  const model = context.agents.openai('gpt-3.5-turbo');
+
+  // Generator agent that generates content
+  const generator = context.agents.agent({
+    model,
+    name: 'generator',
+    maxSteps: 1,
+    background: 'You are an agent that generates text based on a prompt.',
+    tools: {}
+  });
+
+  // Evaluator agent that evaluates the text and gives corrections
+  const evaluator = context.agents.agent({
+    model,
+    name: 'evaluator',
+    maxSteps: 1,
+    background: 'You are an agent that evaluates the generated text and provides corrections if needed.',
+    tools: {}
+  });
+
+  let generatedText = '';
+  let evaluationResult = '';
+
+  const prompt = "Generate a short explanation of quantum mechanics.";
+  let nextPrompt = prompt;
+  for (let i = 0; i < 3; i++) {
+    // Construct prompt for generator: 
+    // - If there's no evaluation, use the original prompt
+    // - If there's an evaluation, provide the prompt, the last generated text, and the evaluator's feedback
+    if (evaluationResult && evaluationResult !== "PASS") {
+      nextPrompt = `Please revise the answer to the question "${prompt}". Previous answer was: "${generatedText}", which received this feedback: "${evaluationResult}".`;
+    }
+
+    // Generate content
+    const generatedResponse = await context.agents.task({ agent: generator, prompt: nextPrompt }).run();
+    generatedText = generatedResponse.text
+
+    // Evaluate the generated content
+    const evaluationResponse = await context.agents.task({ agent: evaluator, prompt: `Evaluate and provide feedback for the following text: ${generatedText}` }).run();
+    evaluationResult = evaluationResponse.text
+
+    // If the evaluator accepts the content (i.e., "PASS"), stop
+    if (evaluationResult.includes("PASS")) {
+      break;
+    }
+  }
+
+  console.log(generatedText);
+});
+
+----------------------------------------
+
+TITLE: Implementing Complete AI Processing Workflow in TypeScript
+DESCRIPTION: Main workflow implementation that handles dataset processing using Upstash Workflow and OpenAI GPT-4. The workflow downloads data, processes it in chunks, aggregates results, and generates reports.
+
+LANGUAGE: typescript
+CODE:
+import { serve } from "@upstash/workflow/nextjs"
+import {
+  downloadData,
+  aggregateResults,
+  generateReport,
+  sendReport,
+  getDatasetUrl,
+  splitIntoChunks,
+} from "./utils"
+
+type OpenAiResponse = {
+  choices: {
+    message: {
+      role: string,
+      content: string
+    }
+  }[]
+}
+
+export const { POST } = serve<{ datasetId: string; userId: string }>(
+  async (context) => {
+    const request = context.requestPayload
+
+    // Step 1: Download the dataset
+    const datasetUrl = await context.run("get-dataset-url", async () => {
+      return await getDatasetUrl(request.datasetId)
+    })
+
+    const { body: dataset } = await context.call("download-dataset", {
+      url: datasetUrl,
+      method: "GET"
+    })
+      
+    // Step 2: Process data in chunks using OpenAI
+    const chunkSize = 1000
+    const chunks = splitIntoChunks(dataset, chunkSize)
+    const processedChunks: string[] = []
+
+    for (let i = 0; i < chunks.length; i++) {
+      const { body: processedChunk } = await context.api.openai.call(
+        `process-chunk-${i}`,
+        {
+          token: process.env.OPENAI_API_KEY,
+          operation: "chat.completions.create",
+          body: {
+            model: "gpt-4",
+            messages: [
+              {
+                role: "system",
+                content:
+                  "You are an AI assistant tasked with analyzing data chunks. Provide a brief summary and key insights for the given data.",
+              },
+              {
+                role: "user",
+                content: `Analyze this data chunk: ${JSON.stringify(chunks[i])}`,
+              },
+            ],
+            max_completion_tokens: 150,
+          },
+        }
+      )
+
+      processedChunks.push(processedChunk.choices[0].message.content!)
+
+      if (i % 10 === 9 || i === chunks.length - 1) {
+        await context.run(`aggregate-results${i}`, async () => {
+          await aggregateResults(processedChunks)
+          processedChunks.length = 0
+        })
+      }
+    }
+
+    const report = await context.run("generate-report", async () => {
+      return await generateReport(request.datasetId)
+    })
+
+    await context.run("send-report", async () => {
+      await sendReport(report, request.userId)
+    })
+  }
+)
+
+----------------------------------------
+
+TITLE: Implementing Payment Retry Workflow in TypeScript
+DESCRIPTION: This code snippet implements a payment retry workflow using Upstash Workflow in TypeScript. It handles payment processing, retries, account suspension, and email notifications.
+
+LANGUAGE: typescript
+CODE:
+import { serve } from "@upstash/workflow/nextjs";
+
+type ChargeUserPayload = {
+  email: string;
+};
+
+export const { POST } = serve<ChargeUserPayload>(async (context) => {
+  const { email } = context.requestPayload;
+
+  for (let i = 0; i < 3; i++) {
+    // attempt to charge the user
+    const result = await context.run("charge customer", async () => {
+      try {
+        return await chargeCustomer(i + 1),
+      } catch (e) {
+        console.error(e);
+        return
+      }
+    });
+
+    if (!result) {
+      // Wait for a day
+      await context.sleep("wait for retry", 24 * 60 * 60);
+    } else {
+      // Unsuspend User
+      const isSuspended = await context.run("check suspension", async () => {
+        return await checkSuspension(email);
+      });
+      if (isSuspended) {
+        await context.run("unsuspend user", async () => {
+          await unsuspendUser(email);
+        });
+      }
+
+      // send invoice email
+      await context.run("send invoice email", async () => {
+        await sendEmail(
+          email,
+          `Payment successfull. Incoice: ${result.invoiceId}, Total cost: $${result.totalCost}`
+        );
+      });
+
+      // by retuning, we end the workflow run
+      return;
+    }
+  }
+
+  // suspend user if the user isn't suspended
+  const isSuspended = await context.run("check suspension", async () => {
+    return await checkSuspension(email);
+  });
+
+  if (!isSuspended) {
+    await context.run("suspend user", async () => {
+      await suspendUser(email);
+    });
+
+    await context.run("send suspended email", async () => {
+      await sendEmail(
+        email,
+        "Your account has been suspended due to payment failure. Please update your payment method."
+      );
+    });
+  }
+});
+
+async function sendEmail(email: string, content: string) {
+  // Implement the logic to send an email
+  console.log("Sending email to", email, "with content:", content);
+}
+
+async function checkSuspension(email: string) {
+  // Implement the logic to check if the user is suspended
+  console.log("Checking suspension status for", email);
+  return true;
+}
+
+async function suspendUser(email: string) {
+  // Implement the logic to suspend the user
+  console.log("Suspending the user", email);
+}
+
+async function unsuspendUser(email: string) {
+  // Implement the logic to unsuspend the user
+  console.log("Unsuspending the user", email);
+}
+
+async function chargeCustomer(attempt: number) {
+  // Implement the logic to charge the customer
+  console.log("Charging the customer");
+
+  if (attempt <= 2) {
+    throw new Error("Payment failed");
+  }
+
+  return {
+    invoiceId: "INV123",
+    totalCost: 100,
+  } as const;
+}
+
+----------------------------------------
+
+TITLE: Implementing E-commerce Order Fulfillment Workflow in Python with FastAPI
+DESCRIPTION: This code implements an e-commerce order fulfillment workflow using Upstash Workflow in a FastAPI environment. It handles order creation, stock verification, payment processing, order dispatching, and customer notifications. The workflow is implemented as a POST endpoint.
+
+LANGUAGE: python
+CODE:
+from fastapi import FastAPI
+from typing import List, TypedDict
+from upstash_workflow.fastapi import Serve
+from upstash_workflow import AsyncWorkflowContext
+from utils import (
+    create_order_id,
+    check_stock_availability,
+    process_payment,
+    dispatch_order,
+    send_order_confirmation,
+    send_dispatch_notification,
+)
+
+app = FastAPI()
+serve = Serve(app)
+
+
+class OrderItem(TypedDict):
+    product_id: str
+    quantity: int
+
+
+class OrderPayload(TypedDict):
+    user_id: str
+    items: List[OrderItem]
+
+
+@serve.post("/order-fulfillment")
+async def order_fulfillment(context: AsyncWorkflowContext[OrderPayload]) -> None:
+    # Get the order payload from the request
+    payload = context.request_payload
+    user_id = payload["user_id"]
+    items = payload["items"]
+
+    # Step 1: Create Order Id
+    async def _create_order_id():
+        return await create_order_id(user_id)
+
+    order_id: str = await context.run("create-order-id", _create_order_id)
+
+    # Step 2: Verify stock availability
+    async def _check_stock():
+        return await check_stock_availability(items)
+
+    stock_available: bool = await context.run("check-stock", _check_stock)
+
+    if not stock_available:
+        print("Some items are out of stock")
+        return
+
+    # Step 3: Process payment
+    async def _process_payment():
+        return await process_payment(order_id)
+
+    await context.run("process-payment", _process_payment)
+
+    # Step 4: Dispatch the order
+    async def _dispatch_order():
+        return await dispatch_order(order_id, items)
+
+    await context.run("dispatch-order", _dispatch_order)
+
+    # Step 5: Send order confirmation email
+    async def _send_confirmation():
+        return await send_order_confirmation(user_id, order_id)
+
+    await context.run("send-confirmation", _send_confirmation)
+
+    # Step 6: Send dispatch notification
+    async def _send_dispatch_notification():
+        return await send_dispatch_notification(user_id, order_id)
+
+    await context.run("send-dispatch-notification", _send_dispatch_notification)
+
+----------------------------------------
+
+TITLE: Implementing E-commerce Order Fulfillment Workflow in TypeScript with Next.js
+DESCRIPTION: This code demonstrates an e-commerce order fulfillment workflow using Upstash Workflow in a Next.js environment. It handles order creation, stock verification, payment processing, order dispatching, and customer notifications. The workflow is implemented as a POST route handler.
+
+LANGUAGE: typescript
+CODE:
+import { serve } from "@upstash/workflow/nextjs"
+import {
+  createOrderId,
+  checkStockAvailability,
+  processPayment,
+  dispatchOrder,
+  sendOrderConfirmation,
+  sendDispatchNotification,
+} from "./utils"
+
+type OrderPayload = {
+  userId: string
+  items: { productId: string, quantity: number }[]
+}
+
+export const { POST } = serve<OrderPayload>(async (context) => {
+  const { userId, items } = context.requestPayload;
+
+  // Step 1: Create Order Id
+  const orderId = await context.run("create-order-id", async () => {
+    return await createOrderId(userId);
+  });
+
+  // Step 2: Verify stock availability
+  const stockAvailable = await context.run("check-stock", async () => {
+    return await checkStockAvailability(items);
+  });
+
+  if (!stockAvailable) {
+    console.warn("Some items are out of stock");
+    return;
+  };
+
+  // Step 3: Process payment
+  await context.run("process-payment", async () => {
+    return await processPayment(orderId)
+  })
+
+  // Step 4: Dispatch the order
+  await context.run("dispatch-order", async () => {
+    return await dispatchOrder(orderId, items)
+  })
+
+  // Step 5: Send order confirmation email
+  await context.run("send-confirmation", async () => {
+    return await sendOrderConfirmation(userId, orderId)
+  })
+
+  // Step 6: Send dispatch notification
+  await context.run("send-dispatch-notification", async () => {
+    return await sendDispatchNotification(userId, orderId)
+  })
+})
+
+----------------------------------------
+
+TITLE: Basic Workflow Implementation
+DESCRIPTION: Shows how to create a basic workflow endpoint with multiple steps using both TypeScript and Python. Demonstrates the core workflow setup with step definitions.
+
+LANGUAGE: typescript
+CODE:
+import { serve } from "@upstash/workflow/nextjs";
+
+export const { POST } = serve(async (context) => {
+  const result = await context.run("step-1", async () => {
+    // define a piece of business logic as step 1
+  });
+
+  await context.run("step-2", async () => {
+    // define another piece of business logic as step 2
+  });
+});
+
+LANGUAGE: python
+CODE:
+from fastapi import FastAPI
+from upstash_workflow.fastapi import Serve
+from upstash_workflow import AsyncWorkflowContext
+
+app = FastAPI()
+serve = Serve(app)
+
+@serve.post("/api/example")
+async def example(context: AsyncWorkflowContext[str]) -> None:
+    async def _step1() -> str:
+        # define a piece of business logic as step 1
+        return "step 1 result"
+
+    result = await context.run("step-1", _step1)
+
+    async def _step2() -> None:
+        # define another piece of business logic as step 2
+        pass
+
+    await context.run("step-2", _step2)
+
+----------------------------------------
+
+TITLE: TypeScript Auth Provider Webhook Implementation
+DESCRIPTION: Complete implementation of the auth provider webhook handler in TypeScript using Upstash Workflow and Next.js. Handles user creation, Stripe integration, trial management, and automated email notifications.
+
+LANGUAGE: typescript
+CODE:
+import { serve } from "@upstash/workflow/nextjs";
+import { WorkflowContext } from '@upstash/qstash/workflow'
+
+type UserCreatedPayload = {
+  name: string;
+  email: string;
+};
+
+export const { POST } = serve<UserCreatedPayload>(async (context) => {
+  const { name, email } = context.requestPayload;
+
+  const { userid } = await context.run("sync user", async () => {
+    return await createUserInDatabase({ name, email });
+  });
+
+  await context.run("create new user in stripe", async () => {
+    await createNewUserInStripe(email);
+  });
+
+  await context.run("start trial in Stripe", async () => {
+    await startTrialInStripe(email);
+  });
+
+  await context.run("send welcome email", async () => {
+    await sendEmail(
+      email,
+      "Welcome to our platform!, You have 14 days of free trial."
+    );
+  });
+
+  await context.sleep("wait", 7 * 24 * 60 * 60);
+
+  const stats = await context.run("get user stats", async () => {
+    return await getUserStats(userid);
+  });
+  await sendProblemSolvedEmail({context, email, stats});
+
+  await context.sleep("wait for trial warning", 5 * 24 * 60 * 60);
+  const isUpgraded = await context.run("check upgraded plan", async () => {
+    return await checkUpgradedPlan(email);
+  });
+
+  if (isUpgraded) return;
+
+  await context.run("send trial warning email", async () => {
+    await sendEmail(
+      email,
+      "Your trial is about to end in 2 days. Please upgrade your plan to keep using our platform."
+    );
+  });
+
+  await context.sleep("wait for trial end", 2 * 24 * 60 * 60);
+
+  await context.run("send trial end email", async () => {
+    await sendEmail(
+      email,
+      "Your trial has ended. Please upgrade your plan to keep using our platform."
+    );
+  });
+});
+
+----------------------------------------
+
+TITLE: Implementing Parallel Agent Execution in Upstash Workflow with TypeScript
+DESCRIPTION: This code snippet demonstrates how to create multiple worker agents, execute them in parallel, and aggregate their results using an aggregator agent in Upstash Workflow. It uses the OpenAI GPT-3.5-turbo model for generating explanations of quantum physics, relativity, and string theory.
+
+LANGUAGE: typescript
+CODE:
+import { serve } from "@upstash/workflow/nextjs";
+
+export const { POST } = serve(async (context) => {
+  const model = context.agents.openai('gpt-3.5-turbo');
+
+  // Define worker agents
+  const worker1 = context.agents.agent({
+    model,
+    name: 'worker1',
+    maxSteps: 1,
+    background: 'You are an agent that explains quantum physics.',
+    tools: {}
+  });
+
+  const worker2 = context.agents.agent({
+    model,
+    name: 'worker2',
+    maxSteps: 1,
+    background: 'You are an agent that explains relativity.',
+    tools: {}
+  });
+
+  const worker3 = context.agents.agent({
+    model,
+    name: 'worker3',
+    maxSteps: 1,
+    background: 'You are an agent that explains string theory.',
+    tools: {}
+  });
+
+  // Await results
+  const [result1, result2, result3] = await Promise.all([
+    context.agents.task({ agent: worker1, prompt: "Explain quantum physics." }).run(),
+    context.agents.task({ agent: worker2, prompt: "Explain relativity." }).run(),
+    context.agents.task({ agent: worker3, prompt: "Explain string theory." }).run(),
+  ]);
+
+  // Aggregating results
+  const aggregator = context.agents.agent({
+    model,
+    name: 'aggregator',
+    maxSteps: 1,
+    background: 'You are an agent that summarizes multiple answers.',
+    tools: {}
+  });
+
+  const task = await context.agents.task({
+    agent: aggregator,
+    prompt: `Summarize these three explanations: ${result1.text}, ${result2.text}, ${result3.text}`
+  })
+  const finalSummary = await task.run();
+
+  console.log(finalSummary.text);
+});
+
+----------------------------------------
+
+TITLE: Implementing Orchestrator-Workers Pattern with Upstash Workflow
+DESCRIPTION: Sets up an orchestrator system with three specialized worker agents that handle different physics topics using Wikipedia as a knowledge source. The workers are coordinated to create a comprehensive Q&A about advanced physics topics.
+
+LANGUAGE: typescript
+CODE:
+import { serve } from "@upstash/workflow/nextjs";
+import { WikipediaQueryRun } from "@langchain/community/tools/wikipedia_query_run";
+
+const wikiTool = new WikipediaQueryRun({
+  topKResults: 1,
+  maxDocContentLength: 500,
+})
+
+export const { POST } = serve(async (context) => {
+  const model = context.agents.openai('gpt-4o');
+
+  // Worker agents
+  const worker1 = context.agents.agent({
+    model,
+    name: 'worker1',
+    tools: { wikiTool },
+    maxSteps: 3,
+    background: 'You are a worker agent that answers general questions about advanced physics.'
+  });
+
+  const worker2 = context.agents.agent({
+    model,
+    name: 'worker2',
+    tools: { wikiTool },
+    maxSteps: 3,
+    background: 'You are a worker agent that answers questions about quantum mechanics.'
+  });
+
+  const worker3 = context.agents.agent({
+    model,
+    name: 'worker3',
+    tools: { wikiTool },
+    maxSteps: 3,
+    background: 'You are a worker agent that answers questions about relativity.'
+  });
+
+  // Synthesizing results
+  const task = context.agents.task({
+    model,
+    prompt: `Create a Q&A for advanced topics in physics`,
+    agents: [worker1, worker2, worker3],
+    maxSteps: 3,
+  })
+  const { text } = await task.run();
+
+  console.log(text);
+});
+
+----------------------------------------
+
+TITLE: Implementing Image Processing Workflow API in TypeScript
+DESCRIPTION: Main workflow implementation that processes images through multiple steps including retrieval, resizing, filtering, and storage. Uses parallel processing with Promise.all for better performance.
+
+LANGUAGE: typescript
+CODE:
+import { serve } from "@upstash/workflow/nextjs"
+import {
+  resizeImage,
+  applyFilters,
+  storeImage,
+  getImageUrl,
+} from "./utils"
+
+type ImageResult = {
+  imageUrl: string
+}
+
+export const { POST } = serve<{ imageId: string; userId: string }>(
+  async (context) => {
+    const { imageId, userId } = context.requestPayload
+
+    // Step 1: Retrieve the uploaded image
+    const imageUrl = await context.run("get-image-url", async () => {
+      return await getImageUrl(imageId)
+    })
+
+    // Step 2: Resize the image to multiple resolutions
+    const resolutions = [640, 1280, 1920]
+
+    const resizedImages: { body: ImageResult }[] = await Promise.all(resolutions.map(
+      resolution => context.call<ImageResult>(
+        `resize-image-${resolution}`,
+        {
+          url: "https://image-processing-service.com/resize",
+          method: "POST",
+          body: {
+            imageUrl,
+            width: resolution,
+          }
+        }
+      )
+    ))
+
+    // Step 3: Apply filters to each resized image
+    const filters = ["grayscale", "sepia", "contrast"]
+    const processedImagePromises: Promise<string>[] = []
+
+    for (const resizedImage of resizedImages) {
+      for (const filter of filters) {
+        const processedImagePromise = context.call<ImageResult>(
+          `apply-filter-${filter}`,
+          {
+            url: "https://image-processing-service.com/filter",
+            method: "POST",
+            body: {
+              imageUrl: resizedImage.body.imageUrl,
+              filter,
+            }
+          }
+        )
+        processedImagePromises.push(processedImagePromise)
+      }
+    }
+    const processedImages: { body: ImageResult }[] = await Promise.all(processedImagePromises)
+
+    // Step 4: Store processed images in cloud storage
+    const storedImageUrls: string[] = await Promise.all(
+      processedImages.map(
+        processedImage => context.run(`store-image`, async () => {
+          return await storeImage(processedImage.body.imageUrl)
+        })
+      )
+    )
+  }
+)
+
+----------------------------------------
+
+TITLE: Implementing Customer Onboarding Workflow in Python with Upstash
+DESCRIPTION: This snippet showcases a customer onboarding workflow using Upstash Workflow in Python. It handles user registration, sends welcome emails, and periodically checks and responds to the user's activity state.
+
+LANGUAGE: python
+CODE:
+from fastapi import FastAPI
+from typing import Literal, TypedDict
+from upstash_workflow.fastapi import Serve
+from upstash_workflow import AsyncWorkflowContext
+
+app = FastAPI()
+serve = Serve(app)
+
+UserState = Literal["non-active", "active"]
+
+
+class InitialData(TypedDict):
+    email: str
+
+
+async def send_email(message: str, email: str) -> None:
+    # Implement email sending logic here
+    print(f"Sending {message} email to {email}")
+
+
+async def get_user_state() -> UserState:
+    # Implement user state logic here
+    return "non-active"
+
+
+@serve.post("/customer-onboarding")
+async def customer_onboarding(context: AsyncWorkflowContext[InitialData]) -> None:
+    email = context.request_payload["email"]
+
+    async def _new_signup() -> None:
+        await send_email("Welcome to the platform", email)
+
+    await context.run("new-signup", _new_signup)
+
+    await context.sleep("wait-for-3-days", 60 * 60 * 24 * 3)
+
+    while True:
+
+        async def _check_user_state() -> UserState:
+            return await get_user_state()
+
+        state: UserState = await context.run("check-user-state", _check_user_state)
+
+        if state == "non-active":
+
+            async def _send_email_non_active() -> None:
+                await send_email("Email to non-active users", email)
+
+            await context.run("send-email-non-active", _send_email_non_active)
+        else:
+
+            async def _send_email_active() -> None:
+                await send_email("Send newsletter to active users", email)
+
+            await context.run("send-email-active", _send_email_active)
+
+        await context.sleep("wait-for-1-month", 60 * 60 * 24 * 30)
+
+----------------------------------------
+
+TITLE: Implementing Custom Retry Logic for OpenAI API in TypeScript
+DESCRIPTION: This code snippet demonstrates a custom retry logic implementation for OpenAI API calls using Upstash Workflow in TypeScript. It handles successful responses, rate limiting, and other error scenarios with dynamic sleep times.
+
+LANGUAGE: typescript
+CODE:
+import { serve } from "@upstash/workflow/nextjs"
+import { storeResponse } from "@/lib/utils"
+
+const BASE_DELAY = 10;
+
+const createSystemMessage = () => ({
+  role: "system",
+  content: "You are an AI assistant providing a brief summary and key insights for any given data.",
+})
+
+const createUserMessage = (data: string) => ({
+  role: "user",
+  content: `Analyze this data chunk: ${data}`,
+})
+
+export const { POST } = serve<{ userData: string }>(async (context) => {
+  // 👇 initial data sent along when triggering the workflow
+  const { userData } = context.requestPayload
+
+  for (let attempt = 0; attempt < 10; attempt++) {
+    const response = await context.api.openai.call(`call-openai`, {
+      token: process.env.OPENAI_API_KEY!,
+      operation: "chat.completions.create",
+      body: {
+        model: "gpt-3.5-turbo",
+        messages: [createSystemMessage(), createUserMessage(userData)],
+        max_completion_tokens: 150,
+      },
+    })
+
+    // Success case
+    if (response.status < 300) {
+      await context.run("store-response-in-db", () => storeResponse(response.body))
+      return
+    }
+
+    // Rate limit case - wait and retry
+    if (response.status === 429) {
+      const resetTime =
+        response.header["x-ratelimit-reset-tokens"]?.[0] ||
+        response.header["x-ratelimit-reset-requests"]?.[0] ||
+        BASE_DELAY
+
+      // assuming `resetTime` is in seconds
+      await context.sleep("sleep-until-retry", Number(resetTime))
+
+      continue
+    }
+
+    // Any other scenario - pause for 5 seconds to avoid overloading OpenAI API
+    await context.sleep("pause-to-avoid-spam", 5)
+  }
+})
+
+----------------------------------------
+
+TITLE: Implementing Payment Retry Workflow in Python
+DESCRIPTION: This code snippet implements a payment retry workflow using Upstash Workflow in Python. It handles payment processing, retries, account suspension, and email notifications.
+
+LANGUAGE: python
+CODE:
+from fastapi import FastAPI
+from typing import TypedDict, Optional
+from dataclasses import dataclass
+from upstash_workflow.fastapi import Serve
+from upstash_workflow import AsyncWorkflowContext
+
+app = FastAPI()
+serve = Serve(app)
+
+
+@dataclass
+class ChargeResult:
+    invoice_id: str
+    total_cost: float
+
+
+class ChargeUserPayload(TypedDict):
+    email: str
+
+
+async def send_email(email: str, content: str) -> None:
+    # Implement the logic to send an email
+    print("Sending email to", email, "with content:", content)
+
+
+async def check_suspension(email: str) -> bool:
+    # Implement the logic to check if the user is suspended
+    print("Checking suspension status for", email)
+    return True
+
+
+async def suspend_user(email: str) -> None:
+    # Implement the logic to suspend the user
+    print("Suspending the user", email)
+
+
+async def unsuspend_user(email: str) -> None:
+    # Implement the logic to unsuspend the user
+    print("Unsuspending the user", email)
+
+
+async def charge_customer(attempt: int) -> Optional[ChargeResult]:
+    # Implement the logic to charge the customer
+    print("Charging the customer")
+    if attempt <= 2:
+        raise Exception("Payment failed")
+    return ChargeResult(invoice_id="INV123", total_cost=100)
+
+
+@serve.post("/payment-retries")
+async def payment_retries(context: AsyncWorkflowContext[ChargeUserPayload]) -> None:
+    email = context.request_payload["email"]
+
+    async def _check_suspension() -> bool:
+        return await check_suspension(email)
+
+    for i in range(3):
+        # attempt to charge the user
+        async def _charge_customer() -> Optional[ChargeResult]:
+            try:
+                return await charge_customer(i + 1)
+            except Exception as e:
+                print(f"Error: {e}")
+                return None
+
+        result = await context.run("charge customer", _charge_customer)
+
+        if not result:
+            # Wait for a day
+            await context.sleep("wait for retry", 24 * 60 * 60)
+        else:
+            # Unsuspend User
+            is_suspended = await context.run("check suspension", _check_suspension)
+
+            if is_suspended:
+
+                async def _unsuspend_user() -> None:
+                    await unsuspend_user(email)
+
+                await context.run("unsuspend user", _unsuspend_user)
+
+            # send invoice email
+            async def _send_invoice_email() -> None:
+                await send_email(
+                    email,
+                    f"Payment successful. Invoice: {result.invoice_id}, Total cost: ${result.total_cost}",
+                )
+
+            await context.run("send invoice email", _send_invoice_email)
+
+            # by returning, we end the workflow run
+            return
+
+    # suspend user if the user isn't suspended
+    is_suspended = await context.run("check suspension", _check_suspension)
+
+    if not is_suspended:
+
+        async def _suspend_user() -> None:
+            await suspend_user(email)
+
+        await context.run("suspend user", _suspend_user)
+
+        async def _send_suspended_email() -> None:
+            await send_email(
+                email,
+                "Your account has been suspended due to payment failure. Please update your payment method.",
+            )
+
+        await context.run("send suspended email", _send_suspended_email)
+
+
+----------------------------------------
+
+TITLE: Implementing Order Processing Workflow with Event Handling
+DESCRIPTION: Main workflow implementation that handles order processing using Upstash Workflow. It includes steps for initiating the order, waiting for processing events, and sending confirmation emails. Uses context.waitForEvent for handling asynchronous processing with timeout functionality.
+
+LANGUAGE: typescript
+CODE:
+import { serve } from "@upstash/workflow/nextjs";
+
+export const { POST } = serve(async (context) => {
+  const { orderId, userEmail } = context.requestPayload;
+
+  // Step 1: request order processing
+  await context.run("request order processing", async () => {
+    await requestProcessing(orderId)
+  })
+
+  // Step 2: Wait for the order to be processed
+  const { eventData, timeout } = await context.waitForEvent(
+    "wait for order processing",
+    `order-${orderId}`,
+    {
+      timeout: "10m" // 10 minutes timeout
+    }
+  );
+
+  if (timeout) {
+    // end workflow in case of timeout
+    return;
+  }
+
+  const processedData = eventData;
+
+  // Step 3: Log the processed order
+  await context.run("process-order", async () => {
+    console.log(`Order ${orderId} processed:`, processedData);
+  });
+
+  // Step 4: Send a confirmation email
+  await context.run("send-confirmation-email", async () => {
+    await sendEmail(
+      userEmail,
+      "Your order has been processed!",
+      processedData
+    );
+  });
+});
+
+----------------------------------------
+
+TITLE: Initializing Workflow Context in TypeScript and Python
+DESCRIPTION: Basic setup of workflow context in Next.js (TypeScript) and FastAPI (Python) environments. Shows how to initialize and access the workflow context object.
+
+LANGUAGE: typescript
+CODE:
+import { serve } from "@upstash/workflow/nextjs";
+
+export const { POST } = serve(
+  async (context) => {
+    // ...
+  }
+);
+
+LANGUAGE: python
+CODE:
+from fastapi import FastAPI
+from upstash_workflow.fastapi import Serve
+from upstash_workflow import AsyncWorkflowContext
+
+app = FastAPI()
+serve = Serve(app)
+
+@serve.post("/api/example")
+async def example(context: AsyncWorkflowContext[str]) -> None: ...
+
+----------------------------------------
+
+TITLE: Python Auth Provider Webhook Implementation
+DESCRIPTION: Complete implementation of the auth provider webhook handler in Python using FastAPI and Upstash Workflow. Provides the same functionality as the TypeScript version with user creation, Stripe integration, trial management, and automated emails.
+
+LANGUAGE: python
+CODE:
+from fastapi import FastAPI
+from typing import Dict, TypedDict
+from upstash_workflow.fastapi import Serve
+from upstash_workflow import AsyncWorkflowContext
+
+app = FastAPI()
+serve = Serve(app)
+
+class UserCreatedPayload(TypedDict):
+    name: str
+    email: str
+
+class UserStats(TypedDict):
+    total_problems_solved: int
+    most_interested_topic: str
+
+@serve.post("/auth-provider-webhook")
+async def auth_provider_webhook(
+    context: AsyncWorkflowContext[UserCreatedPayload],
+) -> None:
+    payload = context.request_payload
+    name = payload["name"]
+    email = payload["email"]
+
+    async def _sync_user() -> str:
+        return await create_user_in_database(name, email)
+
+    result = await context.run("sync user", _sync_user)
+    userid = result["userid"]
+
+    async def _create_new_user_in_stripe() -> None:
+        await create_new_user_in_stripe(email)
+
+    await context.run("create new user in stripe", _create_new_user_in_stripe)
+
+    async def _start_trial_in_stripe() -> None:
+        await start_trial_in_stripe(email)
+
+    await context.run("start trial in Stripe", _start_trial_in_stripe)
+
+    async def _send_welcome_email() -> None:
+        await send_email(
+            email, "Welcome to our platform!, You have 14 days of free trial."
+        )
+
+    await context.run("send welcome email", _send_welcome_email)
+
+    await context.sleep("wait", 7 * 24 * 60 * 60)
+
+    async def _get_user_stats() -> UserStats:
+        return await get_user_stats(userid)
+
+    stats: UserStats = await context.run("get user stats", _get_user_stats)
+
+    await send_problem_solved_email(context, email, stats)
+
+    await context.sleep("wait for trial warning", 5 * 24 * 60 * 60)
+
+    async def _check_upgraded_plan() -> bool:
+        return await check_upgraded_plan(email)
+
+    is_upgraded = await context.run("check upgraded plan", _check_upgraded_plan)
+
+    if is_upgraded:
+        return
+
+    async def _send_trial_warning_email() -> None:
+        await send_email(
+            email,
+            "Your trial is about to end in 2 days. Please upgrade your plan to keep using our platform.",
+        )
+
+    await context.run("send trial warning email", _send_trial_warning_email)
+
+    await context.sleep("wait for trial end", 2 * 24 * 60 * 60)
+
+    async def _send_trial_end_email() -> None:
+        await send_email(
+            email,
+            "Your trial has ended. Please upgrade your plan to keep using our platform.",
+        )
+
+    await context.run("send trial end email", _send_trial_end_email)
+
+----------------------------------------
+
+TITLE: Triggering a Workflow Run in TypeScript
+DESCRIPTION: Demonstrates how to use the Client class to trigger a new workflow run. It shows how to initialize the client with a token and use the trigger method with various optional parameters.
+
+LANGUAGE: typescript
+CODE:
+import { Client } from "@upstash/workflow";
+
+const client = new Client({ token: "<QSTASH_TOKEN>" })
+const { workflowRunId } = await client.trigger({
+  url: "https://<YOUR_WORKFLOW_ENDPOINT>/<YOUR-WORKFLOW-ROUTE>",
+  body: "hello there!",         // optional body
+  headers: { ... },             // optional headers
+  workflowRunId: "my-workflow", // optional workflow run id
+  retries: 3                    // optional retries in the initial request
+  flowControl: {                // optional flow control
+    key: "USER_GIVEN_KEY",
+    ratePerSecond: 10,
+    parallelism: 5
+  }
+})
+
+console.log(workflowRunId)
+// prints wfr_my-workflow
+
+----------------------------------------
+
+TITLE: Complete Workflow Example with Parallel Steps in Next.js API Route
+DESCRIPTION: This code snippet shows a complete workflow implementation using Upstash Workflow in a Next.js API route. It demonstrates parallel inventory checks for coffee ingredients and conditional coffee brewing based on availability.
+
+LANGUAGE: typescript
+CODE:
+import { serve } from "@upstash/workflow/nextjs";
+import { checkInventory, brewCoffee, printReceipt } from "@/utils";
+
+export const { POST } = serve(async (ctx) => {
+  const [coffeeBeansAvailable, cupsAvailable, milkAvailable] =
+    await Promise.all([
+      ctx.run("check-coffee-beans", () => checkInventory("coffee-beans")),
+      ctx.run("check-cups", () => checkInventory("cups")),
+      ctx.run("check-milk", () => checkInventory("milk")),
+    ]);
+
+  // If all ingedients available, brew coffee
+  if (coffeeBeansAvailable && cupsAvailable && milkAvailable) {
+    const price = await ctx.run("brew-coffee", async () => {
+      return await brewCoffee({ style: "cappuccino" });
+    });
+
+    await printReceipt(price);
+  }
+});
+
+----------------------------------------
+
+TITLE: Implementing Customer Onboarding Workflow in Next.js
+DESCRIPTION: TypeScript implementation of a customer onboarding workflow using Upstash Workflow in Next.js. Demonstrates welcome email sending, delayed follow-ups, and AI-generated personalized messages.
+
+LANGUAGE: typescript
+CODE:
+import { serve } from "@upstash/workflow/nextjs";
+import { sendEmail } from "./emailUtils";
+
+interface InitialData {
+  userId: string
+  email: string
+  name: string
+}
+
+export const { POST } = serve<InitialData>(async (context) => {
+  const { userId, email, name } = context.requestPayload;
+
+  await context.run("send-welcome-email", async () => {
+    await sendEmail(email, "Welcome to our service!");
+  });
+
+  await context.sleep("sleep-until-follow-up", 60 * 60 * 24 * 3);
+
+  const { body: aiResponse } = await context.api.openai.call(
+    "generate-personalized-message",
+    {
+      token: "<OPENAI_API_KEY>",
+      operation: "chat.completions.create",
+      body: {
+        model: "gpt-3.5-turbo",
+        messages: [
+          { role: "system", content: "You are an assistant creating personalized follow-up messages." },
+          { role: "user", content: `Create a short, friendly follow-up message for ${name} who joined our service 3 days ago.` }
+        ]
+      },
+    }
+  );
+
+  const personalizedMessage = aiResponse.choices[0].message.content;
+
+  await context.run("send-follow-up-email", async () => {
+    await sendEmail(email, personalizedMessage);
+  });
+});
+
+----------------------------------------
+
+TITLE: Calling OpenAI-Compatible Provider (Deepseek) in Upstash Workflow
+DESCRIPTION: This example demonstrates how to use the context.api.openai.call method to interact with an OpenAI-compatible provider, specifically Deepseek. It shows how to specify a custom base URL and API key for the provider.
+
+LANGUAGE: typescript
+CODE:
+const { status, body } = await context.api.openai.call(
+  "Call Deepseek",
+  {
+    baseURL: "https://api.deepseek.com",
+    token: process.env.DEEPSEEK_API_KEY,
+    operation: "chat.completions.create",
+    body: {
+      model: "gpt-4o",
+      messages: [
+        {
+          role: "system",
+          content: "Assistant says 'hello!'",
+        },
+        {
+          role: "user",
+          content: "User shouts back 'hi!'"
+        }
+      ],
+    },
+  }
+);
+
+----------------------------------------
+
+TITLE: Implementing Prompt Chaining with Upstash Workflow and OpenAI
+DESCRIPTION: This code sets up three agents using Upstash Workflow and OpenAI to chain prompts. It uses Wikipedia as a tool for the second agent. The workflow lists famous physicists, describes their work, and then summarizes the information.
+
+LANGUAGE: typescript
+CODE:
+import { serve } from "@upstash/workflow/nextjs";
+import { WikipediaQueryRun } from "@langchain/community/tools/wikipedia_query_run";
+
+export const { POST } = serve(async (context) => {
+  const model = context.agents.openai('gpt-3.5-turbo');
+
+  const agent1 = context.agents.agent({
+    model,
+    name: 'firstAgent',
+    maxSteps: 1,
+    background: 'You are an agent that lists famous physicists.',
+    tools: {}
+  });
+
+  const agent2 = context.agents.agent({
+    model,
+    name: 'secondAgent',
+    // set to 2 as this agent will first request tools
+    // and then summarize them:
+    maxSteps: 2,
+    background:
+      'You are an agent that describes the work of' +
+      ' the physicists listed in the previous prompt.',
+    tools: {
+      wikiTool: new WikipediaQueryRun({
+        topKResults: 1,
+        maxDocContentLength: 500,
+      })
+    }
+  });
+
+  const agent3 = context.agents.agent({
+    model,
+    name: 'thirdAgent',
+    maxSteps: 1,
+    background:
+      'You are an agent that summarizes the ' +
+      'works of the physicists mentioned previously.',
+    tools: {}
+  });
+
+  // Chaining agents
+  const firstOutput = await context.agents.task({
+    agent: agent1,
+    prompt: "List 3 famous physicists."
+  }).run();
+
+  const secondOutput = await context.agents.task({
+    agent: agent2,
+    prompt: `Describe the work of: ${firstOutput.text}`
+  }).run();
+  
+
+  const { text } = await context.agents.task({
+    agent: agent3,
+    prompt: `Summarize: ${secondOutput.text}`
+  }).run();
+
+  console.log(text);
+});
+
+----------------------------------------
+
+TITLE: Creating Custom OpenAI Client for Workflow Integration
+DESCRIPTION: Implementation of a custom OpenAI client that uses Upstash Workflow's context.call method for making HTTP requests, ensuring durability for long-running LLM operations.
+
+LANGUAGE: typescript
+CODE:
+import { createOpenAI } from '@ai-sdk/openai';
+import { HTTPMethods } from '@upstash/qstash';
+import { WorkflowAbort, WorkflowContext } from '@upstash/workflow';
+
+export const createWorkflowOpenAI = (context: WorkflowContext) => {
+  return createOpenAI({
+    compatibility: "strict",
+    fetch: async (input, init) => {
+      try {
+        const headers = init?.headers
+          ? Object.fromEntries(new Headers(init.headers).entries())
+          : {};
+
+        const body = init?.body ? JSON.parse(init.body as string) : undefined;
+
+        const responseInfo = await context.call("openai-call-step", {
+          url: input.toString(),
+          method: init?.method as HTTPMethods,
+          headers,
+          body,
+        });
+
+        const responseHeaders = new Headers(
+          Object.entries(responseInfo.header).reduce((acc, [key, values]) => {
+            acc[key] = values.join(", ");
+            return acc;
+          }, {} as Record<string, string>)
+        );
+
+        return new Response(JSON.stringify(responseInfo.body), {
+          status: responseInfo.status,
+          headers: responseHeaders,
+        });
+      } catch (error) {
+        if (error instanceof WorkflowAbort) {
+          throw error
+        } else {
+          console.error("Error in fetch implementation:", error);
+          throw error;
+        }
+      }
+    },
+  });
+};
+
+----------------------------------------
+
+TITLE: Implementing Complete AI Processing Workflow in Python
+DESCRIPTION: FastAPI implementation of the AI processing workflow using Upstash Workflow. Handles the same functionality as the TypeScript version with dataset processing, chunking, and report generation.
+
+LANGUAGE: python
+CODE:
+from fastapi import FastAPI
+import json
+import os
+from typing import Dict, List, Any, TypedDict
+from upstash_workflow.fastapi import Serve
+from upstash_workflow import AsyncWorkflowContext, CallResponse
+from utils import (
+    aggregate_results,
+    generate_report,
+    send_report,
+    get_dataset_url,
+    split_into_chunks,
+)
+
+app = FastAPI()
+serve = Serve(app)
+
+class RequestPayload(TypedDict):
+    dataset_id: str
+    user_id: str
+
+@serve.post("/ai-generation")
+async def ai_generation(context: AsyncWorkflowContext[RequestPayload]) -> None:
+    request = context.request_payload
+    dataset_id = request["dataset_id"]
+    user_id = request["user_id"]
+
+    async def _get_dataset_url() -> str:
+        return await get_dataset_url(dataset_id)
+
+    dataset_url = await context.run("get-dataset-url", _get_dataset_url)
+
+    response: CallResponse[Any] = await context.call(
+        "download-dataset", url=dataset_url, method="GET"
+    )
+    dataset = response.body
+
+    chunk_size = 1000
+    chunks = split_into_chunks(dataset, chunk_size)
+    processed_chunks: List[str] = []
+
+    for i, chunk in enumerate(chunks):
+        openai_response: CallResponse[Dict[str, str]] = await context.call(
+            f"process-chunk-{i}",
+            url="https://api.openai.com/v1/chat/completions",
+            method="POST",
+            headers={
+                "authorization": f"Bearer {os.getenv('OPENAI_API_KEY')}",
+            },
+            body={
+                "model": "gpt-4",
+                "messages": [
+                {
+                    "role": "system",
+                    "content":
+                    "You are an AI assistant tasked with analyzing data chunks. Provide a brief summary and key insights for the given data.",
+                },
+                {
+                    "role": "user",
+                    "content": f"Analyze this data chunk: {json.dumps(chunk)}",
+                },
+                ],
+                "max_tokens": 150,
+            },
+        )
+
+        processed_chunks.append(
+            openai_response.body["choices"][0]["message"]["content"]
+        )
+
+        if i % 10 == 9 or i == len(chunks) - 1:
+            async def _aggregate_results() -> None:
+                await aggregate_results(processed_chunks)
+                processed_chunks.clear()
+
+            await context.run(f"aggregate-results{i}", _aggregate_results)
+
+    async def _generate_report() -> Any:
+        return await generate_report(dataset_id)
+
+    report = await context.run("generate-report", _generate_report)
+
+    async def _send_report() -> None:
+        await send_report(report, user_id)
+
+    await context.run("send-report", _send_report)
+
+----------------------------------------
+
+TITLE: Calling Anthropic API using context.api.anthropic.call in TypeScript
+DESCRIPTION: This snippet demonstrates how to use the type-safe method `context.api.anthropic.call` to interact with Anthropic's text generation API. It includes setting the API key, specifying the operation, and defining the request body with model and message parameters.
+
+LANGUAGE: typescript
+CODE:
+const { status, body } = await context.api.anthropic.call(
+  "Call Anthropic",
+  {
+    token: "<ANTHROPIC_API_KEY>",
+    operation: "messages.create",
+    body: {
+      model: "claude-3-5-sonnet-20241022",
+      max_tokens: 1024,
+      messages: [
+          {"role": "user", "content": "Hello, world"}
+      ]
+    },
+  }
+);
+
+// get text:
+console.log(body.content[0].text)
+
+----------------------------------------
+
+TITLE: Exposing Multiple Workflows with serveMany() in Next.js
+DESCRIPTION: This snippet shows how to use serveMany() to expose multiple workflows as endpoints in a Next.js application. It demonstrates defining workflows and exporting them as a catch-all route.
+
+LANGUAGE: typescript
+CODE:
+import { WorkflowContext } from "@upstash/workflow";
+import { createWorkflow, serveMany } from "@upstash/workflow/nextjs";
+
+const workflowOne = createWorkflow(async (context) => {
+  await context.run("say hi", () => {
+    console.log("workflow one says hi!")
+  })
+
+  const { body, isCanceled, isFailed } = await context.invoke("invoking other", {
+    workflow: workflowTwo,
+    body: "hello from workflow one",
+  })
+
+  console.log(`received response from workflowTwo: ${body}`)
+})
+
+const workflowTwo = createWorkflow(async (context: WorkflowContext<string>) => {
+  await context.run("say hi", () => {
+    console.log("workflowTwo says hi!")
+    console.log(`received: '${context.requestPayload}' in workflowTwo`)
+  })
+
+  return "Workflow two finished!"
+})
+
+export const { POST } = serveMany(
+  {
+    "workflow-one-route": workflowOne,
+    "workflow-two-route": workflowTwo,
+  }
+)
+
+----------------------------------------
+
+TITLE: Executing Business Logic in context.run for Upstash Workflow (TypeScript and Python)
+DESCRIPTION: Demonstrates the correct way to place business logic inside the context.run function for each step in an Upstash Workflow. This ensures that the logic is executed properly during multiple workflow runs.
+
+LANGUAGE: typescript
+CODE:
+export const { POST } = serve<string>(async (context) => {
+  const input = context.requestPayload
+
+  const result = await context.run("step-1", () => {
+    return { success: true }
+  })
+
+  console.log("This log will appear multiple times")
+
+  await context.run("step-2", () => {
+    console.log("This log will appear just once")
+    console.log("Step 1 status is:", result.success)
+  })
+})
+
+LANGUAGE: python
+CODE:
+@serve.post("/api/example")
+async def example(context: AsyncWorkflowContext[str]) -> None:
+    input = context.request_payload
+
+    async def _step_1() -> Dict:
+        return {"success": True}
+
+    result = await context.run("step-1", _step_1)
+
+    print("This log will appear multiple times")
+
+    async def _step_2() -> None:
+        print("This log will appear just once")
+        print("Step 1 status is:", result["success"])
+
+    await context.run("step-2", _step_2)
+
+----------------------------------------
+
+TITLE: HTTP Calls with Workflow Context
+DESCRIPTION: Shows how to make timeout-resistant HTTP calls using the context.call method, with support for headers, request body, and response handling.
+
+LANGUAGE: typescript
+CODE:
+import { serve } from "@upstash/workflow/nextjs";
+
+export const { POST } = serve<{ topic: string }>(async (context) => {
+  const request = context.requestPayload;
+
+  const {
+    status,
+    headers,
+    body,
+  } = await context.call(
+    "generate-long-essay",
+    {
+      url: "https://api.openai.com/v1/chat/completions",
+      method: "POST",
+      body: {
+        model: "gpt-4o",
+        messages: [
+          {
+            role: "system",
+            content: "You are a helpful assistant writing really long essays that would cause a normal serverless function to timeout.",
+          },
+          { role: "user", content: request.topic },
+        ],
+      },
+      headers: {
+        authorization: `Bearer ${process.env.OPENAI_API_KEY}`,
+      },
+    }
+  );
+});
+
+----------------------------------------
+
+TITLE: Serial and Parallel Workflow Execution
+DESCRIPTION: Demonstrates how to execute workflow steps both serially and in parallel using the context.run method.
+
+LANGUAGE: typescript
+CODE:
+import { serve } from "@upstash/workflow/nextjs";
+
+export const { POST } = serve<string>(async (context) => {
+  const input = context.requestPayload;
+
+  const result1 = await context.run("step-1", async () => {
+    return someWork(input);
+  });
+
+  await context.run("step-2", async () => {
+    someOtherWork(result1);
+  });
+});
+
+LANGUAGE: python
+CODE:
+from fastapi import FastAPI
+from upstash_workflow.fastapi import Serve
+from upstash_workflow import AsyncWorkflowContext
+
+app = FastAPI()
+serve = Serve(app)
+
+@serve.post("/api/example")
+async def example(context: AsyncWorkflowContext[str]) -> None:
+    input = context.request_payload
+
+    async def _step1():
+        return some_work(input)
+
+    result1 = await context.run("step-1", _step1)
+
+    async def _step2():
+        return some_other_work(result1)
+
+    await context.run("step-2", _step2)
+
+----------------------------------------
+
+TITLE: Validating Webhook Requests in TypeScript
+DESCRIPTION: Demonstrates how to validate incoming webhook requests using Svix in TypeScript. It includes parsing the payload, extracting headers, and verifying the request using a webhook secret.
+
+LANGUAGE: typescript
+CODE:
+export const { POST } = serve<string>(async (context) => {
+	const payloadString = context.requestPayload;
+	const headerPayload = context.headers;
+
+    let event: WebhookEvent;
+    try {
+    	event = await validateRequest(payloadString, headerPayload);
+    } catch {
+    	return
+    }
+
+    // Next steps based on the event
+
+})
+
+LANGUAGE: typescript
+CODE:
+import { Webhook } from "svix";
+import { WebhookEvent } from "@clerk/nextjs/server";
+
+const webhookSecret = "YOUR_WEBHOOK_SECRET";
+
+async function validateRequest(payloadString: string, headerPayload: Headers) {
+  const svixHeaders = {
+    "svix-id": headerPayload.get("svix-id") as string,
+    "svix-timestamp": headerPayload.get("svix-timestamp") as string,
+    "svix-signature": headerPayload.get("svix-signature") as string,
+  };
+  const wh = new Webhook(webhookSecret);
+  return wh.verify(payloadString, svixHeaders) as WebhookEvent;
+}
+
+----------------------------------------
+
+TITLE: External API Rate Limiting with Context Call
+DESCRIPTION: Implementation of flow control for external API calls using context.call. Shows how to limit requests to external services with rate and parallelism controls.
+
+LANGUAGE: javascript
+CODE:
+import { serve } from "@upstash/workflow/nextjs";
+
+export const { POST } = serve<{ topic: string }>(async (context) => {
+  const request = context.requestPayload;
+
+  const response = await context.call(
+    "generate-long-essay", 
+    {
+      url: "https://api.openai.com/v1/chat/completions",
+      method: "POST",
+      body: {/*****/},
+      flowControl: { key: "opani-call", parallelism: 3, ratePerSecond: 10 }
+    }
+  );
+});
+
+----------------------------------------
+
+TITLE: Canceling Workflow Runs in TypeScript
+DESCRIPTION: Illustrates different ways to cancel workflow runs using the Client class. It shows how to cancel specific runs by ID, cancel runs based on a URL prefix, and cancel all pending and active runs.
+
+LANGUAGE: typescript
+CODE:
+// cancel a single workflow
+await client.cancel({ ids: "<WORKFLOW_RUN_ID>" });
+
+// cancel a set of workflow runs
+await client.cancel({ ids: ["<WORKFLOW_RUN_ID_1>", "<WORKFLOW_RUN_ID_2>"] });
+
+// cancel workflows starting with a url
+await client.cancel({ urlStartingWith: "https://your-endpoint.com" });
+
+// cancel all pending and currently running workflows
+await client.cancel({ all: true });
+
+----------------------------------------
+
+TITLE: Implementing Single Agent Task Handler
+DESCRIPTION: Complete implementation of a single agent task handler using Wikipedia tools and OpenAI model.
+
+LANGUAGE: typescript
+CODE:
+import { serve } from "@upstash/workflow/nextjs";
+import { WikipediaQueryRun } from "@langchain/community/tools/wikipedia_query_run";
+
+export const { POST } = serve(async (context) => {
+  const model = context.agents.openai('gpt-3.5-turbo');
+
+  const researcherAgent = context.agents.agent({
+    model,
+    name: 'academic',
+    maxSteps: 2,
+    tools: {
+      wikiTool: new WikipediaQueryRun({
+        topKResults: 1,
+        maxDocContentLength: 500,
+      })
+    },
+    background:
+      'You are researcher agent with access to Wikipedia. ' +
+      'Utilize Wikipedia as much as possible for correct information',
+  });
+
+  const task = context.agents.task({
+    agent: researcherAgent,
+    prompt: "Tell me about 5 topics in advanced physics.",
+  });
+  const { text } = await task.run();
+  console.log("result:", text)
+})
+
+----------------------------------------
+
+TITLE: Configuring Flow Control in Serve Method
+DESCRIPTION: Implementation of flow control parameters in the serve method to limit workflow execution. Sets parallelism to 3 concurrent executions and rate limit to 10 calls per second.
+
+LANGUAGE: javascript
+CODE:
+export const { POST } = serve<string>(
+  async (context) => {
+    await context.run("step-1", async () => {
+      return someWork();
+    });
+  },
+  {
+    flowControl: { key: "app1", parallelism: 3, ratePerSecond: 10 }
+  }
+);
+
+----------------------------------------
+
+TITLE: Creating Workflow Endpoint in Next.js App Router
+DESCRIPTION: TypeScript implementation of workflow endpoints using Next.js App Router, demonstrating basic workflow steps and request handling.
+
+LANGUAGE: typescript
+CODE:
+import { serve } from "@upstash/workflow/nextjs"
+
+export const { POST } = serve(
+  async (context) => {
+    await context.run("initial-step", () => {
+      console.log("initial step ran")
+    })
+
+    await context.run("second-step", () => {
+      console.log("second step ran")
+    })
+  }
+)
+
+LANGUAGE: typescript
+CODE:
+import { serve } from "@upstash/workflow/nextjs";
+import { NextRequest } from "next/server";
+
+export const POST = async (request: NextRequest) => {
+  // do something with the native request object
+  const { POST: handler } = serve(async (context) => {
+    // Your workflow steps
+  });
+
+  return await handler(request);
+}
+
+----------------------------------------
+
+TITLE: Custom Authorization in TypeScript
+DESCRIPTION: Implementation of custom authorization mechanism in TypeScript using bearer token validation
+
+LANGUAGE: typescript
+CODE:
+import { serve } from "@upstash/workflow/nextjs";
+
+export const { POST } = serve(
+  async (context) => {
+    const authHeader = context.headers.get("authorization");
+    const bearerToken = authHeader?.split(" ")[1];
+
+    if (!isValid(bearerToken)) {
+      console.error("Authentication failed.");
+      return;
+    }
+
+    // Your workflow steps..
+  },
+  {
+    failureFunction: async () => {
+      const authHeader = context.headers.get("authorization");
+      const bearerToken = authHeader?.split(" ")[1];
+
+      if (!isValid(bearerToken)) {
+        // ...
+      }
+    },
+  }
+);
+
+----------------------------------------
+
+TITLE: Executing Parallel Steps in Upstash Workflow with TypeScript
+DESCRIPTION: This snippet demonstrates how to run multiple workflow steps concurrently using Promise.all in Upstash Workflow. It shows a basic structure for parallel execution.
+
+LANGUAGE: typescript
+CODE:
+const [result1, result2, result3] =
+  await Promise.all([
+    ctx.run("parallel-step-1", async () => { ... }),
+    ctx.run("parallel-step-2", async () => { ... }),
+    ctx.run("parallel-step-3", async () => { ... }),
+  ])
+
+----------------------------------------
+
+TITLE: Avoiding Non-deterministic Code in Upstash Workflow (TypeScript and Python)
+DESCRIPTION: Shows examples of non-deterministic code patterns to avoid in Upstash Workflow, including non-idempotent functions, time-dependent code, and random code outside of context.run.
+
+LANGUAGE: typescript
+CODE:
+export const { POST } = serve<{ entryId: string }>(async (context) => {
+  const { entryId } = context.requestPayload;
+
+  // 👇 Problem: Non-idempotent function outside context.run:
+  const result = await getResultFromDb(entryId);
+  if (result.return) {
+    return;
+  }
+
+  // ...
+})
+
+LANGUAGE: typescript
+CODE:
+export const { POST } = serve<string>(async (context) => {
+  const input = context.requestPayload
+
+  // 👇 Problem: time-dependent code
+  if (Date.now() % 5 == 2) {
+    await context.run("step-1", () => {
+      // ...
+    })
+  } else {
+    await context.run("step-2", () => {
+      // ...
+    })
+  }
+})
+
+LANGUAGE: typescript
+CODE:
+export const { POST } = serve<string>(async (context) => {
+  const input = context.requestPayload
+
+  // 👇 Problem: random code
+  if (Math.floor(Math.random() * 10) % 5 == 2) {
+    await context.run("step-1", () => {
+      // ...
+    })
+  } else {
+    await context.run("step-2", () => {
+      // ...
+    })
+  }
+})
+
+LANGUAGE: python
+CODE:
+@serve.post("/api/example")
+async def example(context: AsyncWorkflowContext[str]) -> None:
+    entry_id = context.request_payload["entry_id"]
+
+    # 👇 Problem: Non-idempotent function outside context.run:
+    result = await get_result_from_db(entry_id)
+    if result.should_return:
+        return
+
+    # ...
+
+LANGUAGE: python
+CODE:
+@serve.post("/api/example")
+async def example(context: AsyncWorkflowContext[str]) -> None:
+    input = context.request_payload
+
+    # 👇 Problem: time-dependent code
+    if time.time() % 5 == 2:
+        await context.run("step-1", lambda: ...)
+    else:
+        await context.run("step-2", lambda: ...)
+
+LANGUAGE: python
+CODE:
+@serve.post("/api/example")
+async def example(context: AsyncWorkflowContext[str]) -> None:
+    input = context.request_payload
+
+    # 👇 Problem: random code
+    if random.randint(0, 9) % 5 == 2:
+        await context.run("step-1", lambda: ...)
+    else:
+        await context.run("step-2", lambda: ...)
+
+----------------------------------------
+
+TITLE: Verifying Stock Availability in E-commerce Order Fulfillment Workflow
+DESCRIPTION: This code snippet demonstrates the process of creating an order ID and verifying stock availability in both TypeScript and Python implementations. It's a crucial step in the e-commerce order fulfillment workflow to ensure items are in stock before proceeding with the order.
+
+LANGUAGE: typescript
+CODE:
+const orderId = await context.run("create-order-id", async () => {
+  return await createOrderId(userId);
+});
+
+const stockAvailable = await context.run("check-stock", async () => {
+  return await checkStockAvailability(items)
+})
+
+if (!stockAvailable) {
+  console.warn("Some items are out of stock")
+  return;
+}
+
+LANGUAGE: python
+CODE:
+async def _create_order_id():
+    return await create_order_id(user_id)
+
+order_id: str = await context.run("create-order-id", _create_order_id)
+
+async def _check_stock():
+    return await check_stock_availability(items)
+
+stock_available: bool = await context.run("check-stock", _check_stock)
+
+if not stock_available:
+    print("Some items are out of stock")
+    return
+
+----------------------------------------
+
+TITLE: Avoiding Nested Context Methods in Upstash Workflow (TypeScript and Python)
+DESCRIPTION: Shows incorrect usage of nested context methods within Upstash Workflow steps. Calling context.sleep, context.run, or context.call within another context.run should be avoided to maintain proper workflow execution.
+
+LANGUAGE: typescript
+CODE:
+import { serve } from "@upstash/workflow/nextjs"
+
+export const { POST } = serve<string>(async (context) => {
+  const input = context.requestPayload
+
+  await context.run("step-1", async () => {
+    await context.sleep(...) // ❌ INCORRECT
+    await context.run(...) // ❌ INCORRECT
+    await context.call(...) // ❌ INCORRECT
+  })
+})
+
+LANGUAGE: python
+CODE:
+@serve.post("/api/example")
+async def example(context: AsyncWorkflowContext[str]) -> None:
+    input = context.request_payload
+
+    async def _step_1() -> None:
+        await context.sleep(...) #  ❌ INCORRECT
+        await context.run(...) #  ❌ INCORRECT
+        await context.call(...) #  ❌ INCORRECT
+
+    await context.run("step-1", _step_1)
+
+----------------------------------------
+
+TITLE: Processing Payment in E-commerce Order Fulfillment Workflow
+DESCRIPTION: This code snippet shows the payment processing step in the e-commerce order fulfillment workflow for both TypeScript and Python implementations. It processes the payment for the order after stock verification.
+
+LANGUAGE: typescript
+CODE:
+await context.run("process-payment", async () => {
+  return await processPayment(orderId)
+})
+
+LANGUAGE: python
+CODE:
+async def _process_payment():
+    return await process_payment(order_id)
+
+await context.run("process-payment", _process_payment)
+
+----------------------------------------
+
+TITLE: Validating Webhook Requests in Python
+DESCRIPTION: Shows how to validate incoming webhook requests in Python using a custom validation function. It includes extracting the payload and headers from the context and handling validation errors.
+
+LANGUAGE: python
+CODE:
+async def validate_request(payload_string: str, header_payload: dict):
+    # Validate the request
+    pass
+
+
+@serve.post("/api/example")
+async def example(context: AsyncWorkflowContext[str]) -> None:
+    payload_string = context.request_payload
+    header_payload = context.headers
+
+    try:
+        event = await validate_request(payload_string, header_payload)
+    except:
+        return
+
+    # Next steps based on the event
+
+
+----------------------------------------
+
+TITLE: Implementing Workflow Endpoint in Cloudflare Workers
+DESCRIPTION: TypeScript implementation of a workflow endpoint with multiple steps using the Upstash Workflow SDK
+
+LANGUAGE: typescript
+CODE:
+import { serve } from "@upstash/workflow/cloudflare"
+
+interface Env {
+  ENVIRONMENT: "development" | "production"
+}
+
+export default serve<{ text: string }>(
+  async (context) => {
+    const initialPayload = context.requestPayload.text
+
+    const result = await context.run("initial-step", async () => {
+        console.log(`Step 1 running with payload: ${initialPayload}`)
+
+        return { text: "initial step ran" }
+      }
+    )
+
+    await context.run("second-step", async () => {
+      console.log(`Step 2 running with result from step 1: ${result.text}`)
+    })
+  }
+)
+
+----------------------------------------
+
+TITLE: Triggering Workflow with Client in TypeScript
+DESCRIPTION: This snippet demonstrates how to use the Client from @upstash/workflow to trigger a workflow. It shows setting up the client with a QStash token and calling the trigger method with various options.
+
+LANGUAGE: typescript
+CODE:
+import { Client } from "@upstash/workflow";
+
+const client = new Client({ token: "<QSTASH_TOKEN>" });
+
+const { workflowRunId } = await client.trigger({
+  url: "https://<YOUR_WORKFLOW_ENDPOINT>/<YOUR-WORKFLOW-ROUTE>",
+  body: "hello there!",         // Optional body
+  headers: { ... },             // Optional headers
+  workflowRunId: "my-workflow", // Optional workflow run ID
+  retries: 3                    // Optional retries for the initial request
+});
+
+----------------------------------------
+
+TITLE: Dispatching Order in E-commerce Order Fulfillment Workflow
+DESCRIPTION: This code snippet demonstrates the order dispatching step in the e-commerce order fulfillment workflow for both TypeScript and Python implementations. It initiates the dispatch process after successful payment processing.
+
+LANGUAGE: typescript
+CODE:
+await context.run("dispatch-order", async () => {
+  return await dispatchOrder(orderId, items)
+})
+
+LANGUAGE: python
+CODE:
+async def _dispatch_order():
+    return await dispatch_order(order_id, items)
+
+await context.run("dispatch-order", _dispatch_order)
+
+----------------------------------------
+
+TITLE: Invoking Workflows in TypeScript with Upstash
+DESCRIPTION: This snippet demonstrates how to invoke another workflow using the context.invoke() method. It shows the structure of the invoke call and the expected return values.
+
+LANGUAGE: typescript
+CODE:
+const {
+  body,      // response from the invoked workflow
+  isFailed,  // whether the invoked workflow was canceled
+  isCanceled // whether the invoked workflow failed
+} = await context.invoke(
+  "analyze-content",
+  {
+    workflow: analyzeContent,
+    body: "test",
+    header: {...}, // headers to pass to anotherWorkflow (optional)
+    retries,       // number of retries (optional, default: 3)
+    flowControl,   // flow control settings (optional)
+    workflowRunId  // workflowRunId to set (optional)
+  }
+)
+
+----------------------------------------
+
+TITLE: Sending Confirmation and Notification Emails in E-commerce Order Fulfillment Workflow
+DESCRIPTION: This code snippet shows the process of sending order confirmation and dispatch notification emails to the customer in both TypeScript and Python implementations. It's the final step in the e-commerce order fulfillment workflow, ensuring customers are informed about their order status.
+
+LANGUAGE: typescript
+CODE:
+await context.run("send-confirmation", async () => {
+  return await sendOrderConfirmation(userId, orderId)
+})
+
+await context.run("send-dispatch-notification", async () => {
+  return await sendDispatchNotification(userId, orderId)
+})
+
+LANGUAGE: python
+CODE:
+async def _send_confirmation():
+    return await send_order_confirmation(user_id, order_id)
+
+await context.run("send-confirmation", _send_confirmation)
+
+async def _send_dispatch_notification():
+    return await send_dispatch_notification(user_id, order_id)
+
+await context.run("send-dispatch-notification", _send_dispatch_notification)
+
+----------------------------------------
+
+TITLE: Bulk Cancel Using Workflow SDK
+DESCRIPTION: Examples of cancelling workflow runs using the Upstash Workflow SDK, showing different cancellation methods including by IDs, URL prefix, and cancelling all workflows.
+
+LANGUAGE: javascript
+CODE:
+import { Client } from "@upstash/workflow";
+
+// cancel a set of workflow runs
+await client.cancel({ ids: [
+  "<WORKFLOW_RUN_ID_1>",
+  "<WORKFLOW_RUN_ID_2>",
+]})
+
+// cancel workflows starting with a url
+await client.cancel({ urlStartingWith: "https://your-endpoint.com" })
+
+// cancel all workflows
+await client.cancel({ all: true })
+
+----------------------------------------
+
+TITLE: Implementing an Authenticated Workflow Endpoint in Flask
+DESCRIPTION: Example of a Flask workflow endpoint that includes basic authentication checking before executing the workflow steps.
+
+LANGUAGE: python
+CODE:
+from flask import Flask
+from upstash_workflow.flask import Serve
+from upstash_workflow import WorkflowContext
+
+app = Flask(__name__)
+serve = Serve(app)
+
+def some_work(input: str) -> str:
+    return f"processed '{input}'"
+
+@serve.route("/auth")
+def auth(context: WorkflowContext[str]) -> None:
+    if context.headers.get("Authentication") != "Bearer secret_password":
+        print("Authentication failed.")
+        return
+
+    def _step1() -> str:
+        return "output 1"
+
+    context.run("step1", _step1)
+
+    def _step2() -> str:
+        return "output 2"
+
+    context.run("step2", _step2)
+
+
+----------------------------------------
+
+TITLE: Notify Event Using Workflow SDK
+DESCRIPTION: Example of using the Upstash Workflow SDK to notify an event with custom event ID and data.
+
+LANGUAGE: javascript
+CODE:
+import { Client } from "@upstash/workflow";
+
+const client = new Client({ token: "<QSTASH_TOKEN>" })
+await client.notify({
+  eventId: "my-event-id",
+  eventData: "Hello World!"
+});
+
+----------------------------------------
+
+TITLE: Using context.waitForEvent in TypeScript
+DESCRIPTION: Demonstrates how to pause a workflow execution until an event occurs using context.waitForEvent. Takes an event description, event ID, and timeout parameter in seconds. Returns event data and timeout status.
+
+LANGUAGE: typescript
+CODE:
+const { eventData, timeout } = await context.waitForEvent(
+  "description of event",
+  "event-id",
+  {
+    timeout: timeoutInSeconds,
+  }
+);
+
+----------------------------------------
+
+TITLE: Implementing client.notify in TypeScript
+DESCRIPTION: Shows how to notify waiting workflows about an event occurrence using the Upstash Workflow Client. Requires a QSTASH_TOKEN for authentication and accepts eventId and eventData parameters.
+
+LANGUAGE: typescript
+CODE:
+import { Client } from "@upstash/workflow";
+
+const client = new Client({ token: "<QSTASH_TOKEN>" });
+
+await client.notify({
+  eventId: "event-id",
+  eventData: { my: "data" },
+});
+
+----------------------------------------
+
+TITLE: Workflow Event Notification Implementation
+DESCRIPTION: Code example showing how to notify a workflow about external events using the Upstash Workflow Client. Demonstrates sending event data to resume a waiting workflow.
+
+LANGUAGE: typescript
+CODE:
+import { Client } from "@upstash/workflow";
+
+const client = new Client({ token: "<QSTASH_TOKEN>" })
+const orderId = "1324"
+
+await client.notify({
+  eventId: `order-${orderId}`,
+  eventData: { deliveryTime: "2 days" }
+});
+
+----------------------------------------
+
+TITLE: Using context.notify in TypeScript
+DESCRIPTION: Demonstrates how to notify workflows from within another workflow using context.notify. Takes a step name, event ID, and event data as parameters.
+
+LANGUAGE: typescript
+CODE:
+const { notifyResponse } = await context.notify(
+  "notify step", // notify step name
+  "event-Id", // event id
+  { my: "data" } // event data
+);
+
+----------------------------------------
+
+TITLE: Handling WorkflowAbort in Try/Catch Blocks
+DESCRIPTION: Demonstrates how to properly handle WorkflowAbort errors when running workflow steps inside try/catch blocks. Shows implementation in both TypeScript and Python.
+
+LANGUAGE: typescript
+CODE:
+import { WorkflowAbort } from '@upstash/workflow';
+
+try {
+  await context.run( ... );
+} catch (error) {    
+  if (error instanceof WorkflowAbort) {
+    throw error;
+  } else {
+    // handle other errors
+  }
+}
+
+LANGUAGE: python
+CODE:
+from upstash_workflow import WorkflowAbort
+
+try:
+    await context.run( ... )
+except Exception as e:
+    if isinstance(e, WorkflowAbort):
+        raise e
+    else:
+        # handle other errors
+
+----------------------------------------
+
+TITLE: Setting Up Basic Webhook Endpoint in Python
+DESCRIPTION: Shows how to create a basic webhook endpoint using FastAPI and Upstash Workflow in Python. It includes setting up the FastAPI app, defining the serve object, and creating an endpoint with an initial payload parser.
+
+LANGUAGE: python
+CODE:
+from fastapi import FastAPI
+from upstash_workflow.fastapi import Serve
+from upstash_workflow import AsyncWorkflowContext
+
+app = FastAPI()
+serve = Serve(app)
+
+
+def initial_payload_parser(payload):
+    return payload
+
+
+@serve.post("/api/example", initial_payload_parser=initial_payload_parser)
+async def example(context: AsyncWorkflowContext[str]) -> None:
+    # Your webhook handling logic here
+
+
+----------------------------------------
+
+TITLE: Creating Stripe Customer from Webhook Data in TypeScript
+DESCRIPTION: Demonstrates how to create a Stripe customer using data extracted from a webhook event in TypeScript. It uses the context.run method to perform the Stripe API call.
+
+LANGUAGE: typescript
+CODE:
+export const { POST } = serve(async (context) => {
+  // ... Previous validation and user data extraction
+
+  if (!user) {
+    return;
+  }
+
+  const customer = await context.run("create-stripe-customer", async () => {
+    return await stripe.customers.create({
+      email: user.email,
+      name: `${user.firstName} ${user.lastName}`,
+      metadata: {
+        userId: user.userId,
+      },
+    });
+  });
+
+  /// ... Additional steps
+});
+
+----------------------------------------
+
+TITLE: Handling Webhook Events in Python
+DESCRIPTION: Shows how to process webhook events using the context.run method in Python. It includes parsing the event, extracting user data, and returning a structured payload.
+
+LANGUAGE: python
+CODE:
+@serve.post("/api/example")
+async def example(context: AsyncWorkflowContext[str]) -> None:
+    # ... Parse and validate the incoming request
+
+    async def _handle_webhook_event():
+        if event.type == "user.created":
+            clerk_user_id = event.data["id"]
+            email_addresses = event.data["email_addresses"]
+            first_name = event.data["first_name"]
+
+            primary_email = next(
+                (
+                    email
+                    for email in email_addresses
+                    if email.id == event.data["primary_email_address_id"]
+                ),
+                None,
+            )
+
+            if not primary_email:
+                return False
+
+            return {
+                "event": event.type,
+                "user_id": clerk_user_id,
+                "email": primary_email["email_address"],
+                "first_name": first_name,
+            }
+
+        return False
+
+    user = await context.run("handle-webhook-event", _handle_webhook_event)
+
+
+----------------------------------------
+
+TITLE: Implementing Authenticated Workflow in FastAPI
+DESCRIPTION: Example of creating an authenticated workflow endpoint in FastAPI using Upstash Workflow.
+
+LANGUAGE: python
+CODE:
+from fastapi import FastAPI
+from upstash_workflow.fastapi import Serve
+from upstash_workflow import AsyncWorkflowContext
+
+app = FastAPI()
+serve = Serve(app)
+
+def some_work(input: str) -> str:
+    return f"processed '{input}'"
+
+@serve.post("/auth")
+async def auth(context: AsyncWorkflowContext[str]) -> None:
+    if context.headers.get("authentication") != "Bearer secret_password":
+        print("Authentication failed.")
+        return
+
+    async def _step1() -> str:
+        return "output 1"
+
+    await context.run("step1", _step1)
+
+    async def _step2() -> str:
+        return "output 2"
+
+    await context.run("step2", _step2)
+
+----------------------------------------
+
+TITLE: Implementing Upstash Workflow with Next.js SDK
+DESCRIPTION: This code snippet demonstrates how to implement a workflow using the Upstash SDK for Next.js. It includes sleep functionality, parallel execution of tasks, and integration with external services.
+
+LANGUAGE: javascript
+CODE:
+import { serve } from "@upstash/workflow/nextjs";
+import { retrieveEmail, fetchFromLLm, UserRequest} from "../../../lib/util";
+
+
+export const { POST } = serve<UserRequest>(
+  async (context) => {
+    const input = context.requestPayload;
+
+    await context.sleep("sleep", 10);
+
+    const p1 = context.run("retrieveEmail", async () => {
+      return retrieveEmail(input.id);
+    });
+
+    const p2 = context.run("askllm", async () => {
+      return fetchFromLLm(input.question);
+    });
+
+    await Promise.all([p1, p2])
+  },
+);
+
+----------------------------------------
+
+TITLE: Custom Payload Parsing
+DESCRIPTION: Example of implementing custom payload parsing for workflow requests using initialPayloadParser in both TypeScript and Python.
+
+LANGUAGE: typescript
+CODE:
+type InitialPayload = {
+  foo: string;
+  bar: number;
+};
+
+export const { POST } = serve<InitialPayload>(
+  async (context) => {
+    const payload: InitialPayload = context.requestPayload;
+  },
+  {
+    initialPayloadParser: (initialPayload) => {
+      const payload: InitialPayload = parsePayload(initialPayload);
+      return payload;
+    },
+  }
+);
+
+LANGUAGE: python
+CODE:
+@dataclass
+class InitialPayload:
+    foo: str
+    bar: int
+
+def initial_payload_parser(initial_payload: str) -> InitialPayload:
+    return parse_payload(initial_payload)
+
+@serve.post("/api/example", initial_payload_parser=initial_payload_parser)
+async def example(context: AsyncWorkflowContext[InitialPayload]) -> None:
+    payload: InitialPayload = context.request_payload
+
+----------------------------------------
+
+TITLE: Implementing failureFunction Handler in TypeScript
+DESCRIPTION: Example of implementing a custom failure handler function in a workflow endpoint. The failureFunction receives context, status, response, and headers of the failed execution for custom error handling like logging to Sentry.
+
+LANGUAGE: typescript
+CODE:
+export const { POST } = serve<string>(
+  async (context) => {
+    // Your workflow logic...
+  },
+  {
+    failureFunction: async ({
+      context,
+      failStatus,
+      failResponse,
+      failHeaders,
+    }) => {
+      // Handle error, i.e. log to Sentry
+    },
+  }
+);
+
+----------------------------------------
+
+TITLE: Creating a Workflow Endpoint in Express.js
+DESCRIPTION: Example of how to define a workflow endpoint in an Express.js application using the Upstash Workflow SDK.
+
+LANGUAGE: typescript
+CODE:
+import { serve } from "@upstash/workflow/express";
+import express from 'express';
+import { config } from 'dotenv';
+
+config();
+
+const app = express();
+
+app.use(
+  express.json()
+);
+
+app.post(
+  '/workflow',
+  serve<{ message: string }>(
+    async (context) => {
+      const res1 = await context.run("step1", async () => {
+        const message = context.requestPayload.message;
+        return message;
+      })
+
+      await context.run("step2", async () => {
+          console.log(res1);
+      })
+    }
+  )
+);
+
+app.listen(3000, () => {
+  console.log('Server running on port 3000');
+});
+
+----------------------------------------
+
+TITLE: Configuring failureUrl Handler in TypeScript
+DESCRIPTION: Example of setting up a failure URL endpoint for workflow error handling. This approach is useful when the main service is unavailable and errors need to be sent to an alternative endpoint.
+
+LANGUAGE: typescript
+CODE:
+export const { POST } = serve<string>(
+  async (context) => {
+    // Your workflow logic...
+  },
+  {
+    failureUrl: "https://<YOUR_FAILURE_URL>/workflow-failure",
+  }
+);
+
+----------------------------------------
+
+TITLE: Implementing Daily Backup Workflow
+DESCRIPTION: Example of a workflow endpoint that creates and uploads backups, with error handling capabilities. Demonstrates basic workflow structure with multiple steps using Upstash Workflow.
+
+LANGUAGE: typescript
+CODE:
+import { serve } from "@upstash/workflow/nextjs";
+import { createBackup, uploadBackup } from "./utils";
+
+export const { POST } = serve(
+  async (ctx) => {
+    const backup = await ctx.run("create-backup", async () => {
+      return await createBackup();
+    });
+
+    await ctx.run("upload-backup", async () => {
+      await uploadBackup(backup);
+    });
+  },
+  {
+    failureFunction({ context, failStatus, failResponse, failHeader }) {
+      // immediately get notified for failed backups
+      // i.e. send an email, log to Sentry
+    },
+  }
+);
+
+LANGUAGE: python
+CODE:
+from fastapi import FastAPI
+from upstash_workflow.fastapi import Serve
+from upstash_workflow import AsyncWorkflowContext
+from utils import create_backup, upload_backup
+
+app = FastAPI()
+serve = Serve(app)
+
+
+@serve.post("/api/workflow")
+async def workflow(context: AsyncWorkflowContext[str]) -> None:
+    async def _step1():
+        return await create_backup()
+
+    backup = await context.run("create_backup", _step1)
+
+    async def _step2():
+        await upload_backup(backup)
+
+    await context.run("upload_backup", _step2)
+
+----------------------------------------
+
+TITLE: Sending Single Email with Resend API in TypeScript
+DESCRIPTION: Demonstrates how to send a single email using the type-safe context.api.resend.call method. Includes configuration for API key, email content, and headers.
+
+LANGUAGE: typescript
+CODE:
+const { status, body } = await context.api.resend.call(
+  "Call Resend",
+  {
+    token: "<RESEND_API_KEY>",
+    body: {
+      from: "Acme <onboarding@resend.dev>",
+      to: ["delivered@resend.dev"],
+      subject: "Hello World",
+      html: "<p>It works!</p>",
+    },
+    headers: {
+      "content-type": "application/json",
+    },
+  }
+);
+
+----------------------------------------
+
+TITLE: Creating Stripe Customer from Webhook Data in Python
+DESCRIPTION: Shows how to create a Stripe customer using data extracted from a webhook event in Python. It uses the context.run method to perform the Stripe API call.
+
+LANGUAGE: python
+CODE:
+@serve.post("/api/example")
+async def example(context: AsyncWorkflowContext[str]) -> None:
+    # ... Previous validation and user data extraction
+
+    if not user:
+        return
+
+    async def _create_stripe_customer():
+        return await stripe.customers.create(
+            email=user["email"],
+            name=f"{user['first_name']} {user['last_name']}",
+            metadata={"user_id": user["user_id"]},
+        )
+
+    customer = await context.run("create-stripe-customer", _create_stripe_customer)
+
+    # ... Additional steps
+
+
+----------------------------------------
+
+TITLE: Sending Batch Emails with Resend API in TypeScript
+DESCRIPTION: Shows how to send multiple emails in a batch using context.api.resend.call. Includes batch flag configuration and array of email objects.
+
+LANGUAGE: typescript
+CODE:
+const { status, body } = await context.api.resend.call(
+  "Call Resend",
+  {
+    batch: true,
+    token: "<RESEND_API_KEY>",
+    body: [
+      {
+        from: "Acme <onboarding@resend.dev>",
+        to: ["delivered@resend.dev"],
+        subject: "Hello World",
+        html: "<p>It works!</p>",
+      },
+      {
+        from: "Acme <onboarding@resend.dev>",
+        to: ["delivered@resend.dev"],
+        subject: "Hello World",
+        html: "<p>It works!</p>",
+      },
+    ],
+    headers: {
+      "content-type": "application/json",
+    },
+  }
+);
+
+----------------------------------------
+
+TITLE: Creating Custom Workflow Tool Implementation
+DESCRIPTION: Example of creating a custom mathematical evaluation tool using WorkflowTool class.
+
+LANGUAGE: typescript
+CODE:
+import { WorkflowTool } from '@upstash/workflow'
+import { z } from 'zod'
+import * as mathjs from 'mathjs'
+
+const tool = new WorkflowTool({
+  description:
+    'A tool for evaluating mathematical expressions. ' +
+    'Example expressions: ' +
+    "'1.2 * (2 + 4.5)', '12.7 cm to inch', 'sin(45 deg) ^ 2'.",
+  schema: z.object({ expression: z.string() }),
+  invoke: async ({ expression }) => mathjs.evaluate(expression),
+})
+
+----------------------------------------
+
+TITLE: Creating a Minimal Workflow Endpoint with Hono
+DESCRIPTION: TypeScript code example showing how to create a basic workflow endpoint using Hono and Upstash Workflow.
+
+LANGUAGE: typescript
+CODE:
+import { Hono } from "hono"
+import { serve } from "@upstash/workflow/hono"
+
+const app = new Hono()
+
+app.post("/workflow",
+  serve(async (context) => {
+    await context.run("initial-step", () => {
+      console.log("initial step ran")
+    })
+
+    await context.run("second-step", () => {
+      console.log("second step ran")
+    })
+  })
+)
+
+export default app
+
+----------------------------------------
+
+TITLE: Flow Control Configuration
+DESCRIPTION: Shows how to implement rate limiting and parallel request control using flowControl options.
+
+LANGUAGE: typescript
+CODE:
+export const { POST } = serve<string>(
+  async (context) => { ... },
+  {
+    flowControl: { key: "aFlowControlKey",  ratePerSecond: 10, parallelism: 3 }
+  }
+);
+
+----------------------------------------
+
+TITLE: Implementing Workflow with Sleep Function in FastAPI
+DESCRIPTION: Example of creating a workflow endpoint with sleep functionality in FastAPI using Upstash Workflow.
+
+LANGUAGE: python
+CODE:
+from fastapi import FastAPI
+import time
+from upstash_workflow.fastapi import Serve
+from upstash_workflow import AsyncWorkflowContext
+
+app = FastAPI()
+serve = Serve(app)
+
+def some_work(input: str) -> str:
+    return f"processed '{input}'"
+
+@serve.post("/sleep")
+async def sleep(context: AsyncWorkflowContext[str]) -> None:
+    input = context.request_payload
+
+    async def _step1() -> str:
+        output = some_work(input)
+        print("step 1 input", input, "output", output)
+        return output
+
+    result1: str = await context.run("step1", _step1)
+
+    await context.sleep_until("sleep1", time.time() + 3)
+
+    async def _step2() -> str:
+        output = some_work(result1)
+        print("step 2 input", result1, "output", output)
+        return output
+
+    result2: str = await context.run("step2", _step2)
+
+    await context.sleep("sleep2", 2)
+
+    async def _step3() -> None:
+        output = some_work(result2)
+        print("step 3 input", result2, "output", output)
+
+    await context.run("step3", _step3)
+
+----------------------------------------
+
+TITLE: Retrieving Workflow Logs in TypeScript
+DESCRIPTION: Shows how to use the log method of the Client class to retrieve logs for workflow runs. It demonstrates various optional parameters for filtering and pagination.
+
+LANGUAGE: typescript
+CODE:
+import { Client } from "@upstash/workflow";
+
+const client = new Client({ token: "<QSTASH_TOKEN>" })
+const { runs, cursor } = await client.logs({
+  // Id of the workflow run to get
+  workflowRunId,
+  // Number of workflows to get
+  count,
+  // Workflow state to filter for.
+  // One of "RUN_STARTED", "RUN_SUCCESS", "RUN_FAILED", "RUN_CANCELED"
+  state,
+  // Workflow url to search for. should be an exact match
+  workflowUrl,       
+  // Unix timestamp when the run was created
+  workflowCreatedAt, 
+  // Cursor from a previous request to continue the search
+  cursor             
+})
+
+----------------------------------------
+
+TITLE: Defining a Workflow Endpoint in Nuxt.js
+DESCRIPTION: TypeScript code for creating a workflow endpoint in a Nuxt.js project, demonstrating how to define and execute workflow steps.
+
+LANGUAGE: typescript
+CODE:
+import { serve } from "@upstash/workflow/h3"
+
+const { handler } = serve(
+  async (context) => {
+    await context.run("initial-step", () => {
+      console.log("initial step ran")
+    })
+
+    await context.run("second-step", () => {
+      console.log("second step ran")
+    })
+  },
+)
+
+export default handler;
+
+----------------------------------------
+
+TITLE: Creating Workflow Endpoint in Next.js Pages Router
+DESCRIPTION: TypeScript implementation of workflow endpoints using Next.js Pages Router, showing both minimal and request-handling examples.
+
+LANGUAGE: typescript
+CODE:
+import { servePagesRouter } from "@upstash/workflow/nextjs";
+
+const { handler } = servePagesRouter<string>(
+  async (context) => {
+    await context.run("initial-step", () => {
+      console.log("initial step ran")
+    })
+
+    await context.run("second-step", () => {
+      console.log("second step ran")
+    })
+  }
+)
+export default handler;
+
+LANGUAGE: typescript
+CODE:
+import type { NextApiRequest, NextApiResponse } from "next";
+import { servePagesRouter } from "@upstash/workflow/nextjs";
+
+export default async function handler(
+  req: NextApiRequest,
+  res: NextApiResponse
+) {
+  // do something with the native request object
+  const { handler } = servePagesRouter(
+    async (context) => {
+      // Your workflow steps
+    }
+  )
+
+  await handler(req, res)
+}
+
+----------------------------------------
+
+TITLE: Importing Upstash Workflow Serve Method
+DESCRIPTION: Demonstrates how to import the base serve method for custom platform integration in both TypeScript and Python implementations.
+
+LANGUAGE: javascript
+CODE:
+import { serve } from "@upstash/workflow";
+
+LANGUAGE: python
+CODE:
+from upstash_workflow import serve, async_serve
+
+----------------------------------------
+
+TITLE: Implementing Workflow with API Call in FastAPI
+DESCRIPTION: Example of creating a workflow endpoint that makes an API call in FastAPI using Upstash Workflow.
+
+LANGUAGE: python
+CODE:
+from fastapi import FastAPI
+from typing import Dict
+from upstash_workflow.fastapi import Serve
+from upstash_workflow import AsyncWorkflowContext, CallResponse
+
+app = FastAPI()
+serve = Serve(app)
+
+def some_work(input: str) -> str:
+    return f"processed '{input}'"
+
+@app.post("/get-data")
+async def get_data() -> Dict[str, str]:
+    return {"message": "get data response"}
+
+@serve.post("/call")
+async def call(context: AsyncWorkflowContext[str]) -> None:
+    input = context.request_payload
+
+    async def _step1() -> str:
+        output = some_work(input)
+        print("step 1 input", input, "output", output)
+        return output
+
+    result1: str = await context.run("step1", _step1)
+
+    response: CallResponse[Dict[str, str]] = await context.call(
+        "get-data",
+        url=f"{context.env.get('UPSTASH_WORKFLOW_URL', 'http://localhost:8000')}/get-data",
+        method="POST",
+        body={"message": result1},
+    )
+
+    async def _step2() -> str:
+        output = some_work(response.body["message"])
+        print("step 2 input", response, "output", output)
+        return output
+
+    await context.run("step2", _step2)
+
+----------------------------------------
+
+TITLE: Defining Workflow Endpoint with AI Agent
+DESCRIPTION: TypeScript code defining a workflow endpoint that uses an AI agent to process prompts and communicate thoughts.
+
+LANGUAGE: ts
+CODE:
+import { z } from "zod";
+import { tool } from "ai";
+
+import { serve } from "@upstash/workflow/nextjs";
+
+export const { POST } = serve<{ prompt: string }>(async (context) => {
+  const prompt = context.requestPayload.prompt
+  const model = context.agents.openai('gpt-3.5-turbo')
+
+  const communicatorAgent = context.agents.agent({
+    model,
+    name: 'communicatorAgent',
+    maxSteps: 2,
+    tools: {
+      communicationTool: tool({
+        description: 'A tool for informing the caller about your inner thoughts',
+        parameters: z.object({ message: z.string() }),
+        execute: async ({ message }) => {
+          console.log("Inner thought:", message)
+          return "success"
+        }
+      })
+    },
+    background:
+      'Answer questions directed towards you.' +
+      ' You have access to a tool to share your inner thoughts' +
+      ' with the caller. Utilize this tool at least once before' +
+      ' answering the prompt. In your inner thougts, briefly' +
+      ' explain what you will talk about and why. Keep your' +
+      ' answers brief.',
+  })
+
+  const task = context.agents.task({
+    agent: communicatorAgent,
+    prompt
+  })
+
+  const { text } = await task.run()
+
+  console.log("Final response:", text);
+})
+
+----------------------------------------
+
+TITLE: Authorization Condition Handling
+DESCRIPTION: Demonstrates the correct pattern for handling non-deterministic authorization conditions in workflows to avoid authentication failures.
+
+LANGUAGE: typescript
+CODE:
+export const { POST } = serve(async (context) => {
+  
+  const shouldReturn = await context.run("check condition", () => someCondition())
+  if (shouldReturn) => {
+    return;
+  }
+
+  // rest of the workflow
+})
+
+LANGUAGE: python
+CODE:
+@serve.post("/api/example")
+async def example(context: AsyncWorkflowContext[str]) -> None:
+
+    async def _check_condition() -> bool:
+        return some_condition()
+
+    should_return = await context.run("check condition", _check_condition)
+    if should_return:
+        return
+
+    # rest of the workflow
+
+----------------------------------------
+
+TITLE: Cancelling Workflow with Workflow SDK
+DESCRIPTION: Cancel a workflow run using the official Upstash Workflow SDK for JavaScript. Requires QStash token for authentication.
+
+LANGUAGE: javascript
+CODE:
+import { Client } from "@upstash/workflow";
+
+const client = new Client({ token: "<QSTASH_TOKEN>" })
+await client.cancel({ workflowRunId: "<WORKFLOW_RUN_ID>" })
+
+----------------------------------------
+
+TITLE: Implementing a Workflow with External API Calls in Flask
+DESCRIPTION: Demonstration of a Flask workflow that makes external API calls using the context.call method, showcasing how to integrate external services into a workflow.
+
+LANGUAGE: python
+CODE:
+from flask import Flask
+from typing import Dict
+from upstash_workflow.flask import Serve
+from upstash_workflow import WorkflowContext, CallResponse
+
+app = Flask(__name__)
+serve = Serve(app)
+
+def some_work(input: str) -> str:
+    return f"processed '{input}'"
+
+@app.route("/get-data", methods=["POST"])
+def get_data() -> Dict[str, str]:
+    return {"message": "get data response"}
+
+@serve.route("/call")
+def call(context: WorkflowContext[str]) -> None:
+    input = context.request_payload
+
+    def _step1() -> str:
+        output = some_work(input)
+        print("step 1 input", input, "output", output)
+        return output
+
+    result1: str = context.run("step1", _step1)
+
+    response: CallResponse[Dict[str, str]] = context.call(
+        "get-data",
+        url=f"{context.env.get('UPSTASH_WORKFLOW_URL', 'http://localhost:8000')}/get-data",
+        method="POST",
+        body={"message": result1},
+    )
+
+    def _step2() -> str:
+        output = some_work(response.body["message"])
+        print("step 2 input", response, "output", output)
+        return output
+
+    context.run("step2", _step2)
+
+
+----------------------------------------
+
+TITLE: Cancelling Workflow with Python
+DESCRIPTION: Cancel a workflow run using Python requests library. Requires authentication via bearer token.
+
+LANGUAGE: python
+CODE:
+import requests
+
+headers = {
+    'Authorization': 'Bearer <token>',
+}
+
+response = requests.delete(
+  'https://qstash.upstash.io/v2/workflows/runs/wfr_TzazoUCuZmFGp2u9cdy5K', 
+  headers=headers
+)
+
+----------------------------------------
+
+TITLE: Calling OpenAI API in Upstash Workflow using TypeScript
+DESCRIPTION: This snippet demonstrates how to use the context.api.openai.call method to make a request to OpenAI's chat completions API. It includes setting up the request with an API key, specifying the model, and providing messages for the conversation.
+
+LANGUAGE: typescript
+CODE:
+const { status, body } = await context.api.openai.call(
+  "Call OpenAI",
+  {
+    token: "<OPENAI_API_KEY>",
+    operation: "chat.completions.create",
+    body: {
+      model: "gpt-4o",
+      messages: [
+        {
+          role: "system",
+          content: "Assistant says 'hello!'",
+        },
+        {
+          role: "user",
+          content: "User shouts back 'hi!'"
+        }
+      ],
+    },
+  }
+);
+
+// get text:
+console.log(body.content[0].text)
+
+----------------------------------------
+
+TITLE: Cancelling Workflow with Go
+DESCRIPTION: Cancel a workflow run using Go's http package. Requires authentication via bearer token.
+
+LANGUAGE: go
+CODE:
+req, err := http.NewRequest("DELETE", "https://qstash.upstash.io/v2/workflows/runs/wfr_TzazoUCuZmFGp2u9cdy5K", nil)
+if err != nil {
+  log.Fatal(err)
+}
+req.Header.Set("Authorization", "Bearer <token>")
+resp, err := http.DefaultClient.Do(req)
+if err != nil {
+  log.Fatal(err)
+}
+defer resp.Body.Close()
+
+----------------------------------------
+
+TITLE: Calling Protected Workflow Endpoint in Vercel Preview
+DESCRIPTION: This snippet demonstrates how to make a POST request to a protected workflow endpoint in a Vercel preview deployment. It includes the bypass token as a query parameter to circumvent deployment protection.
+
+LANGUAGE: bash
+CODE:
+curl -X POST \
+  'https://vercel-preview.com/workflow?x-vercel-protection-bypass=<PROTECTION_BYPASS_SECRET>' \
+  -d 'Hello world!'
+
+----------------------------------------
+
+TITLE: Bulk Cancel Using Node.js Fetch
+DESCRIPTION: Example of cancelling specific workflow runs using Node.js fetch API by providing workflow run IDs.
+
+LANGUAGE: javascript
+CODE:
+const response = await fetch('https://qstash.upstash.io/v2/workflows/runs', {
+  method: 'DELETE',
+  headers: {
+    'Authorization': 'Bearer <token>',
+    'Content-Type': 'application/json',
+    body: {
+        workflowRunIds: [
+            "run_id_1",
+            "run_id_2",
+            "run_id_3",
+        ],
+    },
+  }
+});
+
+----------------------------------------
+
+TITLE: Retrieving Event Waiters in JavaScript
+DESCRIPTION: Shows how to use the getWaiters method of the Client class to retrieve a list of waiters for a specific event ID. This can be used to check which workflows are waiting for a particular event.
+
+LANGUAGE: javascript
+CODE:
+import { Client } from "@upstash/workflow";
+
+const client = new Client({ token: "<QSTASH_TOKEN>" });
+const result = await client.getWaiters({
+  eventId: "my-event-id",
+});
+
+----------------------------------------
+
+TITLE: Bulk Cancel Using Python Requests
+DESCRIPTION: Example of cancelling specific workflow runs using Python requests library by providing workflow run IDs.
+
+LANGUAGE: python
+CODE:
+import requests
+
+headers = {
+    'Authorization': 'Bearer <token>',
+    'Content-Type': 'application/json',
+}
+
+data = {
+  "workflowRunIds": [
+    "run_id_1",
+    "run_id_2",
+    "run_id_3"
+  ]
+}
+
+response = requests.delete(
+  'https://qstash.upstash.io/v2/workflows/runs',
+  headers=headers,
+  data=data
+)
+
+----------------------------------------
+
+TITLE: Creating Workflow Endpoint in Astro
+DESCRIPTION: Implementation of a minimal workflow endpoint using the Upstash Workflow SDK with Astro
+
+LANGUAGE: typescript
+CODE:
+import { serve } from "@upstash/workflow/astro";
+
+export const { POST } = serve<string>(async (context) => {
+  const result1 = await context.run("initial-step", () => {
+    console.log("initial step ran")
+    return "hello world!"
+  })
+
+  await context.run("second-step", () => {
+    console.log(`second step ran with value ${result1}`)
+  })
+}, {
+  env: {
+    ...process.env,
+    ...import.meta.env
+  }
+})
+
+----------------------------------------
+
+TITLE: Bulk Cancel Using Go HTTP Client
+DESCRIPTION: Example of cancelling specific workflow runs using Go's HTTP client by providing workflow run IDs.
+
+LANGUAGE: go
+CODE:
+var data = strings.NewReader(`{
+  "workflowRunIds": [
+    "run_id_1",
+    "run_id_2",
+    "run_id_3"
+  ]
+}`)
+req, err := http.NewRequest("DELETE", "https://qstash.upstash.io/v2/workflows/runs", data)
+if err != nil {
+  log.Fatal(err)
+}
+req.Header.Set("Authorization", "Bearer <token>")
+req.Header.Set("Content-Type", "application/json")
+resp, err := http.DefaultClient.Do(req)
+if err != nil {
+  log.Fatal(err)
+}
+defer resp.Body.Close()
+
+----------------------------------------
+
+TITLE: Fetching Workflow Logs with Go HTTP Client
+DESCRIPTION: This Go code snippet demonstrates how to fetch workflow logs using the standard HTTP client. It creates a GET request with an authorization header and sends it to the Upstash Workflow API endpoint.
+
+LANGUAGE: go
+CODE:
+req, err := http.NewRequest("GET", "https://qstash.upstash.io/v2/workflows/logs", nil)
+if err != nil {
+  log.Fatal(err)
+}
+req.Header.Set("Authorization", "Bearer <token>")
+resp, err := http.DefaultClient.Do(req)
+if err != nil {
+  log.Fatal(err)
+}
+defer resp.Body.Close()
+
+----------------------------------------
+
+TITLE: Notify Event Using Node Fetch
+DESCRIPTION: Example of notifying an event using Node.js fetch API with authentication.
+
+LANGUAGE: javascript
+CODE:
+const response = await fetch('https://qstash.upstash.io/v2/notify/myEvent', {
+  method: 'POST',
+  body: "Hello world!",
+  headers: {
+    'Authorization': 'Bearer <token>'
+  }
+});
+
+----------------------------------------
+
+TITLE: Implementing a Basic Workflow Endpoint in Flask with Upstash Workflow
+DESCRIPTION: Python code demonstrating how to create a simple workflow endpoint in Flask using the Upstash Workflow SDK. It defines two steps that are executed sequentially.
+
+LANGUAGE: python
+CODE:
+from flask import Flask
+from upstash_workflow.flask import Serve
+
+app = Flask(__name__)
+serve = Serve(app)
+
+@serve.route("/api/workflow")
+def workflow(context) -> None:
+    def _step1() -> None:
+        print("initial step ran")
+
+    context.run("initial-step", _step1)
+
+    def _step2() -> None:
+        print("second step ran")
+
+    context.run("second-step", _step2)
+
+
+----------------------------------------
+
+TITLE: Notify Event Using Python
+DESCRIPTION: Example of notifying an event using Python requests library with authentication.
+
+LANGUAGE: python
+CODE:
+import requests
+
+headers = {
+    'Authorization': 'Bearer <token>',
+}
+
+response = requests.post(
+  'https://qstash.upstash.io/v2/notify/myEvent', 
+  headers=headers
+)
+
+----------------------------------------
+
+TITLE: Publishing QStash Message in TypeScript
+DESCRIPTION: This code shows how to use the QStash client in TypeScript to publish a JSON message to a workflow endpoint. It includes setting up the client and calling the publishJSON method with various options.
+
+LANGUAGE: typescript
+CODE:
+import { Client } from "@upstash/qstash";
+
+const client = new Client({ token: "<QSTASH_TOKEN>" });
+
+const { messageId } = await client.publishJSON({
+  url: "https://<YOUR_WORKFLOW_ENDPOINT>/<YOUR-WORKFLOW-ROUTE>",
+  body: { hello: "there!" },
+  headers: { ... },    
+  retries: 3           
+});
+
+----------------------------------------
+
+TITLE: Notify Event Using Go
+DESCRIPTION: Example of notifying an event using Go's HTTP client with authentication.
+
+LANGUAGE: go
+CODE:
+req, err := http.NewRequest("POST", "https://qstash.upstash.io/v2/notify/myEvent", nil)
+if err != nil {
+  log.Fatal(err)
+}
+req.Header.Set("Authorization", "Bearer <token>")
+resp, err := http.DefaultClient.Do(req)
+if err != nil {
+  log.Fatal(err)
+}
+defer resp.Body.Close()
+
+----------------------------------------
+
+TITLE: Fetching Message Logs with Go
+DESCRIPTION: This Go code snippet shows how to use the net/http package to make a GET request to the List Message Logs API endpoint. It includes the necessary authorization header and error handling.
+
+LANGUAGE: go
+CODE:
+req, err := http.NewRequest("GET", "https://qstash.upstash.io/v2/workflows/messageLogs", nil)
+if err != nil {
+  log.Fatal(err)
+}
+req.Header.Set("Authorization", "Bearer <token>")
+resp, err := http.DefaultClient.Do(req)
+if err != nil {
+  log.Fatal(err)
+}
+defer resp.Body.Close()
+
+----------------------------------------
+
+TITLE: Fetching Workflow Runs using cURL
+DESCRIPTION: This snippet demonstrates how to fetch workflow runs using a cURL command. It sends a GET request to the Upstash Workflow API endpoint with an authorization token.
+
+LANGUAGE: shell
+CODE:
+curl https://qstash.upstash.io/v2/workflows/logs \
+  -H "Authorization: Bearer <token>"
+
+----------------------------------------
+
+TITLE: Creating Type-Safe Workflows with createWorkflow() in TypeScript
+DESCRIPTION: This snippet illustrates how to use createWorkflow() to define type-safe workflows. It shows the creation of two workflows and how to invoke one from another while maintaining type safety.
+
+LANGUAGE: typescript
+CODE:
+import { WorkflowContext }  from "@upstash/workflow";
+import { createWorkflow } from "@upstash/workflow/nextjs";
+
+const anotherWorkflow = createWorkflow(
+  // Define the workflow logic, specifying the type of the initial request body.
+  // In this case, the body is a string:
+  async (context: WorkflowContext<string>) => {
+
+    await context.sleep("wait 1 second", 1)
+
+    // Return a response from the workflow. The type of this
+    // response will be available when `context.invoke` is
+    // called with `anotherWorkflow`.
+    return { message: "This is the data returned by the workflow" };
+  }
+);
+
+const someWorkflow = createWorkflow(async (context) => {
+  // Invoke anotherWorkflow with a string body and get the response
+  // The types of the body parameter and the response are
+  // typesafe and inferred from anotherWorkflow
+  const { body } = await context.invoke(
+    "invoke anotherWorkflow",
+    {
+      workflow: anotherWorkflow,
+      body: "user-1"
+    }
+  ),
+});
+
+----------------------------------------
+
+TITLE: Fetching Workflow Logs with Node.js Fetch API
+DESCRIPTION: This Node.js code snippet uses the Fetch API to retrieve workflow logs. It sends a GET request to the Upstash Workflow API endpoint with an authorization header.
+
+LANGUAGE: javascript
+CODE:
+const response = await fetch("https://qstash.upstash.io/v2/workflows/logs", {
+  headers: {
+    Authorization: "Bearer <token>",
+  },
+});
+
+----------------------------------------
+
+TITLE: Publishing QStash Message in Python
+DESCRIPTION: This snippet demonstrates using the AsyncQStash client in Python to publish a JSON message to a workflow endpoint. It shows how to instantiate the client and use the publish_json method with various parameters.
+
+LANGUAGE: python
+CODE:
+from qstash import AsyncQStash
+
+client = AsyncQStash("<QSTASH_TOKEN>")
+
+res = await client.message.publish_json(
+    url="https://<YOUR_WORKFLOW_ENDPOINT>/<YOUR-WORKFLOW-ROUTE>",
+    body={"hello": "there!"},
+    headers={...},
+    retries=3,
+)
+
+message_id = res.message_id
+
+----------------------------------------
+
+TITLE: Fetching Message Logs with cURL
+DESCRIPTION: This snippet demonstrates how to use cURL to make a GET request to the List Message Logs API endpoint. It includes the necessary authorization header.
+
+LANGUAGE: shell
+CODE:
+curl https://qstash.upstash.io/v2/workflows/messageLogs \
+  -H "Authorization: Bearer <token>"
+
+----------------------------------------
+
+TITLE: Fetching Message Logs with Node.js
+DESCRIPTION: This code snippet shows how to use the fetch API in Node.js to make a GET request to the List Message Logs API endpoint. It includes the necessary authorization header.
+
+LANGUAGE: javascript
+CODE:
+const response = await fetch(
+  "https://qstash.upstash.io/v2/workflows/messageLogs",
+  {
+    headers: {
+      Authorization: "Bearer <token>",
+    },
+  }
+);
+
+----------------------------------------
+
+TITLE: Failure Handling Configuration
+DESCRIPTION: Demonstrates how to configure failure handling using failureUrl and failureFunction options in TypeScript.
+
+LANGUAGE: typescript
+CODE:
+export const { POST } = serve<string>(
+  async (context) => { ... },
+  {
+    failureUrl: "https://<YOUR-FAILURE-ENDPOINT>/..."
+  }
+);
+
+export const { POST } = serve<string>(
+  async (context) => { ... },
+  {
+    failureFunction: async ({
+      context,      // context during failure
+      failStatus,   // failure status
+      failResponse, // failure message
+      failHeaders   // failure headers
+    }) => {
+      // handle the failure
+    }
+  }
+);
+
+----------------------------------------
+
+TITLE: Fetching Message Logs with Python
+DESCRIPTION: This Python code demonstrates how to use the requests library to make a GET request to the List Message Logs API endpoint. It includes the necessary authorization header.
+
+LANGUAGE: python
+CODE:
+import requests
+headers = {
+    'Authorization': 'Bearer <token>',
+}
+
+response = requests.get(
+  'https://qstash.upstash.io/v2/workflows/messageLogs',
+  headers=headers
+)
+
+----------------------------------------
+
+TITLE: Implementing QStash Verification in TypeScript
+DESCRIPTION: TypeScript implementation of QStash request verification using explicit signing keys
+
+LANGUAGE: typescript
+CODE:
+import { Receiver } from "@upstash/qstash";
+import { serve } from "@upstash/workflow/nextjs";
+
+export const { POST } = serve(
+  async (context) => {
+    // Your workflow steps...
+  },
+  {
+    receiver: new Receiver({
+      currentSigningKey: process.env.QSTASH_CURRENT_SIGNING_KEY,
+      nextSigningKey: process.env.QSTASH_NEXT_SIGNING_KEY,
+    }),
+  }
+);
+
+----------------------------------------
+
+TITLE: Response Schema for Bulk Cancel Operation
+DESCRIPTION: JSON response schema showing the number of cancelled workflow runs.
+
+LANGUAGE: json
+CODE:
+{
+  "cancelled": number
+}
+
+----------------------------------------
+
+TITLE: Bulk Cancel Using cURL
+DESCRIPTION: Example of cancelling workflow runs using cURL by specifying a workflow URL prefix.
+
+LANGUAGE: shell
+CODE:
+curl -XDELETE https://qstash.upstash.io/v2/workflows/runs \
+   -H "Content-Type: application/json" \
+  -H "Authorization: Bearer <QSTASH_TOKEN>" \
+  -d '{"workflowUrl": "https://example.com"}'
+
+----------------------------------------
+
+TITLE: Implementing QStash Verification in Python
+DESCRIPTION: Python implementation of QStash request verification using explicit signing keys
+
+LANGUAGE: python
+CODE:
+from qstash import Receiver
+
+@serve.post(
+    "/api/example",
+    receiver=Receiver(
+        current_signing_key=os.environ["QSTASH_CURRENT_SIGNING_KEY"],
+        next_signing_key=os.environ["QSTASH_NEXT_SIGNING_KEY"],
+    ),
+)
+async def example(context: AsyncWorkflowContext[str]) -> None:
+    ...
+
+----------------------------------------
+
+TITLE: Generated Physics Q&A Output
+DESCRIPTION: Example output showing the synthesized Q&A content generated by the worker agents, covering topics in quantum mechanics and relativity.
+
+LANGUAGE: text
+CODE:
+### Quantum Mechanics
+
+**Q: What is quantum mechanics?**
+A: Quantum mechanics is a fundamental theory in physics that describes the behavior of nature at the atomic and subatomic levels. It serves as the foundation for all quantum physics, including quantum chemistry, quantum field theory, quantum technology, and quantum information science.
+
+**Q: What are some key principles of quantum mechanics?**
+A: 
+1. **Wave-Particle Duality**: Particles exhibit both wave-like and particle-like properties.
+2. **Uncertainty Principle**: Certain pairs of physical properties, like position and momentum, cannot be simultaneously measured with arbitrary precision.
+3. **Quantum Superposition**: A quantum system can exist in multiple states at once until it is measured.
+4. **Quantum Entanglement**: Particles become interconnected such that the state of one influences the state of another, regardless of distance.
+5. **Quantization**: Energy levels in quantum systems are discrete.
+6. **Probability and Wave Functions**: Quantum systems are described by wave functions, which provide probabilities of finding a system in a particular state.
+7. **Observer Effect**: Measurement affects the system being observed.
+
+### Relativity
+
+**Q: What is the theory of relativity?**
+A: Developed by Albert Einstein, the theory of relativity encompasses two interrelated theories: special relativity and general relativity.
+
+**Q: What is special relativity?**
+A: Proposed by Einstein in 1905, special relativity addresses the relationship between space and time in the absence of gravity. It is based on two key postulates: the invariance of physical laws in all inertial frames and the constancy of the speed of light in a vacuum.
+
+**Q: What is general relativity?**
+A: Published by Einstein in 1915, general relativity is a geometric theory of gravitation. It describes gravity as a geometric property of space and time, or four-dimensional spacetime, and explains how massive objects cause a distortion in spacetime.
+
+These topics challenge classical intuitions and have led to significant advancements in our understanding of the universe and the development of new technologies.
+
+----------------------------------------
+
+TITLE: Custom Authorization in Python
+DESCRIPTION: Implementation of custom authorization mechanism in Python using bearer token validation
+
+LANGUAGE: python
+CODE:
+from fastapi import FastAPI
+from upstash_workflow.fastapi import Serve
+from upstash_workflow import AsyncWorkflowContext
+
+app = FastAPI()
+serve = Serve(app)
+
+
+@serve.post("/api/example")
+async def example(context: AsyncWorkflowContext[str]) -> None:
+    auth_header = context.headers.get("authorization")
+    bearer_token = auth_header.split(" ")[1] if auth_header else None
+
+    if not is_valid(bearer_token):
+        print("Authentication failed.")
+        return
+
+    # Your workflow steps...
+
+----------------------------------------
+
+TITLE: QStash Development Server Output Example
+DESCRIPTION: Sample output showing the local QStash development server configuration including authentication tokens and signing keys.
+
+LANGUAGE: plaintext
+CODE:
+Upstash QStash development server is runnning at http://127.0.0.1:8080
+
+A default user has been created for you to authorize your requests.
+QSTASH_TOKEN=eyJVc2VySUQiOiJkZWZhdWx0VXNlciIsIlBhc3N3b3JkIjoiZGVmYXVsdFBhc3N3b3JkIn0=
+QSTASH_CURRENT_SIGNING_KEY=sig_7RvLjqfZBvP5KEUimQCE1pvpLuou
+QSTASH_NEXT_SIGNING_KEY=sig_7W3ZNbfKWk5NWwEs3U4ixuQ7fxwE
+
+Sample cURL request:
+curl -X POST http://127.0.0.1:8080/v2/publish/https://example.com -H "Authorization: Bearer eyJVc2VySUQiOiJkZWZhdWx0VXNlciIsIlBhc3N3b3JkIjoiZGVmYXVsdFBhc3N3b3JkIn0="
+
+Check out documentation for more details:
+https://upstash.com/docs/qstash/howto/local-development
+
+----------------------------------------
+
+TITLE: Creating Environment Variables for Upstash Workflow
+DESCRIPTION: Commands and file content for setting up environment variables required for Upstash Workflow in a Nuxt.js project.
+
+LANGUAGE: bash
+CODE:
+touch .env.local
+
+LANGUAGE: bash
+CODE:
+QSTASH_URL="http://127.0.0.1:8080"
+QSTASH_TOKEN=<QSTASH_TOKEN>
+
+LANGUAGE: bash
+CODE:
+QSTASH_TOKEN="***"
+UPSTASH_WORKFLOW_URL=<UPSTASH_WORKFLOW_URL>
+
+----------------------------------------
+
+TITLE: Setting QStash Environment Variables
+DESCRIPTION: Configuration of QStash signing keys in environment variables for request verification
+
+LANGUAGE: bash
+CODE:
+QSTASH_CURRENT_SIGNING_KEY=xxxxxxxxx
+QSTASH_NEXT_SIGNING_KEY=xxxxxxxxx
+
+----------------------------------------
+
+TITLE: Defining Notify Response Type in TypeScript
+DESCRIPTION: TypeScript type definition for the response returned by the notify endpoint containing an array of waiter objects and message IDs.
+
+LANGUAGE: typescript
+CODE:
+type NotifyResponse = { waiter: Waiter, messageId: string }[]
+
+----------------------------------------
+
+TITLE: Triggering QStash Workflow with cURL
+DESCRIPTION: Example of triggering a workflow using QStash's publish API via cURL command
+
+LANGUAGE: bash
+CODE:
+curl -XPOST \
+    -H 'Authorization: Bearer <YOUR_QSTASH_TOKEN>' \
+    -H "Content-type: application/json" \
+    -d '{ "initialData": "hello world" }' \
+    'https://qstash.upstash.io/v2/publish/https://<your-app-url>/api/workflow'
+
+----------------------------------------
+
+TITLE: Creating SvelteKit Workflow Endpoint
+DESCRIPTION: TypeScript code for implementing a workflow endpoint in SvelteKit using Upstash Workflow
+
+LANGUAGE: typescript
+CODE:
+import { serve } from "@upstash/workflow/svelte"
+import { env } from "$env/dynamic/private"
+
+export const { POST } = serve(
+  async (context) => {
+    await context.run("initial-step", () => {
+      console.log("initial step ran")
+    })
+
+    await context.run("second-step", () => {
+      console.log("second step ran")
+    })
+  },
+  { env }
+)
+
+----------------------------------------
+
+TITLE: Sending HTTP Request with requests in Python
+DESCRIPTION: This Python code demonstrates using the requests library to send a POST request to a workflow endpoint. It shows how to include custom headers and a JSON payload in the request.
+
+LANGUAGE: python
+CODE:
+import requests
+
+requests.post(
+    "https://<YOUR_WORKFLOW_ENDPOINT>/<YOUR-WORKFLOW-ROUTE>", json={"foo": "bar"}, headers={"my-header": "foo"}
+)
+
+----------------------------------------
+
+TITLE: Cancelling Workflow with Node.js Fetch
+DESCRIPTION: Cancel a workflow run using Node.js fetch API. Requires authentication via bearer token.
+
+LANGUAGE: javascript
+CODE:
+const response = await fetch('https://qstash.upstash.io/v2/workflows/runs/wfr_TzazoUCuZmFGp2u9cdy5K', {
+  method: 'DELETE',
+  headers: {
+    'Authorization': 'Bearer <token>'
+  }
+});
+
+----------------------------------------
+
+TITLE: Triggering Workflows with Different Methods
+DESCRIPTION: Examples of how to trigger Upstash Workflows using TypeScript SDK, Python SDK, or REST API calls. Shows various options for customizing the workflow trigger.
+
+LANGUAGE: typescript
+CODE:
+import { Client } from "@upstash/workflow";
+
+const client = new Client({ token: "<QSTASH_TOKEN>" });
+
+const { workflowRunId } = await client.trigger({
+  url: "https://<YOUR_WORKFLOW_ENDPOINT>/<YOUR-WORKFLOW-ROUTE>",
+  body: "hello there!",         // Optional body
+  headers: { ... },             // Optional headers
+  workflowRunId: "my-workflow", // Optional workflow run ID
+  retries: 3                    // Optional retries for the initial request
+});
+
+LANGUAGE: python
+CODE:
+from qstash import AsyncQStash
+
+client = AsyncQStash("<QSTASH_TOKEN>")
+
+res = await client.message.publish_json(
+    url="https://<YOUR_WORKFLOW_ENDPOINT>/<YOUR-WORKFLOW-ROUTE>",
+    body={"hello": "there!"},
+    headers={...},
+    retries=3,
+)
+
+LANGUAGE: bash
+CODE:
+curl -X POST https://<YOUR_WORKFLOW_ENDPOINT>/<YOUR-WORKFLOW-ROUTE> -b '{"hello": "there!"}'
+
+----------------------------------------
+
+TITLE: Local QStash Server Configuration
+DESCRIPTION: Environment variables configuration for local QStash development server
+
+LANGUAGE: txt
+CODE:
+QSTASH_URL="http://127.0.0.1:8080"
+QSTASH_TOKEN=<QSTASH_TOKEN>
+
+----------------------------------------
+
+TITLE: Installing Required Dependencies for Vercel AI SDK
+DESCRIPTION: Package installation commands for setting up Vercel AI SDK with OpenAI and Zod dependencies.
+
+LANGUAGE: bash
+CODE:
+npm install @ai-sdk/openai ai zod
+
+----------------------------------------
+
+TITLE: Creating a Workflow Endpoint in SolidJS
+DESCRIPTION: Example of defining a workflow endpoint in a SolidJS project using the Upstash Workflow SDK.
+
+LANGUAGE: typescript
+CODE:
+import { serve } from "@upstash/workflow/solidjs"
+
+export const { POST } = serve(async (context) => {
+  await context.run("initial-step", () => {
+    console.log("initial step ran")
+  })
+
+  await context.run("second-step", () => {
+    console.log("second step ran")
+  })
+})
+
+----------------------------------------
+
+TITLE: Basic Text Generation Workflow Implementation
+DESCRIPTION: Implementation of a workflow endpoint that uses OpenAI to generate text based on a provided prompt, with proper error handling and step management.
+
+LANGUAGE: typescript
+CODE:
+import { serve } from "@upstash/workflow/nextjs";
+import { WorkflowAbort } from '@upstash/workflow';
+import { generateText, ToolExecutionError } from 'ai';
+
+import { createWorkflowOpenAI } from './model';
+
+export const { POST } = serve<{ prompt: string }>(async (context) => {
+  const openai = createWorkflowOpenAI(context);
+
+  const prompt = await context.run("get prompt", async () => {
+    return context.requestPayload.prompt;
+  });
+
+  try {
+    const result = await generateText({
+      model: openai('gpt-3.5-turbo'),
+      maxTokens: 2048,
+      prompt,
+    });
+
+    await context.run("text", () => {
+      console.log(`TEXT: ${result.text}`);
+      return result.text;
+    });
+    
+  } catch (error) {    
+    if (error instanceof ToolExecutionError && error.cause instanceof WorkflowAbort) {
+      throw error.cause;
+    } else {
+      throw error;
+    }
+  }
+});
+
+----------------------------------------
+
+TITLE: Configuring Environment Variables for Local QStash Server
+DESCRIPTION: Environment variable configuration for using a local QStash server.
+
+LANGUAGE: env
+CODE:
+export QSTASH_URL="http://127.0.0.1:8080"
+export QSTASH_TOKEN=<QSTASH_TOKEN>
+
+----------------------------------------
+
+TITLE: Installing Upstash Workflow SDK
+DESCRIPTION: Commands for installing the Upstash Workflow SDK using different package managers
+
+LANGUAGE: bash
+CODE:
+npm install @upstash/workflow
+
+LANGUAGE: bash
+CODE:
+pnpm install @upstash/workflow
+
+LANGUAGE: bash
+CODE:
+bun add @upstash/workflow
+
+----------------------------------------
+
+TITLE: Handling Webhook Events in TypeScript
+DESCRIPTION: Demonstrates how to process webhook events using the context.run method in TypeScript. It includes parsing the event, extracting user data, and returning a structured payload.
+
+LANGUAGE: typescript
+CODE:
+export const { POST } = serve(async (context) => {
+  // ... Parse and validate the incoming request
+
+  const user = await context.run<false | UserPayload>(
+    "handle-webhook-event",
+    async () => {
+      if (event.type === "user.created") {
+        const { id: clerkUserId, email_addresses, first_name } = event.data;
+        const primaryEmail = email_addresses.find(
+          (email) => (email.id = event.data.primary_email_address_id)
+        );
+
+        if (!primaryEmail) {
+          return false;
+        }
+
+        return {
+          event: event.type,
+          userId: clerkUserId,
+          email: primaryEmail.email_address,
+          firstName: first_name,
+        } as UserPayload;
+      }
+      return false;
+    }
+  );
+});
+
+----------------------------------------
+
+TITLE: Local Tunnel Configuration
+DESCRIPTION: Environment variables setup for using a local tunnel with QStash
+
+LANGUAGE: txt
+CODE:
+QSTASH_TOKEN="***"
+UPSTASH_WORKFLOW_URL=<UPSTASH_WORKFLOW_URL>
+
+----------------------------------------
+
+TITLE: Implementing a Workflow with Sleep Functionality in Flask
+DESCRIPTION: Example of a Flask workflow that incorporates sleep functionality between steps, demonstrating how to pause execution for specified durations.
+
+LANGUAGE: python
+CODE:
+from flask import Flask
+import time
+from upstash_workflow.flask import Serve
+from upstash_workflow import WorkflowContext
+
+app = Flask(__name__)
+serve = Serve(app)
+
+def some_work(input: str) -> str:
+    return f"processed '{input}'"
+
+@serve.route("/sleep")
+def sleep(context: WorkflowContext[str]) -> None:
+    input = context.request_payload
+
+    def _step1() -> str:
+        output = some_work(input)
+        print("step 1 input", input, "output", output)
+        return output
+
+    result1: str = context.run("step1", _step1)
+
+    context.sleep_until("sleep1", time.time() + 3)
+
+    def _step2() -> str:
+        output = some_work(result1)
+        print("step 2 input", result1, "output", output)
+        return output
+
+    result2: str = context.run("step2", _step2)
+
+    context.sleep("sleep2", 2)
+
+    def _step3() -> None:
+        output = some_work(result2)
+        print("step 3 input", result2, "output", output)
+
+    context.run("step3", _step3)
+
+
+----------------------------------------
+
+TITLE: Setting up environment variables for Upstash Workflow
+DESCRIPTION: Example of environment variables needed for Upstash Workflow, including QStash URL and token.
+
+LANGUAGE: txt
+CODE:
+QSTASH_URL="http://127.0.0.1:8080"
+QSTASH_TOKEN=<QSTASH_TOKEN>
+
+----------------------------------------
+
+TITLE: Environment Variables Configuration
+DESCRIPTION: Environment variable settings for local QStash server and tunnel configurations.
+
+LANGUAGE: txt
+CODE:
+QSTASH_URL="http://127.0.0.1:8080"
+QSTASH_TOKEN=<QSTASH_TOKEN>
+
+LANGUAGE: txt
+CODE:
+QSTASH_TOKEN="***"
+UPSTASH_WORKFLOW_URL=<UPSTASH_WORKFLOW_URL>
+
+----------------------------------------
+
+TITLE: Setting up Virtual Environment and Installing Dependencies
+DESCRIPTION: Commands to create a virtual environment and install required packages for the FastAPI and Upstash Workflow integration.
+
+LANGUAGE: bash
+CODE:
+python -m venv venv
+source venv/bin/activate
+pip install fastapi uvicorn upstash-workflow
+
+----------------------------------------
+
+TITLE: Starting Ngrok HTTP Tunnel
+DESCRIPTION: Commands to start an ngrok HTTP tunnel for local development, with example for port 3000.
+
+LANGUAGE: bash
+CODE:
+ngrok http <PORT>
+ngrok http 3000
+
+----------------------------------------
+
+TITLE: Configuring Environment Variables for Local QStash Server
+DESCRIPTION: Example of setting up environment variables for using a local QStash server during development.
+
+LANGUAGE: bash
+CODE:
+export QSTASH_URL="http://127.0.0.1:8080"
+export QSTASH_TOKEN=<QSTASH_TOKEN>
+
+----------------------------------------
+
+TITLE: Creating a Workflow Endpoint with Hono Context
+DESCRIPTION: Advanced TypeScript example demonstrating how to create a workflow endpoint with access to Hono context and environment variables.
+
+LANGUAGE: typescript
+CODE:
+import { Hono } from "hono"
+import { serve, WorkflowBindings } from "@upstash/workflow/hono"
+import { env } from "hono/adapter"
+
+interface Bindings extends WorkflowBindings {
+  ENVIRONMENT: "development" | "production"
+}
+
+const app = new Hono<{ Bindings: Bindings }>()
+
+app.post("/workflow", (c) => {
+  // 👇 access Honos native context, i.e. getting an env variable
+  const { ENVIRONMENT } = env(c)
+
+  // 👇 `unknown` represents your initial payload data type
+  const handler = serve<unknown, Bindings>(
+    async (context) => { ... }
+  )
+
+  return await handler(c)
+})
+
+export default app
+
+----------------------------------------
+
+TITLE: Configuring Environment Variables for Local Tunnel
+DESCRIPTION: Example of setting up environment variables when using a local tunnel for development.
+
+LANGUAGE: bash
+CODE:
+export QSTASH_TOKEN="***"
+export UPSTASH_WORKFLOW_URL=<UPSTASH_WORKFLOW_URL>
+
+----------------------------------------
+
+TITLE: Retrieving Flow Control Info using cURL in Bash
+DESCRIPTION: This cURL command sends a GET request to the Upstash QStash API to retrieve information about a specific flow control. It requires the flow control key and an authorization token.
+
+LANGUAGE: sh
+CODE:
+curl -X GET https://qstash.upstash.io/v2/flowControl/YOUR_FLOW_CONTROL_KEY  -H "Authorization: Bearer <token>"
+
+----------------------------------------
+
+TITLE: Setting up Virtual Environment and Installing Dependencies for Flask and Upstash Workflow
+DESCRIPTION: Commands to create a virtual environment, activate it, and install the required packages including Flask and Upstash Workflow SDK.
+
+LANGUAGE: bash
+CODE:
+python -m venv venv
+source venv/bin/activate
+pip install fastapi uvicorn upstash-workflow
+
+----------------------------------------
+
+TITLE: Customizing Request and Response Types for Anthropic API Call in TypeScript
+DESCRIPTION: This snippet shows how to override the default types for the request and response bodies when calling the Anthropic API. It allows for more flexibility in handling custom API responses or requests.
+
+LANGUAGE: typescript
+CODE:
+type ResponseBodyType = { ... }; // Define your response body type
+type RequestBodyType = { ... };  // Define your request body type
+
+const { status, body } = await context.api.anthropic.call<
+  ResponseBodyType,
+  RequestBodyType
+>(
+  "Call Anthropic",
+  {
+    ...
+  }
+);
+
+----------------------------------------
+
+TITLE: Configuring Environment Variables for Upstash Workflow in Flask
+DESCRIPTION: Example of setting up environment variables in a .env file for QStash URL and token, used for authenticating with the QStash service.
+
+LANGUAGE: bash
+CODE:
+export QSTASH_URL="http://127.0.0.1:8080"
+export QSTASH_TOKEN=<QSTASH_TOKEN>
+
+----------------------------------------
+
+TITLE: Triggering a Workflow with cURL
+DESCRIPTION: Example of how to trigger a workflow using a cURL command to make a POST request to the workflow endpoint.
+
+LANGUAGE: bash
+CODE:
+curl -X POST http://localhost:3000/workflow \
+    -H "Content-Type: application/json" \
+    -d '{"message": "Hello from the workflow!"}'
+
+# result: {"workflowRunId":"wfr_xxxxxx"}
+
+----------------------------------------
+
+TITLE: Creating Environment Variables File for Local Development
+DESCRIPTION: Command to create a .dev.vars file for storing environment variables during local development.
+
+LANGUAGE: bash
+CODE:
+touch .dev.vars
+
+----------------------------------------
+
+TITLE: Sending HTTP Request with curl
+DESCRIPTION: This curl command demonstrates how to send a POST request to a workflow endpoint with custom headers and a JSON body. It's a direct way to trigger a workflow without using client libraries.
+
+LANGUAGE: bash
+CODE:
+curl -X POST https://<YOUR_WORKFLOW_ENDPOINT>/<YOUR-WORKFLOW-ROUTE> \
+     -H "my-header: foo" \
+     -b '{"foo": "bar"}'
+
+----------------------------------------
+
+TITLE: Configuring Environment Variables for Local QStash Server
+DESCRIPTION: Example of .dev.vars file content for using a local QStash server during development.
+
+LANGUAGE: txt
+CODE:
+QSTASH_URL="http://127.0.0.1:8080"
+QSTASH_TOKEN=<QSTASH_TOKEN>
+
+----------------------------------------
+
+TITLE: Triggering Workflow with Flow Control
+DESCRIPTION: Example of triggering a workflow with flow control parameters using the Upstash Client. Demonstrates setting up rate limiting and parallelism constraints.
+
+LANGUAGE: javascript
+CODE:
+import { Client } from "@upstash/workflow";
+
+const client = new Client({ token: "<QStash_TOKEN>" });
+const { workflowRunId } = await client.trigger({
+  url: "https://workflow-endpoint.com",
+  body: "hello there!",
+  flowControl: { key: "app1", parallelism: 3, ratePerSecond: 10 }
+});
+
+----------------------------------------
+
+TITLE: Running Hono App Locally
+DESCRIPTION: Command to start the Hono application in development mode for local testing.
+
+LANGUAGE: bash
+CODE:
+npm run dev
+
+----------------------------------------
+
+TITLE: Running a Flask Application with Upstash Workflow
+DESCRIPTION: Command to start the Flask application on port 8000, which is necessary to run and test the Upstash Workflow endpoints.
+
+LANGUAGE: bash
+CODE:
+flask --app main run -p 8000
+
+----------------------------------------
+
+TITLE: Deploying Hono App to Production
+DESCRIPTION: Command to deploy the Hono application to production using Wrangler CLI.
+
+LANGUAGE: bash
+CODE:
+wrangler deploy
+
+----------------------------------------
+
+TITLE: Notify Event Using cURL
+DESCRIPTION: Example of notifying an event using cURL with authentication token and event data.
+
+LANGUAGE: shell
+CODE:
+curl -X POST https://qstash.upstash.io/v2/notify/myEvent \
+  -H "Authorization: Bearer <token>" \
+  -d "Hello World!"
+
+----------------------------------------
+
+TITLE: Verifying Production Workflow Endpoint
+DESCRIPTION: cURL command to verify the workflow endpoint in production after deployment.
+
+LANGUAGE: bash
+CODE:
+curl -X POST https://<YOUR-PRODUCTION-URL>/workflow
+
+----------------------------------------
+
+TITLE: Setting Up Basic Webhook Endpoint in TypeScript
+DESCRIPTION: Demonstrates how to create a basic webhook endpoint using the serve function from @upstash/workflow in TypeScript. It includes setting up the endpoint and defining an initial payload parser.
+
+LANGUAGE: typescript
+CODE:
+import { serve } from "@upstash/workflow/nextjs";
+
+export const { POST } = serve(
+  async (context) => {
+    // Your webhook handling logic here
+  },
+  {
+    initialPayloadParser: (payload) => {
+      return payload;
+    },
+  }
+);
+
+----------------------------------------
+
+TITLE: Starting Local QStash Server
+DESCRIPTION: Command to start a local QStash server for development purposes.
+
+LANGUAGE: bash
+CODE:
+npx @upstash/qstash-cli dev
+
+----------------------------------------
+
+TITLE: Triggering a Workflow Endpoint in Flask
+DESCRIPTION: cURL command to trigger a workflow by sending a POST request to the defined endpoint, which returns a unique workflow run ID.
+
+LANGUAGE: bash
+CODE:
+curl -X POST https://localhost:8000/api/workflow
+
+# result: {"workflowRunId":"wfr_xxxxxx"}
+
+----------------------------------------
+
+TITLE: Configuring Environment Variables for Local Tunnel
+DESCRIPTION: Environment variable configuration for using a local tunnel with production QStash.
+
+LANGUAGE: env
+CODE:
+export QSTASH_TOKEN="***"
+export UPSTASH_WORKFLOW_URL=<UPSTASH_WORKFLOW_URL>
+
+----------------------------------------
+
+TITLE: Configuring Environment Variables for Local Tunnel
+DESCRIPTION: Environment variable configuration for using a local tunnel with production QStash.
+
+LANGUAGE: env
+CODE:
+export QSTASH_TOKEN="***"
+export UPSTASH_WORKFLOW_URL=<UPSTASH_WORKFLOW_URL>
+
+----------------------------------------
+
+TITLE: Triggering Workflow Endpoint with cURL
+DESCRIPTION: Example of how to trigger the workflow endpoint using cURL command.
+
+LANGUAGE: bash
+CODE:
+curl -X POST https://localhost:8000/api/workflow
+
+----------------------------------------
+
+TITLE: Sourcing Environment Variables
+DESCRIPTION: Command to load environment variables from the .env file.
+
+LANGUAGE: bash
+CODE:
+source .env
+
+----------------------------------------
+
+TITLE: Starting Development Server
+DESCRIPTION: Command to start the Next.js development server.
+
+LANGUAGE: bash
+CODE:
+npm run dev
+
+----------------------------------------
+
+TITLE: Deploying to Vercel Production
+DESCRIPTION: Command to deploy the project to Vercel production environment.
+
+LANGUAGE: bash
+CODE:
+vercel --prod
+
+----------------------------------------
+
+TITLE: Retrieving Workflow Logs using Python Requests
+DESCRIPTION: This Python code uses the Requests library to fetch workflow logs. It sends a GET request to the Upstash Workflow API endpoint with an authorization header.
+
+LANGUAGE: python
+CODE:
+import requests
+headers = {
+    'Authorization': 'Bearer <token>',
+}
+
+response = requests.get(
+  'https://qstash.upstash.io/v2/workflows/logs',
+  headers=headers
+)
+
+----------------------------------------
+
+TITLE: Installing Project Dependencies
+DESCRIPTION: Command to install the project dependencies using npm.
+
+LANGUAGE: bash
+CODE:
+npm install
+
+----------------------------------------
+
+TITLE: Testing Workflow Endpoint with cURL
+DESCRIPTION: cURL command to test the workflow endpoint by sending a POST request.
+
+LANGUAGE: bash
+CODE:
+curl -X POST https://localhost:8787/workflow
+
+# result: {"workflowRunId":"wfr_xxxxxx"}
+
+----------------------------------------
+
+TITLE: Configuring Environment Variables for Local QStash Server
+DESCRIPTION: Example of environment variables to be added to the .env file when using a local QStash server.
+
+LANGUAGE: env
+CODE:
+export QSTASH_URL="http://127.0.0.1:8080"
+export QSTASH_TOKEN=<QSTASH_TOKEN>
+
+----------------------------------------
+
+TITLE: Retrieving Workflow Logs with Upstash Workflow JS SDK
+DESCRIPTION: This JavaScript code uses the Upstash Workflow JS SDK to fetch workflow logs. It demonstrates filtering by workflow run ID, workflow URL, and state.
+
+LANGUAGE: javascript
+CODE:
+import { Client } from "@upstash/workflow";
+
+const client = new Client({ token: "<QSTASH_TOKEN>" });
+
+// Filter by workflow run ID
+const { runs } = await client.logs({ workflowRunId: "<WORKFLOW_RUN_ID>"});
+
+// Filter by workflow server url
+const { runs } = await client.logs({ workflowUrl: "<WORKFLOW_URL>"});
+
+// Filter by state
+const { runs } = await client.logs({ state: "RUN_SUCCESS"});
+
+----------------------------------------
+
+TITLE: Configuring Environment Variables for Local Tunnel
+DESCRIPTION: Example of environment variables to be added to the .env file when using a local tunnel for development.
+
+LANGUAGE: env
+CODE:
+export QSTASH_TOKEN="***"
+export UPSTASH_WORKFLOW_URL=<UPSTASH_WORKFLOW_URL>
+
+----------------------------------------
+
+TITLE: Updating context.call Usage in JavaScript
+DESCRIPTION: Example of updating the usage of context.call method, showing changes in parameter passing and return value structure.
+
+LANGUAGE: javascript
+CODE:
+// old
+const result = await context.call("call step", "<call-url>", "POST", ...)
+
+// new
+const {
+  status,  // response status
+  headers, // response headers
+  body     // response body
+} = await context.call("call step", {
+  url: "<call-url>",
+  method: "POST",
+  ...
+})
+
+----------------------------------------
+
+TITLE: Deploying to Vercel Production
+DESCRIPTION: Command to deploy the project to Vercel production environment.
+
+LANGUAGE: bash
+CODE:
+vercel --prod
+
+----------------------------------------
+
+TITLE: Triggering Upstash Workflow with cURL
+DESCRIPTION: This bash command demonstrates how to trigger the implemented Upstash Workflow using cURL. It sends a POST request with JSON payload to the workflow endpoint.
+
+LANGUAGE: bash
+CODE:
+curl -XPOST https://qstash-workflow.vercel.app/api/example -d '{"id": "id_123", "question": "what is the meaning of life?"}'
+
+----------------------------------------
+
+TITLE: Running and Testing Workflow Endpoint in Nuxt.js
+DESCRIPTION: Commands for starting the Nuxt.js application and making a POST request to trigger the workflow endpoint.
+
+LANGUAGE: bash
+CODE:
+npm run dev
+
+LANGUAGE: bash
+CODE:
+curl -X POST https://localhost:3000/api/workflow
+
+# result: {"workflowRunId":"wfr_xxxxxx"}
+
+----------------------------------------
+
+TITLE: Updating Serve Method Usage in JavaScript
+DESCRIPTION: Example of updating the usage of the serve method in JavaScript, showing the change in the return value structure.
+
+LANGUAGE: javascript
+CODE:
+// old
+export const POST = serve(...);
+
+// new
+export const { POST } = serve(...);
+
+----------------------------------------
+
+TITLE: Installing Upstash Workflow SDK in SolidJS
+DESCRIPTION: Commands for installing the Upstash Workflow SDK using different package managers (npm, pnpm, bun).
+
+LANGUAGE: bash
+CODE:
+npm install @upstash/workflow
+
+LANGUAGE: bash
+CODE:
+pnpm install @upstash/workflow
+
+LANGUAGE: bash
+CODE:
+bun add @upstash/workflow
+
+----------------------------------------
+
+TITLE: Updating Serve Method Imports in TypeScript
+DESCRIPTION: Example of changing the import statement for the serve method from @upstash/qstash to @upstash/workflow in TypeScript.
+
+LANGUAGE: typescript
+CODE:
+// old
+import { serve } from "@upstash/qstash/nextjs"
+
+// new 
+import { serve } from "@upstash/workflow/nextjs"
+
+----------------------------------------
+
+TITLE: Configuring Environment Variables for Local Tunnel
+DESCRIPTION: Example of environment variables setup for using a local tunnel during development.
+
+LANGUAGE: txt
+CODE:
+QSTASH_TOKEN="***"
+UPSTASH_WORKFLOW_URL=<UPSTASH_WORKFLOW_URL>
+
+----------------------------------------
+
+TITLE: Installing Upstash Workflow SDK in Nuxt.js
+DESCRIPTION: Commands for installing the Upstash Workflow SDK using different package managers in a Nuxt.js project.
+
+LANGUAGE: bash
+CODE:
+npm install @upstash/workflow
+
+LANGUAGE: bash
+CODE:
+pnpm install @upstash/workflow
+
+LANGUAGE: bash
+CODE:
+bun add @upstash/workflow
+
+----------------------------------------
+
+TITLE: Starting Local QStash Server
+DESCRIPTION: Command to run a local QStash server for development
+
+LANGUAGE: bash
+CODE:
+npx @upstash/qstash-cli dev
+
+----------------------------------------
+
+TITLE: Installing @upstash/workflow SDK with bun
+DESCRIPTION: Command to install the new @upstash/workflow package using bun package manager.
+
+LANGUAGE: bash
+CODE:
+bun add @upstash/workflow
+
+----------------------------------------
+
+TITLE: Local QStash Environment Configuration
+DESCRIPTION: Environment variables setup for local QStash server configuration
+
+LANGUAGE: txt
+CODE:
+QSTASH_URL="http://127.0.0.1:8080"
+QSTASH_TOKEN=<QSTASH_TOKEN>
+
+----------------------------------------
+
+TITLE: Initializing OpenAI Model in Workflow Route
+DESCRIPTION: Setting up an OpenAI model within a Next.js route handler using the Upstash Workflow serve function.
+
+LANGUAGE: typescript
+CODE:
+import { serve } from "@upstash/workflow/nextjs";
+
+export const { POST } = serve(async (context) => {
+  const model = context.agents.openai('gpt-3.5-turbo')
+
+  // ...
+})
+
+----------------------------------------
+
+TITLE: Production Environment Configuration
+DESCRIPTION: Environment variables setup for production using QStash token
+
+LANGUAGE: txt
+CODE:
+QSTASH_TOKEN="***"
+UPSTASH_WORKFLOW_URL=<UPSTASH_WORKFLOW_URL>
+
+----------------------------------------
+
+TITLE: Configuring Ngrok Authentication
+DESCRIPTION: Command to configure ngrok authentication token for initial setup.
+
+LANGUAGE: bash
+CODE:
+ngrok config add-authtoken <YOUR-AUTH-TOKEN>
+
+----------------------------------------
+
+TITLE: Installing Required Packages
+DESCRIPTION: Command to install necessary packages for Upstash Workflow and AI functionality.
+
+LANGUAGE: bash
+CODE:
+npm i @upstash/workflow ai zod
+
+----------------------------------------
+
+TITLE: Configuring Environment Variables for OpenAI Integration
+DESCRIPTION: Setting up required environment variables for QStash and OpenAI integration.
+
+LANGUAGE: plaintext
+CODE:
+QSTASH_TOKEN="<QSTASH_TOKEN>"
+OPENAI_API_KEY="<OPENAI_API_KEY>"
+
+----------------------------------------
+
+TITLE: Setting Environment Variables
+DESCRIPTION: Example of environment variables to be set in the .env.local file for QStash and OpenAI.
+
+LANGUAGE: txt
+CODE:
+QSTASH_URL="http://127.0.0.1:8080"
+QSTASH_TOKEN=<QSTASH_TOKEN>
+
+OPENAI_API_KEY=<OPENAI_API_KEY>
+
+----------------------------------------
+
+TITLE: Installing Required Dependencies for Workflow Agents
+DESCRIPTION: NPM command to install necessary packages for defining tools in the Workflow Agents API.
+
+LANGUAGE: bash
+CODE:
+npm i ai mathjs zod @agentic/ai-sdk @agentic/weather @langchain/core @langchain/community
+
+----------------------------------------
+
+TITLE: Installing Upstash Workflow Dependencies
+DESCRIPTION: Commands for installing the Upstash Workflow SDK using different package managers (npm, pnpm, bun)
+
+LANGUAGE: bash
+CODE:
+npm install @upstash/workflow
+
+LANGUAGE: bash
+CODE:
+pnpm install @upstash/workflow
+
+LANGUAGE: bash
+CODE:
+bun add @upstash/workflow
+
+----------------------------------------
+
+TITLE: Setting Up Python Virtual Environment
+DESCRIPTION: Commands to create and activate a Python virtual environment for the project.
+
+LANGUAGE: bash
+CODE:
+python -m venv venv
+source venv/bin/activate
+
+----------------------------------------
+
+TITLE: Environment Variable Configuration
+DESCRIPTION: Environment variable setup for local QStash server configuration
+
+LANGUAGE: txt
+CODE:
+QSTASH_URL="http://127.0.0.1:8080"
+QSTASH_TOKEN=<QSTASH_TOKEN>
+
+----------------------------------------
+
+TITLE: Installing @upstash/workflow SDK with npm
+DESCRIPTION: Command to install the new @upstash/workflow package using npm package manager.
+
+LANGUAGE: bash
+CODE:
+npm install @upstash/workflow
+
+----------------------------------------
+
+TITLE: Initializing Vercel Deployment
+DESCRIPTION: Command to initialize the Vercel deployment process.
+
+LANGUAGE: bash
+CODE:
+vercel
+
+----------------------------------------
+
+TITLE: Installing @upstash/workflow SDK with pnpm
+DESCRIPTION: Command to install the new @upstash/workflow package using pnpm package manager.
+
+LANGUAGE: bash
+CODE:
+pnpm install @upstash/workflow
+
+----------------------------------------
+
+TITLE: Starting Local QStash Server for Development
+DESCRIPTION: Command to start a local QStash server for testing workflows without affecting billing.
+
+LANGUAGE: bash
+CODE:
+npx @upstash/qstash-cli dev
+
+----------------------------------------
+
+TITLE: Calling Workflow Endpoint with Client
+DESCRIPTION: TypeScript code demonstrating how to call the workflow endpoint using the Upstash Workflow Client.
+
+LANGUAGE: ts
+CODE:
+import { Client } from "@upstash/workflow";
+
+const client = new Client({
+  baseUrl: process.env.QSTASH_URL,
+  token: process.env.QSTASH_TOKEN!,
+})
+
+const workflowRunId = await client.trigger({
+  url: "http://127.0.0.1:3000/workflow",
+  body: { prompt: "Explain the future of space exploration" },
+})
+
+console.log(workflowRunId);
+
+----------------------------------------
+
+TITLE: Running Next.js Application
+DESCRIPTION: Command to start the Next.js development server.
+
+LANGUAGE: bash
+CODE:
+npm run dev
+
+----------------------------------------
+
+TITLE: Installing Project Dependencies
+DESCRIPTION: Command to install the necessary npm packages for the project.
+
+LANGUAGE: bash
+CODE:
+npm install
+
+----------------------------------------
+
+TITLE: Starting Local QStash Server
+DESCRIPTION: Commands to start the local QStash server using npm or pnpm.
+
+LANGUAGE: bash
+CODE:
+npx @upstash/qstash-cli dev
+
+LANGUAGE: bash
+CODE:
+pnpm dlx @upstash/qstash-cli dev
+
+----------------------------------------
+
+TITLE: Ngrok Tunnel Status Output
+DESCRIPTION: Sample output showing ngrok tunnel status and forwarding URL configuration.
+
+LANGUAGE: plaintext
+CODE:
+Session Status                online
+Account                       <YOUR-NAME> (Plan: Free)
+Version                       3.1.0
+Region                        Europe (eu)
+Latency                       -
+Web Interface                 http://127.0.0.1:4040
+Forwarding                    https://e02f-2a02-810d-af40-5284-b139-58cc-89df-b740.eu.ngrok.io -> http://localhost:3000
+Connections                   ttl     opn     rt1     rt5     p50     p90
+                              0       0       0.00    0.00    0.00    0.00
+
+----------------------------------------
+
+TITLE: Creating Environment File
+DESCRIPTION: Command to create a .env.local file for environment variables
+
+LANGUAGE: bash
+CODE:
+touch .env.local
+
+----------------------------------------
+
+TITLE: Installing Upstash Workflow SDK with npm
+DESCRIPTION: Command to install the Upstash Workflow SDK in an Express.js project using npm.
+
+LANGUAGE: bash
+CODE:
+npm install @upstash/workflow
+
+----------------------------------------
+
+TITLE: Cloning Next.js & FastAPI Example Repository
+DESCRIPTION: Commands to clone the example repository and navigate to the project directory.
+
+LANGUAGE: bash
+CODE:
+git clone https://github.com/upstash/workflow-py.git
+cd workflow-py/examples/nextjs-fastapi
+
+----------------------------------------
+
+TITLE: Sourcing Environment Variables
+DESCRIPTION: Command to source the environment variables from the .env file.
+
+LANGUAGE: bash
+CODE:
+source .env
+
+----------------------------------------
+
+TITLE: Setting Up Python Virtual Environment
+DESCRIPTION: Commands to create and activate a Python virtual environment for the project.
+
+LANGUAGE: bash
+CODE:
+python -m venv venv
+source venv/bin/activate
+
+----------------------------------------
+
+TITLE: Creating Environment File
+DESCRIPTION: Command to create a .env file for storing environment variables.
+
+LANGUAGE: bash
+CODE:
+touch .env
+
+----------------------------------------
+
+TITLE: Initializing Vercel Deployment
+DESCRIPTION: Command to initialize the project for Vercel deployment.
+
+LANGUAGE: bash
+CODE:
+vercel
+
+----------------------------------------
+
+TITLE: Cloning Next.js & Flask Example Repository
+DESCRIPTION: Commands to clone the example repository and navigate to the project directory.
+
+LANGUAGE: bash
+CODE:
+git clone https://github.com/upstash/workflow-py.git
+cd workflow-py/examples/nextjs-flask
+
+----------------------------------------
+
+TITLE: Creating Environment File
+DESCRIPTION: Command to create a .env file for storing environment variables.
+
+LANGUAGE: bash
+CODE:
+touch .env
+
+----------------------------------------
+
+TITLE: Starting Local QStash Server
+DESCRIPTION: Command to start a local QStash server for development purposes.
+
+LANGUAGE: bash
+CODE:
+npx @upstash/qstash-cli dev
+
+----------------------------------------
+
+TITLE: Starting Development Server
+DESCRIPTION: Command to start the development server for the Next.js application.
+
+LANGUAGE: bash
+CODE:
+npm run dev
+
+----------------------------------------
+
+TITLE: Installing Upstash Workflow SDK with Package Managers
+DESCRIPTION: Commands for installing the @upstash/workflow package using different package managers (npm, pnpm, bun).
+
+LANGUAGE: bash
+CODE:
+npm install @upstash/workflow
+
+LANGUAGE: bash
+CODE:
+pnpm install @upstash/workflow
+
+LANGUAGE: bash
+CODE:
+bun add @upstash/workflow
+
+----------------------------------------
+
+TITLE: Installing Upstash Workflow SDK with Package Managers
+DESCRIPTION: Commands to install the Upstash Workflow SDK using different package managers (npm, pnpm, bun).
+
+LANGUAGE: bash
+CODE:
+npm install @upstash/workflow
+
+LANGUAGE: bash
+CODE:
+pnpm install @upstash/workflow
+
+LANGUAGE: bash
+CODE:
+bun add @upstash/workflow
+
+----------------------------------------
+
+TITLE: Configuring Environment Variables for Local Tunnel
+DESCRIPTION: Example of .dev.vars file content for using a local tunnel to connect to production QStash.
+
+LANGUAGE: txt
+CODE:
+QSTASH_TOKEN="***"
+UPSTASH_WORKFLOW_URL=<UPSTASH_WORKFLOW_URL>
+
+----------------------------------------
+
+TITLE: Configuring Environment Variables for Local QStash Server
+DESCRIPTION: Example of environment variables setup for using a local QStash server during development.
+
+LANGUAGE: txt
+CODE:
+QSTASH_URL="http://127.0.0.1:8080"
+QSTASH_TOKEN=<QSTASH_TOKEN>
+
+----------------------------------------
+
+TITLE: Local Tunnel Environment Configuration
+DESCRIPTION: Environment variable setup for using a local tunnel with production QStash
+
+LANGUAGE: txt
+CODE:
+QSTASH_TOKEN="***"
+UPSTASH_WORKFLOW_URL=<UPSTASH_WORKFLOW_URL>
+
+----------------------------------------
+
+TITLE: Installing Upstash Workflow SDK
+DESCRIPTION: Commands for installing the Upstash Workflow package using different package managers
+
+LANGUAGE: bash
+CODE:
+npm install @upstash/workflow
+
+LANGUAGE: bash
+CODE:
+pnpm install @upstash/workflow
+
+LANGUAGE: bash
+CODE:
+bun add @upstash/workflow
+
+----------------------------------------
+
+TITLE: Creating a New Next.js Project
+DESCRIPTION: Command to create a new Next.js project using create-next-app.
+
+LANGUAGE: bash
+CODE:
+npx create-next-app@latest [project-name] [options]
+
+----------------------------------------
+
+TITLE: Customizing Type Definitions for Resend API Calls
+DESCRIPTION: Example of how to override default types for request and response bodies when using context.api.resend.call with custom type parameters.
+
+LANGUAGE: typescript
+CODE:
+type IsBatch = true; // Set to either true or false
+type ResponseBodyType = { ... }; // Define your response body type
+type RequestBodyType = { ... };  // Define your request body type
+
+const { status, body } = await context.api.resend.call<
+  IsBatch,
+  ResponseBodyType,
+  RequestBodyType
+>(
+  "Call Resend",
+  {
+    ...
+  }
+);
+
+----------------------------------------
+
+TITLE: Advanced Implementation with Tool Support
+DESCRIPTION: Extended workflow implementation that includes tool support for weather information, demonstrating how to implement custom tools with proper step management and error handling.
+
+LANGUAGE: typescript
+CODE:
+import { z } from 'zod';
+import { serve } from "@upstash/workflow/nextjs";
+import { WorkflowAbort } from '@upstash/workflow';
+import { generateText, ToolExecutionError, tool } from 'ai';
+
+import { createWorkflowOpenAI } from './model';
+
+export const { POST } = serve<{ prompt: string }>(async (context) => {
+  const openai = createWorkflowOpenAI(context);
+
+  const prompt = await context.run("get prompt", async () => {
+    return context.requestPayload.prompt;
+  });
+
+  try {
+    const result = await generateText({
+      model: openai('gpt-3.5-turbo'),
+      tools: {
+        weather: tool({
+          description: 'Get the weather in a location',
+          parameters: z.object({
+            location: z.string().describe('The location to get the weather for'),
+          }),
+          execute: ({ location }) => context.run("weather tool", () => {
+            return {
+              location,
+              temperature: 72 + Math.floor(Math.random() * 21) - 10,
+            };
+          })
+        }),
+      },
+      maxSteps: 2,
+      prompt,
+    });
+    
+    await context.run("text", () => {
+      console.log(`TEXT: ${result.text}`);
+      return result.text;
+    });
+  } catch (error) {
+    if (error instanceof ToolExecutionError && error.cause instanceof WorkflowAbort) {
+      throw error.cause;
+    } else {
+      throw error;
+    }
+  }
+});
+
+----------------------------------------
+
+TITLE: Cancelling Workflow with cURL
+DESCRIPTION: Cancel a workflow run using a DELETE HTTP request with cURL. Requires authentication via bearer token.
+
+LANGUAGE: shell
+CODE:
+curl -XDELETE https://qstash.upstash.io/v2/workflows/runs/wfr_TzazoUCuZmFGp2u9cdy5K \
+  -H "Authorization: Bearer <token>"

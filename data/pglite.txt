@@ -1,0 +1,2376 @@
+TITLE: Importing PGlite Constructor in TypeScript
+DESCRIPTION: Shows how to import the PGlite constructor from the '@electric-sql/pglite' package to create a new database instance.
+
+LANGUAGE: typescript
+CODE:
+import { PGlite } from '@electric-sql/pglite'
+
+----------------------------------------
+
+TITLE: Creating In-Memory PGlite Database in Browser
+DESCRIPTION: Example of creating an in-memory Postgres database instance in the browser using PGlite. This shows how to initialize the database and execute a basic query.
+
+LANGUAGE: javascript
+CODE:
+const db = new PGlite()
+await db.query("select 'Hello world' as message;")
+// -> { rows: [ { message: "Hello world" } ] }
+
+----------------------------------------
+
+TITLE: Creating tables and inserting data with PGlite's exec method
+DESCRIPTION: Example of using the .exec method to create a todo table and insert test data. This method supports multiple SQL statements and is ideal for migrations and batch operations.
+
+LANGUAGE: js
+CODE:
+await db.exec(`
+  CREATE TABLE IF NOT EXISTS todo (
+    id SERIAL PRIMARY KEY,
+    task TEXT,
+    done BOOLEAN DEFAULT false
+  );
+  INSERT INTO todo (task, done) VALUES ('Install PGlite from NPM', true);
+  INSERT INTO todo (task, done) VALUES ('Load PGlite', true);
+  INSERT INTO todo (task, done) VALUES ('Create a table', true);
+  INSERT INTO todo (task, done) VALUES ('Insert some data', true);
+  INSERT INTO todo (task) VALUES ('Update a task');
+`)
+
+----------------------------------------
+
+TITLE: Basic PGlite Usage in JavaScript
+DESCRIPTION: Demonstrates importing PGlite and executing a simple SQL query to create an in-memory PostgreSQL database. The query returns 'Hello world' as a message demonstrating successful connection.
+
+LANGUAGE: javascript
+CODE:
+import { PGlite } from "@electric-sql/pglite";
+
+const db = new PGlite();
+await db.query("select 'Hello world' as message;");
+// -> { rows: [ { message: "Hello world" } ] }
+
+----------------------------------------
+
+TITLE: Basic PGlite Usage in JavaScript
+DESCRIPTION: Demonstrates how to import the PGlite library and execute a simple SQL query with an in-memory database instance. The example shows the minimal code needed to initialize PGlite and run a test query.
+
+LANGUAGE: javascript
+CODE:
+import { PGlite } from "@electric-sql/pglite";
+
+const db = new PGlite();
+await db.query("select 'Hello world' as message;");
+// -> { rows: [ { message: "Hello world" } ] }
+
+----------------------------------------
+
+TITLE: Executing Parameterized Queries in PGlite
+DESCRIPTION: Shows how to execute a parameterized query using the query method. This example inserts a value into a table using a parameter and returns the affected rows count.
+
+LANGUAGE: typescript
+CODE:
+await pg.query('INSERT INTO test (name) VALUES ($1);', ['test'])
+// { affectedRows: 1 },
+
+----------------------------------------
+
+TITLE: Initializing in-memory PGlite database in the browser
+DESCRIPTION: Code to create a new in-memory Postgres database instance in a browser environment.
+
+LANGUAGE: js
+CODE:
+const db = new PGlite()
+
+----------------------------------------
+
+TITLE: Initializing IndexedDB-persisted PGlite database in the browser
+DESCRIPTION: Code to create a new PGlite database instance that persists data to IndexedDB in a browser environment.
+
+LANGUAGE: js
+CODE:
+const db = new PGlite('idb://my-pgdata')
+
+----------------------------------------
+
+TITLE: Using the usePGlite Hook for Database Access
+DESCRIPTION: Shows how to retrieve the PGlite instance within a component using the usePGlite hook and execute database queries. This example demonstrates inserting a record into a table through a button click.
+
+LANGUAGE: typescript
+CODE:
+import { usePGlite } from "@electric-sql/pglite-react"
+
+const MyComponent = () => {
+  const db = usePGlite()
+
+  const insertItem = () => {
+    db.query("INSERT INTO my_table (name, number) VALUES ('Arthur', 42);")
+  }
+
+  return (
+    <>
+      <button onClick={insertItem}
+    </>
+  )
+}
+
+----------------------------------------
+
+TITLE: Setting Up PGlite with IndexedDB Filesystem in TypeScript
+DESCRIPTION: Shows how to configure PGlite to use IndexedDB for persistence in browser environments, storing database files in IndexedDB and loading them into memory on start.
+
+LANGUAGE: typescript
+CODE:
+const pg = new PGlite('idb://my-database')
+
+LANGUAGE: typescript
+CODE:
+import { IdbFs } from '@electric-sql/pglite'
+const pg = new PGlite({
+  fs: new IdbFs('my-database'),
+})
+
+----------------------------------------
+
+TITLE: Using Tagged Template Queries in PGlite
+DESCRIPTION: Example demonstrating how to use tagged template literals for SQL queries in PGlite. Includes examples of using identifier, raw, sql, and query template helpers to construct and parameterize SQL queries.
+
+LANGUAGE: typescript
+CODE:
+import { identifier, raw, sql, query } from '@electric-sql/pglite/template'
+
+await pg.sql`SELECT * FROM ${identifier`test`} WHERE name = ${'test'}`
+// equivalent of pg.query('SELECT * FROM "test" WHERE name = $1', ['test'])
+
+const filterStmt = (filterVar?: string) =>
+  filterVar ? sql`WHERE name = ${filterVar}` : raw`WHERE 1=1`
+
+await pg.sql`SELECT * FROM test ${filterStmt('test')}`
+// equivalent of pg.query('SELECT * FROM "test" WHERE name = $1', ['test'])
+await pg.sql`SELECT * FROM test ${filterStmt(null)}`
+// equivalent of pg.query('SELECT * FROM "test" WHERE 1=1, [])
+
+query`SELECT * FROM ${identifier`test`} WHERE name = ${'test'}`
+// { query: 'SELECT * FROM "test" WHERE name = $1', params: ['test'] }
+
+----------------------------------------
+
+TITLE: Using useLiveQuery for Reactive Database Queries
+DESCRIPTION: Demonstrates how to use the useLiveQuery hook to reactively update a component when query results change. This example fetches and displays items from a table with a filter condition, automatically re-rendering when the database changes.
+
+LANGUAGE: typescript
+CODE:
+import { useLiveQuery } from '@electric-sql/pglite-react'
+
+const MyComponent = () => {
+  const maxNumber = 100
+  const items = useLiveQuery(`
+    SELECT *
+    FROM my_table
+    WHERE number <= $1
+    ORDER BY number;
+  `, [maxNumber])
+
+  return (
+    <>
+      {
+        items.map((item) =>
+          <MyItem item={item} />
+        )
+      }
+    </>
+  )
+}
+
+----------------------------------------
+
+TITLE: Managing Transactions in PGlite
+DESCRIPTION: Demonstrates using the transaction method to execute multiple queries within a transaction context. The transaction automatically commits on success or rolls back on error.
+
+LANGUAGE: typescript
+CODE:
+await pg.transaction(async (tx) => {
+  await tx.query(
+    'INSERT INTO test (name) VALUES ('$1');',
+    [ 'test' ]
+  );
+  return await ts.query('SELECT * FROM test;');
+});
+
+----------------------------------------
+
+TITLE: Using Basic Live Query
+DESCRIPTION: Example of using the live.query method to subscribe to query results. This method reruns the query whenever underlying tables change and invokes a callback with updated results.
+
+LANGUAGE: javascript
+CODE:
+const ret = pg.live.query('SELECT * FROM test ORDER BY rand;', [], (res) => {
+  // res is the same as a standard query result object
+})
+
+----------------------------------------
+
+TITLE: Using Low-Level Changes API
+DESCRIPTION: Demonstrates using the live.changes method to directly receive change events (inserts, updates, deletes). This low-level API powers the incrementalQuery functionality.
+
+LANGUAGE: typescript
+CODE:
+const ret = pg.live.changes(
+  'SELECT * FROM test ORDER BY rand;',
+  [],
+  'id',
+  (res) => {
+    // res is a change result object
+  },
+)
+
+----------------------------------------
+
+TITLE: Configuring TypeORM with PGlite in JavaScript
+DESCRIPTION: Example showing how to set up a TypeORM DataSource with PGlite as the underlying database driver, including how to access the internal PGlite instance.
+
+LANGUAGE: javascript
+CODE:
+import { PGliteDriver, getPGliteInstance } from 'typeorm-pglite'
+import { DataSource } from 'typeorm'
+
+const PGliteDataSource = new DataSource({
+  type: 'postgres',
+  driver: new PGliteDriver().driver,
+})
+
+// You can access the internal PGlite instance using getPGliteInstance function
+const pgliteDb = await getPGliteInstance()
+
+----------------------------------------
+
+TITLE: Using PGlite with In-Memory Database in Node/Bun/Deno
+DESCRIPTION: Demonstrates importing PGlite and creating an in-memory PostgreSQL database in Node.js, Bun, or Deno environments.
+
+LANGUAGE: javascript
+CODE:
+import { PGlite } from "@electric-sql/pglite";
+
+const db = new PGlite();
+await db.query("select 'Hello world' as message;");
+// -> { rows: [ { message: "Hello world" } ] }
+
+----------------------------------------
+
+TITLE: Creating Persistent PGlite Database with IndexedDB
+DESCRIPTION: Demonstrates how to create a persistent Postgres database in the browser using PGlite with IndexedDB storage. The database will be stored with the provided identifier.
+
+LANGUAGE: javascript
+CODE:
+const db = new PGlite("idb://my-pgdata");
+
+----------------------------------------
+
+TITLE: Creating Persistent PGlite Database with Filesystem
+DESCRIPTION: Shows how to create a persistent Postgres database in Node.js, Bun, or Deno environments using PGlite with filesystem storage. The database files will be stored at the specified path.
+
+LANGUAGE: javascript
+CODE:
+const db = new PGlite("./path/to/pgdata");
+
+----------------------------------------
+
+TITLE: Using PostgreSQL Notifications with listen()
+DESCRIPTION: Shows how to subscribe to PostgreSQL notification channels using the listen method. This example registers a callback that processes notifications sent to the 'test' channel.
+
+LANGUAGE: typescript
+CODE:
+const unsub = await pg.listen('test', (payload) => {
+  console.log('Received:', payload)
+})
+await pg.query("NOTIFY test, 'Hello, world!'");
+
+----------------------------------------
+
+TITLE: Integrating Drizzle ORM with PGlite in TypeScript
+DESCRIPTION: Example of how to initialize a Drizzle ORM instance with PGlite as the database client, allowing you to use Drizzle's query capabilities with PGlite.
+
+LANGUAGE: typescript
+CODE:
+import { PGlite } from '@electric-sql/pglite';
+import { drizzle } from 'drizzle-orm/pglite';
+
+const client = new PGlite();
+const db = drizzle(client);
+
+await db.select().from(...);
+
+----------------------------------------
+
+TITLE: Working with Blobs in PGlite
+DESCRIPTION: Examples showing how to import and export data using the virtual /dev/blob device in PGlite with the COPY TO/FROM commands. This allows importing data from Blobs and exporting query results as Blobs.
+
+LANGUAGE: typescript
+CODE:
+await pg.query("COPY my_table FROM '/dev/blob';", [], {
+  blob: MyBlob,
+})
+
+LANGUAGE: typescript
+CODE:
+const ret = await pg.query("COPY my_table TO '/dev/blob';")
+// ret.blob is a `Blob` object with the data from the copy.
+
+----------------------------------------
+
+TITLE: Syncing Multiple Tables with Transactional Consistency
+DESCRIPTION: Implementation of the multi-table sync API, showing how to synchronize data from multiple tables while maintaining transactional consistency across tables.
+
+LANGUAGE: typescript
+CODE:
+const sync = await pg.electric.syncShapesToTables({
+  shapes: {
+    todos: {
+      shape: {
+        url: 'http://localhost:3000/v1/shape',
+        params: { table: 'todo' },
+      },
+      table: 'todo',
+      primaryKey: ['id'],
+    },
+    users: {
+      shape: {
+        url: 'http://localhost:3000/v1/shape',
+        params: { table: 'users' },
+      },
+      table: 'users',
+      primaryKey: ['id'],
+    },
+  },
+  key: 'my-sync', // or null if the sync state does not need to be persisted
+  onInitialSync: () => {
+    console.log('Initial sync complete')
+  },
+})
+
+// Stop syncing when done
+sync.unsubscribe()
+
+----------------------------------------
+
+TITLE: Setting Up PGlite with ElectricSQL Sync Plugin
+DESCRIPTION: Example showing how to initialize PGlite with the ElectricSQL sync plugin and create a table schema for syncing data.
+
+LANGUAGE: typescript
+CODE:
+import { electricSync } from '@electric-sql/pglite-sync'
+
+const pg = await PGlite.create({
+  extensions: {
+    electric: electricSync(),
+  },
+})
+
+await pg.exec(`
+  CREATE TABLE IF NOT EXISTS todo (
+    id SERIAL PRIMARY KEY,
+    task TEXT,
+    done BOOLEAN
+  );
+`)
+
+----------------------------------------
+
+TITLE: Setting Up PGliteProvider in React
+DESCRIPTION: Demonstrates how to initialize a PGlite database with the live extension and provide it to the React component tree using PGliteProvider. This setup enables child components to access the database through various hooks.
+
+LANGUAGE: typescript
+CODE:
+import { PGlite } from "@electric-sql/pglite"
+import { live } from "@electric-sql/pglite/live"
+import { PGliteProvider } from "@electric-sql/pglite-react"
+
+const db = await PGlite.create({
+  extensions: { live }
+})
+
+const App = () => {
+  // ...
+
+  return (
+    <PGliteProvider db={db}>
+      // ...
+    </PGliteProvider>
+  )
+}
+
+----------------------------------------
+
+TITLE: Setting up PGlite with Vue using providePGlite
+DESCRIPTION: Demonstrates how to initialize a PGlite database instance and provide it to all child components using Vue's provide/inject pattern.
+
+LANGUAGE: vue
+CODE:
+<script lang="ts" setup>
+import { PGlite } from '@electric-sql/pglite'
+import { providePGlite } from '@electric-sql/pglite-vue'
+
+const db = new PGlite()
+providePGlite(db)
+</script>
+// ...
+
+----------------------------------------
+
+TITLE: Creating a File-Based Persistent PostgreSQL Database
+DESCRIPTION: Shows how to create a persistent PostgreSQL database that stores data in the filesystem, which works in Node.js, Bun, and Deno environments.
+
+LANGUAGE: javascript
+CODE:
+const db = new PGlite("./path/to/pgdata");
+
+----------------------------------------
+
+TITLE: Setting up Knex.js with PGlite in JavaScript
+DESCRIPTION: Example of how to configure a Knex.js instance to work with PGlite using the ClientPgLite adapter, establishing a connection to an IndexedDB-backed PostgreSQL database.
+
+LANGUAGE: javascript
+CODE:
+import { knex } from 'knex'
+import ClientPgLite from 'knex-pglite'
+
+export const db = knex({
+  client: ClientPgLite,
+  dialect: 'postgres',
+  connection: { connectionString: 'idb://my-database' },
+})
+
+----------------------------------------
+
+TITLE: Implementing Windowed Live Queries
+DESCRIPTION: Shows how to implement pagination using the offset and limit options with live.query. This approach efficiently transfers only the rows in the current window and tracks total count separately.
+
+LANGUAGE: javascript
+CODE:
+const ret = pg.live.query({
+  query: 'SELECT * FROM test ORDER BY rand;',
+  offset: 0,
+  limit: 10,
+  callback: (res) => {
+    // res includes:
+    // - rows: the rows for the current window
+    // - offset: the current offset
+    // - limit: the current limit
+    // - totalCount: total number of rows in the full result set
+  },
+})
+
+----------------------------------------
+
+TITLE: Using Incremental Live Queries
+DESCRIPTION: Example of using live.incrementalQuery which maintains state in a temporary table and only transfers changes between query executions. Requires a key column for tracking differences.
+
+LANGUAGE: typescript
+CODE:
+const ret = pg.live.incrementalQuery(
+  'SELECT * FROM test ORDER BY rand;',
+  [],
+  'id',
+  (res) => {
+    // res is the same as a standard query result object
+  },
+)
+
+----------------------------------------
+
+TITLE: Using SQL Tagged Template Literals in PGlite
+DESCRIPTION: Demonstrates using the SQL tagged template literal for creating parameterized queries. This provides a more readable way to include parameters directly in the query.
+
+LANGUAGE: typescript
+CODE:
+await pg.sql`SELECT * FROM test WHERE name = ${'test'}`
+// equivalent of pg.query('SELECT * FROM test WHERE name = $1', ['test'])
+
+----------------------------------------
+
+TITLE: Executing Multiple SQL Statements with exec()
+DESCRIPTION: Shows how to execute multiple SQL statements in a single call using the exec method. This example creates a table, inserts data, and queries it, returning results for each statement.
+
+LANGUAGE: typescript
+CODE:
+await pg.exec(`
+  CREATE TABLE IF NOT EXISTS test (
+    id SERIAL PRIMARY KEY,
+    name TEXT
+  );
+  INSERT INTO test (name) VALUES ('test');
+  SELECT * FROM test;
+`)
+// [
+//   { affectedRows: 0 },
+//   { affectedRows: 1 },
+//   {
+//     rows: [
+//       { id: 1, name: 'test' }
+//     ]
+//     affectedRows: 0,
+//     fields: [
+//       { name: 'id', dataTypeID: '23' },
+//       { name: 'name', dataTypeID: '25' },
+//     ]
+//   }
+// ]
+
+----------------------------------------
+
+TITLE: Describing Query Types in PGlite
+DESCRIPTION: Example showing how to use the describeQuery method to get type information about a query's parameters and result fields without executing it. This returns details about parameter data types and result field structures.
+
+LANGUAGE: typescript
+CODE:
+await pg.describeQuery('SELECT * FROM test WHERE name = $1', ['test'])
+
+// returns:
+{
+  queryParams: [{ dataTypeID: 25, serializer: Function }],
+  resultFields: [{ name: "id", dataTypeID: 23, parser: Function }],
+}
+
+----------------------------------------
+
+TITLE: Configuring Custom Type Parsers in PGlite
+DESCRIPTION: Demonstrates how to create a PGlite instance with custom parsers that transform data as it's retrieved from the database. This example shows converting text values to uppercase.
+
+LANGUAGE: typescript
+CODE:
+import { PGlite, types } from '@electric-sql/pglite'
+
+const pg = await PGlite.create({
+  parsers: {
+    [types.TEXT]: (value) => value.toUpperCase(),
+  },
+})
+
+----------------------------------------
+
+TITLE: Loading PGlite Extensions
+DESCRIPTION: Demonstrates how to load extensions like live queries and vector support when creating a PGlite instance. The example shows importing extensions and making them available on the PGlite instance.
+
+LANGUAGE: typescript
+CODE:
+import { PGlite } from '@electric-sql/pglite'
+import { live } from '@electric-sql/pglite/live'
+import { vector } from '@electric-sql/pglite/vector'
+
+const pg = await PGlite.create({
+  extensions: {
+    live, // Live query extension, is a PGlite client plugin
+    vector, // Postgres pgvector extension
+  },
+})
+
+// The `live` namespace is added by the use of the
+// `live` key in the `extensions` object.
+pg.live.query('...')
+
+----------------------------------------
+
+TITLE: Configuring Custom Type Serializers in PGlite
+DESCRIPTION: Shows how to set up custom serializers that transform data before it's stored in the database. This example converts numeric values to strings during serialization.
+
+LANGUAGE: typescript
+CODE:
+import { PGlite, types } from '@electric-sql/pglite'
+
+const pg = await PGlite.create({
+  serializers: {
+    [types.NUMERIC]: (value) => value.toString(),
+  },
+})
+
+----------------------------------------
+
+TITLE: Creating PGlite Worker File
+DESCRIPTION: Creates a worker file that initializes and exposes a PGlite instance to all tabs. The worker wrapper receives an init function that returns a new PGlite instance.
+
+LANGUAGE: javascript
+CODE:
+// my-pglite-worker.js
+import { PGlite } from '@electric-sql/pglite'
+import { worker } from '@electric-sql/pglite/worker'
+
+worker({
+  async init() {
+    // Create and return a PGlite instance
+    return new PGlite()
+  },
+})
+
+----------------------------------------
+
+TITLE: Using useLiveIncrementalQuery for Efficient Reactive Queries
+DESCRIPTION: Demonstrates the useLiveIncrementalQuery hook for efficiently tracking database changes with diffing support. This approach requires a key column identifier to optimize the diffing process when query results change.
+
+LANGUAGE: typescript
+CODE:
+import { useLiveIncrementalQuery } from '@electric-sql/pglite-react'
+
+const MyComponent = () => {
+  const maxNumber = 100
+  const items = useLiveIncrementalQuery(`
+    SELECT *
+    FROM my_table
+    WHERE number <= $1
+    ORDER BY number;
+  `, [maxNumber], 'id')
+
+  return (
+    <>
+      {
+        items.map((item) =>
+          <MyItem item={item} />
+        )
+      }
+    </>
+  )
+}
+
+----------------------------------------
+
+TITLE: Creating Typed PGliteWorker with Extensions
+DESCRIPTION: Uses the static create method to initialize a PGliteWorker with proper TypeScript types for any extensions. This approach ensures type safety when using extension namespaces like live queries.
+
+LANGUAGE: typescript
+CODE:
+import { PGliteWorker } from '@electric-sql/pglite/worker'
+import { live } from '@electric-sql/pglite/live'
+
+const pg = await PGliteWorker.create(
+  new Worker(new URL('./my-pglite-worker.js', import.meta.url), {
+    type: 'module',
+  }),
+  {
+    extensions: {
+      live,
+    },
+  },
+)
+
+// TypeScript is aware of the `pg.live` namespace:
+pg.live.query(/* ... */)
+
+----------------------------------------
+
+TITLE: Implementing PGlite with OPFS AHP Filesystem in TypeScript
+DESCRIPTION: Shows how to use the Origin Private Filesystem (OPFS) with access handle pooling for PGlite in Web Worker contexts, providing efficient synchronous file access in supported browsers.
+
+LANGUAGE: typescript
+CODE:
+const pg = new PGlite('opfs-ahp://path/to/datadir/')
+
+LANGUAGE: typescript
+CODE:
+import { OpfsAhpFS } from '@electric-sql/pglite/opfs-ahp'
+const pg = new PGlite({
+  fs: new OpfsAhpFS('./path/to/datadir/'),
+})
+
+----------------------------------------
+
+TITLE: Change Type Definitions for live.changes
+DESCRIPTION: TypeScript type definitions for the Change objects returned by live.changes, including insert, delete, and update operations with metadata about changed columns and positioning.
+
+LANGUAGE: typescript
+CODE:
+type ChangeInsert<T> = {
+  __changed_columns__: string[]
+  __op__: 'INSERT'
+  __after__: number
+} & T
+
+type ChangeDelete<T> = {
+  __changed_columns__: string[]
+  __op__: 'DELETE'
+  __after__: undefined
+} & T
+
+type ChangeUpdate<T> = {
+  __changed_columns__: string[]
+  __op__: 'UPDATE'
+  __after__: number
+} & T
+
+type Change<T> = ChangeInsert<T> | ChangeDelete<T> | ChangeUpdate<T>
+
+----------------------------------------
+
+TITLE: Configuring PGlite with Node.js Filesystem in TypeScript
+DESCRIPTION: Demonstrates how to initialize PGlite with the Node.js filesystem that provides persistence through the Node.js file system API, available in both Node and Bun environments.
+
+LANGUAGE: typescript
+CODE:
+const pg = new PGlite('./path/to/datadir/')
+
+LANGUAGE: typescript
+CODE:
+import { NodeFS } from '@electric-sql/pglite'
+const pg = new PGlite({
+  fs: new NodeFS('./path/to/datadir/'),
+})
+
+----------------------------------------
+
+TITLE: Using Query Options with Custom Parsers
+DESCRIPTION: Demonstrates using query-specific parsers that override instance-level parsers. This example shows how to transform text values to uppercase for a specific query only.
+
+LANGUAGE: typescript
+CODE:
+import { types } from '@electric-sql/pglite'
+await pg.query(`SELECT * FROM test WHERE name = $1;`, ['test'], {
+  parsers: {
+    [types.TEXT]: (value) => value.toUpperCase(),
+  },
+})
+
+----------------------------------------
+
+TITLE: Syncing Multiple Tables with ElectricSQL in PGlite
+DESCRIPTION: Example of using the syncShapesToTables method to synchronize multiple tables simultaneously between PGlite and ElectricSQL. This approach ensures consistency across related tables by syncing updates within a single transaction.
+
+LANGUAGE: typescript
+CODE:
+const sync = await pg.electric.syncShapesToTables({
+  shapes: {
+    todos: {
+      shape: { url: 'http://localhost:3000/v1/shape', table: 'todo' },
+      table: 'todo',
+      primaryKey: ['id'],
+    },
+    users: {
+      shape: { url: 'http://localhost:3000/v1/shape', table: 'users' },
+      table: 'users',
+      primaryKey: ['id'],
+    }
+  },
+  key: 'my-sync', // or null if the sync state does not need to be persisted
+  onInitialSync: () => {
+    console.log('Initial sync complete')
+  }
+})
+
+// Unsubscribe when done
+sync.unsubscribe()
+
+----------------------------------------
+
+TITLE: Using Query Options with Custom Serializers
+DESCRIPTION: Shows how to use query-specific serializers that override instance-level serializers. This example converts numeric values to strings for a specific insert query.
+
+LANGUAGE: typescript
+CODE:
+import { types } from '@electric-sql/pglite'
+await pg.query(`INSERT INTO test (numeric) VALUES ($1);`, [100n], {
+  serializers: {
+    [types.NUMERIC]: (value: number | bigint) => value.toString(),
+  },
+})
+
+----------------------------------------
+
+TITLE: Using PGlite REPL as a Web Component
+DESCRIPTION: Example of how to include and configure the PGlite REPL as a web component in an HTML page.
+
+LANGUAGE: html
+CODE:
+<script
+  src="https://cdn.jsdelivr.net/npm/@electric-sql/pglite-repl/dist-webcomponent/Repl.js"
+  type="module"
+></script>
+
+<!-- Include the Repl web component in your page -->
+<pglite-repl id="repl"></pglite-repl>
+
+<script type="module">
+  import { PGlite } from 'https://cdn.jsdelivr.net/npm/@electric-sql/pglite/dist/index.js'
+
+  // Create a PGlite instance
+  const pg = new PGlite()
+
+  // Retrieve the Repl element
+  const repl = document.getElementById('repl')
+
+  // REPL to your PGlite instance
+  repl.pg = pg
+</script>
+
+----------------------------------------
+
+TITLE: Using pgDump with PGlite in TypeScript
+DESCRIPTION: Example demonstrating how to use the pgDump function to export a PGlite database to a SQL file. The example creates a test table, inserts data, and then dumps the database contents to a file.
+
+LANGUAGE: typescript
+CODE:
+import { PGlite } from '@electric-sql/pglite'
+import { pgDump } from '@electric-sql/pglite-tools/pg_dump'
+
+const pg = await PGlite.create()
+
+// Create a table and insert some data
+await pg.exec(`
+  CREATE TABLE test (
+    id SERIAL PRIMARY KEY,
+    name TEXT
+  );
+`)
+await pg.exec(`
+  INSERT INTO test (name) VALUES ('test');
+`)
+
+// Dump the database to a file
+const dump = await pgDump({ pg })
+
+----------------------------------------
+
+TITLE: Integrating PGlite REPL in React
+DESCRIPTION: Example of how to import and use the PGlite REPL component in a React application.
+
+LANGUAGE: tsx
+CODE:
+import { PGlite } from '@electric-sql/pglite'
+import { Repl } from '@electric-sql/pglite-repl'
+
+function MyComponent() {
+  const pg = new PGlite()
+
+  return (
+    <>
+      <Repl pg={pg} />
+    </>
+  )
+}
+
+----------------------------------------
+
+TITLE: Configuring Next.js for PGlite Compatibility
+DESCRIPTION: Next.js configuration that adds PGlite packages to the transpilePackages array and disables SWC minification. This ensures Next.js correctly processes PGlite's code during the build process.
+
+LANGUAGE: javascript
+CODE:
+const nextConfig = {
+  swcMinify: false,
+  transpilePackages: [
+    '@electric-sql/pglite-react', // Optional
+    '@electric-sql/pglite',
+  ],
+}
+
+export default nextConfig
+
+----------------------------------------
+
+TITLE: Configuring Vite to Exclude PGlite from Dependency Optimization
+DESCRIPTION: A Vite configuration that excludes PGlite from dependency optimization to prevent bundling issues. This is necessary because PGlite may have specific dependencies that shouldn't be processed by Vite's optimizer.
+
+LANGUAGE: javascript
+CODE:
+import { defineConfig } from 'vite'
+
+export default defineConfig({
+  optimizeDeps: {
+    exclude: ['@electric-sql/pglite'],
+  },
+})
+
+----------------------------------------
+
+TITLE: Configuring Vite for PGlite Multi-tab Worker Support
+DESCRIPTION: Extended Vite configuration that both excludes PGlite from dependency optimization and sets the worker format to 'es' instead of the default 'iife'. This resolves production build errors when using the Multi-tab Worker feature.
+
+LANGUAGE: typescript
+CODE:
+import { defineConfig } from 'vite'
+
+export default defineConfig({
+  optimizeDeps: {
+    exclude: ['@electric-sql/pglite'],
+  },
+  worker: {
+    format: 'es',
+  },
+})
+
+----------------------------------------
+
+TITLE: LiveQueryReturn Interface Definition
+DESCRIPTION: TypeScript interface that defines the return value from live.query and live.incrementalQuery, including methods to unsubscribe and refresh the query.
+
+LANGUAGE: typescript
+CODE:
+interface LiveQueryReturn<T> {
+  initialResults: Results<T> & {
+    offset?: number // Current offset (if windowed)
+    limit?: number // Current limit (if windowed)
+    totalCount?: number // Total row count (if windowed)
+  }
+  unsubscribe: () => Promise<void>
+  refresh: (options?: { offset?: number; limit?: number }) => Promise<void>
+}
+
+----------------------------------------
+
+TITLE: Integrating PGlite REPL in a React Component
+DESCRIPTION: Example showing how to import and use the PGlite REPL component in a React application. It initializes a PGlite instance and renders the REPL component.
+
+LANGUAGE: tsx
+CODE:
+import { PGlite } from "@electric-sql/pglite";
+import { Repl } from "@electric-sql/pglite-repl";
+
+function MyComponent() {
+  const pg = new PGlite();
+
+  return <>
+    <Repl pg={pg} />
+  </>
+}
+
+----------------------------------------
+
+TITLE: LiveChangesReturn Interface Definition
+DESCRIPTION: TypeScript interface defining the return value from live.changes, including fields, initial changes, and methods to unsubscribe and refresh the query.
+
+LANGUAGE: typescript
+CODE:
+interface LiveChangesReturn<T = { [key: string]: any }> {
+  fields: { name: string; dataTypeID: number }[]
+  initialChanges: Array<Change<T>>
+  unsubscribe: () => Promise<void>
+  refresh: () => Promise<void>
+}
+
+----------------------------------------
+
+TITLE: Creating Typed PGliteProvider with Extensions
+DESCRIPTION: Demonstrates how to create a custom PGliteProvider with proper TypeScript typing for extensions. The makePGliteProvider function returns components that retain the type information for database extensions like live queries and vector support.
+
+LANGUAGE: typescript
+CODE:
+import { PGlite, PGliteInterfaceExtensions } from '@electric-sql/pglite'
+import { LiveNamespace } from '@electric-sql/pglite/live'
+import { VectorNamespace } from '@electric-sql/pglite/vector'
+import { makePGliteProvider } from '@electric-sql/pglite-react'
+
+const { PGliteProvider, usePGlite } = makePGliteProvider<
+  PGlite &
+    PGliteInterfaceExtensions<{
+      live: typeof live
+      vector: typeof vector
+    }>
+>()
+
+export { PGliteProvider, usePGlite }
+
+----------------------------------------
+
+TITLE: Connecting to PGlite Worker from Main Thread
+DESCRIPTION: Connects a PGliteWorker instance to the worker process from the main script. Creates a new Worker with the worker file URL and initializes PGliteWorker with it.
+
+LANGUAGE: javascript
+CODE:
+import { PGliteWorker } from '@electric-sql/pglite/worker'
+
+const pg = new PGliteWorker(
+  new Worker(new URL('./my-pglite-worker.js', import.meta.url), {
+    type: 'module',
+  }),
+)
+
+// `pg` has the same interface as a standard PGlite interface
+
+----------------------------------------
+
+TITLE: Creating typed dependency injectors with makePGliteDependencyInjector
+DESCRIPTION: Example of using makePGliteDependencyInjector to create typed versions of providePGlite and injectPGlite with extensions added to the PGlite instance.
+
+LANGUAGE: typescript
+CODE:
+import { PGlite, PGliteInterfaceExtensions } from '@electric-sql/pglite'
+import { live } from '@electric-sql/pglite/live'
+import { vector } from '@electric-sql/pglite/vector'
+import { makePGliteDependencyInjector } from '@electric-sql/pglite-vue'
+
+const { providePGlite, injectPGlite } = makePGliteDependencyInjector<
+  PGlite &
+    PGliteInterfaceExtensions<{
+      live: typeof live
+      vector: typeof vector
+    }>
+>()
+
+export { providePGlite, injectPGlite }
+
+----------------------------------------
+
+TITLE: Using useLiveQuery hook in a Vue component
+DESCRIPTION: Demonstrates how to use the useLiveQuery hook to reactively receive updates when query results change, with parameterized queries.
+
+LANGUAGE: vue
+CODE:
+<script lang="ts">
+import { useLiveQuery } from '@electric-sql/pglite-vue'
+
+const maxNumber = 100
+const items = useLiveQuery(
+  `
+    SELECT *
+    FROM my_table
+    WHERE number <= $1
+    ORDER BY number;
+  `,
+  [maxNumber],
+)
+</script>
+
+<template>
+  <MyItem v-for="item in items" :item="item" :key="item.id" />
+</template>
+
+----------------------------------------
+
+TITLE: Using injectPGlite in a Vue component
+DESCRIPTION: Shows how to retrieve a PGlite database instance in a child component using the injectPGlite function and perform queries.
+
+LANGUAGE: vue
+CODE:
+<script lang="ts" setup>
+import { onMounted, shallowRef } from 'vue'
+import { injectPGlite } from '@electric-sql/pglite-vue'
+
+const db = injectPGlite()
+
+const insertItem = () => {
+  db.query("INSERT INTO my_table (name, number) VALUES ('Arthur', 42);")
+}
+</script>
+
+<template>
+  // ...
+  <button @click="insertItem">Insert item</button>
+  // ...
+</template>
+
+----------------------------------------
+
+TITLE: Using useLiveQuery.sql with template literals
+DESCRIPTION: Shows how to use the SQL tagged template literal syntax with useLiveQuery for cleaner parameter embedding in queries.
+
+LANGUAGE: vue
+CODE:
+<script lang="ts">
+import { useLiveQuery } from '@electric-sql/pglite-vue'
+
+const maxNumber = 100
+const items = useLiveQuery.sql`
+  SELECT *
+  FROM my_table
+  WHERE number <= ${maxNumber}
+  ORDER BY number;
+`
+</script>
+// ...
+
+----------------------------------------
+
+TITLE: Defining PGlite Extension Interface in TypeScript
+DESCRIPTION: This code snippet defines the TypeScript interface for creating PGlite extensions. It shows the required structure including the name property, setup function, and the ExtensionSetupResult interface which specifies what the setup function should return.
+
+LANGUAGE: typescript
+CODE:
+export interface Extension {
+  name: string
+  setup: ExtensionSetup
+}
+
+export type ExtensionSetup = (
+  pg: PGliteInterface,
+  emscriptenOpts: any,
+  clientOnly?: boolean,
+) => Promise<ExtensionSetupResult>
+
+export interface ExtensionSetupResult {
+  emscriptenOpts?: any
+  namespaceObj?: any
+  bundlePath?: URL
+  init?: () => Promise<void>
+  close?: () => Promise<void>
+}
+
+----------------------------------------
+
+TITLE: PGlite REPL Props Interface
+DESCRIPTION: TypeScript interface defining the available props for the PGlite REPL React component.
+
+LANGUAGE: ts
+CODE:
+// The theme to use, auto is auto-switching based on the system
+type ReplTheme = 'light' | 'dark' | 'auto'
+
+interface ReplProps {
+  pg: PGlite // PGlite db instance
+  border?: boolean // Outer border on the component, defaults to false
+  lightTheme?: Extension
+  darkTheme?: Extension
+  theme?: ReplTheme // Defaults to "auto"
+}
+
+----------------------------------------
+
+TITLE: Filtering and Sorting Extensions in Vue
+DESCRIPTION: Computed property that filters extensions based on selected tag and sorts them with featured extensions first, then alphabetically by name.
+
+LANGUAGE: javascript
+CODE:
+const filteredExtensions = computed(() => {
+  return data.extensions
+    .filter((ext) => !selectedTag.value || ext.tags.includes(selectedTag.value))
+    .sort((a, b) => {
+      if (a.featured && !b.featured) return -1;
+      if (!a.featured && b.featured) return 1;
+      return a.name.localeCompare(b.name);
+    });
+});
+
+----------------------------------------
+
+TITLE: PGlite Extensions Page Template
+DESCRIPTION: Vue template that displays interactive extension list with tag filtering, extension details, and relevant links. Includes interactive buttons for tag selection and proper anchor links for each extension.
+
+LANGUAGE: html
+CODE:
+<div class="tags">
+  <button
+    v-for="tag in tags"
+    :key="tag.name"
+    @click="
+      selectedTag == tag.name ?
+        selectedTag = null :
+        selectedTag = tag.name
+    "
+    class="btn-tag"
+    :class="{ selected: tag.name === selectedTag }"
+  >
+    {{ tag.name }} <span class="count">{{ tag.count }}</span>
+  </button>
+</div>
+
+<div class="extension" v-for="ext in filteredExtensions">
+
+<h2
+  :id="slugify(ext.name)"
+  tabindex="-1"
+>
+  <a :href="mainLink(ext)">{{ ext.name }}</a>
+  <a 
+    class="header-anchor"
+    :href="`#${slugify(ext.name)}`"
+    :aria-label="`Permalink to ${ext.name}`"
+  >​</a>
+</h2>
+
+<div class="description" v-html="ext.descriptionHtml"></div>
+
+<div class="links">
+  <a 
+    v-if="ext.repo?.startsWith('https://github.com/')" 
+    :href="ext.repo"
+    target="_blank"
+  >Github</a>
+  <a v-else-if="ext.repo" :href="ext.repo" target="_blank">Repo</a>
+  <a v-if="ext.docs" :href="ext.docs" target="_blank">Documentation</a>
+  <a v-if="ext.homepage" :href="ext.homepage" target="_blank">Homepage</a>
+  <span class="bundle-size" v-if="ext.size">
+    Bundle Size: {{ formatSize(ext.size) }}
+  </span>
+</div>
+<div class="tags">
+  <span v-for="tag in ext.tags" :key="tag" class="tag">{{ tag }}</span>
+</div>
+
+</div>
+
+----------------------------------------
+
+TITLE: Installing PGlite and PGlite-React Packages
+DESCRIPTION: Command to install the PGlite and PGlite-React npm packages, which provide the database functionality and React integration respectively.
+
+LANGUAGE: bash
+CODE:
+$ pnpm install @electric-sql/pglite @electric-sql/pglite-react
+
+----------------------------------------
+
+TITLE: Vue Component Structure with Tag Filtering
+DESCRIPTION: Complete Vue setup script that imports data and defines reactive state and computed properties for the extension listing component.
+
+LANGUAGE: vue
+CODE:
+<script setup>
+import { computed, ref } from "vue";
+import { data } from "./extensions.data.ts";
+
+const filteredExtensions = computed(() => {
+  return data.extensions
+    .filter((ext) => !selectedTag.value || ext.tags.includes(selectedTag.value))
+    .sort((a, b) => {
+      if (a.featured && !b.featured) return -1;
+      if (!a.featured && b.featured) return 1;
+      return a.name.localeCompare(b.name);
+    });
+});
+
+function mainLink(ext) {
+  return ext.homepage || ext.repo || ext.docs;
+}
+
+function slugify(string) {
+  return string
+    .replace('/', '')
+    .replace(' ', '-')
+    .replace('_', '-')
+    .toLowerCase()
+}
+
+const tags = computed(() => {
+  return data.tags.map((tag) => {
+    return {
+      name: tag,
+      count: data.extensions.filter((ext) => ext.tags.includes(tag)).length,
+    }
+  })
+})
+
+function formatSize(bytes) {
+  const units = ['B', 'KB', 'MB', 'GB', 'TB', 'PB'];
+  let i = 0;
+
+  while (bytes >= 1024 && i < units.length - 1) {
+    bytes /= 1024;
+    i++;
+  }
+
+  return `${bytes.toFixed(1)} ${units[i]}`;
+}
+
+const selectedTag = ref(null)
+</script>
+
+----------------------------------------
+
+TITLE: Syncing a Single Table from Electric to PGlite
+DESCRIPTION: Implementation of the single table sync API, demonstrating how to synchronize data from a remote Electric database into a single PGlite table.
+
+LANGUAGE: typescript
+CODE:
+const shape = await pg.electric.syncShapeToTable({
+  shape: {
+    url: 'http://localhost:3000/v1/shape',
+    params: {
+      table: 'todo',
+    },
+  },
+  table: 'todo',
+  primaryKey: ['id'],
+  shapeKey: 'todo', // or null if the shape state does not need to be persisted
+})
+
+// Stop syncing when done
+shape.unsubscribe()
+
+----------------------------------------
+
+TITLE: Importing PGlite in the browser using a CDN
+DESCRIPTION: Code to import PGlite in a browser environment using the JSDeliver CDN.
+
+LANGUAGE: js
+CODE:
+import { PGlite } from 'https://cdn.jsdelivr.net/npm/@electric-sql/pglite/dist/index.js'
+
+----------------------------------------
+
+TITLE: Passing Options to PGlite Worker
+DESCRIPTION: Demonstrates how to pass options from the main thread to the worker process. Includes examples of both worker configuration and main thread initialization with options and metadata.
+
+LANGUAGE: javascript
+CODE:
+// my-pglite-worker.js
+import { PGlite } from '@electric-sql/pglite'
+import { worker } from '@electric-sql/pglite/worker'
+
+worker({
+  async init(options) {
+    const meta = options.meta
+    // Do something with additional metadata.
+    // or even run your own code in the leader along side the PGlite
+    return new PGlite({
+      dataDir: options.dataDir,
+    })
+  },
+})
+
+// my-app.js
+import { PGliteWorker } from '@electric-sql/pglite/worker'
+
+const pg = new PGliteWorker(
+  new Worker(new URL('./my-pglite-worker.js', import.meta.url), {
+    type: 'module',
+  }),
+  {
+    dataDir: 'idb://my-db',
+    meta: {
+      // additional metadata passed to `init`
+    },
+  },
+)
+
+----------------------------------------
+
+TITLE: Configuring Extensions in PGlite Worker
+DESCRIPTION: Shows how to add extension support inside the worker process. The example demonstrates registering the vector extension within the worker initialization function.
+
+LANGUAGE: javascript
+CODE:
+// my-pglite-worker.js
+import { PGlite } from '@electric-sql/pglite'
+import { worker } from '@electric-sql/pglite/worker'
+import { vector } from '@electric-sql/pglite/vector'
+
+worker({
+  async init() {
+    return new PGlite({
+      extensions: {
+        vector,
+      },
+    })
+  },
+})
+
+----------------------------------------
+
+TITLE: Installing Knex.js with PGlite using npm
+DESCRIPTION: Command to install Knex.js query builder along with PGlite and the third-party knex-pglite adapter using npm.
+
+LANGUAGE: bash
+CODE:
+npm i @electric-sql/pglite knex knex-pglite
+
+----------------------------------------
+
+TITLE: Using Plugin Extensions with PGliteWorker
+DESCRIPTION: Demonstrates how to use PGlite plugin extensions in the main thread with PGliteWorker. The example shows configuring the live queries extension on the worker instance.
+
+LANGUAGE: javascript
+CODE:
+import { PGliteWorker } from '@electric-sql/pglite/worker'
+import { live } from '@electric-sql/pglite/live'
+
+const pg = new PGliteWorker(
+  new Worker(new URL('./my-pglite-worker.js', import.meta.url), {
+    type: 'module',
+  }),
+  {
+    extensions: {
+      live,
+    },
+  },
+)
+
+----------------------------------------
+
+TITLE: Initializing in-memory PGlite database in Node/Bun/Deno
+DESCRIPTION: Code to import PGlite and create a new in-memory Postgres database instance.
+
+LANGUAGE: js
+CODE:
+import { PGlite } from '@electric-sql/pglite'
+
+const db = new PGlite()
+
+----------------------------------------
+
+TITLE: Installing PGlite in Node/Bun/Deno with pnpm
+DESCRIPTION: Command to install PGlite using pnpm package manager.
+
+LANGUAGE: bash
+CODE:
+pnpm install @electric-sql/pglite
+
+----------------------------------------
+
+TITLE: Installing PGlite in Node/Bun/Deno with yarn
+DESCRIPTION: Command to install PGlite using yarn package manager.
+
+LANGUAGE: bash
+CODE:
+yarn add @electric-sql/pglite
+
+----------------------------------------
+
+TITLE: Installing PGlite in Node/Bun/Deno with bun
+DESCRIPTION: Command to install PGlite using bun package manager.
+
+LANGUAGE: bash
+CODE:
+bun install @electric-sql/pglite
+
+----------------------------------------
+
+TITLE: Installing PGlite in Node/Bun/Deno with deno
+DESCRIPTION: Command to install PGlite using deno package manager.
+
+LANGUAGE: bash
+CODE:
+deno add npm:@electric-sql/pglite
+
+----------------------------------------
+
+TITLE: Initializing file-persisted PGlite database in Node/Bun/Deno
+DESCRIPTION: Code to create a new PGlite database instance that persists data to the native filesystem.
+
+LANGUAGE: js
+CODE:
+const db = new PGlite('./path/to/pgdata')
+
+----------------------------------------
+
+TITLE: Importing PGlite in the browser using a package manager
+DESCRIPTION: Code to import PGlite in a browser environment using a package manager.
+
+LANGUAGE: js
+CODE:
+import { PGlite } from '@electric-sql/pglite'
+
+----------------------------------------
+
+TITLE: Installing ElectricSQL PGlite Sync Plugin
+DESCRIPTION: Command to install the ElectricSQL sync plugin for PGlite using npm.
+
+LANGUAGE: sh
+CODE:
+npm install @electric-sql/pglite-sync
+
+----------------------------------------
+
+TITLE: Querying data with PGlite's query method
+DESCRIPTION: Example of using the .query method to retrieve data from the todo table. This method returns a result object with rows property containing the query results.
+
+LANGUAGE: js
+CODE:
+const ret = await db.query(`
+  SELECT * from todo WHERE id = 1;
+`)
+console.log(ret.rows)
+
+----------------------------------------
+
+TITLE: Using parameterized queries with PGlite
+DESCRIPTION: Example of using parameterized queries with PGlite's query method to safely update records with user-supplied values, preventing SQL injection.
+
+LANGUAGE: js
+CODE:
+const ret = await db.query(
+  'UPDATE todo SET task = $2, done = $3 WHERE id = $1',
+  [5, 'Update a task using parametrised queries', true],
+)
+
+----------------------------------------
+
+TITLE: Creating a New Vite Project with React and TypeScript
+DESCRIPTION: Command to initiate a new Vite project setup with React and TypeScript, which will be used as the foundation for integrating PGlite.
+
+LANGUAGE: bash
+CODE:
+$ pnpm create vite
+
+----------------------------------------
+
+TITLE: Importing PGlite in Browser Environments
+DESCRIPTION: Shows two ways to import the PGlite library in browser environments: using a package manager or directly from a CDN. This illustrates the flexibility in how PGlite can be included in web applications.
+
+LANGUAGE: javascript
+CODE:
+import { PGlite } from "@electric-sql/pglite";
+
+LANGUAGE: javascript
+CODE:
+import { PGlite } from "https://cdn.jsdelivr.net/npm/@electric-sql/pglite/dist/index.js";
+
+----------------------------------------
+
+TITLE: Installing PGlite in Node.js
+DESCRIPTION: Command to install PGlite library in a Node.js project using npm. This adds the dependency to the project's package.json.
+
+LANGUAGE: bash
+CODE:
+npm install @electric-sql/pglite
+
+----------------------------------------
+
+TITLE: Building PGlite from Source
+DESCRIPTION: Commands to clone the PGlite repository and install dependencies for building from source.
+
+LANGUAGE: bash
+CODE:
+git clone https://github.com/electric-sql/pglite
+cd pglite
+pnpm install
+
+----------------------------------------
+
+TITLE: Installing PGlite in Deno
+DESCRIPTION: Command to add PGlite as a dependency in a Deno project. This uses Deno's npm compatibility layer to install the npm package.
+
+LANGUAGE: bash
+CODE:
+deno add npm:@electric-sql/pglite
+
+----------------------------------------
+
+TITLE: Using PGlite In-Memory Database in Node/Bun/Deno
+DESCRIPTION: Example of creating and using an in-memory Postgres database in Node.js, Bun, or Deno environments. Shows how to import the library, initialize the database, and execute a query.
+
+LANGUAGE: javascript
+CODE:
+import { PGlite } from "@electric-sql/pglite";
+
+const db = new PGlite();
+await db.query("select 'Hello world' as message;");
+// -> { rows: [ { message: "Hello world" } ] }
+
+----------------------------------------
+
+TITLE: Installing PGlite REPL with npm
+DESCRIPTION: Command to install the PGlite REPL package using npm.
+
+LANGUAGE: bash
+CODE:
+npm install @electric-sql/pglite-repl
+
+----------------------------------------
+
+TITLE: Cloning and Setting Up PGlite Repository for Development
+DESCRIPTION: Commands to clone the PGlite repository with its submodules and install dependencies. Required to start contributing to the project or building from source.
+
+LANGUAGE: bash
+CODE:
+git clone --recurse-submodules https://github.com/electric-sql/pglite
+cd pglite
+pnpm install
+
+----------------------------------------
+
+TITLE: Building PGlite WASM Module
+DESCRIPTION: Command to build only the Postgres WASM module using Docker. This creates the core WebAssembly binaries needed by PGlite.
+
+LANGUAGE: bash
+CODE:
+pnpm wasm:build
+
+----------------------------------------
+
+TITLE: Installing Dependencies for PGlite React Example
+DESCRIPTION: Command to install the required dependencies for the PGlite React example, ignoring the workspace configuration since only the example project dependencies are needed.
+
+LANGUAGE: bash
+CODE:
+$ pnpm i --ignore-workspace
+
+----------------------------------------
+
+TITLE: Building All PGlite TypeScript Packages
+DESCRIPTION: Command to build all TypeScript packages in the PGlite project, including the client library. This builds the packages based on their dependency relationships.
+
+LANGUAGE: bash
+CODE:
+pnpm ts:build
+
+----------------------------------------
+
+TITLE: Creating a Changeset for PGlite Contributions
+DESCRIPTION: Command to create a changeset when contributing to PGlite. This is required for any code changes before submitting a PR.
+
+LANGUAGE: bash
+CODE:
+pnpm changeset
+
+----------------------------------------
+
+TITLE: Importing PGlite Worker with Vite
+DESCRIPTION: Example of importing a PGlite worker using Vite's ?worker import syntax. This demonstrates the proper way to create and configure a PGlite worker instance in a Vite project.
+
+LANGUAGE: typescript
+CODE:
+import PGWorker from './worker.js?worker'
+
+export const pglite = new PGliteWorker(
+  new PGWorker({
+    type: 'module',
+      name: 'pglite-worker',
+    }),
+    {
+      // ...your options here
+    }
+  },
+)
+
+----------------------------------------
+
+TITLE: Importing PGlite in the Browser
+DESCRIPTION: Shows two methods to import PGlite in a browser environment: using a package manager or using a CDN like JSDeliver.
+
+LANGUAGE: javascript
+CODE:
+import { PGlite } from "@electric-sql/pglite";
+
+LANGUAGE: javascript
+CODE:
+import { PGlite } from "https://cdn.jsdelivr.net/npm/@electric-sql/pglite/dist/index.js";
+
+----------------------------------------
+
+TITLE: Creating an In-Memory PostgreSQL Database in Browser
+DESCRIPTION: Shows how to initialize an in-memory PostgreSQL database in the browser and execute a simple query.
+
+LANGUAGE: javascript
+CODE:
+const db = new PGlite()
+await db.query("select 'Hello world' as message;")
+// -> { rows: [ { message: "Hello world" } ] }
+
+----------------------------------------
+
+TITLE: Installing PGlite in Bun
+DESCRIPTION: Command to install PGlite library in a Bun project. Bun is an alternative JavaScript runtime and package manager.
+
+LANGUAGE: bash
+CODE:
+bun install @electric-sql/pglite
+
+----------------------------------------
+
+TITLE: Creating a Persistent PostgreSQL Database with IndexedDB
+DESCRIPTION: Demonstrates how to create a persistent PostgreSQL database in the browser using IndexedDB for storage.
+
+LANGUAGE: javascript
+CODE:
+const db = new PGlite("idb://my-pgdata");
+
+----------------------------------------
+
+TITLE: Installing PGlite in Node.js
+DESCRIPTION: Command to install PGlite in a Node.js project using npm.
+
+LANGUAGE: bash
+CODE:
+npm install @electric-sql/pglite
+
+----------------------------------------
+
+TITLE: Example output from a PGlite query
+DESCRIPTION: Sample output returned from a PGlite query showing the structure of the results object with an array of row objects.
+
+LANGUAGE: js
+CODE:
+[
+  {
+    id: 1,
+    task: 'Install PGlite from NPM',
+    done: false,
+  },
+]
+
+----------------------------------------
+
+TITLE: Installing PGlite in Bun
+DESCRIPTION: Command to install PGlite in a Bun project.
+
+LANGUAGE: bash
+CODE:
+bun install @electric-sql/pglite
+
+----------------------------------------
+
+TITLE: Installing PGlite in Deno
+DESCRIPTION: Command to add PGlite as a dependency in a Deno project using npm specifier.
+
+LANGUAGE: bash
+CODE:
+deno add npm:@electric-sql/pglite
+
+----------------------------------------
+
+TITLE: Building TypeScript Packages for PGlite
+DESCRIPTION: Command to build all TypeScript packages in the PGlite project.
+
+LANGUAGE: bash
+CODE:
+pnpm ts:build
+
+----------------------------------------
+
+TITLE: Building a Single Package in PGlite
+DESCRIPTION: Commands to navigate to a specific package directory and build just that package.
+
+LANGUAGE: bash
+CODE:
+cd packages/pglite
+pnpm build
+
+----------------------------------------
+
+TITLE: Building the WASM Module for PGlite
+DESCRIPTION: Command to build only the PostgreSQL WASM module using Docker.
+
+LANGUAGE: bash
+CODE:
+pnpm wasm:build
+
+----------------------------------------
+
+TITLE: Setting up Vue Components and GitHub Star Counter
+DESCRIPTION: A Vue.js script that imports necessary components, sets up a client-side REPL component, and initializes a GitHub star counter with animation. It updates the star count display with a smooth counting animation effect.
+
+LANGUAGE: javascript
+CODE:
+import { onMounted } from 'vue'
+import { defineClientComponent } from 'vitepress'
+import { VPHomeHero } from 'vitepress/theme'
+import { data as initialStarCount } from './count.data.ts'
+import { starCount } from './components/starCount.ts'
+
+const Repl = defineClientComponent(() => {
+  return import('./components/Repl.vue')
+})
+
+onMounted(async () => {
+  if (typeof window !== 'undefined' && document.querySelector) {
+    const linkEl = document.querySelector('.action a[href="https://github.com/electric-sql/pglite"]')
+    let countEl = linkEl.querySelector('.count')
+    
+    if (!countEl) {
+      countEl = document.createElement('span')
+      countEl.classList.add('count')
+      countEl.innerText = `( ${initialStarCount.toLocaleString()} )`;
+
+      const icon = document.createElement('span')
+      icon.classList.add('vpi-social-github')
+      linkEl.prepend(icon)
+    }
+    
+    linkEl.append(countEl)
+
+    const count = await starCount(initialStarCount)
+
+    let currentCount = Math.max(count - 15, initialStarCount)
+    const animateCount = () => {
+      currentCount += 1;
+      if (currentCount >= count) {
+        currentCount = count;
+        clearInterval(intervalId);
+      }
+      countEl.innerText = `( ${currentCount.toLocaleString()} )`;
+    };
+    const intervalId = setInterval(animateCount, 64);
+  }
+});
+
+----------------------------------------
+
+TITLE: Creating a Changeset for Contributing to PGlite
+DESCRIPTION: Command to create a changeset when contributing to PGlite, which is required for pull requests that change code.
+
+LANGUAGE: bash
+CODE:
+pnpm changeset
+
+----------------------------------------
+
+TITLE: Styling GitHub Star Counter Button
+DESCRIPTION: CSS styles for the GitHub star counter button in the actions section. It defines the layout, spacing, and appearance of the GitHub icon and count display within the button.
+
+LANGUAGE: css
+CODE:
+.actions a[href="https://github.com/electric-sql/pglite"] {
+  display: flex;
+  align-items: center;
+}
+.actions a[href="https://github.com/electric-sql/pglite"] .vpi-social-github {
+  display: block;
+  width: 1.42rem;
+  height: 1.42rem;
+  margin: 0 0.5rem 0 0;
+  position: relative;
+}
+.actions a[href="https://github.com/electric-sql/pglite"] .count {
+  margin-left: 0.25rem;
+  min-width: 55px;
+}
+
+----------------------------------------
+
+TITLE: Styling Page Layout Components
+DESCRIPTION: CSS styles for the main page layout components including the demo sections, REPL container, and responsive design. It defines the layout for the demo videos, REPL playground, and responsive adjustments for different screen sizes.
+
+LANGUAGE: css
+CODE:
+.try-it-now,
+.postgres-new {
+  margin-top: 3rem;
+  display: flex;
+  flex-direction: column;
+}
+
+.try-it-now .repl {
+  display: block;
+  width: 100%;
+  margin-bottom: 1rem;
+  height: 350px;
+}
+
+.info {
+  text-align: center;
+}
+
+.postgres-new video {
+  display: block;
+  width: 100%;
+  border-radius: 12px;
+  margin-bottom: 1rem;
+  aspect-ratio: 1616 / 1080;
+}
+
+.link-btn {
+  border-color: var(--vp-button-alt-border);
+  color: var(--vp-button-alt-text);
+  background-color: var(--vp-button-alt-bg);
+  border-radius: 20px;
+  padding: 0 20px;
+  line-height: 38px;
+  font-size: 14.5px;
+  display: inline-block;
+  border: 1px solid transparent;
+  text-align: center;
+  font-weight: 600;
+  white-space: nowrap;
+  transition: color 0.25s, border-color 0.25s, background-color 0.25s;
+  text-decoration: none;
+}
+
+@media (min-width: 1000px) {
+  .row {
+    display: flex;
+  }
+
+  .try-it-now,
+  .postgres-new {
+    width: 50%;
+  }
+
+  .try-it-now {
+    padding-left: 1rem;
+  }
+
+  .postgres-new {
+    padding-right: 1rem;
+  }
+
+  .try-it-now .repl {
+    height: auto;
+    aspect-ratio: 1616 / 1080;
+  }
+}
+
+----------------------------------------
+
+TITLE: Starting the PGlite React Example Development Server
+DESCRIPTION: Command to start the Vite development server for the PGlite React example project.
+
+LANGUAGE: bash
+CODE:
+$ pnpm dev
+
+----------------------------------------
+
+TITLE: Demo Section HTML Layout
+DESCRIPTION: HTML structure for the demo sections of the page, including the database.build integration and REPL playground. It contains sections for showcasing PGlite with database.build and an interactive REPL demo.
+
+LANGUAGE: html
+CODE:
+<span class="vpi-social-github"></span>
+
+<div class="row">
+  <div class="postgres-new">
+    <div class="info">
+      <h3>Experience PGlite with <a href="https://database.build">database.build</a></h3>
+      <p>
+        Create and publish a Postgres database using AI
+        <br class="hide-xs" />
+        built on PGlite by <a href="https://supabase.com">Supabase</a>:
+      </p>
+    </div>
+    <video controls poster="https://static.pglite.dev/videos/postgres-new-showcase-loop.png">
+      <source src="https://static.pglite.dev/videos/postgres-new-showcase-loop-1080p.mp4" type="video/mp4" />
+    </video>
+    <a class="link-btn" href="https://database.build">
+      What would you like to create?</a>
+  </div>
+  <div class="try-it-now">
+    <div class="info">
+      <h3>Try PGlite Now</h3>
+      <p>
+        This is a full PGlite Postgres running in your browser.
+        <br class="hide-xs" />
+        It even includes <a href="/extensions/#pgvector">pgvector</a>!
+      </p>
+    </div>
+    <ClientOnly>
+      <Repl class="repl" />
+    </ClientOnly>
+    <a class="link-btn" href="/repl">
+      Try more extensions in the playground</a>
+  </div>
+</div>
+
+----------------------------------------
+
+TITLE: VitePress Frontmatter Configuration
+DESCRIPTION: YAML frontmatter configuration for the VitePress home page layout. It defines the page layout, hero section content, action buttons, and feature highlights for the PGlite documentation site.
+
+LANGUAGE: yaml
+CODE:
+# https://vitepress.dev/reference/default-theme-home-page
+layout: home
+
+hero:
+  name: 'PGlite'
+  text: 'Embeddable Postgres'
+  tagline: 'Run a full Postgres database locally in WASM with reactivity and live sync.'
+  actions:
+    - theme: brand
+      text: Get Started
+      link: /docs/
+    - theme: alt
+      text: Star on GitHub
+      link: https://github.com/electric-sql/pglite
+
+features:
+  - title: Lightweight
+    details: A complete WASM build of Postgres that's under 3MB Gzipped.
+  - title: Extendable
+    details: Dynamic extension loading mechanism, including support for pgvector.
+  - title: Reactive
+    details: Built in support for data loading, synchronisation and live query primitives.
+
+----------------------------------------
+
+TITLE: Navigating to and Setting Up the New Vite Project
+DESCRIPTION: Commands to navigate to the newly created Vite project directory, install dependencies, and start the development server.
+
+LANGUAGE: bash
+CODE:
+  $ cd pglite-vite-react-project
+  $ pnpm install
+  $ pnpm run dev
+
+----------------------------------------
+
+TITLE: Finding Main Link for Extension
+DESCRIPTION: Function that determines the primary link for an extension by checking for homepage, repository, or documentation links in order of preference.
+
+LANGUAGE: javascript
+CODE:
+function mainLink(ext) {
+  return ext.homepage || ext.repo || ext.docs;
+}
+
+----------------------------------------
+
+TITLE: Slugifying Strings for URLs
+DESCRIPTION: Function that converts a string into a URL-friendly slug by replacing specific characters and converting to lowercase.
+
+LANGUAGE: javascript
+CODE:
+function slugify(string) {
+  return string
+    .replace('/', '')
+    .replace(' ', '-')
+    .replace('_', '-')
+    .toLowerCase()
+}
+
+----------------------------------------
+
+TITLE: Starting Electric Server with Docker Compose
+DESCRIPTION: Command to start the Electric synchronization server using Docker Compose. This sets up the necessary infrastructure for the sync example.
+
+LANGUAGE: sh
+CODE:
+docker compose up
+
+----------------------------------------
+
+TITLE: Computing Tag List with Counts
+DESCRIPTION: Computed property that creates a list of tags with their occurrence count across all extensions for display in the filter buttons.
+
+LANGUAGE: javascript
+CODE:
+const tags = computed(() => {
+  return data.tags.map((tag) => {
+    return {
+      name: tag,
+      count: data.extensions.filter((ext) => ext.tags.includes(tag)).length,
+    }
+  })
+})
+
+----------------------------------------
+
+TITLE: Formatting File Size for Display
+DESCRIPTION: Function that converts byte sizes to human-readable formats (B, KB, MB, etc.) by progressively dividing by 1024 and selecting the appropriate unit.
+
+LANGUAGE: javascript
+CODE:
+function formatSize(bytes) {
+  const units = ['B', 'KB', 'MB', 'GB', 'TB', 'PB'];
+  let i = 0;
+
+  while (bytes >= 1024 && i < units.length - 1) {
+    bytes /= 1024;
+    i++;
+  }
+
+  return `${bytes.toFixed(1)} ${units[i]}`;
+}
+
+----------------------------------------
+
+TITLE: Starting Python HTTP Server
+DESCRIPTION: Command to start a simple Python HTTP server in the packages directory to serve the example files.
+
+LANGUAGE: sh
+CODE:
+python3 -m http.server
+
+----------------------------------------
+
+TITLE: Importing Vue Component for PostgreSQL Playground
+DESCRIPTION: Imports a REPL playground component for PostgreSQL using the VitePress defineClientComponent function. This lazy-loads the ReplPlayground.vue component for better performance.
+
+LANGUAGE: javascript
+CODE:
+import { defineClientComponent } from 'vitepress'
+
+const ReplPlayground = defineClientComponent(() => {
+  return import('./ReplPlayground.vue')
+})
+
+----------------------------------------
+
+TITLE: Rendering Client-Side PostgreSQL Playground Component
+DESCRIPTION: Renders the imported ReplPlayground component inside a ClientOnly wrapper. This ensures the component only executes in the browser and not during server-side rendering.
+
+LANGUAGE: html
+CODE:
+<ClientOnly>
+  <ReplPlayground />
+</ClientOnly>
+
+----------------------------------------
+
+TITLE: Checking PNPM Version for PGlite Project Prerequisites
+DESCRIPTION: Command to verify the installed PNPM version, which is required for package management in the PGlite project.
+
+LANGUAGE: bash
+CODE:
+$ pnpm --version
+
+----------------------------------------
+
+TITLE: Checking Git Version for PGlite Project Prerequisites
+DESCRIPTION: Command to verify the installed Git version, which is needed to clone the PGlite repository.
+
+LANGUAGE: bash
+CODE:
+$ git --version
+
+----------------------------------------
+
+TITLE: Installing PGlite Vue Bindings with npm
+DESCRIPTION: Command to install the PGlite Vue bindings package using npm. This package enables Vue components to interact with PGlite database functionality through various hooks.
+
+LANGUAGE: sh
+CODE:
+npm install @electric-sql/pglite-vue
+
+----------------------------------------
+
+TITLE: Installing PGlite React Hooks Package
+DESCRIPTION: Command to install the PGlite React hooks package via npm. This package provides React integration for PGlite database functionality.
+
+LANGUAGE: sh
+CODE:
+npm install @electric-sql/pglite-react
+
+----------------------------------------
+
+TITLE: Styling for Extension List Component
+DESCRIPTION: CSS styles for the extension listing, including tag buttons, links, and bundle size indicators with appropriate theming variables for dark/light mode compatibility.
+
+LANGUAGE: css
+CODE:
+<style scoped>
+.btn-tag {
+    border-color: var(--vp-button-alt-border);
+    color: var(--vp-button-alt-text);
+    background-color: var(--vp-button-alt-bg);
+    border-radius: 20px;
+    padding: 0 20px;
+    line-height: 38px;
+    font-size: 14.5px;
+    display: inline-block;
+    border: 1px solid transparent;
+    text-align: center;
+    font-weight: 600;
+    white-space: nowrap;
+    transition: color 0.25s, border-color 0.25s, background-color 0.25s;
+    margin-right: 0.5rem;
+}
+
+.btn-tag:hover {
+  border-color: var(--vp-button-alt-hover-border);
+  color: var(--vp-button-alt-hover-text);
+  background-color: var(--vp-button-alt-hover-bg);
+}
+
+.btn-tag.selected {
+  border-color: var(--vp-button-brand-border);
+  color: var(--vp-c-gray-3);
+  background-color: var(--vp-button-brand-bg);
+}
+
+.btn-tag.selected:hover {
+  border-color: var(--vp-button-brand-hover-border);
+  background-color: var(--vp-button-brand-hover-bg);
+}
+
+.btn-tag .count {
+  margin-left: 0.25rem;
+  margin-left: 0.25rem;
+  opacity: 0.5
+}
+
+.tags, .links {
+  margin-top: 1rem;
+}
+
+.tag {
+    border-color: var(--vp-button-alt-border);
+    color: var(--vp-button-alt-text);
+    background-color: var(--vp-button-alt-bg);
+    border-radius: 20px;
+    padding: 5px 10px;
+    line-height: 18px;
+    font-size: 14.5px;
+    display: inline-block;
+    border: 1px solid transparent;
+    text-align: center;
+    font-weight: 600;
+    white-space: nowrap;
+    transition: color 0.25s, border-color 0.25s, background-color 0.25s;
+    margin-right: 0.5rem;
+}
+
+.links a {
+  margin-right: 0.5rem;
+}
+
+.bundle-size {
+  float:right;
+  opacity: 0.5;
+}
+</style>
+
+----------------------------------------
+
+TITLE: Installing PGlite REPL with npm
+DESCRIPTION: Command to install the PGlite REPL component using npm package manager.
+
+LANGUAGE: bash
+CODE:
+npm install @electric-sql/pglite-repl
+
+----------------------------------------
+
+TITLE: Development Setup Commands for PGlite REPL
+DESCRIPTION: Shell commands for setting up a development environment for the PGlite REPL component, including installing dependencies, running the development server, and building the library.
+
+LANGUAGE: sh
+CODE:
+# Install deps
+pnpm install
+
+# Run dev server
+pnpm dev
+# then open a browser to the url shown
+
+# Build the lib
+pnpm build
+
+----------------------------------------
+
+TITLE: Installing PGlite ElectricSQL Sync Plugin with npm
+DESCRIPTION: Command to install the ElectricSQL sync plugin for PGlite using npm package manager.
+
+LANGUAGE: sh
+CODE:
+npm install @electric-sql/pglite-sync
+
+----------------------------------------
+
+TITLE: Installing pglite-tools via npm
+DESCRIPTION: Command to install the pglite-tools package using npm. This package provides various utilities for working with PGlite databases.
+
+LANGUAGE: bash
+CODE:
+npm install @electric-sql/pglite-tools
+
+----------------------------------------
+
+TITLE: Setting up and running PGlite benchmarks
+DESCRIPTION: Commands to install dependencies, build the project, and start a local server to run the benchmarks. After execution, benchmarks can be accessed via web browser at the specified localhost URLs.
+
+LANGUAGE: sh
+CODE:
+pnpm install
+pnpm build
+cd ./dist
+python3 -m http.server
+
+----------------------------------------
+
+TITLE: CSS Styling for Benchmark Tables
+DESCRIPTION: CSS styles for formatting the benchmark tables, ensuring proper alignment and whitespace handling for table cells. The styles make numeric data right-aligned and descriptive text left-aligned, with appropriate vertical alignment for table headers.
+
+LANGUAGE: css
+CODE:
+<style scoped>
+  table :is(td, th) {
+    white-space: nowrap;
+  }
+  thead th {
+    vertical-align: top;
+  }
+  thead th:first-child {
+    vertical-align: middle;
+  }
+  tbody td {
+    text-align: right;
+  }
+  tbody td:first-child {
+    text-align: left;
+  }
+</style>
+
+----------------------------------------
+
+TITLE: Running PGlite Native Baseline Benchmarks
+DESCRIPTION: Instructions for running the native baseline benchmarks for PGlite. This requires cloning the PGlite monorepo, navigating to the benchmark package, installing dependencies with pnpm, and executing the baseline.ts script with tsx.
+
+LANGUAGE: bash
+CODE:
+cd ./packages/benchmark
+pnpm install
+npx tsx baseline.ts
+
+----------------------------------------
+
+TITLE: Changelog Entry in Markdown for @electric-sql/pg-protocol
+DESCRIPTION: Documents version 0.0.2 of the @electric-sql/pg-protocol package, noting that dependencies were updated to address security alerts identified by Dependabot.
+
+LANGUAGE: markdown
+CODE:
+# @electric-sql/pg-protocol
+
+## 0.0.2
+
+### Patch Changes
+
+- 3d8efbb: Bump dependencies to address Dependabot alerts
+
+----------------------------------------
+
+TITLE: Installing Drizzle with PGlite using npm
+DESCRIPTION: Command to install Drizzle ORM with PGlite and the Drizzle Kit development dependency using npm.
+
+LANGUAGE: bash
+CODE:
+npm i drizzle-orm @electric-sql/pglite
+npm i -D drizzle-kit
+
+----------------------------------------
+
+TITLE: Installing TypeORM with PGlite using npm
+DESCRIPTION: Command to install the required packages for using TypeORM with PGlite through the typeorm-pglite adapter.
+
+LANGUAGE: bash
+CODE:
+npm i @electric-sql/pglite typeorm-pglite
+
+----------------------------------------
+
+TITLE: Checking Node.js Version for PGlite Project Prerequisites
+DESCRIPTION: Command to verify the installed Node.js version, which should be at least version 18 for running a PGlite project.
+
+LANGUAGE: bash
+CODE:
+$ node --version
+
+----------------------------------------
+
+TITLE: Cloning the PGlite Repository from GitHub
+DESCRIPTION: Command to clone the PGlite repository from GitHub, which contains the example React project.
+
+LANGUAGE: bash
+CODE:
+$ git clone https://github.com/electric-sql/pglite
+
+----------------------------------------
+
+TITLE: Navigating to the PGlite React Example Directory
+DESCRIPTION: Command to change directory to the React example folder within the cloned PGlite repository.
+
+LANGUAGE: bash
+CODE:
+$ cd ./pglite/examples/react
+
+----------------------------------------
+
+TITLE: Installing PGlite in Node/Bun/Deno with npm
+DESCRIPTION: Command to install PGlite using npm package manager.
+
+LANGUAGE: bash
+CODE:
+npm install @electric-sql/pglite
+
+----------------------------------------
+
+TITLE: Connecting to PostgreSQL Database
+DESCRIPTION: Command to connect to the PostgreSQL database using psql CLI with the provided connection string.
+
+LANGUAGE: sh
+CODE:
+psql postgresql://postgres:password@localhost:54321/electric
+
+----------------------------------------
+
+TITLE: Performing CRUD Operations in PostgreSQL
+DESCRIPTION: SQL commands demonstrating insert, update, and delete operations on the 'test' table, which will be synchronized through Electric.
+
+LANGUAGE: sql
+CODE:
+INSERT INTO test (name) VALUES ('Hello, World!');
+UPDATE test SET name = 'Hello, Electric!' WHERE id = 1;
+DELETE FROM test WHERE id = 1;

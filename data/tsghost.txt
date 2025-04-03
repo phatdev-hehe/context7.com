@@ -1,0 +1,5195 @@
+TITLE: Performing Mutations (Add, Edit, Delete) on Ghost Resources
+DESCRIPTION: A comprehensive example showing how to add, edit, and delete a post using the Admin API. The example demonstrates error handling with the discriminated union response pattern and includes type checking.
+
+LANGUAGE: typescript
+CODE:
+import { TSGhostAdminAPI } from "@ts-ghost/admin-api";
+
+let url = "https://demo.ghost.io";
+let key = "1efedd9db174adee2d23d982:4b74dca0219bad629852191af326a45037346c2231240e0f7aec1f9371cc14e8";
+const api = new TSGhostAdminAPI(url, key, "v5.0");
+
+// Input data are fully typed and then parsed through the appropriate Zod Schema
+const adding = await api.posts.add({
+  title: title,
+  html: "<p>Hello from ts-ghost</p>",
+  tags: [{ name: "ts-ghost" }],
+  tiers: [{ name: "ts-ghost" }],
+  custom_excerpt: "This is custom excerpt from ts-ghost",
+  meta_title: "Meta Title from ts-ghost",
+  meta_description: "Description from ts-ghost",
+  featured: true,
+  og_title: "OG Title from ts-ghost",
+  og_description: "OG Description from ts-ghost",
+  twitter_title: "Twitter Title from ts-ghost",
+  twitter_description: "Twitter Description from ts-ghost",
+  visibility: "public",
+  slug: "foobarbaz",
+});
+
+if (!adding.success) {
+  console.error(adding.errors);
+  throw new Error("Failed to create post");
+}
+
+const newPost = adding.data;
+//     ^? type Post
+
+// Update
+const postEdit = await api.posts.edit(newPost.id, {
+  custom_excerpt: "Modified excerpt from ghost",
+  // This is required by Ghost to send the updated_at field with the updated_at
+  // of the post you want to edit.
+  updated_at: new Date(newPost.updated_at || ""),
+});
+
+if (!postEdit.success) {
+  console.error(postEdit.errors);
+  throw new Error("Failed to edit post");
+}
+
+const editedPost = postEdit.data;
+//     ^? type Post
+
+// Delete
+const postDelete = await api.posts.delete(editedPost.id);
+if (!postDelete.success) {
+  console.error(postDelete.errors);
+  throw new Error("Failed to delete post");
+}
+
+----------------------------------------
+
+TITLE: Paginating Posts with Authors and Tags in TypeScript using @ts-ghost/content-api
+DESCRIPTION: This code snippet demonstrates how to retrieve all posts from a Ghost blog, including their authors and tags, using pagination. It initializes a TSGhostContentAPI instance, fetches the first page of posts, and then iteratively fetches subsequent pages until all posts are retrieved.
+
+LANGUAGE: typescript
+CODE:
+import { TSGhostContentAPI, type Post } from "@ts-ghost/content-api";
+
+let url = "https://demo.ghost.io";
+let key = "22444f78447824223cefc48062"; // Content API KEY
+const api = new TSGhostContentAPI(url, key, "v5.0");
+
+const posts: Post[] = [];
+let cursor = await api.posts
+  .browse()
+  .include({ authors: true, tags: true })
+  .paginate();
+if (cursor.current.success) posts.push(...cursor.current.data);
+while (cursor.next) {
+  cursor = await cursor.next.paginate();
+  if (cursor.current.success) posts.push(...cursor.current.data);
+}
+return posts;
+
+----------------------------------------
+
+TITLE: Fetching and Updating Ghost Posts with updated_at to Avoid Collision Errors
+DESCRIPTION: This snippet demonstrates how to safely update a Ghost post by first fetching it to obtain the current updated_at timestamp, then including that timestamp in the update request to prevent UPDATE_COLLISION errors. The code initializes the TSGhostAdminAPI, fetches a post by slug, and updates its custom_excerpt while passing the current updated_at value.
+
+LANGUAGE: typescript
+CODE:
+import { TSGhostAdminAPI } from "@ts-ghost/admin-api";
+
+const api = new TSGhostAdminAPI(env.GHOST_URL, env.GHOST_ADMIN_API_KEY, "v5.0");
+
+const result = await api.posts
+  .read({
+    slug: "coming-soon",
+  })
+  .fetch();
+
+if (!result.success) {
+  throw new Error(result.errors.join(", "));
+}
+const post = result.data;
+
+const postEditResult = await api.posts.edit(post.id, {
+  custom_excerpt: "Modified excerpt from ghost",
+  updated_at: new Date(post.updated_at || ""),
+});
+
+----------------------------------------
+
+TITLE: Paginating Posts with Authors and Tags in ts-ghost
+DESCRIPTION: Recipe for retrieving all posts including related authors and tags using pagination with the ts-ghost Content API.
+
+LANGUAGE: typescript
+CODE:
+import { TSGhostContentAPI, type Post } from "@ts-ghost/content-api";
+
+let url = "https://demo.ghost.io";
+let key = "22444f78447824223cefc48062"; // Content API KEY
+const api = new TSGhostContentAPI(url, key, "v5.0");
+
+const posts: Post[] = [];
+let cursor = await api.posts
+  .browse()
+  .include({ authors: true, tags: true })
+  .paginate();
+if (cursor.current.success) posts.push(...cursor.current.data);
+while (cursor.next) {
+  cursor = await cursor.next.paginate();
+  if (cursor.current.success) posts.push(...cursor.current.data);
+}
+return posts;
+
+----------------------------------------
+
+TITLE: Paginating Through All Posts with Author Information
+DESCRIPTION: Demonstrates how to use the paginate function to fetch all posts from a Ghost blog, including author and tag information, handling pagination automatically.
+
+LANGUAGE: typescript
+CODE:
+import { TSGhostAdminAPI, type Post } from "@ts-ghost/admin-api";
+
+let url = "https://demo.ghost.io";
+let key = "1efedd9db174adee2d23d982:4b74dca0219bad629852191af326a45037346c2231240e0f7aec1f9371cc14e8"; // Admin API KEY
+const api = new TSGhostAdminAPI(url, key, "v5.0");
+
+const posts: Post[] = [];
+let cursor = await api.posts
+  .browse()
+  .include({ authors: true, tags: true })
+  .paginate();
+if (cursor.current.success) posts.push(...cursor.current.data);
+while (cursor.next) {
+  cursor = await cursor.next.paginate();
+  if (cursor.current.success) posts.push(...cursor.current.data);
+}
+return posts;
+
+----------------------------------------
+
+TITLE: Paginating Posts with Author Information using TS Ghost Admin API
+DESCRIPTION: This snippet demonstrates how to fetch all posts from a Ghost blog including their authors and tags using pagination. It uses the paginate function to retrieve data page by page until all posts are collected.
+
+LANGUAGE: typescript
+CODE:
+import { TSGhostAdminAPI, type Post } from "@ts-ghost/admin-api";
+
+let url = "https://demo.ghost.io";
+let key = "1efedd9db174adee2d23d982:4b74dca0219bad629852191af326a45037346c2231240e0f7aec1f9371cc14e8"; // Admin API KEY
+const api = new TSGhostAdminAPI(url, key, "v5.0");
+
+const posts: Post[] = [];
+let cursor = await api.posts
+  .browse()
+  .include({ authors: true, tags: true })
+  .paginate();
+if (cursor.current.success) posts.push(...cursor.current.data);
+while (cursor.next) {
+  cursor = await cursor.next.paginate();
+  if (cursor.current.success) posts.push(...cursor.current.data);
+}
+return posts;
+
+----------------------------------------
+
+TITLE: Querying Ghost Blog Posts with TypeScript
+DESCRIPTION: A TypeScript example showing how to initialize the Ghost Admin API client and fetch blog posts with specific fields and formats. The response is fully typed based on the requested fields.
+
+LANGUAGE: typescript
+CODE:
+import { TSGhostAdminAPI } from "@ts-ghost/admin-api";
+
+const api = new TSGhostAdminAPI(
+  process.env.GHOST_URL || "",
+  process.env.GHOST_ADMIN_API_KEY || "",
+  "v5.47.0"
+);
+
+export async function getBlogPosts() {
+  const response = await api.posts
+    .browse({
+      limit: 10,
+    })
+    .fields({
+      title: true,
+      slug: true,
+      id: true,
+      html: true,
+      plaintext: true,
+    })
+    .formats({
+      html: true,
+      plaintext: true,
+    })
+    .fetch();
+  if (!response.success) {
+    throw new Error(response.errors.join(", "));
+  }
+  // Response data is typed correctly with only the requested fields
+  // {
+  //   title: string;
+  //   slug: string;
+  //   id: string;
+  //   html: string;
+  //   plaintext: string;
+  // }[]
+  return response.data;
+}
+
+----------------------------------------
+
+TITLE: Implementing TS-Ghost Content API in Remix Route Loader
+DESCRIPTION: Complete Remix route component that uses the TS-Ghost Content API. It fetches blog settings and posts from a Ghost CMS instance, then renders them as a list of links. Demonstrates proper error handling and data fetching patterns.
+
+LANGUAGE: tsx
+CODE:
+import { json, type LoaderArgs, type V2_MetaFunction } from "@remix-run/node";
+import { Link, useLoaderData } from "@remix-run/react";
+import { TSGhostContentAPI } from "@ts-ghost/content-api";
+
+export const meta: V2_MetaFunction = () => {
+  return [{ title: "New Remix App" }];
+};
+
+export async function loader({ request }: LoaderArgs) {
+  const api = new TSGhostContentAPI(
+    process.env.GHOST_URL || "",
+    process.env.GHOST_CONTENT_API_KEY || "",
+    "v5.0"
+  );
+  const [settings, posts] = await Promise.all([api.settings.fetch(), api.posts.browse().fetch()]);
+
+  if (!settings.success) {
+    throw new Error(settings.errors.join(", "));
+  }
+  if (!posts.success) {
+    throw new Error(posts.errors.join(", "));
+  }
+  return json({ settings: settings.data, posts: posts.data });
+}
+
+export default function Index() {
+  const { settings, posts } = useLoaderData<typeof loader>();
+
+  return (
+    <div style={{ fontFamily: "system-ui, sans-serif", lineHeight: "1.4" }}>
+      <h1>This is a list of posts for {settings.title}:</h1>
+      <ul>
+        {posts.map((post) => (
+          <li key={post.slug}>
+            <Link to={`/${post.slug}`}>{post.title}</Link>
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
+----------------------------------------
+
+TITLE: Implementing Ghost Content API queries in TypeScript
+DESCRIPTION: Creates a TypeScript module that initializes the Ghost Content API client and implements a function to fetch blog posts with specific fields. The response is properly typed based on the requested fields.
+
+LANGUAGE: typescript
+CODE:
+import { TSGhostContentAPI } from "@ts-ghost/content-api";
+
+const api = new TSGhostContentAPI(
+  process.env.GHOST_URL || "",
+  process.env.GHOST_CONTENT_API_KEY || "",
+  "v5.47.0"
+);
+
+export async function getBlogPosts() {
+  const response = await api.posts
+    .browse({
+      limit: 10,
+    })
+    .fields({
+      title: true,
+      slug: true,
+      id: true,
+    })
+    .fetch();
+  if (!response.success) {
+    throw new Error(response.errors.join(", "));
+  }
+  // Response data is typed correctly with only the requested fields
+  // {
+  //   title: string;
+  //   slug: string;
+  //   id: string;
+  // }[]
+  return response.data;
+}
+
+----------------------------------------
+
+TITLE: Fetching Data and Handling Results with Type Safety in TS-Ghost Admin API
+DESCRIPTION: Demonstrates the pattern for fetching data and handling results with proper type checking. The example shows querying a post by slug, then using TypeScript's discriminated unions to handle success and error cases.
+
+LANGUAGE: typescript
+CODE:
+let result = await api.posts.read({ slug: "this-is-a-slug" }).fetch();
+if (result.success) {
+  const posts = result.data;
+  //     ^? type Post
+} else {
+  // errors array of objects
+  console.log(result.errors.map((e) => e.message).join("\n"));
+}
+
+----------------------------------------
+
+TITLE: Integrating TSGhost Admin API with Remix
+DESCRIPTION: Demonstrates how to use TSGhost Admin API in a Remix route loader to fetch Ghost site and posts data. The example shows authentication, data fetching, error handling, and rendering the fetched data.
+
+LANGUAGE: tsx
+CODE:
+import { json, type LoaderArgs, type V2_MetaFunction } from "@remix-run/node";
+import { Link, useLoaderData } from "@remix-run/react";
+import { TSGhostAdminAPI } from "@ts-ghost/admin-api";
+
+export const meta: V2_MetaFunction = () => {
+  return [{ title: "New Remix App" }];
+};
+
+export async function loader({ request }: LoaderArgs) {
+  const api = new TSGhostAdminAPI(
+    process.env.GHOST_URL || "",
+    process.env.GHOST_ADMIN_API_KEY || "",
+    "v5.0"
+  );
+  const [site, posts] = await Promise.all([api.site.fetch(), api.posts.browse().fetch()]);
+
+  if (!site.success) {
+    throw new Error(site.errors.join(", "));
+  }
+  if (!posts.success) {
+    throw new Error(posts.errors.join(", "));
+  }
+  return json({ site: site.data, posts: posts.data });
+}
+
+export default function Index() {
+  const { site, posts } = useLoaderData<typeof loader>();
+
+  return (
+    <div style={{ fontFamily: "system-ui, sans-serif", lineHeight: "1.4" }}>
+      <h1>This is a list of posts for {site.title}:</h1>
+      <ul>
+        {posts.map((post) => (
+          <li key={post.slug}>
+            <Link to={`/${post.slug}`}>{post.title}</Link>
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
+----------------------------------------
+
+TITLE: Implementing Ghost API Client in TypeScript
+DESCRIPTION: Core implementation of a Ghost CMS client that handles authentication, versioning, and HTTP requests. It uses a Builder pattern for configuration and supports both admin and content APIs.
+
+LANGUAGE: typescript
+CODE:
+import querystring from 'querystring'
+import crypto from 'crypto'
+import fetch from 'node-fetch'
+import { GhostUrls, createUrls, ResourceConfig, GhostResourceKindConfig, extractResourceConfigs } from './resources-config'
+
+type BodylessMethod = 'get' | 'delete' | 'head'
+type BodyMethod = 'post' | 'put' | 'patch'
+type Method = BodylessMethod | BodyMethod
+
+export type QueryParams = {
+  filter?: string
+  include?: string
+  page?: string | number
+  limit?: string | number
+  fields?: string
+  order?: string
+  formats?: string
+  absolute_urls?: boolean
+  [key: string]: any
+}
+
+type GhostAPIConfig = {
+  url: string
+  key: string
+  version: string
+  userAgent?: string
+}
+
+type ContentAPIConfig = GhostAPIConfig
+
+type AdminAPIConfig = GhostAPIConfig & {
+  email: string
+  password: string
+}
+
+type APIConfig = ContentAPIConfig | AdminAPIConfig
+
+type Endpoint = 'admin' | 'content' | 'members'
+
+type EndpointVersions = {
+  admin: string
+  content: string
+  members: string
+}
+
+type InitConfig = Pick<GhostAPIConfig, 'url'> & {
+  version?: string | Partial<EndpointVersions>
+}
+
+type APIEndpointOptions = {
+  method: Method
+  endpoint: string
+  params?: {[key: string]: string | number } | null
+  data?: object | null
+}
+
+const defaultVersions = {
+  admin: 'canary',
+  content: 'v5',
+  members: 'v3'
+}
+
+const defaultUserAgent = 'GhostAdminSDK/0.0.0'
+
+export const stringify = (obj?: object) => obj ? JSON.stringify(obj) : ''
+
+function sign(
+  { key, api, endpoint, path, method, timestamp }: 
+    {key: string, api: 'admin', endpoint: Endpoint, path: string, method: string, timestamp: number}
+): string {
+  const [id, secret] = key.split(':')
+
+  const parts = [
+    method.toUpperCase(),
+    `/ghost/${api}/api/${endpoint}/${path}`.replace(/\/{2,}/, '/'),
+    timestamp
+  ]
+
+  const message = parts.join('\n')
+
+  return crypto.createHmac('sha256', Buffer.from(secret, 'hex'))
+    .update(message)
+    .digest('hex')
+}
+
+export class GhostBuilder {
+  private _config!: InitConfig;
+
+  constructor(config: InitConfig) {
+    this._config = config;
+  }
+
+  public content(key: string) {
+    return new GhostClient({
+      url: this._config.url,
+      key,
+      version: typeof this._config.version === 'string' ? this._config.version : (this._config.version?.content || defaultVersions.content)
+    }, 'content')
+  }
+  
+  public admin(key: string) {
+    return new GhostClient({
+      url: this._config.url,
+      key,
+      version: typeof this._config.version === 'string' ? this._config.version : (this._config.version?.admin || defaultVersions.admin)
+    }, 'admin')
+  }
+}
+
+export default class GhostClient {
+  protected _endpoint: Endpoint;
+  protected _config: GhostAPIConfig;
+  private _urls: GhostUrls;
+
+  constructor(config: GhostAPIConfig, endpoint: Endpoint = 'content') {
+    this._config = config;
+    this._endpoint = endpoint;
+
+    const resourceConfigs = extractResourceConfigs(config.version);
+    this._urls = createUrls(endpoint, resourceConfigs);
+
+    if (!this._config.userAgent) {
+      this._config.userAgent = defaultUserAgent;
+    }
+
+    for (const kind in this._urls) {
+      const urls = this._urls[kind as keyof GhostUrls];
+      const resources = {} as {[index: string]: any};
+
+      for (const resource in urls) {
+        resources[resource] = this._createResourceHandler(kind as keyof GhostResourceKindConfig, resource);
+      }
+
+      // @ts-ignore
+      this[kind] = resources;
+    }
+  }
+
+  async makeRequest<T>({ method, endpoint, params = {}, data = null }: APIEndpointOptions): Promise<T> {
+    const headers: {[index: string]: string} = {
+      'content-type': 'application/json',
+      'accept-version': this._config.version,
+      'user-agent': this._config.userAgent || defaultUserAgent
+    }
+
+    let url = new URL(`${this._config.url.replace(/\/+$/, '')}${endpoint}`);
+
+    if (this._endpoint === 'admin') {
+      headers['origin'] = this._config.url;
+  
+      const timestamp = Math.floor(Date.now() / 1000);
+      const [id] = this._config.key.split(':');
+  
+      const path = url.pathname.substring(url.pathname.indexOf('/ghost/'));
+      const trimmedPath = path.replace(/^(\/ghost\/admin\/api)/i, '');
+      const signature = sign({
+        key: this._config.key,
+        api: 'admin',
+        endpoint: this._endpoint,
+        path: trimmedPath,
+        method,
+        timestamp
+      });
+  
+      url.searchParams.set('key', id);
+      url.searchParams.set('signature', signature);
+      url.searchParams.set('timestamp', timestamp.toString())
+    } else if (this._endpoint === 'content') {
+      url.searchParams.set('key', this._config.key);
+    }
+
+    if (params) {
+      Object.entries(params).forEach(([key, value]) => {
+        url.searchParams.set(key, value.toString());
+      });
+    }
+
+    const options: RequestInit = {
+      method,
+      headers
+    };
+
+    if (method !== 'get' && data) {
+      options.body = stringify(data);
+    }
+
+    const res = await fetch(url.toString(), options);
+
+    if (!res.ok) {
+      throw new Error(`Ghost API error: ${res.status} ${res.statusText}`);
+    }
+
+    // HACK: Parses response as json, if it's possible.
+    try {
+      return await res.json() as T;
+    } catch {
+      return {} as T;
+    }
+  }
+
+  private _createResourceHandler(kind: keyof GhostResourceKindConfig, resource: string) {
+    return {
+      read: async (params: QueryParams) => {
+        const endpoint = this._urls[kind]?.[resource];
+
+        if (!endpoint) {
+          throw new Error(`Could not find endpoint for ${kind}.${resource}`);
+        }
+
+        return this.makeRequest({
+          method: 'get',
+          endpoint,
+          params
+        })
+      },
+
+      browse: async (params: QueryParams = {}) => {
+        const endpoint = this._urls[kind]?.[resource];
+
+        if (!endpoint) {
+          throw new Error(`Could not find endpoint for ${kind}.${resource}`);
+        }
+
+        return this.makeRequest({
+          method: 'get',
+          endpoint,
+          params
+        })
+      }
+    }
+  }
+}
+
+----------------------------------------
+
+TITLE: Combining Output Modifiers in Ghost API
+DESCRIPTION: Shows how to combine multiple output modifiers (fields and formats) to customize API responses. This example retrieves specific fields of a post and gets the content in both HTML and plaintext format.
+
+LANGUAGE: typescript
+CODE:
+let result = await api.posts
+  .read({
+    slug: "this-is-a-post-slug",
+  })
+  .fields({
+    title: true,
+    slug: true,
+    plaintext: true,
+    html: true,
+  })
+  .formats({
+    plaintext: true,
+    html: true,
+  })
+  .fetch();
+
+----------------------------------------
+
+TITLE: Initializing TSGhostContentAPI Client in TypeScript
+DESCRIPTION: Creates an instance of the TSGhostContentAPI client by providing the Ghost blog URL, content API key, and API version. This is the entry point for all subsequent API operations.
+
+LANGUAGE: typescript
+CODE:
+import { TSGhostContentAPI } from "@ts-ghost/content-api";
+
+const api = new TSGhostContentAPI("https://demo.ghost.io", "22444f78447824223cefc48062", "v5.0");
+
+----------------------------------------
+
+TITLE: Building Queries with APIComposer in Ghost API
+DESCRIPTION: Shows how to use the APIComposer instance to build type-safe queries for the Ghost API. Demonstrates how to use the browse method with parameters for filtering and ordering results.
+
+LANGUAGE: typescript
+CODE:
+import { z } from "zod";
+import { APIComposer, type ContentAPICredentials } from "@ts-ghost/core-api";
+
+const api: ContentAPICredentials = {
+  url: "https://ghost.org",
+  key: "7d2d15d7338526d43c2fadc47c",
+  version: "v5.0",
+  resource: "posts",
+};
+
+const simplifiedSchema = z.object({
+  title: z.string(),
+  slug: z.string(),
+  count: z.number().optional(),
+});
+const identitySchema = z.union([z.object({ slug: z.string() }), z.object({ id: z.string() })]);
+const simplifiedIncludeSchema = z.object({
+  count: z.literal(true).optional(),
+});
+
+const composedAPI = new APIComposer(
+  { schema: simplifiedSchema, identitySchema: identitySchema, include: simplifiedIncludeSchema },
+  api
+);
+let query = composedAPI.browse({
+  limit: 5,
+  order: "title DESC",
+  //      ^? the text here will throw a TypeScript lint error if you use unknown field.
+  //      In that case `title` is  correctly defined in the `simplifiedSchema
+});
+
+----------------------------------------
+
+TITLE: Implementing ts-ghost in a NextJS Server Component
+DESCRIPTION: Example of using ts-ghost Content API in a NextJS 13+ server component to fetch and display Ghost posts and settings.
+
+LANGUAGE: tsx
+CODE:
+import { api } from "./ghost";
+
+async function getBlogPosts() {
+  const response = await api.posts.browse().fields({ title: true, slug: true, id: true }).fetch();
+  if (!response.success) {
+    throw new Error(response.errors.join(", "));
+  }
+  return response.data;
+}
+
+async function getSiteSettings() {
+  const response = await api.settings.fetch();
+  if (!response.success) {
+    throw new Error(response.errors.join(", "));
+  }
+  return response.data;
+}
+
+// async Server Component
+export default async function HomePage() {
+  const [posts, settings] = await Promise.all([getBlogPosts(), getSiteSettings()]);
+  return (
+    <div>
+      <h1>This is a list of posts for {settings.title}:</h1>
+      <ul>
+        {posts.map((post) => (
+          <li key={post.id}>
+            {post.title} ({post.slug})
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
+----------------------------------------
+
+TITLE: Fetching Posts with Filtering and Including Relations in ts-ghost
+DESCRIPTION: This snippet demonstrates how to use the ts-ghost Content API to fetch posts with tag filtering and include related authors and tags. It shows the pattern of creating an API instance, building a query with filters and includes, then handling the result.
+
+LANGUAGE: typescript
+CODE:
+import { TSGhostContentAPI, type Post } from "@ts-ghost/content-api";
+
+let url = "https://demo.ghost.io";
+let key = "22444f78447824223cefc48062"; // Content API KEY
+const api = new TSGhostContentAPI(url, key, "v5.0");
+
+let posts: Post[] = [];
+let cursor = await api.posts
+  .browse({ filter: "tags:hash-tag" })
+  .include({ authors: true, tags: true })
+  .fetch();
+if (result.success) {
+  posts = result.data;
+}
+return posts
+
+----------------------------------------
+
+TITLE: Building Queries with APIComposer
+DESCRIPTION: Demonstrates how to build type-safe queries using the APIComposer instance. Shows how to create a browse query with type-checked parameters like limit and order.
+
+LANGUAGE: typescript
+CODE:
+import { z } from "zod";
+import { APIComposer, HTTPClient, type HTTPClientOptions } from "@ts-ghost/core-api";
+
+const credentials: HTTPClientOptions = {
+  url: "https://ghost.org",
+  key: "7d2d15d7338526d43c2fadc47c",
+  version: "v5.0",
+  endpoint: "content",
+};
+
+const httpClient = new HTTPClient(credentials);
+
+const simplifiedSchema = z.object({
+  title: z.string(),
+  slug: z.string(),
+  count: z.number().optional(),
+});
+const identitySchema = z.union([z.object({ slug: z.string() }), z.object({ id: z.string() })]);
+const simplifiedIncludeSchema = z.object({
+  count: z.literal(true).optional(),
+});
+
+const composedAPI = new APIComposer(
+  "posts",
+  { schema: simplifiedSchema, identitySchema: identitySchema, include: simplifiedIncludeSchema },
+  httpClient
+);
+let query = composedAPI.browse({
+  limit: 5,
+  order: "title DESC",
+  //      ^? the text here will throw a TypeScript lint error if you use unknown field.
+  //      In that case `title` is  correctly defined in the `simplifiedSchema
+});
+
+----------------------------------------
+
+TITLE: Initializing TSGhostAdminAPI Client in TypeScript
+DESCRIPTION: Creates a new instance of the TSGhostAdminAPI client with the Ghost blog URL, admin API key, and version specification. This is the entry point for all interactions with the Ghost Admin API.
+
+LANGUAGE: typescript
+CODE:
+import { TSGhostAdminAPI } from "@ts-ghost/admin-api";
+
+const api = new TSGhostAdminAPI(
+  "https://demo.ghost.io",
+  "1efedd9db174adee2d23d982:4b74dca0219bad629852191af326a45037346c2231240e0f7aec1f9371cc14e8",
+  "v5.0"
+);
+
+----------------------------------------
+
+TITLE: Building a Browse Query with the Ghost Content API
+DESCRIPTION: Example of building a query using the browse method with limit and ordering options. Shows how to construct a type-safe query against the Ghost API.
+
+LANGUAGE: typescript
+CODE:
+let query = api.posts.browse({
+  limit: 5,
+  order: "title DESC",
+  //      ^? the text here will throw a TypeScript lint error if you use unknown field.
+});
+
+----------------------------------------
+
+TITLE: Chaining Multiple Fetcher Modifier Methods
+DESCRIPTION: Example showing how to chain .fields(), .formats(), and .include() methods to customize the API request and response format. This allows for precise control over the data returned.
+
+LANGUAGE: typescript
+CODE:
+const bf = new BrowseFetcher(
+  { schema: simplifiedSchema, output: simplifiedSchema, include: simplifiedIncludeSchema },
+  {},
+  api
+);
+let result = await bf
+  .fields({
+    slug: true,
+    title: true,
+    html: true,
+    plaintext: true,
+    count: true,
+  })
+  .formats({
+    html: true,
+    plaintext: true,
+  })
+  .include({
+    count: true,
+  })
+  .fetch();
+
+----------------------------------------
+
+TITLE: Fetching Blog Posts with Ghost Content API
+DESCRIPTION: Example of how to use the TypeScript Ghost Content API to fetch blog posts with specific fields. Demonstrates creating an API instance and making a browse request with field selection.
+
+LANGUAGE: typescript
+CODE:
+import { TSGhostContentAPI } from "@ts-ghost/content-api";
+
+const api = new TSGhostContentAPI(
+  process.env.GHOST_URL || "",
+  process.env.GHOST_CONTENT_API_KEY || "",
+  "v5.47.0"
+);
+
+export async function getBlogPosts() {
+  const response = await api.posts
+    .browse({
+      limit: 10,
+    })
+    .fields({
+      title: true,
+      slug: true,
+      id: true,
+    })
+    .fetch();
+  if (!response.success) {
+    throw new Error(response.errors.join(", "));
+  }
+  // Response data is typed correctly with only the requested fields
+  // {
+  //   title: string;
+  //   slug: string;
+  //   id: string;
+  // }[]
+  return response.data;
+}
+
+----------------------------------------
+
+TITLE: Initializing and Using Browse Method with TSGhost Admin API in TypeScript
+DESCRIPTION: Example showing how to initialize the TSGhost Admin API client and use the browse method with various filtering options. The snippet demonstrates pagination, limiting, filtering, and ordering capabilities.
+
+LANGUAGE: typescript
+CODE:
+import { TSGhostAdminAPI } from "@ts-ghost/admin-api";
+
+const api = new TSGhostAdminAPI(
+  "https://demo.ghost.io",
+  "1efedd9db174adee2d23d982:4b74dca0219bad629852191af326a45037346c2231240e0f7aec1f9371cc14e8",
+  "v5.0"
+);
+
+let query = api.posts.browse({
+  page: 1,
+  limit: 5,
+  filter: "name:bar+slug:-test",
+  //      ^? the text here will throw a TypeScript lint error if you use unknown fields.
+  order: "title DESC",
+  //      ^? the text here will throw a TypeScript lint error if you use unknown fields.
+});
+
+----------------------------------------
+
+TITLE: Chaining Methods to Modify API Output in TypeScript
+DESCRIPTION: Demonstrates how to chain the .fields(), .formats(), and .include() methods to customize the API response according to specific needs.
+
+LANGUAGE: typescript
+CODE:
+const bf = new BrowseFetcher(
+  "posts",
+  { schema: simplifiedSchema, output: simplifiedSchema, include: simplifiedIncludeSchema },
+  {},
+  httpClient
+);
+let result = await bf
+  .fields({
+    slug: true,
+    title: true,
+    html: true,
+    plaintext: true,
+    count: true,
+  })
+  .formats({
+    html: true,
+    plaintext: true,
+  })
+  .include({
+    count: true,
+  })
+  .fetch();
+
+----------------------------------------
+
+TITLE: Selecting Fields with .fields() Method
+DESCRIPTION: Example showing how to use the .fields() method to select specific fields in the API response. This modifies the output schema to only include the selected fields, which TypeScript picks up for type safety.
+
+LANGUAGE: typescript
+CODE:
+import { BrowseFetcher } from "@ts-ghost/core-api";
+
+// Example of instantiating a Fetcher, even though you will probably not do it
+const browseFetcher = new BrowseFetcher(
+  {
+    schema: simplifiedSchema,
+    output: simplifiedSchema,
+    include: simplifiedIncludeSchema,
+  },
+  {
+    browseParams: {
+      limit: 1,
+    },
+  },
+  api
+);
+let result = await browseFetcher
+  .fields({
+    slug: true,
+    title: true,
+    // ^? available fields come form the `simplifiedSchema` passed in the constructor
+  })
+  .fetch();
+
+if (result.success) {
+  const post = result.data;
+  //     ^? type {"slug":string; "title": string}
+}
+
+----------------------------------------
+
+TITLE: Using Browse Method with Query Parameters in Ghost API
+DESCRIPTION: An example showing all available options that can be passed to the browse method, including page, limit, filter, and order parameters. TypeScript linting helps prevent errors with unknown fields.
+
+LANGUAGE: typescript
+CODE:
+let query = api.posts.browse({
+  page: 1,
+  limit: 5,
+  filter: "name:bar+slug:-test",
+  //      ^? the text here will throw a TypeScript lint error if you use unknown fields.
+  order: "title DESC",
+  //      ^? the text here will throw a TypeScript lint error if you use unknown fields.
+});
+
+----------------------------------------
+
+TITLE: Fetching Data with the Ghost Content API
+DESCRIPTION: Example of executing a query with the fetch method, showing both with and without field selection. This demonstrates the final step in making an API request.
+
+LANGUAGE: typescript
+CODE:
+let query = await api.posts
+  .browse({
+    limit: 5,
+    order: "title DESC",
+  })
+  .fields({
+    id: true,
+    slug: true,
+    title: true,
+  })
+  .fetch();
+
+// or without fields selection
+
+let query2 = await api.posts
+  .browse({
+    limit: 5,
+    order: "title DESC",
+  })
+  .fetch();
+
+----------------------------------------
+
+TITLE: Read Method Options in APIComposer
+DESCRIPTION: Shows how to use the read method in APIComposer to fetch a single record by ID or slug. The query is type-safe based on the identitySchema defined.
+
+LANGUAGE: typescript
+CODE:
+const composedAPI = new APIComposer(
+  "posts",
+  { schema: simplifiedSchema, identitySchema: identitySchema, include: simplifiedIncludeSchema },
+  httpClient
+);
+let query = composedAPI.read({
+  id: "edHks74hdKqhs34izzahd45"
+});
+
+// or
+
+let query = composedAPI.read({
+  slug: "typescript-is-awesome-in-2025"
+});
+
+----------------------------------------
+
+TITLE: Configuring Browse options in TSGhost Admin API
+DESCRIPTION: Shows how to use the browse method with various options like pagination, limits, filtering, and ordering. TypeScript provides lint errors for unknown fields in filter and order parameters.
+
+LANGUAGE: typescript
+CODE:
+import { TSGhostAdminAPI } from "@ts-ghost/admin-api";
+
+const api = new TSGhostAdminAPI(
+  "https://demo.ghost.io",
+  "1efedd9db174adee2d23d982:4b74dca0219bad629852191af326a45037346c2231240e0f7aec1f9371cc14e8",
+  "v5.0"
+);
+
+let query = api.posts.browse({
+  page: 1,
+  limit: 5,
+  filter: "name:bar+slug:-test",
+  //      ^? the text here will throw a TypeScript lint error if you use unknown fields.
+  order: "title DESC",
+  //      ^? the text here will throw a TypeScript lint error if you use unknown fields.
+});
+
+----------------------------------------
+
+TITLE: Querying Ghost Blog Posts with TypeScript
+DESCRIPTION: Complete example of fetching blog posts from Ghost using the Admin API with field selection, formatting options, and proper error handling.
+
+LANGUAGE: typescript
+CODE:
+import { TSGhostAdminAPI } from "@ts-ghost/admin-api";
+
+const api = new TSGhostAdminAPI(
+  process.env.GHOST_URL || "",
+  process.env.GHOST_ADMIN_API_KEY || "",
+  "v5.47.0"
+);
+
+export async function getBlogPosts() {
+  const response = await api.posts
+    .browse({
+      limit: 10,
+    })
+    .fields({
+      title: true,
+      slug: true,
+      id: true,
+      html: true,
+      plaintext: true,
+    })
+    .formats({
+      html: true,
+      plaintext: true,
+    })
+    .fetch();
+  if (!response.success) {
+    throw new Error(response.errors.join(", "));
+  }
+  // Response data is typed correctly with only the requested fields
+  // {
+  //   title: string;
+  //   slug: string;
+  //   id: string;
+  //   html: string;
+  //   plaintext: string;
+  // }[]
+  return response.data;
+}
+
+----------------------------------------
+
+TITLE: Handling Post/Page Update Collisions
+DESCRIPTION: Shows how to avoid UPDATE_COLLISION errors when updating posts or pages by first fetching the current post and including its updated_at timestamp in the edit request.
+
+LANGUAGE: typescript
+CODE:
+import { TSGhostAdminAPI } from "@ts-ghost/admin-api";
+
+const api = new TSGhostAdminAPI(env.GHOST_URL, env.GHOST_ADMIN_API_KEY, "v5.0");
+
+const result = await api.posts
+  .read({
+    slug: "coming-soon",
+  })
+  .fetch();
+
+if (!result.success) {
+  throw new Error(result.errors.join(", "));
+}
+const post = result.data;
+
+const postEditResult = await api.posts.edit(post.id, {
+  custom_excerpt: "Modified excerpt from ghost",
+  updated_at: new Date(post.updated_at || ""),
+});
+
+----------------------------------------
+
+TITLE: Performing mutations with the TSGhost Admin API
+DESCRIPTION: Comprehensive example showing how to add, edit, and delete resources using the asynchronous mutation methods. Includes error handling and shows the resulting object type for each operation.
+
+LANGUAGE: typescript
+CODE:
+import { TSGhostAdminAPI } from "@ts-ghost/admin-api";
+
+let url = "https://demo.ghost.io";
+let key = "1efedd9db174adee2d23d982:4b74dca0219bad629852191af326a45037346c2231240e0f7aec1f9371cc14e8";
+const api = new TSGhostAdminAPI(url, key, "v5.0");
+
+// Input data are fully typed and then parsed through the appropriate Zod Schema
+const adding = await api.posts.add({
+  title: title,
+  html: "<p>Hello from ts-ghost</p>",
+  tags: [{ name: "ts-ghost" }],
+  tiers: [{ name: "ts-ghost" }],
+  custom_excerpt: "This is custom excerpt from ts-ghost",
+  meta_title: "Meta Title from ts-ghost",
+  meta_description: "Description from ts-ghost",
+  featured: true,
+  og_title: "OG Title from ts-ghost",
+  og_description: "OG Description from ts-ghost",
+  twitter_title: "Twitter Title from ts-ghost",
+  twitter_description: "Twitter Description from ts-ghost",
+  visibility: "public",
+  slug: "foobarbaz",
+});
+
+if (!adding.success) {
+  console.error(adding.errors);
+  throw new Error("Failed to create post");
+}
+
+const newPost = adding.data;
+//     ^? type Post
+
+// Update
+const postEdit = await api.posts.edit(newPost.id, {
+  custom_excerpt: "Modified excerpt from ghost",
+  // This is required by Ghost to send the updated_at field with the updated_at
+  // of the post you want to edit.
+  updated_at: new Date(newPost.updated_at || ""),
+});
+
+if (!postEdit.success) {
+  console.error(postEdit.errors);
+  throw new Error("Failed to edit post");
+}
+
+const editedPost = postEdit.data;
+//     ^? type Post
+
+// Delete
+const postDelete = await api.posts.delete(editedPost.id);
+if (!postDelete.success) {
+  console.error(postDelete.errors);
+  throw new Error("Failed to delete post");
+}
+
+----------------------------------------
+
+TITLE: Initializing Ghost Admin API Client
+DESCRIPTION: Creates a reusable Ghost Admin API client instance using environment variables that can be imported across the application.
+
+LANGUAGE: ts
+CODE:
+import { TSGhostAdminAPI } from "@ts-ghost/admin-api";
+
+export const api = new TSGhostAdminAPI(
+  process.env.GHOST_URL || "",
+  process.env.GHOST_ADMIN_API_KEY || "",
+  "v5.0"
+);
+
+----------------------------------------
+
+TITLE: Fetching data with the TSGhost Admin API
+DESCRIPTION: Demonstrates how to build and execute queries with the fetch method, showing both with and without field selection. The method returns a Promise that resolves to a result object parsed by the Zod Schema of the resource.
+
+LANGUAGE: typescript
+CODE:
+let query = await api.members
+  .browse({
+    limit: 5,
+    order: "email ASC",
+  })
+  .fields({
+    id: true,
+    email: true,
+    name: true,
+  })
+  .fetch();
+
+// or without fields selection
+
+let query2 = await api.members
+  .browse({
+    limit: 5,
+    order: "email ASC",
+  })
+  .fetch();
+
+----------------------------------------
+
+TITLE: Editing a Member with TSGhost Admin API in TypeScript
+DESCRIPTION: Example demonstrating how to edit a member record to add a Stripe customer ID while specifying the option to not send an email notification. The code initializes the API client with credentials and then calls the edit method with the member ID, new data, and options.
+
+LANGUAGE: typescript
+CODE:
+import { TSGhostAdminAPI } from "@ts-ghost/admin-api";
+
+const api = new TSGhostAdminAPI(
+  "https://demo.ghost.io",
+  "1efedd9db174adee2d23d982:4b74dca0219bad629852191af326a45037346c2231240e0f7aec1f9371cc14e8",
+  "v5.0"
+);
+
+const membersEdit = await api.members.edit(
+  "edHks74hdKqhs34izzahd45",
+  { stripe_customer_id: "cus_123456789" },
+  { send_email: false }
+);
+
+----------------------------------------
+
+TITLE: Fetching Data and Handling Results with Type Safety
+DESCRIPTION: Shows how to execute the fetch operation and handle the discriminated union result with TypeScript type narrowing based on the success property.
+
+LANGUAGE: typescript
+CODE:
+let result = await api.posts.read({ slug: "this-is-a-slug" }).fetch();
+if (result.success) {
+  const posts = result.data;
+  //     ^? type Post
+} else {
+  // errors array of objects
+  console.log(result.errors.map((e) => e.message).join("\n"));
+}
+
+----------------------------------------
+
+TITLE: Selecting Specific Fields in Ghost API Response
+DESCRIPTION: Shows how to use the fields method to select only specific fields in the API response, which modifies the TypeScript output schema to match the selection.
+
+LANGUAGE: typescript
+CODE:
+let result = await api.posts
+  .read({
+    slug: "typescript-is-cool",
+  })
+  .fields({
+    id: true,
+    slug: true,
+    title: true,
+  })
+  .fetch();
+
+if (result.success) {
+  const post = result.data;
+  //     ^? type {"id": string; "slug":string; "title": string}
+}
+
+----------------------------------------
+
+TITLE: Fetching Data with Field Selection
+DESCRIPTION: Demonstrates the complete process of building a query, selecting specific fields, and fetching data using the async fetch method. This returns a promise that resolves to a typed result object.
+
+LANGUAGE: typescript
+CODE:
+let query = await api.posts
+  .browse({
+    limit: 5,
+    order: "title DESC",
+  })
+  .fields({
+    id: true,
+    slug: true,
+    title: true,
+  })
+  .fetch();
+
+// or without fields selection
+
+let query2 = await api.posts
+  .browse({
+    limit: 5,
+    order: "title DESC",
+  })
+  .fetch();
+
+----------------------------------------
+
+TITLE: Complete Ghost API Read Workflow with Error Handling
+DESCRIPTION: A complete workflow for reading a post by slug, demonstrating how to handle the discriminated union result with proper TypeScript type narrowing and error handling.
+
+LANGUAGE: typescript
+CODE:
+let result = await api.posts.read({ slug: "this-is-a-slug" }).fetch();
+if (result.success) {
+  const posts = result.data;
+  //     ^? type Post
+} else {
+  // errors array of objects
+  console.log(result.errors.map((e) => e.message).join("\n"));
+}
+
+----------------------------------------
+
+TITLE: Fetching Posts with Cache Control in Ghost API
+DESCRIPTION: This example demonstrates fetching posts from the Ghost API with specific query parameters and cache control options. It retrieves 5 posts ordered by title in descending order with cache explicitly disabled.
+
+LANGUAGE: typescript
+CODE:
+let query = await api.posts
+  .browse({
+    limit: 5,
+    order: "title DESC",
+  })
+  .fetch({
+    cache: "no-cache",
+  });
+
+----------------------------------------
+
+TITLE: Handling Ghost API Response with TypeScript Discriminated Union
+DESCRIPTION: Shows how to handle the response from a Ghost API fetch operation using TypeScript's discriminated union pattern to distinguish between successful and failed requests.
+
+LANGUAGE: typescript
+CODE:
+let result = await api.posts.browse().fetch();
+if (result.success) {
+  const posts = result.data;
+  //     ^? type Post[]
+} else {
+  // errors array of objects
+  console.log(result.errors.map((e) => e.message).join("\n"));
+}
+
+----------------------------------------
+
+TITLE: Selecting Specific Fields with .fields() Method in TS-Ghost Admin API
+DESCRIPTION: Shows how to use the fields() method to select only specific fields from the response. The example demonstrates querying a post and selecting only the id, slug, and title fields, with proper type inference.
+
+LANGUAGE: typescript
+CODE:
+let result = await api.posts
+  .read({
+    slug: "typescript-is-cool",
+  })
+  .fields({
+    id: true,
+    slug: true,
+    title: true,
+  })
+  .fetch();
+
+if (result.success) {
+  const post = result.data;
+  //     ^? type {"id": string; "slug":string; "title": string}
+}
+
+----------------------------------------
+
+TITLE: Ordering results in TSGhost Admin API
+DESCRIPTION: Demonstrates how to order results by fields using the order parameter. Shows both basic ordering and advanced nested property ordering with a tags example.
+
+LANGUAGE: typescript
+CODE:
+let query = await api.posts
+  .browse({
+    order: "title DESC",
+  })
+  .fetch();
+
+----------------------------------------
+
+TITLE: Using Output Modifiers with Read and Browse Methods in TS-Ghost Admin API
+DESCRIPTION: Demonstrates how to use output modifiers to customize the returned data from read or browse operations. The example shows selecting specific fields in both read and browse queries.
+
+LANGUAGE: typescript
+CODE:
+// Example with read...
+let result = await api.posts.read({ slug: "slug"}).fields({ title: true }).fetch();
+
+// ... and with browse
+let result = await api.posts.browse({limit: 2}).fields({ title: true }).fetch();
+
+----------------------------------------
+
+TITLE: Including Related Data with .include() Method in TS-Ghost Admin API
+DESCRIPTION: Demonstrates how to use the include() method to include additional related data in the response. The example shows including post count when querying an author.
+
+LANGUAGE: typescript
+CODE:
+let result = await api.authors
+  .read({
+    slug: "phildl",
+  })
+  .include({ "count.posts": true })
+  .fetch();
+
+----------------------------------------
+
+TITLE: Fetching Single Ghost Post by ID or Slug
+DESCRIPTION: Shows how to use the read method to fetch a single post from the Ghost API using either the ID or slug as the identifier.
+
+LANGUAGE: typescript
+CODE:
+let query = api.posts.read({
+  id: "edHks74hdKqhs34izzahd45"
+});
+
+// or
+
+let query = api.posts.read({
+  slug: "typescript-is-awesome-in-2025"
+});
+
+----------------------------------------
+
+TITLE: Fetching Ghost Instance Settings in TypeScript using @ts-ghost/content-api
+DESCRIPTION: This code snippet shows how to fetch the settings of a Ghost blog instance. Unlike other resources, the settings resource doesn't support queries and can only be fetched directly. The code initializes the API client and retrieves the settings with proper type inference.
+
+LANGUAGE: typescript
+CODE:
+import { TSGhostContentAPI, type Post } from "@ts-ghost/content-api";
+
+let url = "https://demo.ghost.io";
+let key = "22444f78447824223cefc48062"; // Content API KEY
+const api = new TSGhostContentAPI(url, key, "v5.0");
+
+let result = await api.settings.fetch();
+if (result.success) {
+  const settings = result.data;
+  //     ^? type Settings {title: string; description: string; ...
+}
+
+----------------------------------------
+
+TITLE: Specifying Content Formats with .formats() Method in TS-Ghost Admin API
+DESCRIPTION: Shows how to use the formats() method to retrieve content in different formats like plaintext or HTML. The example demonstrates requesting both plaintext and HTML formats for a post.
+
+LANGUAGE: typescript
+CODE:
+let result = await api.posts
+  .read({
+    slug: "this-is-a-post-slug",
+  })
+  .formats({
+    plaintext: true,
+    html: true,
+  })
+  .fetch();
+
+----------------------------------------
+
+TITLE: Handling Response from Ghost API Read Operation
+DESCRIPTION: Demonstrates how to process the response from reading a single post, checking for success and handling the resulting data with proper TypeScript typing.
+
+LANGUAGE: typescript
+CODE:
+let result = await api.posts.read({ slug: "this-is-a-slug" }).fetch();
+if (result.success) {
+  const posts = result.data;
+  //     ^? type Post
+} else {
+  // errors array of objects
+  console.log(result.errors.map((e) => e.message).join("\n"));
+}
+
+----------------------------------------
+
+TITLE: Fetching Ghost Instance Settings with TS Ghost Admin API
+DESCRIPTION: This snippet shows how to retrieve the settings of a Ghost blog instance using the Admin API. Unlike other resources, settings can only be fetched directly and returns an array of key-value pairs representing various configuration options.
+
+LANGUAGE: typescript
+CODE:
+import { TSGhostAdminAPI, type Post } from "@ts-ghost/admin-api";
+
+let url = "https://demo.ghost.io";
+let key = "1efedd9db174adee2d23d982:4b74dca0219bad629852191af326a45037346c2231240e0f7aec1f9371cc14e8"; // Admin API KEY
+const api = new TSGhostAdminAPI(url, key, "v5.0");
+
+let result = await api.settings.fetch();
+if (result.success) {
+  const settings = result.data;
+  //     ^? type Settings {title: string; description: string; ...
+}
+
+----------------------------------------
+
+TITLE: Using NextJS-specific Fetch Options in TS-Ghost Admin API
+DESCRIPTION: Demonstrates using NextJS-specific fetch options with the TS-Ghost API. The example shows how to set revalidation time for data fetching in a NextJS application.
+
+LANGUAGE: typescript
+CODE:
+let query = await api.posts
+  .browse({
+    limit: 5,
+    order: "title DESC",
+  })
+  .fetch({ next: { revalidate: 10 } }); // NextJS revalidate this data every 10 seconds at most
+
+----------------------------------------
+
+TITLE: Fetching Ghost Blog Settings
+DESCRIPTION: Shows how to fetch the settings of a Ghost blog instance using the special settings resource, which returns an array of key-value pairs representing the blog's configuration.
+
+LANGUAGE: typescript
+CODE:
+import { TSGhostAdminAPI, type Post } from "@ts-ghost/admin-api";
+
+let url = "https://demo.ghost.io";
+let key = "1efedd9db174adee2d23d982:4b74dca0219bad629852191af326a45037346c2231240e0f7aec1f9371cc14e8"; // Admin API KEY
+const api = new TSGhostAdminAPI(url, key, "v5.0");
+
+let result = await api.settings.fetch();
+if (result.success) {
+  const settings = result.data;
+  //     ^? type Settings {title: string; description: string; ...
+}
+
+----------------------------------------
+
+TITLE: Understanding fetch result types in TSGhost Admin API
+DESCRIPTION: Shows the TypeScript type definition of the result from a browse fetch operation, including the pagination metadata that is returned along with the data array.
+
+LANGUAGE: typescript
+CODE:
+// example for the browse query (the data is an array of objects)
+const result: {
+    success: true;
+    data: Post[];
+    meta: {
+        pagination: {
+            pages: number;
+            limit: number;
+            page: number;
+            total: number;
+            prev: number | null;
+            next: number | null;
+        };
+    };
+} | {
+    success: false;
+    errors: {
+        message: string;
+        type: string;
+    }[];
+}
+
+----------------------------------------
+
+TITLE: Creating a Post with .add() Method in TS-Ghost Admin API
+DESCRIPTION: Demonstrates how to create a new post using the add method. The example shows creating a post with the minimum required field (title).
+
+LANGUAGE: typescript
+CODE:
+import { TSGhostAdminAPI } from "@ts-ghost/admin-api";
+
+const api = new TSGhostAdminAPI(
+  "https://demo.ghost.io",
+  "1efedd9db174adee2d23d982:4b74dca0219bad629852191af326a45037346c2231240e0f7aec1f9371cc14e8",
+  "v5.0"
+);
+
+const postAdd = await api.posts.add({
+  title: title,
+});
+
+----------------------------------------
+
+TITLE: Retrieving Active Paid Tiers in Ghost
+DESCRIPTION: Fetches all active paid tiers from a Ghost blog, including their benefits and pricing information, using filtering capabilities of the API.
+
+LANGUAGE: typescript
+CODE:
+import { TSGhostAdminAPI } from "@ts-ghost/admin-api";
+
+const api = new TSGhostAdminAPI(env.GHOST_URL, env.GHOST_ADMIN_API_KEY, "v5.0");
+const tiers = await api.tiers
+  .browse({
+    filter: "active:true+type:paid",
+  })
+  .include({ benefits: true, monthly_price: true, yearly_price: true })
+  .fetch();
+
+if (!tiers.success) {
+  throw new Error(tiers.errors.join(", "));
+}
+console.log(tiers);
+
+----------------------------------------
+
+TITLE: Result Type Structure for Read Operations in TS-Ghost Admin API
+DESCRIPTION: Shows the TypeScript type definition for the result of a read operation. The result is a discriminated union with success flag and either data (when successful) or errors (when failed).
+
+LANGUAGE: typescript
+CODE:
+// example for the read query (the data is an object)
+const result: {
+    success: true;
+    data: Post; // parsed by the Zod Schema and modified by the fields selected
+} | {
+    success: false;
+    errors: {
+        message: string;
+        type: string;
+    }[];
+}
+
+----------------------------------------
+
+TITLE: Result Type Structure for Add Operations in TS-Ghost Admin API
+DESCRIPTION: Shows the TypeScript type definition for the result of an add operation. The result is a discriminated union with success flag and either data (when successful) or errors (when failed).
+
+LANGUAGE: typescript
+CODE:
+// return from the `add` method
+const result: {
+    success: true;
+    data: Member; // parsed by the Zod Schema given in the config
+} | {
+    success: false;
+    errors: {
+        message: string;
+        type: string;
+    }[];
+}
+
+----------------------------------------
+
+TITLE: Ordering with Nested Properties in TSGhost Browse Method
+DESCRIPTION: Example showing how to use nested properties for ordering in the browse method. This retrieves the first 3 public tags ordered by post count in descending order.
+
+LANGUAGE: typescript
+CODE:
+api.tags
+.browse({
+  order: "count.posts DESC",
+  filter: "visibility:public",
+  limit: 3,
+})
+.include({ "count.posts": true })
+.fetch(),
+
+----------------------------------------
+
+TITLE: Handling API Response with ReadFetcher in Ghost API
+DESCRIPTION: Shows how to use the ReadFetcher's fetch method to make requests to the Ghost API and handle the response with proper type-checking. Uses a discriminated union to distinguish between success and error states.
+
+LANGUAGE: typescript
+CODE:
+const composedAPI = new APIComposer(
+  { schema: simplifiedSchema, output: simplifiedSchema, include: simplifiedIncludeSchema },
+  api
+);
+const readFetcher = composedAPI.read({ slug: "typescript-is-cool" });
+let result = await readFetcher.fetch();
+if (result.success) {
+  const post = result.data;
+  //     ^? type {"slug":string; "title": string}
+} else {
+  // errors array of objects
+  console.log(result.errors.map((e) => e.message).join("\n"));
+}
+
+----------------------------------------
+
+TITLE: Editing Members with TSGhost Admin API
+DESCRIPTION: Demonstrates how to edit an existing member record by providing the member ID and updated data. This example shows attaching a Stripe customer ID to a member while specifying not to send an email notification.
+
+LANGUAGE: typescript
+CODE:
+import { TSGhostAdminAPI } from "@ts-ghost/admin-api";
+
+const api = new TSGhostAdminAPI(
+  "https://demo.ghost.io",
+  "1efedd9db174adee2d23d982:4b74dca0219bad629852191af326a45037346c2231240e0f7aec1f9371cc14e8",
+  "v5.0"
+);
+
+const membersEdit = await api.members.edit(
+  "edHks74hdKqhs34izzahd45",
+  { stripe_customer_id: "cus_123456789" },
+  { send_email: false }
+);
+
+----------------------------------------
+
+TITLE: Creating a Member with TSGhost Admin API
+DESCRIPTION: Example of creating a new member with name and email fields, using the optional 'send_email' parameter set to false to prevent automatic notification to the new member.
+
+LANGUAGE: typescript
+CODE:
+import { TSGhostAdminAPI } from "@ts-ghost/admin-api";
+
+const api = new TSGhostAdminAPI(
+  "https://demo.ghost.io",
+  "1efedd9db174adee2d23d982:4b74dca0219bad629852191af326a45037346c2231240e0f7aec1f9371cc14e8",
+  "v5.0"
+);
+
+const memberAdd = await api.members.add(
+  { name: "Philippe", email: "philippe@ts-ghost.com" },
+  { send_email: false }
+);
+
+----------------------------------------
+
+TITLE: Selecting Fields with fields() Method in tsghost
+DESCRIPTION: Demonstrates how to use the fields() method to select specific fields when fetching data with read() or browse() methods. This modifier changes the output to include only selected fields and provides type-safe results.
+
+LANGUAGE: typescript
+CODE:
+// Example with read...
+let result = await api.posts.read({ slug: "slug"}).fields({ title: true }).fetch();
+
+// ... and with browse
+let result = await api.posts.browse({limit: 2}).fields({ title: true }).fetch();
+
+----------------------------------------
+
+TITLE: Deleting Records with TSGhost Admin API
+DESCRIPTION: Shows how to delete a record by its ID using the delete method, with proper error handling to check if the deletion was successful.
+
+LANGUAGE: typescript
+CODE:
+import { TSGhostAdminAPI } from "@ts-ghost/admin-api";
+
+const api = new TSGhostAdminAPI(
+  "https://demo.ghost.io",
+  "1efedd9db174adee2d23d982:4b74dca0219bad629852191af326a45037346c2231240e0f7aec1f9371cc14e8",
+  "v5.0"
+);
+const result = await api.members.delete("edHks74hdKqhs34izzahd45");
+
+if (!result.success) {
+  console.error(result.errors);
+  throw new Error("Failed to delete Member");
+}
+
+----------------------------------------
+
+TITLE: Creating a New Record with .add() Method
+DESCRIPTION: Example showing how to create a new record using the .add() mutation method. The method takes an input object that conforms to the createSchema and optional parameters for additional options.
+
+LANGUAGE: typescript
+CODE:
+const composedAPI = new APIComposer(
+  {
+    schema: simplifiedSchema,
+    identitySchema: identitySchema,
+    include: simplifiedIncludeSchema,
+    createSchema: createSchema,
+    createOptionsSchema: z.object({
+      option_1: z.boolean(),
+    }),
+  },
+  api
+);
+let newPost = await composedAPI.add(
+  {
+    title: "My new post",
+  },
+  {
+    option_1: true,
+  }
+);
+
+----------------------------------------
+
+TITLE: Reading Resources with Identity Fields in TS-Ghost Admin API
+DESCRIPTION: Demonstrates how to use the read method with various identity fields like id, email and slug to fetch specific resources from the Ghost API. The example shows querying users by either email or id.
+
+LANGUAGE: typescript
+CODE:
+import { TSGhostAdminAPI } from "@ts-ghost/admin-api";
+
+const api = new TSGhostAdminAPI(
+  "https://demo.ghost.io",
+  "1efedd9db174adee2d23d982:4b74dca0219bad629852191af326a45037346c2231240e0f7aec1f9371cc14e8",
+  "v5.0"
+);
+
+let query = api.users.read({
+  email: "philippe@ts-ghost.com"
+});
+
+// or
+
+let query = api.users.read({
+  id: "edHks74hdKqhs34izzahd45"
+});
+
+----------------------------------------
+
+TITLE: Creating New Members with TSGhost Admin API
+DESCRIPTION: Demonstrates how to add a new member with minimal information (name and email) using the TSGhost Admin API, with the option to not send an email notification.
+
+LANGUAGE: typescript
+CODE:
+import { TSGhostAdminAPI } from "@ts-ghost/admin-api";
+
+const api = new TSGhostAdminAPI(env.GHOST_URL, env.GHOST_ADMIN_API_KEY, "v5.0");
+
+const membersAdd = await api.members.add(
+  { name: "Philippe", email: "philippe@ts-ghost.com" },
+  { send_email: false }
+);
+
+----------------------------------------
+
+TITLE: Filtering with Dynamic Parameters in TSGhost Browse Method
+DESCRIPTION: Example showing how to use the filter option with dynamic parameters to exclude specific content. This demonstrates how to retrieve featured posts while excluding ones with a specific slug.
+
+LANGUAGE: typescript
+CODE:
+const slugToExclude = "test";
+
+let query = await api.posts
+  .browse({
+    filter: `featured:true+slug:-${slugToExclude}`,
+  })
+  .fetch();
+
+----------------------------------------
+
+TITLE: Understanding the response structure in TSGhost
+DESCRIPTION: Shows the TypeScript type definition of the response object returned by query methods. The result is a discriminated union with the Boolean 'success' as a discriminator to indicate success or failure.
+
+LANGUAGE: typescript
+CODE:
+const result: {
+    success: true;
+    data: Member; // Shape depends on resource + browse | read + output modifiers
+    // contains aditionnal metadata for browse queries
+} | {
+    success: false;
+    errors: {
+        message: string;
+        type: string;
+    }[];
+}
+
+----------------------------------------
+
+TITLE: Updating Members with Stripe Customer ID
+DESCRIPTION: Shows how to update an existing member to add a Stripe customer ID, with the option to not send notification emails to the member.
+
+LANGUAGE: typescript
+CODE:
+import { TSGhostAdminAPI } from "@ts-ghost/admin-api";
+
+const api = new TSGhostAdminAPI(env.GHOST_URL, env.GHOST_ADMIN_API_KEY, "v5.0");
+
+const membersEdit = await api.members.edit(
+  "edHks74hdKqhs34izzahd45",
+  { stripe_customer_id: "cus_123456789" },
+  { send_email: false }
+);
+
+----------------------------------------
+
+TITLE: Including Relations with include() in Ghost API
+DESCRIPTION: Shows how to use the include() modifier to retrieve additional related data that is not included by default in the Ghost API response. This example includes the post count for an author.
+
+LANGUAGE: typescript
+CODE:
+let result = await api.authors
+  .read({
+    slug: "phildl",
+  })
+  .include({ "count.posts": true })
+  .fetch();
+
+----------------------------------------
+
+TITLE: Understanding paginate result types in TSGhost Admin API
+DESCRIPTION: Shows the TypeScript type definition of the result from a paginate operation, which includes a next fetcher for getting the next page of results if available.
+
+LANGUAGE: typescript
+CODE:
+const result: {
+    success: true;
+    data: Post[];
+    meta: {
+        pagination: {
+            pages: number;
+            limit: number | "all";
+            page: number;
+            total: number;
+            prev: number | null;
+            next: number | null;
+        };
+    };
+    next: BrowseFetcher | undefined; // the next page fetcher if it is defined
+} | {
+    success: false;
+    errors: {
+        message: string;
+        type: string;
+    }[];
+    next: undefined; // the next page fetcher is undefined here
+}
+
+----------------------------------------
+
+TITLE: Handling Unknown Inputs with Type Casting in TypeScript
+DESCRIPTION: Shows how to handle dynamically generated field selections with type casting to maintain compatibility with TSGhost's type system.
+
+LANGUAGE: ts
+CODE:
+// `fieldsKeys` comes from outside
+const outputFields = fieldsKeys.reduce((acc, k) => {
+  acc[k as keyof Post] = true;
+  return acc;
+}, {} as { [k in keyof Post]?: true | undefined });
+const result = await api.posts.browse().fields(outputFields).fetch();
+
+----------------------------------------
+
+TITLE: Customizing Fetch Options in TS-Ghost Admin API
+DESCRIPTION: Shows how to customize the fetch request by passing options to the fetch method. The example demonstrates setting the cache behavior to 'no-cache'.
+
+LANGUAGE: typescript
+CODE:
+let query = await api.posts
+  .browse({
+    limit: 5,
+    order: "title DESC",
+  })
+  .fetch({
+    cache: "no-cache",
+  });
+
+----------------------------------------
+
+TITLE: Result Type Definition for fetch() Method in Ghost API
+DESCRIPTION: TypeScript type definition showing the return type of the fetch() method, including success and error cases. Shows the structure of pagination metadata when successful.
+
+LANGUAGE: typescript
+CODE:
+// example for the browse query (the data is an array of objects)
+const result: {
+    success: true;
+    data: Post[];
+    meta: {
+        pagination: {
+            pages: number;
+            limit: number | "all";
+            page: number;
+            total: number;
+            prev: number | null;
+            next: number | null;
+        };
+    };
+} | {
+    success: false;
+    errors: {
+        message: string;
+        type: string;
+    }[];
+}
+
+----------------------------------------
+
+TITLE: Handling Unknown Filter/Order Parameters with Type Helpers
+DESCRIPTION: Uses the BrowseParams type helper to handle uncontrolled user input for Ghost API's ordering and filtering parameters while maintaining type safety.
+
+LANGUAGE: ts
+CODE:
+import type { BrowseParams, Post } from "@ts-ghost/admin-api";
+
+const uncontrolledOrderInput = async (formData: FormData) => {
+  const order = formData.get("order");
+  const filter = formData.get("filter");
+  const result = await api.posts
+    .browse({ order, filter } as BrowseParams<{ order: string; filter: string }, Post>)
+    .fetch();
+};
+
+----------------------------------------
+
+TITLE: Using Multiple Identity Fields with Priority Order in TS-Ghost Admin API
+DESCRIPTION: Shows how to use multiple identity fields in a single query, demonstrating the priority order (id > slug > email) when multiple fields are provided. The example indicates that id will take priority over email.
+
+LANGUAGE: typescript
+CODE:
+let query = api.users.read({
+  id: "edHks74hdKqhs34izzahd45", // id will take priority
+  email: "philippe@ts-ghost.com",
+});
+
+----------------------------------------
+
+TITLE: Result Type Definition for paginate() Method in Ghost API
+DESCRIPTION: TypeScript type definition showing the return type of the paginate() method, which includes a next fetcher property for convenient pagination handling.
+
+LANGUAGE: typescript
+CODE:
+const result: {
+    success: true;
+    data: Post[];
+    meta: {
+        pagination: {
+            pages: number;
+            limit: number | "all";
+            page: number;
+            total: number;
+            prev: number | null;
+            next: number | null;
+        };
+    };
+    next: BrowseFetcher | undefined; // the next page fetcher if it is defined
+} | {
+    success: false;
+    errors: {
+        message: string;
+        type: string;
+    }[];
+    next: undefined; // the next page fetcher is undefined here
+}
+
+----------------------------------------
+
+TITLE: Installing the TypeScript Ghost Content API Package
+DESCRIPTION: Command to install the @ts-ghost/content-api package using pnpm package manager.
+
+LANGUAGE: bash
+CODE:
+pnpm add @ts-ghost/content-api
+
+----------------------------------------
+
+TITLE: Ghost API Read Result Type Definition
+DESCRIPTION: TypeScript type definition showing the return type structure of the fetch method after a read query. The result is a discriminated union with success boolean as discriminator.
+
+LANGUAGE: typescript
+CODE:
+// example for the read query (the data is an object)
+const result: {
+    success: true;
+    data: Post; // parsed by the Zod Schema and modified by the fields selected
+} | {
+    success: false;
+    errors: {
+        message: string;
+        type: string;
+    }[];
+}
+
+----------------------------------------
+
+TITLE: Handling Dynamic Query Parameters in ts-ghost
+DESCRIPTION: Recipe for handling dynamic or user-controlled query parameters in ts-ghost Content API using type casting and the BrowseParams helper type.
+
+LANGUAGE: typescript
+CODE:
+import type { BrowseParams, Post } from "@ts-ghost/content-api";
+
+const uncontrolledOrderInput = async (formData: FormData) => {
+  const order = formData.get("order");
+  const filter = formData.get("filter");
+  const result = await api.posts
+    .browse({ order, filter } as BrowseParams<{ order: string; filter: string }, Post>)
+    .fetch();
+};
+
+----------------------------------------
+
+TITLE: Setting Environment Variables for Ghost API
+DESCRIPTION: Example of environment variables needed for connecting to a Ghost blog, including the URL and Content API key.
+
+LANGUAGE: env
+CODE:
+GHOST_URL="https://myblog.com"
+GHOST_CONTENT_API_KEY="e9b414c5d95a5436a647ff04ab"
+
+----------------------------------------
+
+TITLE: Using .formats() Method to Request Specific Content Formats in TypeScript
+DESCRIPTION: Shows how to use the .formats() method to include additional content formats like html or plaintext that aren't provided by default for Post and Page resources.
+
+LANGUAGE: typescript
+CODE:
+const bf = new BrowseFetcher(
+  "posts",
+  { schema: simplifiedSchema, output: simplifiedSchema, include: simplifiedIncludeSchema },
+  {},
+  httpClient
+);
+let result = await bf
+  .formats({
+    html: true,
+    plaintext: true,
+  })
+  .fetch();
+
+----------------------------------------
+
+TITLE: Ordering Posts in Ghost API with TypeScript Safety
+DESCRIPTION: Shows how to order API results by fields with TypeScript lint errors for unknown fields. This example orders posts by title in descending order.
+
+LANGUAGE: typescript
+CODE:
+let query = await api.posts
+  .browse({
+    order: "title DESC",
+  })
+  .fetch();
+
+----------------------------------------
+
+TITLE: Complete Browse Query with Ghost Content API
+DESCRIPTION: Example of a browse query with all available options including page, limit, filter, and order. Demonstrates the full capability of the browse method parameters.
+
+LANGUAGE: typescript
+CODE:
+let query = api.posts.browse({
+  page: 1,
+  limit: 5,
+  filter: "name:bar+slug:-test",
+  //      ^? the text here will throw a TypeScript lint error if you use unknown fields.
+  order: "title DESC",
+  //      ^? the text here will throw a TypeScript lint error if you use unknown fields.
+});
+
+----------------------------------------
+
+TITLE: Editing Records with edit() Method in TypeScript
+DESCRIPTION: Shows how to update existing records using the edit() method. The method requires the record ID and takes an input object with partial fields to update.
+
+LANGUAGE: typescript
+CODE:
+let newPost = await composedAPI.edit("edHks74hdKqhs34izzahd45", {
+  title: "My new post",
+});
+
+----------------------------------------
+
+TITLE: Ordering Posts by Title in Ghost API
+DESCRIPTION: Example showing how to order posts by title in descending order using the order parameter with TypeScript validation for fields.
+
+LANGUAGE: typescript
+CODE:
+let query = await api.posts
+  .browse({
+    order: "title DESC",
+  })
+  .fetch();
+
+----------------------------------------
+
+TITLE: Ordering Tags by Post Count in Ghost API
+DESCRIPTION: Demonstrates how to use nested properties for ordering, fetching the first 3 public tags with the most posts, and including the post count in the results.
+
+LANGUAGE: typescript
+CODE:
+api.tags
+.browse({
+  order: "count.posts DESC",
+  filter: "visibility:public",
+  limit: 3,
+})
+.include({ "count.posts": true })
+.fetch(),
+
+----------------------------------------
+
+TITLE: Response Structure for Delete Operation
+DESCRIPTION: This code snippet shows the TypeScript type definition for the response returned by the delete method. The response is a discriminated union with a success flag that indicates whether the deletion was successful or not, and error details when unsuccessful.
+
+LANGUAGE: typescript
+CODE:
+// return from the `delete` method
+const result: {
+    success: true;
+} | {
+    success: false;
+    errors: {
+        message: string;
+        type: string;
+    }[];
+}
+
+----------------------------------------
+
+TITLE: Filtering Posts with TypeScript-safe Filter Syntax in Ghost API
+DESCRIPTION: Demonstrates how to filter posts using Ghost's filter syntax with TypeScript safety. This example shows how to get all featured posts except one with a specific slug.
+
+LANGUAGE: typescript
+CODE:
+const slugToExclude = "test";
+
+let query = await api.posts
+  .browse({
+    filter: `featured:true+slug:-${slugToExclude}`,
+  })
+  .fetch();
+
+----------------------------------------
+
+TITLE: Including Related Data in Ghost API Response
+DESCRIPTION: Demonstrates how to include additional related data in the API response using the include method, such as adding post counts to author data.
+
+LANGUAGE: typescript
+CODE:
+let result = await api.authors
+  .read({
+    slug: "phildl",
+  })
+  .include({ "count.posts": true })
+  .fetch();
+
+----------------------------------------
+
+TITLE: Understanding Delete Result Types in TSGhost
+DESCRIPTION: Shows the TypeScript interface for the result returned by the delete method, which includes only success status or error information without data due to Ghost API's empty response.
+
+LANGUAGE: typescript
+CODE:
+// return from the `delete` method
+const result: {
+    success: true;
+} | {
+    success: false;
+    errors: {
+        message: string;
+        type: string;
+    }[];
+}
+
+----------------------------------------
+
+TITLE: Browsing Tags with Nested Properties in Ghost API
+DESCRIPTION: Example of querying tags ordered by post count, filtered by visibility, with a limit. Demonstrates using nested properties in the order parameter and including counts.
+
+LANGUAGE: typescript
+CODE:
+api.tags
+.browse({
+  order: "count.posts DESC",
+  filter: "visibility:public",
+  limit: 3,
+})
+.include({ "count.posts": true })
+.fetch(),
+
+----------------------------------------
+
+TITLE: Installing ts-ghost in a NextJS Project
+DESCRIPTION: Terminal command to install the ts-ghost Content API in a NextJS project using pnpm package manager.
+
+LANGUAGE: bash
+CODE:
+pnpm add @ts-ghost/content-api
+
+----------------------------------------
+
+TITLE: Selecting Specific Fields for Ghost Members Query
+DESCRIPTION: Example of using the fields method to specify which attributes to return from a members query, optimizing the response payload.
+
+LANGUAGE: typescript
+CODE:
+let query = api.members
+  .browse({
+    limit: 5,
+    order: "email ASC",
+  })
+  .fields({
+    id: true,
+    email: true,
+    name: true,
+  });
+
+----------------------------------------
+
+TITLE: Ordering by nested properties in TSGhost Admin API
+DESCRIPTION: Example of ordering by nested properties, fetching the first 3 tags with the most posts by using count.posts in the order parameter.
+
+LANGUAGE: typescript
+CODE:
+api.tags
+.browse({
+  order: "count.posts DESC",
+  filter: "visibility:public",
+  limit: 3,
+})
+.include({ "count.posts": true })
+.fetch(),
+
+----------------------------------------
+
+TITLE: Preserving Type Safety with satisfies in ts-ghost
+DESCRIPTION: Using TypeScript's satisfies operator to maintain type safety when pre-declaring field selections in ts-ghost Content API.
+
+LANGUAGE: typescript
+CODE:
+const outputFields = {
+  slug: true,
+  title: true,
+} satisfies { [k in keyof Post]?: true | undefined };
+
+let test = api.posts.browse().fields(outputFields);
+
+----------------------------------------
+
+TITLE: Selecting Specific Fields with the Ghost Content API
+DESCRIPTION: Example of field selection in a browse query to limit the returned data to only certain properties. This is part of the query building process before making the API call.
+
+LANGUAGE: typescript
+CODE:
+let query = api.posts
+  .browse({
+    limit: 5,
+    order: "title DESC",
+  })
+  .fields({
+    id: true,
+    slug: true,
+    title: true,
+  });
+
+----------------------------------------
+
+TITLE: Selecting Multiple Fields with fields() Method in tsghost
+DESCRIPTION: Shows a more detailed example of using the fields() method to select multiple specific fields (id, slug, title) when fetching a post. The result type is automatically modified to match the selected fields.
+
+LANGUAGE: typescript
+CODE:
+let result = await api.posts
+  .read({
+    slug: "typescript-is-cool",
+  })
+  .fields({
+    id: true,
+    slug: true,
+    title: true,
+  })
+  .fetch();
+
+if (result.success) {
+  const post = result.data;
+  //     ^? type {"id": string; "slug":string; "title": string}
+}
+
+----------------------------------------
+
+TITLE: Installing @ts-ghost/core-api Package with PNPM
+DESCRIPTION: Command to install the @ts-ghost/core-api package using the PNPM package manager.
+
+LANGUAGE: shell
+CODE:
+pnpm i @ts-ghost/core-api
+
+----------------------------------------
+
+TITLE: Not Recommended: Using Multiple Identity Fields in Ghost API Read Method
+DESCRIPTION: Example showing that multiple identity fields can be provided but id takes priority. This pattern is documented as not recommended in the API usage.
+
+LANGUAGE: typescript
+CODE:
+let query = api.posts.read({
+  id: "edHks74hdKqhs34izzahd45", // id will take priority
+  slug: "typescript-is-awesome-in-2025",
+});
+
+----------------------------------------
+
+TITLE: Including Related Data with include() Method in tsghost
+DESCRIPTION: Demonstrates how to use the include() method to fetch additional related data that isn't included by default in the Ghost API response. The example shows including post count for an author.
+
+LANGUAGE: typescript
+CODE:
+let result = await api.authors
+  .read({
+    slug: "phildl",
+  })
+  .include({ "count.posts": true })
+  .fetch();
+
+----------------------------------------
+
+TITLE: Browse Method Options for Ghost API Queries
+DESCRIPTION: Demonstrates all available options for the browse method of the APIComposer including pagination, limits, filtering, and ordering. These parameters are validated through Zod schemas.
+
+LANGUAGE: typescript
+CODE:
+const composedAPI = new APIComposer(
+  { schema: simplifiedSchema, identitySchema: identitySchema, include: simplifiedIncludeSchema },
+  api
+);
+let query = composedAPI.browse({
+  page: 1,
+  limit: 5,
+  filter: "title:typescript+slug:-test",
+  order: "title DESC",
+});
+
+----------------------------------------
+
+TITLE: Using NextJS-specific Fetch Options with ts-ghost
+DESCRIPTION: Example showing how to use NextJS-specific fetch options with ts-ghost Content API, including the revalidation timing configuration.
+
+LANGUAGE: typescript
+CODE:
+let query = await api.posts
+  .browse({
+    limit: 5,
+    order: "title DESC",
+  })
+  .fetch({ next: { revalidate: 10 } }); // NextJS revalidate this data every 10 seconds at most
+
+----------------------------------------
+
+TITLE: Browse Query Response Type Structure with .fetch()
+DESCRIPTION: Type definition for the response returned by the .fetch() method when performing a browse query. The result is a discriminated union that either contains successful data with pagination metadata or an error response.
+
+LANGUAGE: typescript
+CODE:
+// example for the browse query (the data is an array of objects)
+const result: {
+    success: true;
+    data: z.infer<typeof simplifiedSchema>[];
+    meta: {
+        pagination: {
+            pages: number;
+            limit: number;
+            page: number;
+            total: number;
+            prev: number | null;
+            next: number | null;
+        };
+    };
+} | {
+    success: false;
+    errors: {
+        message: string;
+        type: string;
+    }[];
+}
+
+----------------------------------------
+
+TITLE: Read Method Options for Ghost API Queries
+DESCRIPTION: Shows how to use the read method to fetch single records by ID or slug. Only one identifier is required, and if both are provided, ID takes precedence.
+
+LANGUAGE: typescript
+CODE:
+const composedAPI = new APIComposer(
+  { schema: simplifiedSchema, identitySchema: identitySchema, include: simplifiedIncludeSchema },
+  api
+);
+let query = composedAPI.read({
+  id: "edHks74hdKqhs34izzahd45"
+});
+
+// or
+
+let query = composedAPI.read({
+  slug: "typescript-is-awesome-in-2025"
+});
+
+----------------------------------------
+
+TITLE: Implementing ts-ghost in a Remix Route Loader
+DESCRIPTION: Complete example of using ts-ghost Content API in a Remix route loader to fetch Ghost settings and posts data, with error handling and rendering.
+
+LANGUAGE: tsx
+CODE:
+import { json, type LoaderArgs, type V2_MetaFunction } from "@remix-run/node";
+import { Link, useLoaderData } from "@remix-run/react";
+import { TSGhostContentAPI } from "@ts-ghost/content-api";
+
+export const meta: V2_MetaFunction = () => {
+  return [{ title: "New Remix App" }];
+};
+
+export async function loader({ request }: LoaderArgs) {
+  const api = new TSGhostContentAPI(
+    process.env.GHOST_URL || "",
+    process.env.GHOST_CONTENT_API_KEY || "",
+    "v5.0"
+  );
+  const [settings, posts] = await Promise.all([api.settings.fetch(), api.posts.browse().fetch()]);
+
+  if (!settings.success) {
+    throw new Error(settings.errors.join(", "));
+  }
+  if (!posts.success) {
+    throw new Error(posts.errors.join(", "));
+  }
+  return json({ settings: settings.data, posts: posts.data });
+}
+
+export default function Index() {
+  const { settings, posts } = useLoaderData<typeof loader>();
+
+  return (
+    <div style={{ fontFamily: "system-ui, sans-serif", lineHeight: "1.4" }}>
+      <h1>This is a list of posts for {settings.title}:</h1>
+      <ul>
+        {posts.map((post) => (
+          <li key={post.slug}>
+            <Link to={`/${post.slug}`}>{post.title}</Link>
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
+----------------------------------------
+
+TITLE: Handling Browse Query Results in Ghost API
+DESCRIPTION: Demonstrates the typical workflow for handling browse query results, checking for success and accessing the returned data. Shows handling of the discriminated union return type.
+
+LANGUAGE: typescript
+CODE:
+let result = await api.posts.browse().fetch();
+if (result.success) {
+  const posts = result.data;
+  //     ^? type Post[]
+} else {
+  // errors array of objects
+  console.log(result.errors.map((e) => e.message).join("\n"));
+}
+
+----------------------------------------
+
+TITLE: Manual Instantiation of BrowseFetcher for Ghost API
+DESCRIPTION: Demonstrates how to manually instantiate a BrowseFetcher, which is typically handled automatically by the APIComposer. Includes configuration of schemas and browse parameters.
+
+LANGUAGE: typescript
+CODE:
+import { BrowseFetcher } from "@ts-ghost/core-api";
+
+// Example of instantiating a Fetcher, even though you will probably not do it
+const browseFetcher = new BrowseFetcher(
+  {
+    schema: simplifiedSchema,
+    output: simplifiedSchema,
+    include: simplifiedIncludeSchema,
+  },
+  {
+    browseParams: {
+      limit: 1,
+    },
+  },
+  api
+);
+
+----------------------------------------
+
+TITLE: Initializing the Ghost Content API Client
+DESCRIPTION: Example of initializing the TSGhostContentAPI class with a Ghost blog URL, API key, and version number. This is the entry point for using the content API.
+
+LANGUAGE: typescript
+CODE:
+import { TSGhostContentAPI } from "@ts-ghost/content-api";
+
+const api = new TSGhostContentAPI("https://demo.ghost.io", "22444f78447824223cefc48062", "v5.0");
+
+----------------------------------------
+
+TITLE: Handling Browse Method Results with TypeScript
+DESCRIPTION: Example of how to handle the response from the browse method fetch operation, using TypeScript's discriminated unions to properly type-check the success or error cases.
+
+LANGUAGE: typescript
+CODE:
+let result = await api.posts.browse().fetch();
+if (result.success) {
+  const posts = result.data;
+  //     ^? type Post[]
+} else {
+  // errors array of objects
+  console.log(result.errors.map((e) => e.message).join("\n"));
+}
+
+----------------------------------------
+
+TITLE: Browse Query Response Type Structure with .paginate()
+DESCRIPTION: Type definition for the response returned by the .paginate() method. Similar to .fetch() but includes a 'next' property that contains the fetcher for the next page of results if available.
+
+LANGUAGE: typescript
+CODE:
+const result: {
+    success: true;
+    data: z.infer<typeof simplifiedSchema>[];
+    meta: {
+        pagination: {
+            pages: number;
+            limit: number;
+            page: number;
+            total: number;
+            prev: number | null;
+            next: number | null;
+        };
+    };
+    next: BrowseFetcher | undefined; // the next page fetcher if it is defined
+} | {
+    success: false;
+    errors: {
+        message: string;
+        type: string;
+    }[];
+    next: undefined; // the next page fetcher is undefined here
+}
+
+----------------------------------------
+
+TITLE: Instantiating APIComposer with Zod Schemas
+DESCRIPTION: Creates an APIComposer instance with required schemas for type-safe API interactions. Demonstrates how to set up the credentials, HTTP client, and define various Zod schemas for validation.
+
+LANGUAGE: typescript
+CODE:
+import { z } from "zod";
+import { APIComposer, HTTPClient, type HTTPClientOptions } from "@ts-ghost/core-api";
+
+const credentials: HTTPClientOptions = {
+  url: "https://ghost.org",
+  key: "7d2d15d7338526d43c2fadc47c",
+  version: "v5.0",
+  endpoint: "content",
+};
+
+const httpClient = new HTTPClient(credentials);
+
+const simplifiedSchema = z.object({
+  title: z.string(),
+  slug: z.string(),
+  count: z.number().optional(),
+});
+
+// the "identity" schema is used to validate the inputs of the `read`method of the APIComposer
+const identitySchema = z.union([z.object({ slug: z.string() }), z.object({ id: z.string() })]);
+
+// the "include" schema is used to validate the "include" parameters of the API call
+// it is specific to the Ghost API resource targeted.
+// The format is always { 'name_of_the_field': true }
+const simplifiedIncludeSchema = z.object({
+  count: z.literal(true).optional(),
+});
+
+const createSchema = z.object({
+  foo: z.string(),
+  bar: z.string().nullish(),
+  baz: z.boolean().nullish(),
+});
+
+const composedAPI = new APIComposer(
+  "posts",
+  {
+    schema: simplifiedSchema,
+    identitySchema: identitySchema,
+    include: simplifiedIncludeSchema,
+    createSchema: createSchema,
+    createOptionsSchema: z.object({
+      option_1: z.boolean(),
+    }),
+  },
+  HTTPClient
+);
+
+----------------------------------------
+
+TITLE: Creating a Member with Options in TS-Ghost Admin API
+DESCRIPTION: Shows how to create a new member with additional options. The example demonstrates creating a member and disabling the automatic email notification.
+
+LANGUAGE: typescript
+CODE:
+import { TSGhostAdminAPI } from "@ts-ghost/admin-api";
+
+const api = new TSGhostAdminAPI(
+  "https://demo.ghost.io",
+  "1efedd9db174adee2d23d982:4b74dca0219bad629852191af326a45037346c2231240e0f7aec1f9371cc14e8",
+  "v5.0"
+);
+
+const memberAdd = await api.members.add(
+  { name: "Philippe", email: "philippe@ts-ghost.com" },
+  { send_email: false }
+);
+
+----------------------------------------
+
+TITLE: Including Additional Data with .include() Method
+DESCRIPTION: Example demonstrating the .include() method which allows adding extra data not included by default in the Ghost API response. The included fields become non-optional in the resulting type.
+
+LANGUAGE: typescript
+CODE:
+const bf = new BrowseFetcher(
+  { schema: simplifiedSchema, output: simplifiedSchema, include: simplifiedIncludeSchema },
+  {},
+  api
+);
+let result = await bf
+  .include({
+    count: true,
+  })
+  .fetch();
+
+----------------------------------------
+
+TITLE: New Response Structure in TSGhost Core API
+DESCRIPTION: Shows the new response structure with a boolean 'success' property instead of the previous string 'status' property, making it easier to check if a request succeeded or failed.
+
+LANGUAGE: typescript
+CODE:
+// example for the browse query (the data is an array of objects)
+const result:
+  | {
+      success: true;
+      data: Post[];
+      meta: {
+        pagination: {
+          pages: number;
+          limit: number;
+          page: number;
+          total: number;
+          prev: number | null;
+          next: number | null;
+        };
+      };
+    }
+  | {
+      success: false;
+      errors: {
+        message: string;
+        type: string;
+      }[];
+    };
+
+----------------------------------------
+
+TITLE: Combining Multiple Output Modifiers in TS-Ghost Admin API
+DESCRIPTION: Demonstrates how to combine multiple output modifiers to customize the response. The example shows selecting specific fields including content formats, and then specifying which formats to include.
+
+LANGUAGE: typescript
+CODE:
+let result = await api.posts
+  .read({
+    slug: "this-is-a-post-slug",
+  })
+  .fields({
+    title: true,
+    slug: true,
+    plaintext: true,
+    html: true,
+  })
+  .formats({
+    plaintext: true,
+    html: true,
+  })
+  .fetch();
+
+----------------------------------------
+
+TITLE: Using Fetch Options with API Requests
+DESCRIPTION: Example demonstrating how to pass standard RequestInit options to the fetch method when making API requests. This is particularly useful when using NextJS augmented fetch functionality.
+
+LANGUAGE: typescript
+CODE:
+let result = await api.posts.read({ slug: "typescript-is-cool" }).fetch({ cache: "no-store" });
+
+----------------------------------------
+
+TITLE: Setting Environment Variables for Ghost API
+DESCRIPTION: Example of environment variables setup in .env file for storing Ghost blog URL and Admin API key securely.
+
+LANGUAGE: bash
+CODE:
+GHOST_URL="https://myblog.com"
+GHOST_ADMIN_API_KEY="1efedd9db174adee2d23d982:4b74dca0219bad629852191af326a45037346c2231240e0f7aec1f9371cc14e8"
+
+----------------------------------------
+
+TITLE: Understanding Edit Result Types in TSGhost
+DESCRIPTION: Shows the TypeScript interface for the result returned by the edit method, which includes success status and either the updated data or error information.
+
+LANGUAGE: typescript
+CODE:
+// return from the `edit` method
+const result: {
+    success: true;
+    data: Member;
+} | {
+    success: false;
+    errors: {
+        message: string;
+        type: string;
+    }[];
+}
+
+----------------------------------------
+
+TITLE: Create Mutation Response Type Structure
+DESCRIPTION: Type definition for the response returned by the .add() mutation method. The result is a discriminated union that contains either the successfully created record or an error response.
+
+LANGUAGE: typescript
+CODE:
+// return from the `add` method
+const result: {
+    success: true;
+    data: z.infer<typeof simplifiedSchema>; // parsed by the Zod Schema given in the config
+} | {
+    success: false;
+    errors: {
+        message: string;
+        type: string;
+    }[];
+}
+
+----------------------------------------
+
+TITLE: Configuring environment variables for Ghost API access
+DESCRIPTION: Environment variable setup in .env file for Ghost blog URL and Admin API key. These credentials are required to authenticate API requests to the Ghost platform.
+
+LANGUAGE: plaintext
+CODE:
+GHOST_URL="https://myblog.com"
+GHOST_ADMIN_API_KEY="1efedd9db174adee2d23d982:4b74dca0219bad629852191af326a45037346c2231240e0f7aec1f9371cc14e8"
+
+----------------------------------------
+
+TITLE: Edit Mutation Response Type Structure
+DESCRIPTION: Type definition for the response returned by the .edit() mutation method. The result contains either the successfully updated record or an error response.
+
+LANGUAGE: typescript
+CODE:
+// return from the `edit` method
+const result: {
+    success: true;
+    data: z.infer<typeof simplifiedSchema>; // parsed by the Zod Schema given in the config
+} | {
+    success: false;
+    errors: {
+        message: string;
+        type: string;
+    }[];
+}
+
+----------------------------------------
+
+TITLE: Delete Mutation Response Type Structure
+DESCRIPTION: Type definition for the response returned by the .delete() mutation method. The success response contains no data since Ghost API returns an empty 204 response for successful deletions.
+
+LANGUAGE: typescript
+CODE:
+// return from the `delete` method
+const result: {
+    success: true;
+} | {
+    success: false;
+    errors: {
+        message: string;
+        type: string;
+    }[];
+}
+
+----------------------------------------
+
+TITLE: Setting up Environment Variables for Ghost in Remix
+DESCRIPTION: Configuration of environment variables for Ghost URL and API key in a Remix project.
+
+LANGUAGE: bash
+CODE:
+GHOST_URL="https://myblog.com"
+GHOST_CONTENT_API_KEY="e9b414c5d95a5436a647ff04ab"
+
+----------------------------------------
+
+TITLE: Editing an Existing Record with .edit() Method
+DESCRIPTION: Example showing how to update an existing record using the .edit() mutation method. The method requires the record ID and a partial update object containing only the fields that need to be changed.
+
+LANGUAGE: typescript
+CODE:
+let newPost = await composedAPI.edit("edHks74hdKqhs34izzahd45", {
+  title: "My new post",
+});
+
+----------------------------------------
+
+TITLE: Creating a Post with TSGhost Admin API
+DESCRIPTION: Example of creating a new post with the minimum required field 'title'. This demonstrates how to instantiate the API client and use the posts.add() method without options.
+
+LANGUAGE: typescript
+CODE:
+import { TSGhostAdminAPI } from "@ts-ghost/admin-api";
+
+const api = new TSGhostAdminAPI(
+  "https://demo.ghost.io",
+  "1efedd9db174adee2d23d982:4b74dca0219bad629852191af326a45037346c2231240e0f7aec1f9371cc14e8",
+  "v5.0"
+);
+
+const postAdd = await api.posts.add({
+  title: title,
+});
+
+----------------------------------------
+
+TITLE: Configuring Environment Variables for Ghost API
+DESCRIPTION: Sets up the required environment variables for connecting to the Ghost API, including the Ghost URL and Admin API key.
+
+LANGUAGE: bash
+CODE:
+GHOST_URL="https://myblog.com"
+GHOST_ADMIN_API_KEY="1efedd9db174adee2d23d982:4b74dca0219bad629852191af326a45037346c2231240e0f7aec1f9371cc14e8"
+
+----------------------------------------
+
+TITLE: Requesting Additional Content Formats with .formats() Method
+DESCRIPTION: Example showing how to use the .formats() method to request content in additional formats like HTML or plaintext. This is specifically useful for Post and Page resources in the Ghost API.
+
+LANGUAGE: typescript
+CODE:
+const bf = new BrowseFetcher(
+  { schema: simplifiedSchema, output: simplifiedSchema, include: simplifiedIncludeSchema },
+  {},
+  api
+);
+let result = await bf
+  .formats({
+    html: true,
+    plaintext: true,
+  })
+  .fetch();
+
+----------------------------------------
+
+TITLE: Ordering Results with TSGhost Browse Method
+DESCRIPTION: Example of how to order results using the order parameter in the browse method. This demonstrates ordering posts by title in descending order.
+
+LANGUAGE: typescript
+CODE:
+let query = await api.posts
+  .browse({
+    order: "title DESC",
+  })
+  .fetch();
+
+----------------------------------------
+
+TITLE: Exporting Posts Using Content API in Ghost Blog Buster CLI
+DESCRIPTION: Command to export all posts to a specified folder using the Content API when URL and API key are already configured.
+
+LANGUAGE: sh
+CODE:
+ghost-blog-buster export posts --output ./posts
+
+----------------------------------------
+
+TITLE: Fetching Member's Active Subscriptions
+DESCRIPTION: Creates a function to retrieve and filter active subscriptions for a specific member by ID, demonstrating how to access and filter subscription data.
+
+LANGUAGE: typescript
+CODE:
+import { TSGhostAdminAPI } from "@ts-ghost/admin-api";
+
+export const getMemberActiveSubscriptions = async (memberId: string) => {
+  const api = new TSGhostAdminAPI(env.GHOST_URL, env.GHOST_ADMIN_API_KEY, "v5.0");
+  const subscriptions = await api.members.read({ id: memberId }).fields({ subscriptions: true }).fetch();
+  if (!subscriptions.success) {
+    throw new Error(subscriptions.errors.join(", "));
+  }
+  return subscriptions.data.subscriptions.filter((sub) => sub.status === "active");
+};
+
+----------------------------------------
+
+TITLE: Return Type Structure from Edit Method in TSGhost Admin API
+DESCRIPTION: Code snippet showing the TypeScript type definition for the result returned by the edit method. It illustrates the union type that can either represent a successful operation with the updated record or a failed operation with error details.
+
+LANGUAGE: typescript
+CODE:
+// return from the `edit` method
+const result: {
+    success: true;
+    data: Member;
+} | {
+    success: false;
+    errors: {
+        message: string;
+        type: string;
+    }[];
+}
+
+----------------------------------------
+
+TITLE: Piping export output to a file
+DESCRIPTION: Example of exporting author information and redirecting the output to a JSON file using shell redirection.
+
+LANGUAGE: sh
+CODE:
+ghost-blog-buster export authors --host https://astro-starter.digitalpress.blog --key e9b414c5d95a5436a647ff04ab > authors.json
+
+----------------------------------------
+
+TITLE: Retrieving Active Paid Tiers with Ghost Admin API in TypeScript
+DESCRIPTION: Fetches all active and paid tiers from a Ghost blog using the Admin API. The code demonstrates how to filter tiers and include additional data like benefits and pricing information in the response.
+
+LANGUAGE: typescript
+CODE:
+import { TSGhostAdminAPI } from "@ts-ghost/admin-api";
+
+const api = new TSGhostAdminAPI(env.GHOST_URL, env.GHOST_ADMIN_API_KEY, "v5.0");
+const tiers = await api.tiers
+  .browse({
+    filter: "active:true+type:paid",
+  })
+  .include({ benefits: true, monthly_price: true, yearly_price: true })
+  .fetch();
+
+if (!tiers.success) {
+  throw new Error(tiers.errors.join(", "));
+}
+console.log(tiers);
+
+----------------------------------------
+
+TITLE: Fetching posts with cache control in tsghost
+DESCRIPTION: Example of fetching Ghost posts with custom cache behavior using the tsghost library. This demonstrates how to browse posts with a limit and sorting order while specifying the fetch cache option.
+
+LANGUAGE: typescript
+CODE:
+let query = await api.posts
+  .browse({
+    limit: 5,
+    order: "title DESC",
+  })
+  .fetch({
+    cache: "no-cache",
+  });
+
+----------------------------------------
+
+TITLE: Exporting posts with the Admin API
+DESCRIPTION: Command for exporting posts using the Admin API, which allows access to premium/paid content behind subscriptions.
+
+LANGUAGE: sh
+CODE:
+ghost-blog-buster export-admin posts --output ./posts
+
+----------------------------------------
+
+TITLE: Reading a User with Multiple Identity Fields (Not Recommended)
+DESCRIPTION: Demonstrates using multiple identity fields in a read request, showing how the API prioritizes fields in the order: id > slug > email.
+
+LANGUAGE: typescript
+CODE:
+let query = api.users.read({
+  id: "edHks74hdKqhs34izzahd45", // id will take priority
+  email: "philippe@ts-ghost.com",
+});
+
+----------------------------------------
+
+TITLE: Creating a New Member with Ghost Admin API in TypeScript
+DESCRIPTION: Creates a new member with basic information (name and email) using the Ghost Admin API. The code initializes the API client and adds a new member with the option to suppress email notifications.
+
+LANGUAGE: typescript
+CODE:
+import { TSGhostAdminAPI } from "@ts-ghost/admin-api";
+
+const api = new TSGhostAdminAPI(env.GHOST_URL, env.GHOST_ADMIN_API_KEY, "v5.0");
+
+const membersAdd = await api.members.add(
+  { name: "Philippe", email: "philippe@ts-ghost.com" },
+  { send_email: false }
+);
+
+----------------------------------------
+
+TITLE: Installing Ghost Blog Buster CLI tool
+DESCRIPTION: Commands to install and run the Ghost Blog Buster CLI tool, which allows interaction with a Ghost blog through Content API or Admin API.
+
+LANGUAGE: shell
+CODE:
+npx @ts-ghost/ghost-blog-buster
+
+LANGUAGE: shell
+CODE:
+npm install -g @ts-ghost/ghost-blog-buster
+
+----------------------------------------
+
+TITLE: Deleting a Member Using TS-Ghost Admin API
+DESCRIPTION: This example demonstrates how to delete a member record from Ghost using the TSGhostAdminAPI client. It initializes the API with a URL, authentication credentials, and API version, then calls the delete method with the member's ID and handles potential errors.
+
+LANGUAGE: typescript
+CODE:
+import { TSGhostAdminAPI } from "@ts-ghost/admin-api";
+
+const api = new TSGhostAdminAPI(
+  "https://demo.ghost.io",
+  "1efedd9db174adee2d23d982:4b74dca0219bad629852191af326a45037346c2231240e0f7aec1f9371cc14e8",
+  "v5.0"
+);
+const result = await api.members.delete("edHks74hdKqhs34izzahd45");
+
+if (!result.success) {
+  console.error(result.errors);
+  throw new Error("Failed to delete Member");
+}
+
+----------------------------------------
+
+TITLE: Updating a Member with Stripe Customer ID in TypeScript
+DESCRIPTION: Updates an existing member to add their Stripe customer ID using the Ghost Admin API. This code shows how to edit a member record by ID, which is useful for adding payment information after initial registration.
+
+LANGUAGE: typescript
+CODE:
+import { TSGhostAdminAPI } from "@ts-ghost/admin-api";
+
+const api = new TSGhostAdminAPI(env.GHOST_URL, env.GHOST_ADMIN_API_KEY, "v5.0");
+
+const membersEdit = await api.members.edit(
+  "edHks74hdKqhs34izzahd45",
+  { stripe_customer_id: "cus_123456789" },
+  { send_email: false }
+);
+
+----------------------------------------
+
+TITLE: Installing TS Ghost Admin API Package
+DESCRIPTION: Command to install the Admin API package for TypeScript, which provides strongly typed access to manage blog posts, pages, members, tags, tiers, offers, newsletters, and more.
+
+LANGUAGE: shell
+CODE:
+npm install @ts-ghost/admin-api
+
+----------------------------------------
+
+TITLE: Instantiating APIComposer with Zod Schemas for Ghost API
+DESCRIPTION: Demonstrates how to instantiate the APIComposer class with appropriate Zod schemas for validating API requests and responses. It sets up credentials and defines schemas for reading and creating Ghost resources.
+
+LANGUAGE: typescript
+CODE:
+import { z } from "zod";
+import { APIComposer, type ContentAPICredentials } from "@ts-ghost/core-api";
+
+const api: ContentAPICredentials = {
+  url: "https://ghost.org",
+  key: "7d2d15d7338526d43c2fadc47c",
+  version: "v5.0",
+  resource: "posts",
+};
+
+const simplifiedSchema = z.object({
+  title: z.string(),
+  slug: z.string(),
+  count: z.number().optional(),
+});
+
+// the "identity" schema is used to validate the inputs of the `read`method of the APIComposer
+const identitySchema = z.union([z.object({ slug: z.string() }), z.object({ id: z.string() })]);
+
+// the "include" schema is used to validate the "include" parameters of the API call
+// it is specific to the Ghost API resource targeted.
+// The format is always { 'name_of_the_field': true }
+const simplifiedIncludeSchema = z.object({
+  count: z.literal(true).optional(),
+});
+
+const createSchema = z.object({
+  foo: z.string(),
+  bar: z.string().nullish(),
+  baz: z.boolean().nullish(),
+});
+
+const composedAPI = new APIComposer(
+  {
+    schema: simplifiedSchema,
+    identitySchema: identitySchema,
+    include: simplifiedIncludeSchema,
+    createSchema: createSchema,
+    createOptionsSchema: z.object({
+      option_1: z.boolean(),
+    }),
+  },
+  api
+);
+
+----------------------------------------
+
+TITLE: Getting Member's Active Subscriptions with Ghost Admin API in TypeScript
+DESCRIPTION: Creates a function to retrieve active subscriptions for a specific member using the Ghost Admin API. This utility function fetches subscription data and filters it to return only those with an 'active' status.
+
+LANGUAGE: typescript
+CODE:
+import { TSGhostAdminAPI } from "@ts-ghost/admin-api";
+
+export const getMemberActiveSubscriptions = async (memberId: string) => {
+  const api = new TSGhostAdminAPI(env.GHOST_URL, env.GHOST_ADMIN_API_KEY, "v5.0");
+  const subscriptions = await api.members.read({ id: memberId }).fields({ subscriptions: true }).fetch();
+  if (!subscriptions.success) {
+    throw new Error(subscriptions.errors.join(", "));
+  }
+  return subscriptions.data.subscriptions.filter((sub) => sub.status === "active");
+};
+
+----------------------------------------
+
+TITLE: Installing ts-ghost Admin API Package
+DESCRIPTION: Command to install the @ts-ghost/admin-api package using pnpm package manager.
+
+LANGUAGE: bash
+CODE:
+pnpm add @ts-ghost/admin-api
+
+----------------------------------------
+
+TITLE: Defining HTTPClientFactory Interface and Class in TypeScript
+DESCRIPTION: Code snippet showing the interface and implementation for the HTTPClientFactory, which replaced direct HTTPClient instances. The factory creates new HttpClient instances for each request with the specified configuration options.
+
+LANGUAGE: typescript
+CODE:
+export type HTTPClientOptions = {
+  key: string;
+  version: APICredentials["version"];
+  url: APICredentials["url"];
+  endpoint: "content" | "admin";
+};
+
+export interface IHTTPClientFactory {
+  create(config: HTTPClientOptions): HTTPClient;
+}
+
+export class HTTPClientFactory implements IHTTPClientFactory {
+  constructor(private config: HTTPClientOptions) {}
+
+  public create() {
+    return new HTTPClient(this.config);
+  }
+}
+
+----------------------------------------
+
+TITLE: Setting Up Environment Variables for Ghost API
+DESCRIPTION: Environment variables configuration for Ghost blog URL and admin API key in the .env file.
+
+LANGUAGE: bash
+CODE:
+GHOST_URL="https://myblog.com"
+GHOST_ADMIN_API_KEY="1efedd9db174adee2d23d982:4b74dca0219bad629852191af326a45037346c2231240e0f7aec1f9371cc14e8"
+
+----------------------------------------
+
+TITLE: Installing ts-ghost Admin API Package
+DESCRIPTION: Command to install the Ghost Admin API TypeScript package using the pnpm package manager.
+
+LANGUAGE: bash
+CODE:
+pnpm add @ts-ghost/admin-api
+
+----------------------------------------
+
+TITLE: Implementing APIComposer for Ghost API Access in TypeScript
+DESCRIPTION: Example showing how to initialize and use the new APIComposer to interact with Ghost's API, including schema definitions and basic fetching functionality.
+
+LANGUAGE: typescript
+CODE:
+import { APIComposer, type ContentAPICredentials } from "@ts-ghost/core-api";
+
+const api: ContentAPICredentials = {
+  url: "https://ghost.org",
+  key: "1234",
+  version: "v5.0",
+  resource: "posts",
+  endpoint: "content",
+};
+
+const simplifiedSchema = z.object({
+  id: z.string(),
+  foo: z.string(),
+  bar: z.string(),
+  baz: z.boolean().optional(),
+  count: z.number().optional(),
+});
+
+const simplifiedIncludeSchema = z.object({
+  count: z.literal(true).optional(),
+  "count.posts": z.literal(true).optional(),
+});
+
+const identitySchema = z.union([
+  z.object({ id: z.string() }),
+  z.object({ slug: z.string() }),
+  z.object({ email: z.string() }),
+]);
+
+const createSchema = z.object({
+  foo: z.string(),
+  bar: z.string().nullish(),
+  baz: z.boolean().nullish(),
+});
+
+const composer = new APIComposer(
+  {
+    schema: simplifiedSchema,
+    identitySchema: identitySchema,
+    include: simplifiedIncludeSchema,
+    // optional
+    createSchema,
+    // optional
+    createOptionsSchema: z.object({
+      option_1: z.boolean(),
+    }),
+  },
+  api,
+);
+
+const res = await composer
+  .browse({
+    limit: 10,
+    page: 2,
+  })
+  .fetch();
+
+----------------------------------------
+
+TITLE: Initializing Ghost Admin API in NextJS
+DESCRIPTION: TypeScript file that initializes the TSGhostAdminAPI instance with environment variables for use throughout the app.
+
+LANGUAGE: ts
+CODE:
+import { TSGhostAdminAPI } from "@ts-ghost/admin-api";
+
+export const api = new TSGhostAdminAPI(
+  process.env.GHOST_URL || "",
+  process.env.GHOST_ADMIN_API_KEY || "",
+  "v5.0"
+);
+
+----------------------------------------
+
+TITLE: Installing TS-Ghost Core API Package with PNPM
+DESCRIPTION: Command to install the @ts-ghost/core-api package using PNPM. This is an internal package containing the building blocks for Content and Admin packages.
+
+LANGUAGE: shell
+CODE:
+pnpm i @ts-ghost/core-api
+
+----------------------------------------
+
+TITLE: Legacy Identity Schema Implementation in QueryBuilder
+DESCRIPTION: Demonstrates how identity schemas were implemented in the previous QueryBuilder API, showing the pattern for validating input parameters for read operations.
+
+LANGUAGE: typescript
+CODE:
+import { z } from "zod";
+import { QueryBuilder, type ContentAPICredentials } from "@ts-ghost/core-api";
+
+const api: ContentAPICredentials = {
+  url: "https://ghost.org",
+  key: "7d2d15d7338526d43c2fadc47c",
+  version: "v5.0",
+  resource: "posts",
+};
+
+const simplifiedSchema = z.object({
+  title: z.string(),
+  slug: z.string(),
+  count: z.number().optional(),
+});
+
+// the "identity" schema is used to validate the inputs of the `read`method of the QueryBuilder
+const identitySchema = z.union([
+  z.object({ slug: z.string() }),
+  z.object({ id: z.string() }),
+]);
+
+const simplifiedIncludeSchema = z.object({
+  count: z.literal(true).optional(),
+});
+
+const qb = new QueryBuilder(
+  {
+    schema: simplifiedSchema,
+    identitySchema: identitySchema,
+    include: simplifiedIncludeSchema,
+  },
+  api,
+);
+
+----------------------------------------
+
+TITLE: Implementing Ghost API Calls in NextJS Server Component
+DESCRIPTION: NextJS server component that fetches blog posts and site settings from Ghost using the admin API, then renders the data in a React component.
+
+LANGUAGE: tsx
+CODE:
+import { api } from "./ghost";
+
+async function getBlogPosts() {
+  const response = await api.posts.browse().fields({ title: true, slug: true, id: true }).fetch();
+  if (!response.success) {
+    throw new Error(response.errors.join(", "));
+  }
+  return response.data;
+}
+
+async function getSiteSettings() {
+  const response = await api.site.fetch();
+  if (!response.success) {
+    throw new Error(response.errors.join(", "));
+  }
+  return response.data;
+}
+
+// async Server Component
+export default async function HomePage() {
+  const [posts, site] = await Promise.all([getBlogPosts(), getSiteSettings()]);
+  return (
+    <div>
+      <h1>This is a list of posts for {site.title}:</h1>
+      <ul>
+        {posts.map((post) => (
+          <li key={post.id}>
+            {post.title} ({post.slug})
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
+----------------------------------------
+
+TITLE: Running Ghost Blog Buster from Terminal
+DESCRIPTION: Executes the Ghost Blog Buster tool from the terminal after global installation. This command launches the interactive version of the tool.
+
+LANGUAGE: bash
+CODE:
+ghost-blog-buster
+
+----------------------------------------
+
+TITLE: Creating Ghost API Client for NextJS App Router
+DESCRIPTION: Setting up a shared Ghost API client instance for use throughout a NextJS application with app router.
+
+LANGUAGE: typescript
+CODE:
+import { TSGhostContentAPI } from "@ts-ghost/content-api";
+
+export const api = new TSGhostContentAPI(
+  process.env.GHOST_URL || "",
+  process.env.GHOST_CONTENT_API_KEY || "",
+  "v5.0"
+);
+
+----------------------------------------
+
+TITLE: Selecting Fields with fields() in Ghost API
+DESCRIPTION: Demonstrates how to use the fields() modifier to select specific fields in both read and browse operations with the Ghost API. This reduces the response payload to only contain requested fields while maintaining type safety.
+
+LANGUAGE: typescript
+CODE:
+// Example with read...
+let result = await api.posts.read({ slug: "slug"}).fields({ title: true }).fetch();
+
+// ... and with browse
+let result = await api.posts.browse({limit: 2}).fields({ title: true }).fetch();
+
+----------------------------------------
+
+TITLE: Building Packages in the tsghost Monorepo
+DESCRIPTION: Command to build all packages from the root directory using turborepo.
+
+LANGUAGE: bash
+CODE:
+# From the project root directory
+pnpm build
+
+----------------------------------------
+
+TITLE: Browsing Ghost Members with Type-Safe Parameters
+DESCRIPTION: Example of using the browse method on the members resource with typed parameters for pagination and sorting.
+
+LANGUAGE: typescript
+CODE:
+let query = api.members.browse({
+  limit: 5,
+  order: "name ASC",
+  //      ^? the text here will throw a TypeScript lint error if you use unknown field.
+});
+
+----------------------------------------
+
+TITLE: Using fields() with Type Safety in Ghost API
+DESCRIPTION: Example showing how the fields() modifier changes the output schema to match selected fields, providing TypeScript type safety. In this case, only the id, slug, and title fields are retrieved from a post.
+
+LANGUAGE: typescript
+CODE:
+let result = await api.posts
+  .read({
+    slug: "typescript-is-cool",
+  })
+  .fields({
+    id: true,
+    slug: true,
+    title: true,
+  })
+  .fetch();
+
+if (result.success) {
+  const post = result.data;
+  //     ^? type {"id": string; "slug":string; "title": string}
+}
+
+----------------------------------------
+
+TITLE: Code Quality Commands for tsghost
+DESCRIPTION: Commands for linting with ESLint and typechecking TypeScript code in the project.
+
+LANGUAGE: bash
+CODE:
+# Eslint
+pnpm lint
+# Typecheck typescript
+pnpm typecheck
+
+----------------------------------------
+
+TITLE: Fetching Ghost Instance Settings
+DESCRIPTION: Example showing how to fetch Ghost instance settings using the ts-ghost Content API, which is a special resource that doesn't support query building.
+
+LANGUAGE: typescript
+CODE:
+import { TSGhostContentAPI, type Post } from "@ts-ghost/content-api";
+
+let url = "https://demo.ghost.io";
+let key = "22444f78447824223cefc48062"; // Content API KEY
+const api = new TSGhostContentAPI(url, key, "v5.0");
+
+let result = await api.settings.fetch();
+if (result.success) {
+  const settings = result.data;
+  //     ^? type Settings {title: string; description: string; ...
+}
+
+----------------------------------------
+
+TITLE: Formatting Content with formats() in Ghost API
+DESCRIPTION: Demonstrates the formats() modifier which retrieves Post or Page content in different formats such as plaintext, HTML, or mobiledoc. This is particularly useful in the Admin API where HTML is not returned by default.
+
+LANGUAGE: typescript
+CODE:
+let result = await api.posts
+  .read({
+    slug: "this-is-a-post-slug",
+  })
+  .formats({
+    plaintext: true,
+    html: true,
+  })
+  .fetch();
+
+----------------------------------------
+
+TITLE: Cloning and Setting Up the tsghost Project
+DESCRIPTION: Steps to clone the ts-ghost repository, navigate into the project directory, install dependencies with pnpm, and build all packages.
+
+LANGUAGE: bash
+CODE:
+git clone git@github.com:PhilDL/ts-ghost.git
+cd ts-ghost
+pnpm i
+pnpm build
+
+----------------------------------------
+
+TITLE: Formatting Ghost Content in Different Formats
+DESCRIPTION: Shows how to get post content in different formats (plaintext, HTML) using the formats method, which modifies the output type to make these formatted fields non-optional.
+
+LANGUAGE: typescript
+CODE:
+let result = await api.posts
+  .read({
+    slug: "this-is-a-post-slug",
+  })
+  .formats({
+    plaintext: true,
+    html: true,
+  })
+  .fetch();
+
+----------------------------------------
+
+TITLE: Building a Query with the Members Browse Method
+DESCRIPTION: Demonstrates how to build a query using the browse method on the members resource. The query includes parameters for limit and sorting order, with type-safe validation through TypeScript.
+
+LANGUAGE: typescript
+CODE:
+let query = api.members.browse({
+  limit: 5,
+  order: "name ASC",
+  //      ^? the text here will throw a TypeScript lint error if you use unknown field.
+});
+
+----------------------------------------
+
+TITLE: Running Integration Tests for tsghost
+DESCRIPTION: Command to run integration tests against a real Ghost instance. The tests expect specific environment variables to be set and may fail without the correct configuration.
+
+LANGUAGE: bash
+CODE:
+# From the project root directory
+# This will fail as it is expecting specific values from a specific Ghost Instance
+pnpm test:integration:watch
+
+----------------------------------------
+
+TITLE: Using Fetch Options with ts-ghost Content API
+DESCRIPTION: Example of using the standard fetch options with the ts-ghost Content API to control cache behavior when browsing posts.
+
+LANGUAGE: typescript
+CODE:
+let query = await api.posts
+  .browse({
+    limit: 5,
+    order: "title DESC",
+  })
+  .fetch({
+    cache: "no-cache",
+  });
+
+----------------------------------------
+
+TITLE: Selecting Specific Fields in a Query Response
+DESCRIPTION: Shows how to use the fields method to select only specific properties (id, email, name) from the members resource response, providing a way to limit the data returned from the API.
+
+LANGUAGE: typescript
+CODE:
+let query = api.members
+  .browse({
+    limit: 5,
+    order: "email ASC",
+  })
+  .fields({
+    id: true,
+    email: true,
+    name: true,
+  });
+
+----------------------------------------
+
+TITLE: Installing ts-ghost in a Remix Project
+DESCRIPTION: Terminal command to install the ts-ghost Content API in a Remix project using pnpm package manager.
+
+LANGUAGE: bash
+CODE:
+pnpm add @ts-ghost/content-api
+
+----------------------------------------
+
+TITLE: Fetching Data with and without Field Selection
+DESCRIPTION: Demonstrates how to execute queries with the async fetch method, both with and without field selection. The fetch method returns a Promise that resolves to a result object parsed by the Zod Schema.
+
+LANGUAGE: typescript
+CODE:
+let query = await api.members
+  .browse({
+    limit: 5,
+    order: "email ASC",
+  })
+  .fields({
+    id: true,
+    email: true,
+    name: true,
+  })
+  .fetch();
+
+// or without fields selection
+
+let query2 = await api.members
+  .browse({
+    limit: 5,
+    order: "email ASC",
+  })
+  .fetch();
+
+----------------------------------------
+
+TITLE: Handling Unknown Field Selections in ts-ghost
+DESCRIPTION: TypeScript recipe for handling unknown or dynamic field selections in ts-ghost Content API, using type casting to avoid TypeScript errors.
+
+LANGUAGE: typescript
+CODE:
+// `fieldsKeys` comes from outside
+const outputFields = fieldsKeys.reduce((acc, k) => {
+  acc[k as keyof Post] = true;
+  return acc;
+}, {} as { [k in keyof Post]?: true | undefined });
+const result = await api.posts.browse().fields(outputFields).fetch();
+
+----------------------------------------
+
+TITLE: Initializing TSGhost Admin API and Reading a User by Email or ID
+DESCRIPTION: Shows how to instantiate the TSGhost Admin API client and use the read method to fetch a user resource by email or ID as identity fields.
+
+LANGUAGE: typescript
+CODE:
+import { TSGhostAdminAPI } from "@ts-ghost/admin-api";
+
+const api = new TSGhostAdminAPI(
+  "https://demo.ghost.io",
+  "1efedd9db174adee2d23d982:4b74dca0219bad629852191af326a45037346c2231240e0f7aec1f9371cc14e8",
+  "v5.0"
+);
+
+let query = api.users.read({
+  email: "philippe@ts-ghost.com"
+});
+
+// or
+
+let query = api.users.read({
+  id: "edHks74hdKqhs34izzahd45"
+});
+
+----------------------------------------
+
+TITLE: Maintaining Type Safety with TypeScript Satisfies Operator
+DESCRIPTION: Demonstrates using the 'satisfies' operator to maintain TypeScript type safety when pre-declaring field selections for Ghost API queries.
+
+LANGUAGE: ts
+CODE:
+const outputFields = {
+  slug: true,
+  title: true,
+} satisfies { [k in keyof Post]?: true | undefined };
+
+let test = api.posts.browse().fields(outputFields);
+
+----------------------------------------
+
+TITLE: Understanding the Result Type Structure of fetch() Method
+DESCRIPTION: Details the TypeScript type structure of the result returned by the fetch method, showing the discriminated union with success property and corresponding data or errors properties.
+
+LANGUAGE: typescript
+CODE:
+// example for the read query (the data is an object)
+const result: {
+    success: true;
+    data: Post; // parsed by the Zod Schema and modified by the fields selected
+} | {
+    success: false;
+    errors: {
+        message: string;
+        type: string;
+    }[];
+}
+
+----------------------------------------
+
+TITLE: Preserving Type Safety with 'satisfies' Operator for Field Selection
+DESCRIPTION: This snippet shows how to pre-declare output fields while maintaining type safety using the 'satisfies' operator. This approach ensures the output type will only include the explicitly selected fields (slug and title) from the Post type.
+
+LANGUAGE: typescript
+CODE:
+const outputFields = {
+  slug: true,
+  title: true,
+} satisfies { [k in keyof Post]?: true | undefined };
+
+let test = api.posts.browse().fields(outputFields);
+
+----------------------------------------
+
+TITLE: Implementing Ghost API in a Remix route loader and component
+DESCRIPTION: Complete Remix route implementation that initializes the Ghost Admin API, fetches site information and posts, and renders them in a component. The code handles API responses and error states.
+
+LANGUAGE: tsx
+CODE:
+import { json, type LoaderArgs, type V2_MetaFunction } from "@remix-run/node";
+import { Link, useLoaderData } from "@remix-run/react";
+import { TSGhostAdminAPI } from "@ts-ghost/admin-api";
+
+export const meta: V2_MetaFunction = () => {
+  return [{ title: "New Remix App" }];
+};
+
+export async function loader({ request }: LoaderArgs) {
+  const api = new TSGhostAdminAPI(
+    process.env.GHOST_URL || "",
+    process.env.GHOST_ADMIN_API_KEY || "",
+    "v5.0"
+  );
+  const [site, posts] = await Promise.all([api.site.fetch(), api.posts.browse().fetch()]);
+
+  if (!site.success) {
+    throw new Error(site.errors.join(", "));
+  }
+  if (!posts.success) {
+    throw new Error(posts.errors.join(", "));
+  }
+  return json({ site: site.data, posts: posts.data });
+}
+
+export default function Index() {
+  const { site, posts } = useLoaderData<typeof loader>();
+
+  return (
+    <div style={{ fontFamily: "system-ui, sans-serif", lineHeight: "1.4" }}>
+      <h1>This is a list of posts for {site.title}:</h1>
+      <ul>
+        {posts.map((post) => (
+          <li key={post.slug}>
+            <Link to={`/${post.slug}`}>{post.title}</Link>
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
+----------------------------------------
+
+TITLE: Maintaining Type Safety with 'satisfies' Operator in ts-ghost
+DESCRIPTION: This snippet shows how to pre-declare output fields using the 'satisfies' operator, which preserves type safety while ensuring the output will contain only the selected fields of the Post type.
+
+LANGUAGE: typescript
+CODE:
+const outputFields = {
+  slug: true,
+  title: true,
+} satisfies { [k in keyof Post]?: true | undefined };
+
+let test = api.posts.browse().fields(outputFields);
+
+----------------------------------------
+
+TITLE: Handling Unknown Fields with Type Assertion in TypeScript
+DESCRIPTION: This snippet demonstrates how to handle unknown input fields using type assertion with 'as' keyword. While this approach allows the code to compile, it results in losing type safety for the output, as the Post type will include all fields rather than just the selected ones.
+
+LANGUAGE: typescript
+CODE:
+// `fieldsKeys` comes from outside
+const outputFields = fieldsKeys.reduce((acc, k) => {
+  acc[k as keyof Post] = true;
+  return acc;
+}, {} as { [k in keyof Post]?: true | undefined });
+const result = await api.posts.browse().fields(outputFields).fetch();
+
+----------------------------------------
+
+TITLE: Using formats method to request Lexical format in posts
+DESCRIPTION: Example showing how to request the Lexical format along with HTML and plaintext formats when browsing posts. The formats method allows specifying which content formats should be included in the API response.
+
+LANGUAGE: typescript
+CODE:
+const result = await api.posts
+  .browse({
+    limit: 1,
+  })
+  .formats({ html: true, plaintext: true })
+  .fetch();
+
+----------------------------------------
+
+TITLE: Handling Uncontrolled Input with BrowseParams Type Helper
+DESCRIPTION: This snippet demonstrates how to use the BrowseParams type helper to handle uncontrolled inputs like user form data for order and filter parameters. This approach allows the code to compile while still maintaining runtime type checking for the API request.
+
+LANGUAGE: typescript
+CODE:
+import type { BrowseParams, Post } from "@ts-ghost/content-api";
+
+const uncontrolledOrderInput = async (formData: FormData) => {
+  const order = formData.get("order");
+  const filter = formData.get("filter");
+  const result = await api.posts
+    .browse({ order, filter } as BrowseParams<{ order: string; filter: string }, Post>)
+    .fetch();
+};
+
+----------------------------------------
+
+TITLE: New Query API Structure for TSGhost
+DESCRIPTION: Demonstrates the new API structure for querying posts and reading specific content, using method chaining for output options instead of nested configuration objects.
+
+LANGUAGE: typescript
+CODE:
+// After
+const posts = await api.posts
+  .browse({
+    limit: 5,
+    order: "title DESC",
+  })
+  .include({
+    authors: true,
+  })
+  .fetch();
+
+const onePost = await api.posts
+  .read({
+    slug: "test-post",
+  })
+  .fields({
+    slug: true,
+    html: true,
+  })
+  .fetch();
+
+----------------------------------------
+
+TITLE: Filtering Posts with Specific Criteria in Ghost API
+DESCRIPTION: Example of using the filter parameter to get featured posts while excluding a specific slug. Shows how to use string interpolation for dynamic filtering.
+
+LANGUAGE: typescript
+CODE:
+const slugToExclude = "test";
+
+let query = await api.posts
+  .browse({
+    filter: `featured:true+slug:-${slugToExclude}`,
+  })
+  .fetch();
+
+----------------------------------------
+
+TITLE: Old vs New Query API Structure for TSGhost
+DESCRIPTION: Comparison of the old and new API structure for querying posts and reading specific content, showing how the output options have been moved to separate methods on the fetcher.
+
+LANGUAGE: typescript
+CODE:
+// Before
+const posts = await api.posts
+  .browse({
+    input: {
+      limit: 5,
+      order: "title DESC",
+    },
+    output: {
+      include: {
+        authors: true,
+      },
+    },
+  })
+  .fetch();
+
+const onePost = await api.posts
+  .read({
+    input: {
+      slug: "test-post",
+    },
+    output: {
+      fields: {
+        slug: true,
+        html: true,
+      },
+    },
+  })
+  .fetch();
+
+----------------------------------------
+
+TITLE: Initializing TSGhost Content API in NextJS
+DESCRIPTION: TypeScript file that instantiates the TSGhostContentAPI class with environment variables. This creates a reusable API client to use throughout the application.
+
+LANGUAGE: typescript
+CODE:
+import { TSGhostContentAPI } from "@ts-ghost/content-api";
+
+export const api = new TSGhostContentAPI(
+  process.env.GHOST_URL || "",
+  process.env.GHOST_CONTENT_API_KEY || "",
+  "v5.0"
+);
+
+----------------------------------------
+
+TITLE: Creating and Updating Members in TSGhost Admin API
+DESCRIPTION: Example of using the members resource in the admin API to add a new member and then update their details. Shows how to handle the response and access the updated data.
+
+LANGUAGE: typescript
+CODE:
+const createNewMember = await api.members.add(
+  { email: "abcdefgh@msn.com" },
+  { send_email: true },
+);
+assert(createNewMember.success);
+const newMember = createNewMember.data;
+// id => 6438cc365a8fdb00013a8783
+const updateMember = await api.members.edit("6438cc365a8fdb00013a8783", {
+  name: "FooBarBaz",
+  note: "Hello from ts-ghost",
+  labels: [{ name: "ts-ghost" }],
+  geolocation: "Reunion",
+  stripe_customer_id: "aiuhdiuahzdiuhaizudhaiuzdhiuazd",
+});
+if (updateMember.success) {
+  const member = updateMember.data;
+  console.log("labels", member.labels);
+}
+
+----------------------------------------
+
+TITLE: Creating a NextJS App Router Page with Ghost Content API
+DESCRIPTION: Implementation of a NextJS Server Component that fetches blog posts and site settings from Ghost using the previously initialized API client. It demonstrates error handling and data rendering in a React component.
+
+LANGUAGE: tsx
+CODE:
+import { api } from "./ghost";
+
+async function getBlogPosts() {
+  const response = await api.posts.browse().fields({ title: true, slug: true, id: true }).fetch();
+  if (!response.success) {
+    throw new Error(response.errors.join(", "));
+  }
+  return response.data;
+}
+
+async function getSiteSettings() {
+  const response = await api.settings.fetch();
+  if (!response.success) {
+    throw new Error(response.errors.join(", "));
+  }
+  return response.data;
+}
+
+// async Server Component
+export default async function HomePage() {
+  const [posts, settings] = await Promise.all([getBlogPosts(), getSiteSettings()]);
+  return (
+    <div>
+      <h1>This is a list of posts for {settings.title}:</h1>
+      <ul>
+        {posts.map((post) => (
+          <li key={post.id}>
+            {post.title} ({post.slug})
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
+----------------------------------------
+
+TITLE: Simplified Error Handling with New Response Structure
+DESCRIPTION: Demonstrates how to check if a request succeeded or failed with the new response structure using the boolean 'success' property.
+
+LANGUAGE: typescript
+CODE:
+if (result.success) {
+  // do something with result.data
+} else {
+  // do something with result.errors
+}
+
+----------------------------------------
+
+TITLE: Formatting Content with formats() Method in tsghost
+DESCRIPTION: Shows how to use the formats() method to request content in different formats (plaintext and HTML) when fetching a post. This allows you to get the content in alternative formats beyond the default.
+
+LANGUAGE: typescript
+CODE:
+let result = await api.posts
+  .read({
+    slug: "this-is-a-post-slug",
+  })
+  .formats({
+    plaintext: true,
+    html: true,
+  })
+  .fetch();
+
+----------------------------------------
+
+TITLE: Updated Response Structure in TSGhost Core API
+DESCRIPTION: Demonstrates the change in response structure where the discriminator changed from 'status' with values of 'success' or 'error' to 'success' with boolean values of true or false.
+
+LANGUAGE: typescript
+CODE:
+// example for the browse query (the data is an array of objects)
+const result:
+  | {
+      status: "success";
+      data: Post[];
+      meta: {
+        pagination: {
+          pages: number;
+          limit: number;
+          page: number;
+          total: number;
+          prev: number | null;
+          next: number | null;
+        };
+      };
+    }
+  | {
+      status: "error";
+      errors: {
+        message: string;
+        type: string;
+      }[];
+    };
+
+----------------------------------------
+
+TITLE: Installing the Ghost Content API TypeScript package
+DESCRIPTION: Installs the @ts-ghost/content-api package using pnpm package manager.
+
+LANGUAGE: bash
+CODE:
+pnpm add @ts-ghost/content-api
+
+----------------------------------------
+
+TITLE: Including tiers in post request with Admin API
+DESCRIPTION: Example showing how to include tiers data in the API response when reading a post. The include method is used to specify which related data should be included in the response.
+
+LANGUAGE: typescript
+CODE:
+const res = await api.posts
+  .read({ slug: "create-field-widget-in-owl-odoo-16" })
+  .include({ tags: true, authors: true, tiers: true })
+  //                                     ^ Include tiers
+  .formats({ html: true })
+  .fetch();
+
+----------------------------------------
+
+TITLE: Configuring environment variables for Ghost API
+DESCRIPTION: Sets up environment variables for the Ghost blog URL and Content API key in a .env file.
+
+LANGUAGE: bash
+CODE:
+GHOST_URL="https://myblog.com"
+GHOST_CONTENT_API_KEY="e9b414c5d95a5436a647ff04ab"
+
+----------------------------------------
+
+TITLE: Editing a post with newsletter option in Admin API
+DESCRIPTION: Example showing how to edit an existing post with the Admin API, including specifying a newsletter option. The third parameter allows for setting additional options like newsletter selection.
+
+LANGUAGE: typescript
+CODE:
+api.posts.edit(
+  newPost.id,
+  {
+    status: "published",
+    updated_at: new Date(newPost.updated_at || ""),
+  },
+  { newsletter: "weekly-newsletter" },
+);
+
+----------------------------------------
+
+TITLE: Fetching Resources with Read Method using ID or Slug in Ghost API
+DESCRIPTION: Examples of using the read method to fetch a specific post resource using either id or slug as the identity field. The TypeScript code demonstrates proper parameter usage with autocomplete guidance.
+
+LANGUAGE: typescript
+CODE:
+let query = api.posts.read({
+  id: "edHks74hdKqhs34izzahd45"
+});
+
+// or
+
+let query = api.posts.read({
+  slug: "typescript-is-awesome-in-2025"
+});
+
+----------------------------------------
+
+TITLE: Configuring Environment Variables for Ghost Admin API
+DESCRIPTION: Example .env file configuration with Ghost URL and Admin API key for secure credentials management.
+
+LANGUAGE: bash
+CODE:
+GHOST_URL="https://myblog.com"
+GHOST_ADMIN_API_KEY="1efedd9db174adee2d23d982:4b74dca0219bad629852191af326a45037346c2231240e0f7aec1f9371cc14e8"
+
+----------------------------------------
+
+TITLE: Browse Method Options in APIComposer
+DESCRIPTION: Shows all available input options for the browse method in APIComposer including pagination, filtering, and ordering. Each parameter is type-checked against the schema.
+
+LANGUAGE: typescript
+CODE:
+const composedAPI = new APIComposer(
+  "posts",
+  { schema: simplifiedSchema, identitySchema: identitySchema, include: simplifiedIncludeSchema },
+  httpClient
+);
+let query = composedAPI.browse({
+  page: 1,
+  limit: 5,
+  filter: "title:typescript+slug:-test",
+  order: "title DESC",
+});
+
+----------------------------------------
+
+TITLE: Setting up Environment Variables for Ghost in NextJS
+DESCRIPTION: Configuration of environment variables for Ghost URL and API key in a NextJS project.
+
+LANGUAGE: bash
+CODE:
+GHOST_URL="https://myblog.com"
+GHOST_CONTENT_API_KEY="e9b414c5d95a5436a647ff04ab"
+
+----------------------------------------
+
+TITLE: Manually Instantiating a BrowseFetcher
+DESCRIPTION: Demonstrates direct instantiation of a BrowseFetcher without using the APIComposer. This approach gives more control over the fetcher configuration but is generally not needed.
+
+LANGUAGE: typescript
+CODE:
+import { BrowseFetcher, HTTPClient } from "@ts-ghost/core-api";
+
+const httpClient = new HTTPClient({
+  url: "https://ghost.org",
+  key: "7d2d15d7338526d43c2fadc47c",
+  version: "v5.0",
+  endpoint: "content",
+});
+
+// Example of instantiating a Fetcher, even though you will probably not do it
+const browseFetcher = new BrowseFetcher(
+  "posts",
+  {
+    schema: simplifiedSchema,
+    output: simplifiedSchema,
+    include: simplifiedIncludeSchema,
+  },
+  {
+    browseParams: {
+      limit: 1,
+    },
+  },
+  httpClient
+);
+
+----------------------------------------
+
+TITLE: Installing TSGhost Admin API via Package Manager
+DESCRIPTION: Shows how to install the TSGhost Admin API library using pnpm package manager in a terminal environment.
+
+LANGUAGE: bash
+CODE:
+pnpm add @ts-ghost/admin-api
+
+----------------------------------------
+
+TITLE: Handling API Response with Type-Safe Result
+DESCRIPTION: Shows how to use the fetch method of a Fetcher and handle the discriminated union response. The result provides type-safe access to either the data or error messages.
+
+LANGUAGE: typescript
+CODE:
+const composedAPI = new APIComposer(
+  "posts",
+  { schema: simplifiedSchema, output: simplifiedSchema, include: simplifiedIncludeSchema },
+  httpClient
+);
+const readFetcher = composedAPI.read({ slug: "typescript-is-cool" });
+let result = await readFetcher.fetch();
+if (result.success) {
+  const post = result.data;
+  //     ^? type {"slug":string; "title": string}
+} else {
+  // errors array of objects
+  console.log(result.errors.map((e) => e.message).join("\n"));
+}
+
+----------------------------------------
+
+TITLE: Installing @ts-ghost/admin-api package
+DESCRIPTION: Command to install the @ts-ghost/admin-api package using pnpm package manager. This package provides TypeScript bindings for the Ghost Admin API.
+
+LANGUAGE: bash
+CODE:
+pnpm add @ts-ghost/admin-api
+
+----------------------------------------
+
+TITLE: BrowseFetcher .fetch() Response Type Definition in TypeScript
+DESCRIPTION: Demonstrates the discriminated union type returned by the fetch() method of BrowseFetcher. It shows the success case with data and pagination metadata, and the failure case with error information.
+
+LANGUAGE: typescript
+CODE:
+// example for the browse query (the data is an array of objects)
+const result: {
+    success: true;
+    data: z.infer<typeof simplifiedSchema>[];
+    meta: {
+        pagination: {
+            pages: number;
+            limit: number;
+            page: number;
+            total: number;
+            prev: number | null;
+            next: number | null;
+        };
+    };
+} | {
+    success: false;
+    errors: {
+        message: string;
+        type: string;
+    }[];
+}
+
+----------------------------------------
+
+TITLE: Installing TS Ghost Content API Package
+DESCRIPTION: Command to install the Content API package for TypeScript, which provides strongly typed access to browse and read blog posts, pages, tags, tiers, authors, and settings.
+
+LANGUAGE: shell
+CODE:
+npm install @ts-ghost/content-api
+
+----------------------------------------
+
+TITLE: BrowseFetcher .paginate() Response Type Definition in TypeScript
+DESCRIPTION: Illustrates the return type of the paginate() method, which extends the fetch() response with a next property containing the next page fetcher if available.
+
+LANGUAGE: typescript
+CODE:
+const result: {
+    success: true;
+    data: z.infer<typeof simplifiedSchema>[];
+    meta: {
+        pagination: {
+            pages: number;
+            limit: number;
+            page: number;
+            total: number;
+            prev: number | null;
+            next: number | null;
+        };
+    };
+    next: BrowseFetcher | undefined; // the next page fetcher if it is defined
+} | {
+    success: false;
+    errors: {
+        message: string;
+        type: string;
+    }[];
+    next: undefined; // the next page fetcher is undefined here
+}
+
+----------------------------------------
+
+TITLE: Installing TS Ghost Core API Package
+DESCRIPTION: Command to install the Core API package, which provides the base building blocks containing the APIComposer and Fetchers with Zod schema support.
+
+LANGUAGE: shell
+CODE:
+npm install @ts-ghost/core-api
+
+----------------------------------------
+
+TITLE: Using .include() Method to Fetch Additional Data in TypeScript
+DESCRIPTION: Demonstrates how to use the .include() method to request additional data from the Ghost API that isn't provided by default. This modifies the output type to make included fields non-optional.
+
+LANGUAGE: typescript
+CODE:
+const bf = new BrowseFetcher(
+  "posts",
+  { schema: simplifiedSchema, output: simplifiedSchema, include: simplifiedIncludeSchema },
+  {},
+  httpClient
+);
+let result = await bf
+  .include({
+    count: true,
+  })
+  .fetch();
+
+----------------------------------------
+
+TITLE: Importing TS Ghost Content API Module in TypeScript
+DESCRIPTION: Shows the import statement for the @ts-ghost/content-api module, which provides a strongly-typed TypeScript client for the Ghost Content API based on Zod schemas.
+
+LANGUAGE: typescript
+CODE:
+@ts-ghost/content-api
+
+----------------------------------------
+
+TITLE: Passing Fetch Options to API Requests in TypeScript
+DESCRIPTION: Shows how to pass standard RequestInit options to the fetch() and paginate() methods, which can be useful for NextJS augmented fetch implementations.
+
+LANGUAGE: typescript
+CODE:
+let result = await api.posts.read({ slug: "typescript-is-cool" }).fetch({ cache: "no-store" });
+
+----------------------------------------
+
+TITLE: Creating Records with add() Method in TypeScript
+DESCRIPTION: Demonstrates how to create new records using the add() method. The method takes an input object parsed with createSchema and optional options object parsed with createOptionsSchema.
+
+LANGUAGE: typescript
+CODE:
+const composedAPI = new APIComposer(
+  "posts",
+  {
+    schema: simplifiedSchema,
+    identitySchema: identitySchema,
+    include: simplifiedIncludeSchema,
+    createSchema: createSchema,
+    createOptionsSchema: z.object({
+      option_1: z.boolean(),
+    }),
+  },
+  httpClient
+);
+let newPost = await composedAPI.add(
+  {
+    title: "My new post",
+  },
+  {
+    option_1: true,
+  }
+);
+
+----------------------------------------
+
+TITLE: Installing TSGhost Content API Package
+DESCRIPTION: Command to install the @ts-ghost/content-api package using pnpm package manager.
+
+LANGUAGE: bash
+CODE:
+pnpm add @ts-ghost/content-api
+
+----------------------------------------
+
+TITLE: Deleting Records with delete() Method in TypeScript
+DESCRIPTION: Demonstrates how to delete records using the delete() method. The method requires the ID of the record to delete and returns a success/failure response.
+
+LANGUAGE: typescript
+CODE:
+let newPost = await composedAPI.edit("edHks74hdKqhs34izzahd45", {
+  title: "My new post",
+});
+
+----------------------------------------
+
+TITLE: Fetching Ghost Data with NextJS Revalidation
+DESCRIPTION: This example shows how to fetch Ghost API data with NextJS-specific revalidation options. It leverages NextJS 13+ augmented fetch functionality to revalidate cached data every 10 seconds.
+
+LANGUAGE: typescript
+CODE:
+let query = await api.posts
+  .browse({
+    limit: 5,
+    order: "title DESC",
+  })
+  .fetch({ next: { revalidate: 10 } }); // NextJS revalidate this data every 10 seconds at most
+
+----------------------------------------
+
+TITLE: Configuring Ghost API Resources and Endpoints in TypeScript
+DESCRIPTION: Configuration module for Ghost API resources and endpoints. Defines the structure of different API resources and provides functions to extract resource configurations based on API versions.
+
+LANGUAGE: typescript
+CODE:
+export type GhostResourceKindConfig = {
+  'site': { [index: string]: string }
+  'admin': { [index: string]: string }
+  'content': { [index: string]: string }
+}
+
+export type GhostUrls = {
+  site: { [index: string]: string }
+  admin: { [index: string]: string }
+  content: { [index: string]: string }
+}
+
+export type ResourceConfig = {
+  docName: string
+  resource: string
+  api: Array<string>
+}
+
+type Kind = keyof GhostResourceKindConfig
+
+const resources: ResourceConfig[] = [
+  {
+    docName: 'posts',
+    resource: 'posts',
+    api: ['content', 'admin']
+  },
+  {
+    docName: 'tags',
+    resource: 'tags',
+    api: ['content', 'admin']
+  },
+  {
+    docName: 'authors',
+    resource: 'authors',
+    api: ['content']
+  },
+  {
+    docName: 'users',
+    resource: 'users',
+    api: ['admin']
+  },
+  {
+    docName: 'pages',
+    resource: 'pages',
+    api: ['content', 'admin']
+  },
+  {
+    docName: 'settings',
+    resource: 'settings',
+    api: ['content', 'admin']
+  },
+  {
+    docName: 'tiers',
+    resource: 'tiers',
+    api: ['content', 'admin']
+  },
+  {
+    docName: 'offers',
+    resource: 'offers',
+    api: ['content', 'admin']
+  },
+  {
+    docName: 'products',
+    resource: 'products',
+    api: ['admin', 'content']
+  },
+  {
+    docName: 'newsletters',
+    resource: 'newsletters',
+    api: ['admin', 'content']
+  },
+  {
+    docName: 'site',
+    resource: 'site',
+    api: ['site']
+  },
+  {
+    docName: 'themes',
+    resource: 'themes',
+    api: ['admin']
+  },
+  {
+    docName: 'redirects',
+    resource: 'redirects',
+    api: ['admin']
+  },
+  {
+    docName: 'webhooks',
+    resource: 'webhooks',
+    api: ['admin']
+  },
+  {
+    docName: 'snippets',
+    resource: 'snippets',
+    api: ['admin']
+  },
+  {
+    docName: 'members',
+    resource: 'members',
+    api: ['admin']
+  },
+  {
+    docName: 'stats',
+    resource: 'stats',
+    api: ['content']
+  },
+  {
+    docName: 'links',
+    resource: 'links',
+    api: ['admin']
+  },
+  {
+    docName: 'images',
+    resource: 'media/upload',
+    api: ['admin']
+  }
+]
+
+export const extractResourceConfigs = (version?: string): ResourceConfig[] => {
+  return resources;
+}
+
+export const createUrls = (endpointType: "content" | "admin" | "members", resourceConfigs: ResourceConfig[]): GhostUrls => {
+  const urls: GhostUrls = {
+    site: {},
+    admin: {},
+    content: {}
+  }
+
+  for (const config of resourceConfigs) {
+    const { docName, resource, api } = config;
+
+    for (const kind of api) {
+      urls[kind as Kind][docName] = `/ghost/${endpointType === 'members' ? 'api' : endpointType}/api/${endpointType === 'members' ? 'canary' : endpointType}/${resource}/`
+    }
+  }
+
+  return urls;
+}
+
+----------------------------------------
+
+TITLE: Fetching posts with NextJS revalidation in tsghost
+DESCRIPTION: Example of fetching Ghost posts with NextJS 13+ revalidation settings. This demonstrates how to use the NextJS-specific fetch options to control data revalidation intervals.
+
+LANGUAGE: typescript
+CODE:
+let query = await api.posts
+  .browse({
+    limit: 5,
+    order: "title DESC",
+  })
+  .fetch({ next: { revalidate: 10 } }); // NextJS revalidate this data every 10 seconds at most
+
+----------------------------------------
+
+TITLE: Installing Ghost Blog Buster Globally using npm
+DESCRIPTION: Installs the Ghost Blog Buster package globally on your system using npm. After installation, the tool can be accessed from any terminal session.
+
+LANGUAGE: bash
+CODE:
+npm install -g @ts-ghost/ghost-blog-buster
+
+----------------------------------------
+
+TITLE: Setting Up Ghost Environment Variables
+DESCRIPTION: Configuration for the .env file containing the Ghost blog URL and Content API key required for authentication.
+
+LANGUAGE: bash
+CODE:
+GHOST_URL="https://myblog.com"
+GHOST_CONTENT_API_KEY="e9b414c5d95a5436a647ff04ab"
+
+----------------------------------------
+
+TITLE: Full Export Command with All Parameters Using Content API
+DESCRIPTION: Complete example of exporting posts with explicitly specified host URL, Content API key, and output directory.
+
+LANGUAGE: sh
+CODE:
+ghost-blog-buster export posts --host https://astro-starter.digitalpress.blog --key e9b414c5d95a5436a647ff04ab --output ./posts
+
+----------------------------------------
+
+TITLE: Setting Up Environment Variables for Ghost CMS
+DESCRIPTION: Configuration of environment variables needed for connecting to the Ghost CMS. Includes the Ghost blog URL and Content API key.
+
+LANGUAGE: plaintext
+CODE:
+GHOST_URL="https://myblog.com"
+GHOST_CONTENT_API_KEY="e9b414c5d95a5436a647ff04ab"
+
+----------------------------------------
+
+TITLE: Displaying Help Information in Ghost Blog Buster CLI
+DESCRIPTION: Command to show the help documentation for the Ghost Blog Buster CLI tool.
+
+LANGUAGE: sh
+CODE:
+ghost-blog-buster --help
+
+----------------------------------------
+
+TITLE: Starting Remix Development Server
+DESCRIPTION: Command to start the Remix application in development mode, which rebuilds assets automatically when files change.
+
+LANGUAGE: sh
+CODE:
+npm run dev
+
+----------------------------------------
+
+TITLE: Using Ghost Blog Buster with npx
+DESCRIPTION: The simplest way to use Ghost Blog Buster is directly through npx without installation.
+
+LANGUAGE: sh
+CODE:
+npx @ts-ghost/ghost-blog-buster
+
+----------------------------------------
+
+TITLE: Running Remix in Production Mode
+DESCRIPTION: Command to start the Remix application in production mode after building it.
+
+LANGUAGE: sh
+CODE:
+npm start
+
+----------------------------------------
+
+TITLE: Installing Ghost Blog Buster globally
+DESCRIPTION: Instructions for installing the Ghost Blog Buster tool globally on your system for easier access.
+
+LANGUAGE: sh
+CODE:
+npm install -g @ts-ghost/ghost-blog-buster
+
+----------------------------------------
+
+TITLE: Migrating Remix Project to New Template
+DESCRIPTION: Series of commands to create a new Remix project with a pre-configured hosting template and copy over existing application code.
+
+LANGUAGE: sh
+CODE:
+cd ..
+# create a new project, and pick a pre-configured host
+npx create-remix@latest
+cd my-new-remix-app
+# remove the new project's app (not the old one!)
+rm -rf app
+# copy your app over
+cp -R ../my-old-remix-app/app app
+
+----------------------------------------
+
+TITLE: Exporting posts with the Content API
+DESCRIPTION: Command for exporting all posts to a specified directory using the Content API, bypassing interactive prompts.
+
+LANGUAGE: sh
+CODE:
+ghost-blog-buster export posts --output ./posts
+
+----------------------------------------
+
+TITLE: Full Export Command with All Parameters Using Admin API
+DESCRIPTION: Complete example of exporting posts with Admin API key, explicitly specified host URL, and output directory.
+
+LANGUAGE: sh
+CODE:
+ghost-blog-buster export-admin posts --host https://astro-starter.digitalpress.blog --key 1efedd9db174adee2d23d982:4b74dca0219bad629852191af326a45037346c2231240e0f7aec1f9371cc14e8 --output ./posts
+
+----------------------------------------
+
+TITLE: Full export command with Admin API parameters
+DESCRIPTION: Complete example of exporting posts with explicit host URL and Admin API key parameters.
+
+LANGUAGE: sh
+CODE:
+ghost-blog-buster export-admin posts --host https://astro-starter.digitalpress.blog --key 1efedd9db174adee2d23d982:4b74dca0219bad629852191af326a45037346c2231240e0f7aec1f9371cc14e8 --output ./posts
+
+----------------------------------------
+
+TITLE: Piping Export Output to a File in Ghost Blog Buster CLI
+DESCRIPTION: Example of using shell redirection to pipe the export output directly to a JSON file instead of using the --output parameter.
+
+LANGUAGE: sh
+CODE:
+ghost-blog-buster export authors --host https://astro-starter.digitalpress.blog --key e9b414c5d95a5436a647ff04ab > authors.json
+
+----------------------------------------
+
+TITLE: Building Remix for Production
+DESCRIPTION: Command to build the Remix application for production deployment, creating optimized assets.
+
+LANGUAGE: sh
+CODE:
+npm run build
+
+----------------------------------------
+
+TITLE: Exporting Posts Using Admin API in Ghost Blog Buster CLI
+DESCRIPTION: Command to export posts using the Admin API which accesses more complete content including paid/premium content.
+
+LANGUAGE: sh
+CODE:
+ghost-blog-buster export-admin posts --output ./posts
+
+----------------------------------------
+
+TITLE: Handling Dynamic Order/Filter Strings with Type Helper Generics
+DESCRIPTION: This example demonstrates how to handle uncontrolled inputs (like from form data) for order and filter parameters using the BrowseParams type helper. This approach maintains runtime safety while satisfying TypeScript's type requirements.
+
+LANGUAGE: typescript
+CODE:
+import type { BrowseParams, Post } from "@ts-ghost/admin-api";
+
+const uncontrolledOrderInput = async (formData: FormData) => {
+  const order = formData.get("order");
+  const filter = formData.get("filter");
+  const result = await api.posts
+    .browse({ order, filter } as BrowseParams<{ order: string; filter: string }, Post>)
+    .fetch();
+};
+
+----------------------------------------
+
+TITLE: Launching Ghost Blog Buster after global installation
+DESCRIPTION: How to launch the Ghost Blog Buster tool after installing it globally.
+
+LANGUAGE: sh
+CODE:
+ghost-blog-buster
+
+----------------------------------------
+
+TITLE: Filtering Posts by Tags with ts-ghost Admin API
+DESCRIPTION: This example demonstrates how to use the ts-ghost Admin API to browse posts filtered by a specific tag and include author and tag data in the response. The code shows proper error handling with success checking before accessing the data.
+
+LANGUAGE: typescript
+CODE:
+import { TSGhostAdminAPI, type Post } from "@ts-ghost/admin-api";
+
+const api = new TSGhostAdminAPI(env.GHOST_URL, env.GHOST_ADMIN_API_KEY, "v5.0");
+
+let posts: Post[] = [];
+let cursor = await api.posts
+  .browse({ filter: "tags:hash-tag" })
+  .include({ authors: true, tags: true })
+  .fetch();
+if (result.success) {
+  posts = result.data;
+}
+return posts
+
+----------------------------------------
+
+TITLE: Full export command with Content API parameters
+DESCRIPTION: Complete example of exporting posts with explicit host URL and Content API key parameters.
+
+LANGUAGE: sh
+CODE:
+ghost-blog-buster export posts --host https://astro-starter.digitalpress.blog --key e9b414c5d95a5436a647ff04ab --output ./posts
+
+----------------------------------------
+
+TITLE: Creating a post with HTML source in Admin API
+DESCRIPTION: Example of adding a new post with HTML content using the Admin API. The second parameter specifies that the source is HTML, as the Ghost API now expects Lexical formatted content by default.
+
+LANGUAGE: typescript
+CODE:
+const postAdd = await api.posts.add(
+  {
+    title: title,
+    html: "<p>Hello from ts-ghost</p>",
+    tags: [{ name: "ts-ghost" }],
+    tiers: [{ name: "ts-ghost" }],
+    custom_excerpt: "This is custom excerpt from ts-ghost",
+    meta_title: "Meta Title from ts-ghost",
+    meta_description: "Description from ts-ghost",
+    featured: true,
+    og_title: "OG Title from ts-ghost",
+    og_description: "OG Description from ts-ghost",
+    twitter_title: "Twitter Title from ts-ghost",
+    twitter_description: "Twitter Description from ts-ghost",
+    visibility: "public",
+  },
+  { source: "html" },
+);
+
+----------------------------------------
+
+TITLE: Displaying the help information
+DESCRIPTION: Command to display the help information and available options for Ghost Blog Buster.
+
+LANGUAGE: sh
+CODE:
+ghost-blog-buster --help
+
+----------------------------------------
+
+TITLE: Available edit options for posts and pages
+DESCRIPTION: Example of the different options available when editing posts or pages, showing the Zod schema validation. These options reflect Ghost API capabilities like newsletter selection and rendering preferences.
+
+LANGUAGE: typescript
+CODE:
+newsletter: z.string().optional(),
+email_segment: z.string().optional(),
+force_rerender: z.boolean().optional(),
+save_revision: z.boolean().optional(),
+convert_to_lexical: z.boolean().optional(),
+source: z.literal("html").optional(),
+
+----------------------------------------
+
+TITLE: Running Ghost Blog Buster with npx
+DESCRIPTION: Executes the Ghost Blog Buster tool directly using npx without installing it globally. This is useful for one-time use or testing the tool.
+
+LANGUAGE: bash
+CODE:
+npx @ts-ghost/ghost-blog-buster
+
+----------------------------------------
+
+TITLE: Initializing the Ghost Admin API Client
+DESCRIPTION: Basic setup for the TSGhostAdminAPI client with the required Ghost blog URL, Admin API key, and Ghost version.
+
+LANGUAGE: typescript
+CODE:
+import { TSGhostAdminAPI } from "@ts-ghost/admin-api";
+
+const api = new TSGhostAdminAPI(
+  "https://demo.ghost.io",
+  "1efedd9db174adee2d23d982:4b74dca0219bad629852191af326a45037346c2231240e0f7aec1f9371cc14e8",
+  "v5.0"
+);
+
+----------------------------------------
+
+TITLE: Running the Validate Command for tsghost
+DESCRIPTION: Command to run validation which includes linting, typechecking, and tests in a single operation.
+
+LANGUAGE: bash
+CODE:
+# From the project root directory
+pnpm validate
+
+----------------------------------------
+
+TITLE: Filtering featured posts in TSGhost Admin API
+DESCRIPTION: Example of using the filter parameter to get all featured posts except those with a specific slug. Shows how to use the Ghost API filter syntax with dynamic values.
+
+LANGUAGE: typescript
+CODE:
+const slugToExclude = "test";
+
+let query = await api.posts
+  .browse({
+    filter: `featured:true+slug:-${slugToExclude}`,
+  })
+  .fetch();
+
+----------------------------------------
+
+TITLE: Running Tests in Watch Mode for tsghost
+DESCRIPTION: Commands to run tests in watch mode, either for all packages or for a specific package using the --filter flag.
+
+LANGUAGE: bash
+CODE:
+# From the project root directory
+pnpm test:watch
+# If you want to test a specific package
+pnpm test:watch --filter @ts-ghost/core-api
+
+----------------------------------------
+
+TITLE: Handling fetch responses in TSGhost Admin API
+DESCRIPTION: Example of how to handle the response from a fetch call, demonstrating the discriminated union pattern to check for success and handle errors appropriately.
+
+LANGUAGE: typescript
+CODE:
+let result = await api.posts.browse().fetch();
+if (result.success) {
+  const posts = result.data;
+  //     ^? type Post[]
+} else {
+  // errors array of objects
+  console.log(result.errors.map((e) => e.message).join("\n"));
+}
+
+----------------------------------------
+
+TITLE: Starting the Documentation Server for tsghost
+DESCRIPTION: Command to navigate to the documentation directory and start the development server.
+
+LANGUAGE: bash
+CODE:
+cd www/ && pnpm dev
+
+----------------------------------------
+
+TITLE: Using Ghost Admin API in NextJS App Router
+DESCRIPTION: Demonstrates fetching blog posts and site settings with the Ghost Admin API in a NextJS 13 app router server component. Includes error handling and data presentation.
+
+LANGUAGE: tsx
+CODE:
+import { api } from "./ghost";
+
+async function getBlogPosts() {
+  const response = await api.posts.browse().fields({ title: true, slug: true, id: true }).fetch();
+  if (!response.success) {
+    throw new Error(response.errors.join(", "));
+  }
+  return response.data;
+}
+
+async function getSiteSettings() {
+  const response = await api.site.fetch();
+  if (!response.success) {
+    throw new Error(response.errors.join(", "));
+  }
+  return response.data;
+}
+
+// async Server Component
+export default async function HomePage() {
+  const [posts, site] = await Promise.all([getBlogPosts(), getSiteSettings()]);
+  return (
+    <div>
+      <h1>This is a list of posts for {site.title}:</h1>
+      <ul>
+        {posts.map((post) => (
+          <li key={post.id}>
+            {post.title} ({post.slug})
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
+----------------------------------------
+
+TITLE: Comparing API Usage Before and After Breaking Change in v1.0.0
+DESCRIPTION: Demonstrates the difference between the old and new API patterns after breaking changes in version 1.0.0. Shows how input/output handling was restructured to make the API more fluent with methods like include(), fields(), and fetch().
+
+LANGUAGE: typescript
+CODE:
+// Before
+const posts = await api.posts
+  .browse({
+    input: {
+      limit: 5,
+      order: "title DESC",
+    },
+    output: {
+      include: {
+        authors: true,
+      },
+    },
+  })
+  .fetch();
+
+const onePost = await api.posts
+  .read({
+    input: {
+      slug: "test-post",
+    },
+    output: {
+      fields: {
+        slug: true,
+        html: true,
+      },
+    },
+  })
+  .fetch();
+
+LANGUAGE: typescript
+CODE:
+// After
+const posts = await api.posts
+  .browse({
+    limit: 5,
+    order: "title DESC",
+  })
+  .include({
+    authors: true,
+  })
+  .fetch();
+
+const onePost = await api.posts
+  .read({
+    slug: "test-post",
+  })
+  .fields({
+    slug: true,
+    html: true,
+  })
+  .fetch();
+
+----------------------------------------
+
+TITLE: Restricting API Methods with the access() Method in TypeScript
+DESCRIPTION: Demonstrates how to use the access() method to limit the available API operations to only read and browse, preventing the use of mutation methods.
+
+LANGUAGE: typescript
+CODE:
+const composer = new APIComposer(
+  {
+    schema: simplifiedSchema,
+    identitySchema: identitySchema,
+    include: simplifiedIncludeSchema,
+    // optional
+    createSchema,
+    // optional
+    createOptionsSchema: z.object({
+      option_1: z.boolean(),
+    }),
+  },
+  api
+);
+
+const composedAPI = composer.access(["read", "browse]);
+
+composedAPI.browse({ limit: 10, page: 2 }).fetch();
+composedAPI.read({ id: "1234" }).fetch();
+
+// TS error and Runtime error `add` doesn't exist
+composedAPI.add({ foo: "bar" }).fetch();
+
+----------------------------------------
+
+TITLE: Migration from QueryBuilder to APIComposer in TypeScript
+DESCRIPTION: Examples showing how to update existing code by replacing the deprecated QueryBuilder with the new APIComposer, including limiting access to read and browse operations.
+
+LANGUAGE: typescript
+CODE:
+return new QueryBuilder(
+  {
+    schema: adminPostsSchema,
+    identitySchema: slugOrIdSchema,
+    include: postsIncludeSchema,
+  },
+  api,
+);
+
+LANGUAGE: typescript
+CODE:
+import { APIComposer } from "@ts-ghost/core-api";
+// ...
+return new APIComposer(
+  {
+    schema: adminPostsSchema,
+    identitySchema: slugOrIdSchema,
+    include: postsIncludeSchema,
+  },
+  api,
+).access(["read", "browse"]);
+
+----------------------------------------
+
+TITLE: Extending QueryBuilder Class with TypeScript Generics
+DESCRIPTION: Shows how to create a custom MemberQueryBuilder by extending the base QueryBuilder class, demonstrating the use of generics for type definitions.
+
+LANGUAGE: typescript
+CODE:
+import { z } from "zod";
+import { adminMembersSchema, QueryBuilder } from "@ts-ghost/core-api";
+
+const membersIncludeSchema = z.object({});
+const queryIdentitySchema = z.object({
+  id: z.string(),
+});
+export class MemberQueryBuilder<
+  Shape extends typeof adminMembersSchema.shape,
+  Identity extends typeof queryIdentitySchema,
+  IncludeShape extends typeof membersIncludeSchema.shape,
+> extends QueryBuilder<Shape, Identity, IncludeShape> {
+  // ...
+}

@@ -1,0 +1,5045 @@
+TITLE: Basic Vitest Test Suite Example in TypeScript
+DESCRIPTION: Demonstrates how to write a basic test suite in Vitest using TypeScript. Shows common testing patterns including assertions, equality checks, and snapshot testing using the Vitest API.
+
+LANGUAGE: typescript
+CODE:
+import { assert, describe, expect, it } from 'vitest'
+
+describe('suite name', () => {
+  it('foo', () => {
+    expect(1 + 1).toEqual(2)
+    expect(true).to.be.true
+  })
+
+  it('bar', () => {
+    assert.equal(Math.sqrt(4), 2)
+  })
+
+  it('snapshot', () => {
+    expect({ foo: 'bar' }).toMatchSnapshot()
+  })
+})
+
+----------------------------------------
+
+TITLE: Writing Type Tests in TypeScript with Vitest
+DESCRIPTION: Demonstrates how to write type tests using expectTypeOf and assertType APIs to verify type behaviors. Shows parameter type checking and expected type errors.
+
+LANGUAGE: typescript
+CODE:
+import { assertType, expectTypeOf } from 'vitest'
+import { mount } from './mount.js'
+
+test('my types work properly', () => {
+  expectTypeOf(mount).toBeFunction()
+  expectTypeOf(mount).parameter(0).toMatchTypeOf<{ name: string }>()
+
+  // @ts-expect-error name is a string
+  assertType(mount({ name: 42 }))
+})
+
+----------------------------------------
+
+TITLE: Extending Matchers with expect.extend in TypeScript
+DESCRIPTION: This snippet demonstrates how to extend default matchers in Vitest using expect.extend. It includes an example of a custom matcher 'toBeFoo' and explains the structure of the matcher function.
+
+LANGUAGE: typescript
+CODE:
+expect.extend({
+  toBeFoo(received, expected) {
+    const { isNot } = this
+    return {
+      // do not alter your "pass" based on isNot. Vitest does it for you
+      pass: received === 'foo',
+      message: () => `${received} is${isNot ? ' not' : ''} foo`
+    }
+  }
+})
+
+----------------------------------------
+
+TITLE: Mocking Modules in Vitest
+DESCRIPTION: Illustrates how to mock entire modules using vi.mock() in Vitest, including mocking of external libraries and custom implementations.
+
+LANGUAGE: javascript
+CODE:
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { Client } from 'pg'
+import { failure, success } from './handlers.js'
+
+// get todos
+export async function getTodos(event, context) {
+  const client = new Client({
+    // ...clientOptions
+  })
+
+  await client.connect()
+
+  try {
+    const result = await client.query('SELECT * FROM todos;')
+
+    client.end()
+
+    return success({
+      message: `${result.rowCount} item(s) returned`,
+      data: result.rows,
+      status: true,
+    })
+  }
+  catch (e) {
+    console.error(e.stack)
+
+    client.end()
+
+    return failure({ message: e, status: false })
+  }
+}
+
+vi.mock('pg', () => {
+  const Client = vi.fn()
+  Client.prototype.connect = vi.fn()
+  Client.prototype.query = vi.fn()
+  Client.prototype.end = vi.fn()
+
+  return { Client }
+})
+
+vi.mock('./handlers.js', () => {
+  return {
+    success: vi.fn(),
+    failure: vi.fn(),
+  }
+})
+
+describe('get a list of todo items', () => {
+  let client
+
+  beforeEach(() => {
+    client = new Client()
+  })
+
+  afterEach(() => {
+    vi.clearAllMocks()
+  })
+
+  it('should return items successfully', async () => {
+    client.query.mockResolvedValueOnce({ rows: [], rowCount: 0 })
+
+    await getTodos()
+
+    expect(client.connect).toBeCalledTimes(1)
+    expect(client.query).toBeCalledWith('SELECT * FROM todos;')
+    expect(client.end).toBeCalledTimes(1)
+
+    expect(success).toBeCalledWith({
+      message: '0 item(s) returned',
+      data: [],
+      status: true,
+    })
+  })
+
+  it('should throw an error', async () => {
+    const mError = new Error('Unable to retrieve rows')
+    client.query.mockRejectedValueOnce(mError)
+
+    await getTodos()
+
+    expect(client.connect).toBeCalledTimes(1)
+    expect(client.query).toBeCalledWith('SELECT * FROM todos;')
+    expect(client.end).toBeCalledTimes(1)
+    expect(failure).toBeCalledWith({ message: mError, status: false })
+  })
+})
+
+----------------------------------------
+
+TITLE: Writing a Simple Test in JavaScript
+DESCRIPTION: Example of a basic test file in JavaScript using Vitest to test a sum function.
+
+LANGUAGE: javascript
+CODE:
+import { expect, test } from 'vitest'
+import { sum } from './sum.js'
+
+test('adds 1 + 2 to equal 3', () => {
+  expect(sum(1, 2)).toBe(3)
+})
+
+----------------------------------------
+
+TITLE: Installing Vitest with npm
+DESCRIPTION: Command to install Vitest as a dev dependency using npm package manager.
+
+LANGUAGE: bash
+CODE:
+npm install -D vitest
+
+----------------------------------------
+
+TITLE: Type Testing with Vitest
+DESCRIPTION: Illustrates how to write tests for TypeScript types using Vitest's experimental type testing feature, which helps catch type regressions.
+
+LANGUAGE: typescript
+CODE:
+import { assertType, expectTypeOf, test } from 'vitest'
+import { mount } from './mount.js'
+
+test('my types work properly', () => {
+  expectTypeOf(mount).toBeFunction()
+  expectTypeOf(mount).parameter(0).toMatchTypeOf<{ name: string }>()
+
+  // @ts-expect-error name is a string
+  assertType(mount({ name: 42 }))
+})
+
+----------------------------------------
+
+TITLE: Running Concurrent Tests in Vitest
+DESCRIPTION: Shows how to use the .concurrent modifier to run tests in parallel within a test suite, improving test execution speed.
+
+LANGUAGE: typescript
+CODE:
+import { describe, it } from 'vitest'
+
+// The two tests marked with concurrent will be started in parallel
+describe('suite', () => {
+  it('serial test', async () => { /* ... */ })
+  it.concurrent('concurrent test 1', async ({ expect }) => { /* ... */ })
+  it.concurrent('concurrent test 2', async ({ expect }) => { /* ... */ })
+})
+
+----------------------------------------
+
+TITLE: Configuring npm Scripts for Vitest
+DESCRIPTION: JSON snippet showing how to add Vitest test commands to package.json scripts.
+
+LANGUAGE: json
+CODE:
+{
+  "scripts": {
+    "test": "vitest",
+    "coverage": "vitest run --coverage"
+  }
+}
+
+----------------------------------------
+
+TITLE: Creating Snapshots in Vitest
+DESCRIPTION: Illustrates how to create Jest-compatible snapshots in Vitest for testing rendered output or complex objects.
+
+LANGUAGE: typescript
+CODE:
+import { expect, it } from 'vitest'
+
+it('renders correctly', () => {
+  const result = render()
+  expect(result).toMatchSnapshot()
+})
+
+----------------------------------------
+
+TITLE: Mocking Dates in Vitest
+DESCRIPTION: Demonstrates how to mock system time and control dates in Vitest tests using vi.useFakeTimers and vi.setSystemTime.
+
+LANGUAGE: javascript
+CODE:
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+
+const businessHours = [9, 17]
+
+function purchase() {
+  const currentHour = new Date().getHours()
+  const [open, close] = businessHours
+
+  if (currentHour > open && currentHour < close) {
+    return { message: 'Success' }
+  }
+
+  return { message: 'Error' }
+}
+
+describe('purchasing flow', () => {
+  beforeEach(() => {
+    // tell vitest we use mocked time
+    vi.useFakeTimers()
+  })
+
+  afterEach(() => {
+    // restoring date after each test run
+    vi.useRealTimers()
+  })
+
+  it('allows purchases within business hours', () => {
+    // set hour within business hours
+    const date = new Date(2000, 1, 1, 13)
+    vi.setSystemTime(date)
+
+    // access Date.now() will result in the date set above
+    expect(purchase()).toEqual({ message: 'Success' })
+  })
+
+  it('disallows purchases outside of business hours', () => {
+    // set hour outside business hours
+    const date = new Date(2000, 1, 1, 19)
+    vi.setSystemTime(date)
+
+    // access Date.now() will result in the date set above
+    expect(purchase()).toEqual({ message: 'Error' })
+  })
+})
+
+----------------------------------------
+
+TITLE: Basic Type Definitions for Test Functions
+DESCRIPTION: Core type definitions for test functions and options in Vitest
+
+LANGUAGE: typescript
+CODE:
+type Awaitable<T> = T | PromiseLike<T>
+type TestFunction = () => Awaitable<void>
+
+interface TestOptions {
+  timeout?: number
+  retry?: number
+  repeats?: number
+}
+
+----------------------------------------
+
+TITLE: Mocking Classes in Vitest
+DESCRIPTION: Shows how to mock entire classes in Vitest using vi.fn() and how to mock class methods and properties.
+
+LANGUAGE: typescript
+CODE:
+const Dog = vi.fn(function (name) {
+  this.name = name
+})
+
+// notice that static methods are mocked directly on the function,
+// not on the instance of the class
+Dog.getType = vi.fn(() => 'mocked animal')
+
+// mock the "speak" and "feed" methods on every instance of a class
+// all `new Dog()` instances will inherit these spies
+Dog.prototype.speak = vi.fn(() => 'loud bark!')
+Dog.prototype.feed = vi.fn()
+
+const dog = new Dog('Cooper')
+dog.speak() // loud bark!
+
+// you can use built-in assertions to check the validity of the call
+expect(dog.speak).toHaveBeenCalled()
+
+// Reassigning return value for a specific instance
+vi.mocked(dog.speak).mockReturnValue('woof woof')
+
+dog.speak() // woof woof
+
+// Mocking a property
+const nameSpy = vi.spyOn(dog, 'name', 'get').mockReturnValue('Max')
+
+expect(dog.name).toBe('Max')
+expect(nameSpy).toHaveBeenCalledTimes(1)
+
+----------------------------------------
+
+TITLE: Creating Basic Mock Functions with vi.fn() and vi.spyOn()
+DESCRIPTION: Demonstrates how to create mock functions using vi.fn() and spy on existing object methods using vi.spyOn(). Shows basic usage and call tracking.
+
+LANGUAGE: javascript
+CODE:
+import { vi } from 'vitest'
+
+const fn = vi.fn()
+fn('hello world')
+fn.mock.calls[0] === ['hello world']
+
+const market = {
+  getApples: () => 100
+}
+
+const getApplesSpy = vi.spyOn(market, 'getApples')
+market.getApples()
+getApplesSpy.mock.calls.length === 1
+
+----------------------------------------
+
+TITLE: Mocking Functions in Vitest
+DESCRIPTION: Shows how to mock functions using vi.fn() and vi.spyOn() in Vitest, demonstrating spying and mocking capabilities.
+
+LANGUAGE: javascript
+CODE:
+import { afterEach, describe, expect, it, vi } from 'vitest'
+
+const messages = {
+  items: [
+    { message: 'Simple test message', from: 'Testman' },
+    // ...
+  ],
+  getLatest, // can also be a `getter or setter if supported`
+}
+
+function getLatest(index = messages.items.length - 1) {
+  return messages.items[index]
+}
+
+describe('reading messages', () => {
+  afterEach(() => {
+    vi.restoreAllMocks()
+  })
+
+  it('should get the latest message with a spy', () => {
+    const spy = vi.spyOn(messages, 'getLatest')
+    expect(spy.getMockName()).toEqual('getLatest')
+
+    expect(messages.getLatest()).toEqual(
+      messages.items[messages.items.length - 1],
+    )
+
+    expect(spy).toHaveBeenCalledTimes(1)
+
+    spy.mockImplementationOnce(() => 'access-restricted')
+    expect(messages.getLatest()).toEqual('access-restricted')
+
+    expect(spy).toHaveBeenCalledTimes(2)
+  })
+
+  it('should get with a mock', () => {
+    const mock = vi.fn().mockImplementation(getLatest)
+
+    expect(mock()).toEqual(messages.items[messages.items.length - 1])
+    expect(mock).toHaveBeenCalledTimes(1)
+
+    mock.mockImplementationOnce(() => 'access-restricted')
+    expect(mock()).toEqual('access-restricted')
+
+    expect(mock).toHaveBeenCalledTimes(2)
+
+    expect(mock()).toEqual(messages.items[messages.items.length - 1])
+    expect(mock).toHaveBeenCalledTimes(3)
+  })
+})
+
+----------------------------------------
+
+TITLE: Defining ExpectationResult Interface for Vitest Matchers
+DESCRIPTION: This snippet defines the ExpectationResult interface, which represents the expected return value of a matcher function in Vitest. It includes properties for pass/fail status, error message, and optional actual and expected values for automatic diff generation.
+
+LANGUAGE: typescript
+CODE:
+interface ExpectationResult {
+  pass: boolean
+  message: () => string
+  // If you pass these, they will automatically appear inside a diff when
+  // the matcher does not pass, so you don't need to print the diff yourself
+  actual?: unknown
+  expected?: unknown
+}
+
+----------------------------------------
+
+TITLE: Custom Test Extension Definition in TypeScript
+DESCRIPTION: Shows how to create custom test extensions with fixtures using test.extend()
+
+LANGUAGE: typescript
+CODE:
+import { test } from 'vitest'
+
+const todos = []
+const archive = []
+
+export const myTest = test.extend({
+  todos: async ({}, use) => {
+    // setup the fixture before each test function
+    todos.push(1, 2, 3)
+
+    // use the fixture value
+    await use(todos)
+
+    // cleanup the fixture after each test function
+    todos.length = 0
+  },
+  archive
+})
+
+----------------------------------------
+
+TITLE: Inline Snapshot Test in Vitest
+DESCRIPTION: Shows how to use toMatchInlineSnapshot() to create an inline snapshot test in Vitest.
+
+LANGUAGE: typescript
+CODE:
+import { expect, it } from 'vitest'
+
+it('toUpperCase', () => {
+  const result = toUpperCase('foobar')
+  expect(result).toMatchInlineSnapshot()
+})
+
+----------------------------------------
+
+TITLE: Basic Snapshot Test in Vitest
+DESCRIPTION: Demonstrates how to use toMatchSnapshot() to create a basic snapshot test in Vitest.
+
+LANGUAGE: typescript
+CODE:
+import { expect, it } from 'vitest'
+
+it('toUpperCase', () => {
+  const result = toUpperCase('foobar')
+  expect(result).toMatchSnapshot()
+})
+
+----------------------------------------
+
+TITLE: Defining Vitest Configuration
+DESCRIPTION: Example of defining Vitest configuration using defineConfig from vitest/config
+
+LANGUAGE: typescript
+CODE:
+import { defineConfig } from 'vitest/config'
+
+export default defineConfig({
+  test: {
+    // ... Specify options here.
+  },
+})
+
+----------------------------------------
+
+TITLE: Running Vitest in Watch Mode
+DESCRIPTION: Demonstrates how to start Vitest in watch mode, which automatically reruns related tests when source code or test files are modified.
+
+LANGUAGE: bash
+CODE:
+$ vitest
+
+----------------------------------------
+
+TITLE: Configuring Vitest in TypeScript
+DESCRIPTION: Example of a Vitest configuration file in TypeScript, showing how to set test options.
+
+LANGUAGE: typescript
+CODE:
+import { defineConfig } from 'vitest/config'
+
+export default defineConfig({
+  test: {
+    // ...
+  },
+})
+
+----------------------------------------
+
+TITLE: Implementing In-Source Tests in TypeScript
+DESCRIPTION: Example showing how to write in-source tests alongside implementation code using Vitest. Demonstrates a simple add function with test cases using import.meta.vitest conditional block.
+
+LANGUAGE: typescript
+CODE:
+// the implementation
+export function add(...args: number[]) {
+  return args.reduce((a, b) => a + b, 0)
+}
+
+// in-source test suites
+if (import.meta.vitest) {
+  const { it, expect } = import.meta.vitest
+  it('add', () => {
+    expect(add()).toBe(0)
+    expect(add(1)).toBe(1)
+    expect(add(1, 2, 3)).toBe(6)
+  })
+}
+
+----------------------------------------
+
+TITLE: Installing Coverage Dependencies
+DESCRIPTION: Commands for installing v8 or istanbul coverage support packages.
+
+LANGUAGE: bash
+CODE:
+npm i -D @vitest/coverage-v8
+
+LANGUAGE: bash
+CODE:
+npm i -D @vitest/coverage-istanbul
+
+----------------------------------------
+
+TITLE: In-Source Testing with Vitest
+DESCRIPTION: Demonstrates how to write tests within the source code alongside the implementation, allowing for testing of private states without exporting.
+
+LANGUAGE: typescript
+CODE:
+// the implementation
+export function add(...args: number[]): number {
+  return args.reduce((a, b) => a + b, 0)
+}
+
+// in-source test suites
+if (import.meta.vitest) {
+  const { it, expect } = import.meta.vitest
+  it('add', () => {
+    expect(add()).toBe(0)
+    expect(add(1)).toBe(1)
+    expect(add(1, 2, 3)).toBe(6)
+  })
+}
+
+----------------------------------------
+
+TITLE: Basic Assertion Example in Vitest
+DESCRIPTION: Demonstrates basic usage of expect assertions in Vitest, including both Chai and Jest-compatible APIs.
+
+LANGUAGE: typescript
+CODE:
+import { expect } from 'vitest'
+
+const input = Math.sqrt(4)
+
+expect(input).to.equal(2) // chai API
+expect(input).toBe(2) // jest API
+
+----------------------------------------
+
+TITLE: Advanced Workspace Configuration with defineWorkspace
+DESCRIPTION: Demonstrates comprehensive workspace configuration using defineWorkspace helper, including multiple project configurations with different environments and test patterns.
+
+LANGUAGE: typescript
+CODE:
+import { defineWorkspace } from 'vitest/config'
+
+export default defineWorkspace([
+  'packages/*',
+  {
+    extends: './vite.config.js',
+    test: {
+      include: ['tests/**/*.{browser}.test.{ts,js}'],
+      name: 'happy-dom',
+      environment: 'happy-dom',
+    }
+  },
+  {
+    test: {
+      include: ['tests/**/*.{node}.test.{ts,js}'],
+      name: 'node',
+      environment: 'node',
+    }
+  }
+])
+
+----------------------------------------
+
+TITLE: Mocking Timers in Vitest
+DESCRIPTION: Demonstrates how to mock timers in Vitest using vi.useFakeTimers() for testing code with setTimeout and setInterval.
+
+LANGUAGE: javascript
+CODE:
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+
+function executeAfterTwoHours(func) {
+  setTimeout(func, 1000 * 60 * 60 * 2) // 2 hours
+}
+
+function executeEveryMinute(func) {
+  setInterval(func, 1000 * 60) // 1 minute
+}
+
+const mock = vi.fn(() => console.log('executed'))
+
+describe('delayed execution', () => {
+  beforeEach(() => {
+    vi.useFakeTimers()
+  })
+  afterEach(() => {
+    vi.restoreAllMocks()
+  })
+  it('should execute the function', () => {
+    executeAfterTwoHours(mock)
+    vi.runAllTimers()
+    expect(mock).toHaveBeenCalledTimes(1)
+  })
+  it('should not execute the function', () => {
+    executeAfterTwoHours(mock)
+    // advancing by 2ms won't trigger the func
+    vi.advanceTimersByTime(2)
+    expect(mock).not.toHaveBeenCalled()
+  })
+  it('should execute every minute', () => {
+    executeEveryMinute(mock)
+    vi.advanceTimersToNextTimer()
+    expect(mock).toHaveBeenCalledTimes(1)
+    vi.advanceTimersToNextTimer()
+    expect(mock).toHaveBeenCalledTimes(2)
+  })
+})
+
+----------------------------------------
+
+TITLE: Using expect.soft for Continuous Test Execution
+DESCRIPTION: Shows how to use expect.soft to continue test execution after a failed assertion.
+
+LANGUAGE: typescript
+CODE:
+import { expect, test } from 'vitest'
+
+test('expect.soft test', () => {
+  expect.soft(1 + 1).toBe(3) // mark the test as fail and continue
+  expect.soft(1 + 2).toBe(4) // mark the test as fail and continue
+})
+
+----------------------------------------
+
+TITLE: Mocking Network Requests in Vitest
+DESCRIPTION: Shows how to mock network requests in Vitest using Mock Service Worker (MSW) for HTTP, GraphQL, and WebSocket requests.
+
+LANGUAGE: javascript
+CODE:
+import { afterAll, afterEach, beforeAll } from 'vitest'
+import { setupServer } from 'msw/node'
+import { http, HttpResponse } from 'msw'
+
+const posts = [
+  {
+    userId: 1,
+    id: 1,
+    title: 'first post title',
+    body: 'first post body',
+  },
+  // ...
+]
+
+export const restHandlers = [
+  http.get('https://rest-endpoint.example/path/to/posts', () => {
+    return HttpResponse.json(posts)
+  }),
+]
+
+const server = setupServer(...restHandlers)
+
+// Start server before all tests
+beforeAll(() => server.listen({ onUnhandledRequest: 'error' }))
+
+// Close server after all tests
+afterAll(() => server.close())
+
+// Reset handlers after each test for test isolation
+afterEach(() => server.resetHandlers())
+
+----------------------------------------
+
+TITLE: Mocking File System in Vitest
+DESCRIPTION: Demonstrates how to mock the file system in Vitest tests using the memfs library for in-memory file system simulation.
+
+LANGUAGE: typescript
+CODE:
+import { beforeEach, expect, it, vi } from 'vitest'
+import { fs, vol } from 'memfs'
+import { readHelloWorld } from './read-hello-world.js'
+
+// tell vitest to use fs mock from __mocks__ folder
+// this can be done in a setup file if fs should always be mocked
+vi.mock('node:fs')
+vi.mock('node:fs/promises')
+
+beforeEach(() => {
+  // reset the state of in-memory fs
+  vol.reset()
+})
+
+it('should return correct text', () => {
+  const path = '/hello-world.txt'
+  fs.writeFileSync(path, 'hello world')
+
+  const text = readHelloWorld(path)
+  expect(text).toBe('hello world')
+})
+
+it('can return a value multiple times', () => {
+  // you can use vol.fromJSON to define several files
+  vol.fromJSON(
+    {
+      './dir1/hw.txt': 'hello dir1',
+      './dir2/hw.txt': 'hello dir2',
+    },
+    // default cwd
+    '/tmp',
+  )
+
+  expect(readHelloWorld('/tmp/dir1/hw.txt')).toBe('hello dir1')
+  expect(readHelloWorld('/tmp/dir2/hw.txt')).toBe('hello dir2')
+})
+
+----------------------------------------
+
+TITLE: Configuring VS Code Launch for Debugging Vitest Tests
+DESCRIPTION: JSON configuration for VS Code to debug the current test file in Vitest. It sets up a Node.js debugger with specific arguments and settings for Vitest test execution.
+
+LANGUAGE: json
+CODE:
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "type": "node",
+      "request": "launch",
+      "name": "Debug Current Test File",
+      "autoAttachChildProcesses": true,
+      "skipFiles": ["<node_internals>/**", "**/node_modules/**"],
+      "program": "${workspaceRoot}/node_modules/vitest/vitest.mjs",
+      "args": ["run", "${relativeFile}"],
+      "smartStep": true,
+      "console": "integratedTerminal"
+    }
+  ]
+}
+
+----------------------------------------
+
+TITLE: Mock Function Example
+DESCRIPTION: Example of creating and using a mock function with vi.fn()
+
+LANGUAGE: typescript
+CODE:
+const getApples = vi.fn(() => 0)
+
+getApples()
+
+expect(getApples).toHaveBeenCalled()
+expect(getApples).toHaveReturnedWith(0)
+
+getApples.mockReturnValueOnce(5)
+
+const res = getApples()
+expect(res).toBe(5)
+expect(getApples).toHaveNthReturnedWith(2, 5)
+
+----------------------------------------
+
+TITLE: Creating a Custom Environment in Vitest
+DESCRIPTION: This code snippet shows how to create a custom environment for Vitest. It exports an object that implements the Environment interface, including setup and teardown methods, and specifies the transform mode.
+
+LANGUAGE: typescript
+CODE:
+import type { Environment } from 'vitest/environments'
+
+export default <Environment>{
+  name: 'custom',
+  transformMode: 'ssr',
+  // optional - only if you support "experimental-vm" pool
+  async setupVM() {
+    const vm = await import('node:vm')
+    const context = vm.createContext()
+    return {
+      getVmContext() {
+        return context
+      },
+      teardown() {
+        // called after all tests with this env have been run
+      }
+    }
+  },
+  setup() {
+    // custom setup
+    return {
+      teardown() {
+        // called after all tests with this env have been run
+      }
+    }
+  }
+}
+
+----------------------------------------
+
+TITLE: Setting Environment for Specific Files in Vitest
+DESCRIPTION: This snippet demonstrates how to use control comments to specify the test environment for a specific file in Vitest. It sets the environment to 'jsdom' and includes a simple test to verify the presence of the 'window' object.
+
+LANGUAGE: typescript
+CODE:
+// @vitest-environment jsdom
+
+import { expect, test } from 'vitest'
+
+test('test', () => {
+  expect(typeof window).not.toBe('undefined')
+})
+
+----------------------------------------
+
+TITLE: Spy Function Example
+DESCRIPTION: Example of using vi.spyOn() to spy on an object's method
+
+LANGUAGE: typescript
+CODE:
+let apples = 0
+const cart = {
+  getApples: () => 42,
+}
+
+const spy = vi.spyOn(cart, 'getApples').mockImplementation(() => apples)
+apples = 1
+
+expect(cart.getApples()).toBe(1)
+
+expect(spy).toHaveBeenCalled()
+expect(spy).toHaveReturnedWith(1)
+
+----------------------------------------
+
+TITLE: Implementing Custom Coverage Reporter
+DESCRIPTION: Example of implementing a custom coverage reporter following Istanbul's reporter interface.
+
+LANGUAGE: javascript
+CODE:
+const { ReportBase } = require('istanbul-lib-report')
+
+module.exports = class CustomReporter extends ReportBase {
+  constructor(opts) {
+    super()
+    this.file = opts.file
+  }
+
+  onStart(root, context) {
+    this.contentWriter = context.writer.writeFile(this.file)
+    this.contentWriter.println('Start of custom coverage report')
+  }
+
+  onEnd() {
+    this.contentWriter.println('End of custom coverage report')
+    this.contentWriter.close()
+  }
+}
+
+----------------------------------------
+
+TITLE: Configuring Coverage Provider in Vitest
+DESCRIPTION: Shows how to configure the coverage provider (v8 or istanbul) in Vitest configuration file.
+
+LANGUAGE: typescript
+CODE:
+import { defineConfig } from 'vitest/config'
+
+export default defineConfig({
+  test: {
+    coverage: {
+      provider: 'istanbul' // or 'v8'
+    },
+  },
+})
+
+----------------------------------------
+
+TITLE: Using toBe for Equality Assertions
+DESCRIPTION: Demonstrates the usage of toBe for asserting equality of primitives or object references.
+
+LANGUAGE: typescript
+CODE:
+import { expect, test } from 'vitest'
+
+const stock = {
+  type: 'apples',
+  count: 13,
+}
+
+test('stock has 13 apples', () => {
+  expect(stock.type).toBe('apples')
+  expect(stock.count).toBe(13)
+})
+
+test('stocks are the same', () => {
+  const refStock = stock // same reference
+
+  expect(stock).toBe(refStock)
+})
+
+----------------------------------------
+
+TITLE: Extending Default Vitest Reporter
+DESCRIPTION: Example of extending the DefaultReporter class from Vitest to create a custom reporter implementation.
+
+LANGUAGE: typescript
+CODE:
+import { DefaultReporter } from 'vitest/reporters'
+
+export default class MyDefaultReporter extends DefaultReporter {
+  // do something
+}
+
+----------------------------------------
+
+TITLE: Project Configuration with Type Safety
+DESCRIPTION: Demonstrates using defineProject for type-safe project configuration with proper error checking for unsupported options.
+
+LANGUAGE: typescript
+CODE:
+import { defineProject } from 'vitest/config'
+
+export default defineProject({
+  test: {
+    environment: 'jsdom',
+    reporters: ['json']
+  }
+})
+
+----------------------------------------
+
+TITLE: Using expect.poll for Asynchronous Assertions
+DESCRIPTION: Demonstrates how to use expect.poll for retrying assertions until they succeed or timeout.
+
+LANGUAGE: typescript
+CODE:
+import { expect, test } from 'vitest'
+
+test('element exists', async () => {
+  asyncInjectElement()
+
+  await expect.poll(() => document.querySelector('.element')).toBeTruthy()
+})
+
+----------------------------------------
+
+TITLE: Defining Vitest Workspace in TypeScript
+DESCRIPTION: Example of defining a Vitest workspace configuration for multiple projects or test setups.
+
+LANGUAGE: typescript
+CODE:
+import { defineWorkspace } from 'vitest/config'
+
+export default defineWorkspace([
+  'packages/*',
+  'tests/*/vitest.config.{e2e,unit}.ts',
+  {
+    test: {
+      name: 'happy-dom',
+      root: './shared_tests',
+      environment: 'happy-dom',
+      setupFiles: ['./setup.happy-dom.ts'],
+    },
+  },
+  {
+    test: {
+      name: 'node',
+      root: './shared_tests',
+      environment: 'node',
+      setupFiles: ['./setup.node.ts'],
+    },
+  },
+])
+
+----------------------------------------
+
+TITLE: Initializing and Running Tests with startVitest
+DESCRIPTION: Example showing how to use startVitest to initiate Vitest, run tests, and access test results. This method validates package installation and runs tests immediately.
+
+LANGUAGE: typescript
+CODE:
+import { startVitest } from 'vitest/node'
+
+const vitest = await startVitest(
+  'test',
+  [], // CLI filters
+  {}, // override test config
+  {}, // override Vite config
+  {}, // custom Vitest options
+)
+const testModules = vitest.state.getTestModules()
+for (const testModule of testModules) {
+  console.log(testModule.moduleId, testModule.ok() ? 'passed' : 'failed')
+}
+
+----------------------------------------
+
+TITLE: Configuring Vitest Browser Mode
+DESCRIPTION: Basic configuration setup for enabling browser mode in Vitest using Playwright provider.
+
+LANGUAGE: typescript
+CODE:
+import { defineConfig } from 'vitest/config'
+export default defineConfig({
+  test: {
+    browser: {
+      provider: 'playwright',
+      enabled: true,
+      instances: [
+        { browser: 'chromium' },
+      ],
+    },
+  }
+})
+
+----------------------------------------
+
+TITLE: Defining Workspace in TypeScript Configuration
+DESCRIPTION: Shows how to define a Vitest workspace configuration using both workspace file and root config approaches. Demonstrates basic glob pattern usage for including multiple packages.
+
+LANGUAGE: typescript
+CODE:
+export default [
+  'packages/*'
+]
+
+LANGUAGE: typescript
+CODE:
+import { defineConfig } from 'vitest/config'
+
+export default defineConfig({
+  test: {
+    workspace: ['packages/*'],
+  },
+})
+
+----------------------------------------
+
+TITLE: Implementing a Custom Vitest Runner in TypeScript
+DESCRIPTION: This example shows how to create a custom Vitest runner by extending the VitestTestRunner class. It demonstrates setting up the configuration and implementing a custom onAfterRunFiles method.
+
+LANGUAGE: typescript
+CODE:
+import type { RunnerTestFile } from 'vitest'
+import type { VitestRunner, VitestRunnerConfig } from 'vitest/suite'
+import { VitestTestRunner } from 'vitest/runners'
+
+class CustomRunner extends VitestTestRunner implements VitestRunner {
+  public config: VitestRunnerConfig
+
+  constructor(config: VitestRunnerConfig) {
+    this.config = config
+  }
+
+  onAfterRunFiles(files: RunnerTestFile[]) {
+    console.log('finished running', files)
+  }
+}
+
+export default CustomRunner
+
+----------------------------------------
+
+TITLE: Framework-Specific Browser Mode Configuration
+DESCRIPTION: Configuration examples for different frameworks like React, Vue, and Svelte.
+
+LANGUAGE: typescript
+CODE:
+import { defineConfig } from 'vitest/config'
+import react from '@vitejs/plugin-react'
+
+export default defineConfig({
+  plugins: [react()],
+  test: {
+    browser: {
+      enabled: true,
+      provider: 'playwright',
+      instances: [
+        { browser: 'chromium' },
+      ],
+    }
+  }
+})
+
+----------------------------------------
+
+TITLE: Configuring Vitest for In-Source Testing
+DESCRIPTION: Configuration setup for enabling in-source testing in Vitest, including source file inclusion patterns and production build settings.
+
+LANGUAGE: typescript
+CODE:
+import { defineConfig } from 'vitest/config'
+
+export default defineConfig({
+  test: {
+    includeSource: ['src/**/*.{js,ts}'],
+  },
+  define: {
+    'import.meta.vitest': 'undefined',
+  },
+})
+
+----------------------------------------
+
+TITLE: Testing Options Migration in Vitest 3.0
+DESCRIPTION: Shows how to update test options from being passed as a third argument to being passed before the test function.
+
+LANGUAGE: typescript
+CODE:
+test('validation works', () => {
+  // ...
+}, { retry: 3 }) // Old way
+
+test('validation works', { retry: 3 }, () => {
+  // ...
+}) // New way
+
+----------------------------------------
+
+TITLE: Implementing Custom Commands in Vitest Browser Tests
+DESCRIPTION: Demonstrates how to create and use custom commands in Vitest browser tests. This example shows a plugin that adds a custom command and how to use it in a test file.
+
+LANGUAGE: typescript
+CODE:
+import type { Plugin } from 'vitest/config'
+import type { BrowserCommand } from 'vitest/node'
+
+const myCustomCommand: BrowserCommand<[arg1: string, arg2: string]> = ({
+  testPath,
+  provider
+}, arg1, arg2) => {
+  if (provider.name === 'playwright') {
+    console.log(testPath, arg1, arg2)
+    return { someValue: true }
+  }
+
+  throw new Error(`provider ${provider.name} is not supported`)
+}
+
+export default function BrowserCommands(): Plugin {
+  return {
+    name: 'vitest:custom-commands',
+    config() {
+      return {
+        test: {
+          browser: {
+            commands: {
+              myCustomCommand,
+            }
+          }
+        }
+      }
+    }
+  }
+}
+
+LANGUAGE: typescript
+CODE:
+import { commands } from '@vitest/browser/context'
+import { expect, test } from 'vitest'
+
+test('custom command works correctly', async () => {
+  const result = await commands.myCustomCommand('test1', 'test2')
+  expect(result).toEqual({ someValue: true }
+})
+
+// if you are using TypeScript, you can augment the module
+declare module '@vitest/browser/context' {
+  interface BrowserCommands {
+    myCustomCommand: (arg1: string, arg2: string) => Promise<{
+      someValue: true
+    }>
+  }
+}
+
+----------------------------------------
+
+TITLE: Browser Mode Test Example
+DESCRIPTION: Example test code showing how to use browser mode features with element queries and assertions.
+
+LANGUAGE: javascript
+CODE:
+import { expect, test } from 'vitest'
+import { page } from '@vitest/browser/context'
+import { render } from './my-render-function.js'
+
+test('properly handles form inputs', async () => {
+  render()
+  await expect.element(page.getByText('Hi, my name is Alice')).toBeInTheDocument()
+  const usernameInput = page.getByLabelText(/username/i)
+  await usernameInput.fill('Bob')
+  await expect.element(page.getByText('Hi, my name is Bob')).toBeInTheDocument()
+})
+
+----------------------------------------
+
+TITLE: Configuring Vitest Reporters in Configuration File
+DESCRIPTION: Shows how to specify reporters in the Vitest configuration file. The example sets up the verbose reporter.
+
+LANGUAGE: typescript
+CODE:
+import { defineConfig } from 'vitest/config'
+
+export default defineConfig({
+  test: {
+    reporters: ['verbose']
+  },
+})
+
+----------------------------------------
+
+TITLE: Vitest Browser Testing with Retriable Assertions
+DESCRIPTION: Demonstrates how to use retriable assertions in browser tests using expect.element and expect.poll APIs. Shows testing of asynchronous DOM updates with built-in retry mechanisms.
+
+LANGUAGE: typescript
+CODE:
+import { expect, test } from 'vitest'
+import { page } from '@vitest/browser/context'
+
+test('error banner is rendered', async () => {
+  triggerError()
+
+  // @testing-library provides queries with built-in retry-ability
+  // It will try to find the banner until it's rendered
+  const banner = page.getByRole('alert', {
+    name: /error/i,
+  })
+
+  // Vitest provides `expect.element` with built-in retry-ability
+  // It will check `element.textContent` until it's equal to "Error!"
+  await expect.element(banner).toHaveTextContent('Error!')
+})
+
+----------------------------------------
+
+TITLE: Using Custom Test Extensions in TypeScript
+DESCRIPTION: Demonstrates how to use custom test extensions with fixtures in test files.
+
+LANGUAGE: typescript
+CODE:
+import { expect } from 'vitest'
+import { myTest } from './my-test.js'
+
+myTest('add items to todos', ({ todos }) => {
+  expect(todos.length).toBe(3)
+
+  todos.push(4)
+  expect(todos.length).toBe(4)
+})
+
+myTest('move items from todos to archive', ({ todos, archive }) => {
+  expect(todos.length).toBe(3)
+  expect(archive.length).toBe(0)
+
+  archive.push(todos.pop())
+  expect(todos.length).toBe(2)
+  expect(archive.length).toBe(1)
+})
+
+----------------------------------------
+
+TITLE: Defining commands API for Browser Control in TypeScript
+DESCRIPTION: This snippet defines the commands object, which provides access to browser commands. It's a shortcut to server.commands and allows direct interaction with the browser.
+
+LANGUAGE: typescript
+CODE:
+export const commands: BrowserCommands
+
+----------------------------------------
+
+TITLE: Configuring Coverage in Vitest
+DESCRIPTION: Shows how to set up a script for running Vitest with code coverage, which can be used to measure test coverage of the codebase.
+
+LANGUAGE: json
+CODE:
+{
+  "scripts": {
+    "test": "vitest",
+    "coverage": "vitest run --coverage"
+  }
+}
+
+----------------------------------------
+
+TITLE: File Snapshot Test in Vitest
+DESCRIPTION: Demonstrates how to use toMatchFileSnapshot() to compare against a separate snapshot file in Vitest.
+
+LANGUAGE: typescript
+CODE:
+import { expect, it } from 'vitest'
+
+it('render basic', async () => {
+  const result = renderHTML(h('div', { class: 'foo' }))
+  await expect(result).toMatchFileSnapshot('./test/basic.output.html')
+})
+
+----------------------------------------
+
+TITLE: Defining a Test with Name in Vitest
+DESCRIPTION: Shows how to define a test with a specific name using the test function in Vitest.
+
+LANGUAGE: typescript
+CODE:
+import { test } from 'vitest'
+
+test('the validation works correctly', () => {
+  // ...
+})
+
+----------------------------------------
+
+TITLE: Configuring Environment Variables in Vitest
+DESCRIPTION: Demonstrates how to configure Vitest to load all environment variables from .env files, extending beyond the default VITE_ prefixed variables.
+
+LANGUAGE: typescript
+CODE:
+import { loadEnv } from 'vite'
+import { defineConfig } from 'vitest/config'
+
+export default defineConfig(({ mode }) => ({
+  test: {
+    // mode defines what ".env.{mode}" file to choose if exists
+    env: loadEnv(mode, process.cwd(), ''),
+  },
+}))
+
+----------------------------------------
+
+TITLE: Basic UserEvent Usage in Vitest
+DESCRIPTION: Basic example showing how to import and use the userEvent API for clicking elements
+
+LANGUAGE: typescript
+CODE:
+import { userEvent } from '@vitest/browser/context'
+
+await userEvent.click(document.querySelector('.button'))
+
+----------------------------------------
+
+TITLE: Browser Configuration Migration in Vitest 3.0
+DESCRIPTION: Demonstrates migration from deprecated browser.name and browser.providerOptions to the new browser.instances configuration.
+
+LANGUAGE: typescript
+CODE:
+export default defineConfig({
+  test: {
+    browser: {
+      instances: [
+        {
+          browser: 'chromium',
+          launch: { devtools: true },
+        },
+      ],
+    },
+  },
+})
+
+----------------------------------------
+
+TITLE: Using Role-based Locators in Tests
+DESCRIPTION: Example showing how to use getByRole locators to interact with form elements
+
+LANGUAGE: typescript
+CODE:
+await expect.element(
+  page.getByRole('heading', { name: 'Sign up' })
+).toBeVisible()
+
+await page.getByRole('textbox', { name: 'Login' }).fill('admin')
+await page.getByRole('textbox', { name: 'Password' }).fill('admin')
+
+await page.getByRole('button', { name: /submit/i }).click()
+
+----------------------------------------
+
+TITLE: Configuring Thread Pool in Vitest
+DESCRIPTION: Demonstrates how to switch to threads pool for potentially better performance in larger projects using CLI or configuration file.
+
+LANGUAGE: bash
+CODE:
+vitest --pool=threads
+
+LANGUAGE: typescript
+CODE:
+import { defineConfig } from 'vitest/config'
+
+export default defineConfig({
+  test: {
+    pool: 'threads',
+  },
+})
+
+----------------------------------------
+
+TITLE: Configuring Custom Reporter in Vitest Config
+DESCRIPTION: Example of configuring a custom reporter in the Vitest configuration file.
+
+LANGUAGE: typescript
+CODE:
+import { defineConfig } from 'vitest/config'
+import CustomReporter from './custom-reporter.js'
+
+export default defineConfig({
+  test: {
+    reporters: [new CustomReporter()],
+  },
+})
+
+----------------------------------------
+
+TITLE: Using Context-Bound Expect in TypeScript
+DESCRIPTION: Shows how to use the expect API bound to the current test context, which is useful for concurrent snapshot testing.
+
+LANGUAGE: typescript
+CODE:
+import { it } from 'vitest'
+
+it('math is easy', ({ expect }) => {
+  expect(2 + 2).toBe(4)
+})
+
+----------------------------------------
+
+TITLE: Configuring TSConfig Paths in Vitest
+DESCRIPTION: Configuration setup for using tsconfig paths with Vitest using vite-tsconfig-paths plugin.
+
+LANGUAGE: typescript
+CODE:
+import { defineConfig } from 'vitest/config'
+import tsconfigPaths from 'vite-tsconfig-paths'
+
+export default defineConfig({
+  plugins: [tsconfigPaths()]
+})
+
+----------------------------------------
+
+TITLE: Using Reported Tasks API in Custom Reporter
+DESCRIPTION: Example of implementing a custom reporter using the Reported Tasks API to access test results.
+
+LANGUAGE: typescript
+CODE:
+import type { Reporter, RunnerTestFile, TestModule, Vitest } from 'vitest/node'
+
+class MyReporter implements Reporter {
+  private vitest!: Vitest
+
+  onInit(vitest: Vitest) {
+    this.vitest = vitest
+  }
+
+  onFinished(files: RunnerTestFile[]) {
+    for (const file of files) {
+      const testModule = this.vitest.state.getReportedEntity(file) as TestModule
+      for (const task of testModule.children) {
+        console.log('finished', task.type, task.fullName)
+      }
+    }
+  }
+}
+
+----------------------------------------
+
+TITLE: Basic Test Context Usage in TypeScript
+DESCRIPTION: Demonstrates basic usage of test context in Vitest to access test metadata.
+
+LANGUAGE: typescript
+CODE:
+import { it } from 'vitest'
+
+it('should work', (ctx) => {
+  // prints name of the test
+  console.log(ctx.task.name)
+})
+
+----------------------------------------
+
+TITLE: Configuring Aliases in Vitest
+DESCRIPTION: Configuration for setting up proper path aliases in Vitest using URL paths instead of relative paths.
+
+LANGUAGE: typescript
+CODE:
+import { defineConfig } from 'vitest/config'
+
+export default defineConfig({
+  test: {
+    alias: {
+      '@/': new URL('./src/', import.meta.url).pathname,
+    }
+  }
+})
+
+----------------------------------------
+
+TITLE: Suite Children Iteration - TypeScript
+DESCRIPTION: Shows how to iterate over child tasks in a test suite and distinguish between tests and suites.
+
+LANGUAGE: typescript
+CODE:
+for (const task of suite.children) {
+  if (task.type === 'test') {
+    console.log('test', task.fullName)
+  }
+  else {
+    // task is TaskSuite
+    console.log('suite', task.name)
+  }
+}
+
+----------------------------------------
+
+TITLE: TypeScript Configuration for Vitest
+DESCRIPTION: TypeScript configuration to enable proper type support for import.meta.vitest in source files.
+
+LANGUAGE: json
+CODE:
+{
+  "compilerOptions": {
+    "types": [
+      "vitest/importMeta"
+    ]
+  }
+}
+
+----------------------------------------
+
+TITLE: Installing Vitest UI Package
+DESCRIPTION: Command to install the Vitest UI package as a development dependency using npm.
+
+LANGUAGE: bash
+CODE:
+npm i -D @vitest/ui
+
+----------------------------------------
+
+TITLE: Writing Vitest Reporter Output to File
+DESCRIPTION: Shows how to write reporter output to a file using the outputFile configuration option. The example uses the JSON reporter and specifies an output file.
+
+LANGUAGE: typescript
+CODE:
+export default defineConfig({
+  test: {
+    reporters: ['json'],
+    outputFile: './test-output.json'
+  },
+})
+
+----------------------------------------
+
+TITLE: Configuring Vitest Type Checking in package.json
+DESCRIPTION: Shows how to enable type checking in Vitest by adding the --typecheck flag to the test script configuration.
+
+LANGUAGE: json
+CODE:
+{
+  "scripts": {
+    "test": "vitest --typecheck"
+  }
+}
+
+----------------------------------------
+
+TITLE: Running Vitest with UI Flag
+DESCRIPTION: Command to start Vitest tests with the UI interface enabled.
+
+LANGUAGE: bash
+CODE:
+vitest --ui
+
+----------------------------------------
+
+TITLE: Filtering Tests by State in TestCollection using TypeScript
+DESCRIPTION: Defines the 'tests' method, which filters only the tests that are part of this collection. It can optionally filter tests by state.
+
+LANGUAGE: typescript
+CODE:
+function tests(state?: TestState): Generator<TestCase, undefined, void>
+
+----------------------------------------
+
+TITLE: Running Vitest Type Tests with Different Package Managers
+DESCRIPTION: Command examples for running type tests using different package managers including npm, yarn, pnpm, and bun.
+
+LANGUAGE: bash
+CODE:
+npm run test
+yarn test
+pnpm run test
+bun test
+
+----------------------------------------
+
+TITLE: Configuring Lint-Staged with Vitest in JavaScript
+DESCRIPTION: Shows how to configure lint-staged to run Vitest related tests for staged files.
+
+LANGUAGE: javascript
+CODE:
+export default {
+  '*.{js,ts}': 'vitest related --run',
+}
+
+----------------------------------------
+
+TITLE: Adding Custom Metadata to Test in Vitest
+DESCRIPTION: Demonstrates how to add custom metadata to a test during its execution using the task.meta object.
+
+LANGUAGE: typescript
+CODE:
+import { test } from 'vitest'
+
+test('the validation works correctly', ({ task }) => {
+  // ...
+
+  task.meta.decorated = false
+})
+
+----------------------------------------
+
+TITLE: Configuring Vitest Reporters via CLI
+DESCRIPTION: Demonstrates how to specify a reporter using the Vitest CLI. The example uses the verbose reporter.
+
+LANGUAGE: bash
+CODE:
+npx vitest --reporter=verbose
+
+----------------------------------------
+
+TITLE: Merging Vitest Reports with Custom Reporter in Bash
+DESCRIPTION: Shows how to merge blob reports and specify a custom reporter for output.
+
+LANGUAGE: bash
+CODE:
+vitest --merge-reports --reporter=junit
+
+----------------------------------------
+
+TITLE: Configuring Test Isolation in Vitest
+DESCRIPTION: Examples showing how to disable test isolation using CLI flag or configuration file. This can improve performance for projects that don't rely on side effects and properly clean up their state.
+
+LANGUAGE: bash
+CODE:
+vitest --no-isolate
+
+LANGUAGE: typescript
+CODE:
+import { defineConfig } from 'vitest/config'
+
+export default defineConfig({
+  test: {
+    isolate: false,
+    // you can also disable isolation only for specific pools
+    poolOptions: {
+      forks: {
+        isolate: false,
+      },
+    },
+  },
+})
+
+----------------------------------------
+
+TITLE: Combining Multiple Vitest Reporters
+DESCRIPTION: Demonstrates how to use multiple reporters simultaneously and specify different output files for each. The example uses junit, json, and verbose reporters.
+
+LANGUAGE: typescript
+CODE:
+export default defineConfig({
+  test: {
+    reporters: ['junit', 'json', 'verbose'],
+    outputFile: {
+      junit: './junit-report.xml',
+      json: './json-report.json',
+    },
+  },
+})
+
+----------------------------------------
+
+TITLE: Running Vitest Related Tests in Bash
+DESCRIPTION: Demonstrates how to run tests related to specific source files using the 'related' command.
+
+LANGUAGE: bash
+CODE:
+vitest related /src/index.ts /src/hello-world.js
+
+----------------------------------------
+
+TITLE: Configuring HTML Reporter in Vitest
+DESCRIPTION: TypeScript configuration for enabling HTML report generation in Vitest. Demonstrates how to set up the HTML reporter in the Vitest configuration file.
+
+LANGUAGE: typescript
+CODE:
+import { defineConfig } from 'vitest/config'
+
+export default defineConfig({
+  test: {
+    reporters: ['html'],
+  },
+})
+
+----------------------------------------
+
+TITLE: Customizing Vitest Reporter Options
+DESCRIPTION: Demonstrates how to pass additional options to reporters in the configuration file. The example configures the default and junit reporters with custom options.
+
+LANGUAGE: typescript
+CODE:
+export default defineConfig({
+  test: {
+    reporters: [
+      'default',
+      ['junit', { suiteName: 'UI tests' }]
+    ],
+  },
+})
+
+----------------------------------------
+
+TITLE: Initializing Vitest Browser Configuration in Bash
+DESCRIPTION: Demonstrates how to initialize Vitest configuration for browser testing.
+
+LANGUAGE: bash
+CODE:
+vitest init browser
+
+----------------------------------------
+
+TITLE: Previewing HTML Report with Vite
+DESCRIPTION: Command to preview the generated HTML report using Vite's preview functionality.
+
+LANGUAGE: bash
+CODE:
+npx vite preview --outDir ./html
+
+----------------------------------------
+
+TITLE: Configuring Vitest for Browser Debugging in TypeScript
+DESCRIPTION: TypeScript configuration for Vitest to enable browser debugging. It sets up inspection, disables file parallelism, and configures the browser provider.
+
+LANGUAGE: typescript
+CODE:
+import { defineConfig } from 'vitest/config'
+
+export default defineConfig({
+  test: {
+    inspectBrk: true,
+    fileParallelism: false,
+    browser: {
+      provider: 'playwright',
+      instances: [{ browser: 'chromium' }]
+    },
+  },
+})
+
+----------------------------------------
+
+TITLE: Running Vitest with Sharding in Bash
+DESCRIPTION: Demonstrates how to split and run a test suite into multiple shards using the --shard option.
+
+LANGUAGE: bash
+CODE:
+vitest run --shard=1/3
+vitest run --shard=2/3
+vitest run --shard=3/3
+
+----------------------------------------
+
+TITLE: Implementing Custom Reporter with Task Metadata
+DESCRIPTION: Shows how to create a custom reporter that processes task metadata from test results. Implements onTestCaseResult and onTestRunEnd hooks to access metadata.
+
+LANGUAGE: typescript
+CODE:
+import type { Reporter, TestCase, TestModule } from 'vitest/node'
+
+export default {
+  onTestCaseResult(testCase: TestCase) {
+    // custom === 'some-custom-handler' ✅
+    const { custom } = testCase.meta()
+  },
+  onTestRunEnd(testModule: TestModule) {
+    testModule.meta().done === true
+    testModule.children.at(0).meta().custom === 'some-custom-handler'
+  }
+} satisfies Reporter
+
+----------------------------------------
+
+TITLE: Disabling File Parallelism in Vitest
+DESCRIPTION: Shows how to disable parallel test file execution to improve startup time using either CLI or configuration approach.
+
+LANGUAGE: bash
+CODE:
+vitest --no-file-parallelism
+
+LANGUAGE: typescript
+CODE:
+import { defineConfig } from 'vitest/config'
+
+export default defineConfig({
+  test: {
+    fileParallelism: false,
+  },
+})
+
+----------------------------------------
+
+TITLE: Resetting Modules in Vitest Setup
+DESCRIPTION: Example of handling module mocking and cache clearing in a Vitest setup file.
+
+LANGUAGE: typescript
+CODE:
+import { vi } from 'vitest'
+import { sideEffect } from './mocked-file.js'
+
+sideEffect()
+
+vi.resetModules()
+
+----------------------------------------
+
+TITLE: Defining cdp API for Chrome DevTools Protocol in TypeScript
+DESCRIPTION: This snippet defines the cdp function, which returns the current Chrome DevTools Protocol session. It's primarily useful for library authors building tools on top of CDP.
+
+LANGUAGE: typescript
+CODE:
+export const cdp: () => CDPSession
+
+----------------------------------------
+
+TITLE: Browser Configuration with Inherited Setup Files
+DESCRIPTION: Demonstrates how browser configurations inherit options from root config, including setup files.
+
+LANGUAGE: typescript
+CODE:
+export default defineConfig({
+  test: {
+    setupFile: ['./root-setup-file.js'],
+    browser: {
+      enabled: true,
+      testerHtmlPath: './custom-path.html',
+      instances: [
+        {
+          // will have both setup files: "root" and "browser"
+          setupFile: ['./browser-setup-file.js'],
+          // implicitly has "testerHtmlPath" from the root config
+          // testerHtmlPath: './custom-path.html',
+        },
+      ],
+    },
+  },
+})
+
+----------------------------------------
+
+TITLE: Temporary Mock Implementation
+DESCRIPTION: Shows how to temporarily override mock implementation using withImplementation(), including both synchronous and asynchronous examples.
+
+LANGUAGE: javascript
+CODE:
+const myMockFn = vi.fn(() => 'original')
+
+myMockFn.withImplementation(() => 'temp', () => {
+  myMockFn() // 'temp'
+})
+
+myMockFn() // 'original'
+
+----------------------------------------
+
+TITLE: Running Vitest with Node Inspector for Debugging
+DESCRIPTION: Command-line instructions to run Vitest with Node Inspector for debugging. It includes options for single worker, single child process, and browser mode execution.
+
+LANGUAGE: bash
+CODE:
+# To run in a single worker
+vitest --inspect-brk --pool threads --poolOptions.threads.singleThread
+
+# To run in a single child process
+vitest --inspect-brk --pool forks --poolOptions.forks.singleFork
+
+# To run in browser mode
+vitest --inspect-brk --browser --no-file-parallelism
+
+----------------------------------------
+
+TITLE: Basic Browser Configuration in Vitest
+DESCRIPTION: Example of enabling browser testing with Playwright provider and Chromium browser instance configuration.
+
+LANGUAGE: typescript
+CODE:
+import { defineConfig } from 'vitest/config'
+
+export default defineConfig({
+  test: {
+    browser: {
+      enabled: true,
+      provider: 'playwright',
+      instances: [
+        {
+          browser: 'chromium',
+          setupFile: './chromium-setup.js',
+        },
+      ],
+    },
+  },
+})
+
+----------------------------------------
+
+TITLE: Type Extraction Testing with ResponsiveProp
+DESCRIPTION: Example of using extract matcher to narrow down union types for testing with a ResponsiveProp type.
+
+LANGUAGE: typescript
+CODE:
+import { expectTypeOf } from 'vitest'
+
+type ResponsiveProp<T> = T | T[] | { xs?: T; sm?: T; md?: T }
+
+interface CSSProperties { margin?: string; padding?: string }
+
+function getResponsiveProp<T>(_props: T): ResponsiveProp<T> {
+  return {}
+}
+
+const cssProperties: CSSProperties = { margin: '1px', padding: '2px' }
+
+expectTypeOf(getResponsiveProp(cssProperties))
+  .extract<{ xs?: any }>() 
+  .toEqualTypeOf<{ xs?: CSSProperties; sm?: CSSProperties; md?: CSSProperties }>()
+
+expectTypeOf(getResponsiveProp(cssProperties))
+  .extract<unknown[]>() 
+  .toEqualTypeOf<CSSProperties[]>()
+
+----------------------------------------
+
+TITLE: Updating Async Test Pattern in Vitest (JavaScript)
+DESCRIPTION: This snippet demonstrates the transition from using a callback-style async test to a Promise-based approach in Vitest. The updated code wraps the test logic in a Promise, allowing for better handling of asynchronous operations.
+
+LANGUAGE: javascript
+CODE:
+it('should work', (done) => {  // [!code --]
+it('should work', () => new Promise(done => { // [!code ++]
+  // ...
+  done()
+}) // [!code --]
+})) // [!code ++]
+
+----------------------------------------
+
+TITLE: Running Vitest with File Filter in Bash
+DESCRIPTION: Demonstrates how to run Vitest with a file filter argument to execute only specific test files.
+
+LANGUAGE: bash
+CODE:
+vitest foobar
+
+----------------------------------------
+
+TITLE: Function Return Type Testing
+DESCRIPTION: Examples of testing function return types using the returns matcher.
+
+LANGUAGE: typescript
+CODE:
+import { expectTypeOf } from 'vitest'
+
+expectTypeOf(() => {}).returns.toBeVoid()
+expectTypeOf((a: number) => [a, a]).returns.toEqualTypeOf([1, 2])
+
+----------------------------------------
+
+TITLE: Custom Test Rerun Filter Implementation
+DESCRIPTION: Example of implementing a custom filter for watched test specifications to control which tests get rerun.
+
+LANGUAGE: typescript
+CODE:
+const continuesTests: string[] = []
+
+myCustomWrapper.onContinuesRunEnabled(testItem =>
+  continuesTests.push(item.fsPath)
+)
+
+vitest.onFilterWatchedSpecification(specification =>
+  continuesTests.includes(specification.moduleId)
+)
+
+----------------------------------------
+
+TITLE: Running Vitest with Filename and Line Number in Bash
+DESCRIPTION: Shows how to run Vitest by specifying a test file and line number for targeted execution.
+
+LANGUAGE: bash
+CODE:
+$ vitest basic/foo.test.ts:10
+
+----------------------------------------
+
+TITLE: Test With Extended Context
+DESCRIPTION: Example showing how to extend test context with custom fixtures
+
+LANGUAGE: typescript
+CODE:
+const todos = []
+const archive = []
+
+const myTest = test.extend({
+  todos: async ({ task }, use) => {
+    todos.push(1, 2, 3)
+    await use(todos)
+    todos.length = 0
+  },
+  archive
+})
+
+----------------------------------------
+
+TITLE: Creating Vitest Instance with createVitest
+DESCRIPTION: Demonstrates how to use createVitest to initialize a Vitest instance without running tests immediately. Includes event handling and manual test execution.
+
+LANGUAGE: typescript
+CODE:
+import { createVitest } from 'vitest/node'
+
+const vitest = await createVitest(
+  'test',
+  {}, // override test config
+  {}, // override Vite config
+  {}, // custom Vitest options
+)
+
+// called when `vitest.cancelCurrentRun()` is invoked
+vitest.onCancel(() => {})
+// called during `vitest.close()` call
+vitest.onClose(() => {})
+// called when Vitest reruns test files
+vitest.onTestsRerun((files) => {})
+
+try {
+  // this will set process.exitCode to 1 if tests failed,
+  // and won't close the process automatically
+  await vitest.start(['my-filter'])
+}
+catch (err) {
+  // this can throw
+  // "FilesNotFoundError" if no files were found
+  // "GitNotFoundError" with `--changed` and repository is not initialized
+}
+finally {
+  await vitest.close()
+}
+
+----------------------------------------
+
+TITLE: Running Vitest with Multiple Reporters in Bash
+DESCRIPTION: Demonstrates how to specify multiple reporters when running Vitest.
+
+LANGUAGE: bash
+CODE:
+vitest --reporter=dot --reporter=default
+
+----------------------------------------
+
+TITLE: Basic Test Example
+DESCRIPTION: Simple example showing how to write a basic test case
+
+LANGUAGE: typescript
+CODE:
+import { expect, test } from 'vitest'
+
+test('should work as expected', () => {
+  expect(Math.sqrt(4)).toBe(2)
+})
+
+----------------------------------------
+
+TITLE: Creating a Custom Task Collector in JavaScript
+DESCRIPTION: This snippet demonstrates how to create a custom task collector using the createTaskCollector utility from Vitest. It shows how to define a custom task function that can be used in test files.
+
+LANGUAGE: javascript
+CODE:
+import { createTaskCollector, getCurrentSuite } from 'vitest/suite'
+
+export { afterAll, beforeAll, describe } from 'vitest'
+
+export const myCustomTask = createTaskCollector(
+  function (name, fn, timeout) {
+    getCurrentSuite().task(name, {
+      ...this,
+      meta: {
+        customPropertyToDifferentiateTask: true
+      },
+      handler: fn,
+      timeout,
+    })
+  }
+)
+
+----------------------------------------
+
+TITLE: Disabling Vitest API in Bash
+DESCRIPTION: Shows different ways to disable the Vitest API using command line options.
+
+LANGUAGE: bash
+CODE:
+vitest --no-api
+vitest --api=false
+
+----------------------------------------
+
+TITLE: Configuring Custom Pool in Vitest Configuration
+DESCRIPTION: This snippet demonstrates how to configure a custom pool in the Vitest configuration file. It shows how to specify a custom pool file and provide pool options.
+
+LANGUAGE: typescript
+CODE:
+import { defineConfig } from 'vitest/config'
+
+export default defineConfig({
+  test: {
+    // will run every file with a custom pool by default
+    pool: './my-custom-pool.ts',
+    // you can provide options using `poolOptions` object
+    poolOptions: {
+      myCustomPool: {
+        customProperty: true,
+      },
+    },
+  },
+})
+
+----------------------------------------
+
+TITLE: Using Custom Tasks in a Vitest Test File
+DESCRIPTION: This example shows how to use custom tasks created with createTaskCollector in a Vitest test file. It demonstrates the usage of custom tasks alongside standard Vitest functions like describe, beforeAll, and afterAll.
+
+LANGUAGE: javascript
+CODE:
+import {
+  afterAll,
+  beforeAll,
+  describe,
+  myCustomTask
+} from './custom.js'
+import { gardener } from './gardener.js'
+
+describe('take care of the garden', () => {
+  beforeAll(() => {
+    gardener.putWorkingClothes()
+  })
+
+  myCustomTask('weed the grass', () => {
+    gardener.weedTheGrass()
+  })
+  myCustomTask.todo('mow the lawn', () => {
+    gardener.mowerTheLawn()
+  })
+  myCustomTask('water flowers', () => {
+    gardener.waterFlowers()
+  })
+
+  afterAll(() => {
+    gardener.goHome()
+  })
+})
+
+----------------------------------------
+
+TITLE: Using Negation with expect.not
+DESCRIPTION: Shows how to use expect.not to negate assertions.
+
+LANGUAGE: typescript
+CODE:
+import { expect, test } from 'vitest'
+
+const input = Math.sqrt(16)
+
+expect(input).not.to.equal(2) // chai API
+expect(input).not.toBe(2) // jest API
+
+----------------------------------------
+
+TITLE: Creating Test Specification in TypeScript
+DESCRIPTION: Demonstrates how to create a test specification using the project.createSpecification method. The method accepts a resolved module ID and optional test lines array.
+
+LANGUAGE: typescript
+CODE:
+const specification = project.createSpecification(
+  resolve('./example.test.ts'),
+  [20, 40], // optional test lines
+)
+
+----------------------------------------
+
+TITLE: Iterating over TestCollection in TypeScript
+DESCRIPTION: Demonstrates how to iterate over a TestCollection using a for...of loop. This snippet shows how to access the type and name of each child element in the collection.
+
+LANGUAGE: typescript
+CODE:
+for (const child of module.children) {
+  console.log(child.type, child.name)
+}
+
+----------------------------------------
+
+TITLE: Filtering Suites in TestCollection using TypeScript
+DESCRIPTION: Shows the 'suites' method, which filters only the suites that are part of this collection.
+
+LANGUAGE: typescript
+CODE:
+function suites(): Generator<TestSuite, undefined, void>
+
+----------------------------------------
+
+TITLE: Module ID Path Format Examples
+DESCRIPTION: Shows valid and invalid module ID path formats for Vite's module graph. Paths must use posix separators even on Windows systems.
+
+LANGUAGE: typescript
+CODE:
+'C:/Users/Documents/project/example.test.ts' // ✅
+'/Users/mac/project/example.test.ts' // ✅
+'C:\\Users\\Documents\\project\\example.test.ts' // ❌
+
+----------------------------------------
+
+TITLE: Converting TestCollection to Array in TypeScript
+DESCRIPTION: Defines the 'array' method that returns the collection as an array of TestCase or TestSuite objects. This is useful for using Array methods like map and filter.
+
+LANGUAGE: typescript
+CODE:
+function array(): (TestCase | TestSuite)[]
+
+----------------------------------------
+
+TITLE: Filtering All Suites in TestCollection using TypeScript
+DESCRIPTION: Demonstrates the 'allSuites' method, which returns a generator of all TestSuite objects in the collection and its children. The example shows how to use this method to check for errors in suite collection.
+
+LANGUAGE: typescript
+CODE:
+function allSuites(): Generator<TestSuite, undefined, void>
+
+LANGUAGE: typescript
+CODE:
+for (const suite of module.children.allSuites()) {
+  if (suite.errors().length) {
+    console.log('failed to collect', suite.errors())
+  }
+}
+
+----------------------------------------
+
+TITLE: TestSpecification JSON Serialization
+DESCRIPTION: Function signature for converting TestSpecification instance to a JSON-friendly format for Browser Mode or Vitest UI consumption.
+
+LANGUAGE: typescript
+CODE:
+function toJSON(): SerializedTestSpecification
+
+----------------------------------------
+
+TITLE: Checking TestModule Type in TypeScript
+DESCRIPTION: Demonstrates how to check if a task is of type TestModule using TypeScript type narrowing.
+
+LANGUAGE: typescript
+CODE:
+if (task.type === 'module') {
+  task // TestModule
+}
+
+----------------------------------------
+
+TITLE: Generating File Hash for Test ID in Vitest
+DESCRIPTION: Demonstrates how to generate a file hash for test ID using the generateFileHash function from vitest/node.
+
+LANGUAGE: typescript
+CODE:
+import { generateFileHash } from 'vitest/node'
+
+const hash = generateFileHash(
+  '/file/path.js', // relative path
+  undefined, // the project name or `undefined` is not set
+)
+
+----------------------------------------
+
+TITLE: Identifying TestSuite Type Check - TypeScript
+DESCRIPTION: Demonstrates how to check if a task is a TestSuite instance using type checking.
+
+LANGUAGE: typescript
+CODE:
+if (task.type === 'suite') {
+  task // TestSuite
+}
+
+----------------------------------------
+
+TITLE: TestModule State Function Signature in TypeScript
+DESCRIPTION: Defines the state function of TestModule, which returns the TestModuleState.
+
+LANGUAGE: typescript
+CODE:
+function state(): TestModuleState
+
+----------------------------------------
+
+TITLE: Identifying TestCase Type in TypeScript
+DESCRIPTION: Demonstrates how to check if a task is of type 'test' using TypeScript type narrowing.
+
+LANGUAGE: typescript
+CODE:
+if (task.type === 'test') {
+  task // TestCase
+}
+
+----------------------------------------
+
+TITLE: Basic Suite Definition - TypeScript
+DESCRIPTION: Shows how to define a basic test suite using the describe function.
+
+LANGUAGE: typescript
+CODE:
+import { describe } from 'vitest'
+
+describe('the validation logic', () => {
+  // ...
+})
+
+----------------------------------------
+
+TITLE: Extending Base Reporter in TypeScript
+DESCRIPTION: Example showing how to extend Vitest's BaseReporter class to create a custom reporter that logs the number of completed tests.
+
+LANGUAGE: typescript
+CODE:
+import { BaseReporter } from 'vitest/reporters'
+
+export default class CustomReporter extends BaseReporter {
+  onTestRunEnd(testModules, errors) {
+    console.log(testModule.length, 'tests finished running')
+    super.onTestRunEnd(testModules, errors)
+  }
+}
+
+----------------------------------------
+
+TITLE: ModuleDiagnostic Interface Definition in TypeScript
+DESCRIPTION: Defines the ModuleDiagnostic interface, which contains timing information for various stages of test module execution.
+
+LANGUAGE: typescript
+CODE:
+interface ModuleDiagnostic {
+  /**
+   * The time it takes to import and initiate an environment.
+   */
+  readonly environmentSetupDuration: number
+  /**
+   * The time it takes Vitest to setup test harness (runner, mocks, etc.).
+   */
+  readonly prepareDuration: number
+  /**
+   * The time it takes to import the test module.
+   * This includes importing everything in the module and executing suite callbacks.
+   */
+  readonly collectDuration: number
+  /**
+   * The time it takes to import the setup module.
+   */
+  readonly setupDuration: number
+  /**
+   * Accumulated duration of all tests and hooks in the module.
+   */
+  readonly duration: number
+}
+
+----------------------------------------
+
+TITLE: Nested Suite Definition - TypeScript
+DESCRIPTION: Example of nested test suites showing how fullName property is constructed.
+
+LANGUAGE: typescript
+CODE:
+import { describe, test } from 'vitest'
+
+describe('the validation logic', () => {
+  describe('validating cities', () => {
+    // ...
+  })
+})
+
+----------------------------------------
+
+TITLE: Accessing Task Metadata from Vitest State
+DESCRIPTION: Example of accessing task metadata after tests have completed running using the Vitest API.
+
+LANGUAGE: typescript
+CODE:
+const vitest = await createVitest('test')
+const { testModules } = await vitest.start()
+
+const testModule = testModules[0]
+testModule.meta().done === true
+testModule.children.at(0).meta().custom === 'some-custom-handler'
+
+----------------------------------------
+
+TITLE: TestModule Diagnostic Function Signature in TypeScript
+DESCRIPTION: Defines the diagnostic function of TestModule, which returns ModuleDiagnostic information.
+
+LANGUAGE: typescript
+CODE:
+function diagnostic(): ModuleDiagnostic
+
+----------------------------------------
+
+TITLE: Initializing Vitest Projects with Names
+DESCRIPTION: Demonstrates how to create and configure Vitest projects with different naming approaches, including package.json name resolution and custom naming.
+
+LANGUAGE: typescript
+CODE:
+import { createVitest } from 'vitest/node'
+
+const vitest = await createVitest('test')
+vitest.projects.map(p => p.name) === [
+  '@pkg/server',
+  'utils',
+  '2',
+  'custom'
+]
+
+LANGUAGE: typescript
+CODE:
+export default [
+  './packages/server', // has package.json with "@pkg/server"
+  './utils', // doesn't have a package.json file
+  {
+    // doesn't customize the name
+    test: {
+      pool: 'threads',
+    },
+  },
+  {
+    // customized the name
+    test: {
+      name: 'custom',
+    },
+  },
+]
+
+----------------------------------------
+
+TITLE: Accessing Built-in Environments in Vitest
+DESCRIPTION: This snippet demonstrates how to access Vitest's built-in environments and use the populateGlobal utility function. It imports the necessary functions from the 'vitest/environments' module.
+
+LANGUAGE: typescript
+CODE:
+import { builtinEnvironments, populateGlobal } from 'vitest/environments'
+
+console.log(builtinEnvironments) // { jsdom, happy-dom, node, edge-runtime }
+
+----------------------------------------
+
+TITLE: Recursive Test Collection Visitor - TypeScript
+DESCRIPTION: Implementation of a recursive function to visit all tasks in a test collection.
+
+LANGUAGE: typescript
+CODE:
+function visit(collection: TestCollection) {
+  for (const task of collection) {
+    if (task.type === 'suite') {
+      // report a suite
+      visit(task.children)
+    }
+    else {
+      // report a test
+    }
+  }
+}
+
+----------------------------------------
+
+TITLE: Using Context Injection in Vitest Tests
+DESCRIPTION: Demonstrates how to provide and inject context values in Vitest tests using the provide/inject pattern.
+
+LANGUAGE: typescript
+CODE:
+import { createVitest } from 'vitest/node'
+
+const vitest = await createVitest('test')
+const project = vitest.projects.find(p => p.name === 'custom')
+project.provide('key', 'value')
+await vitest.start()
+
+LANGUAGE: typescript
+CODE:
+import { inject } from 'vitest'
+const value = inject('key')
+
+----------------------------------------
+
+TITLE: Configuring Coverage Reporters
+DESCRIPTION: Demonstrates how to configure coverage reporters in Vitest configuration.
+
+LANGUAGE: typescript
+CODE:
+import { defineConfig } from 'vitest/config'
+
+export default defineConfig({
+  test: {
+    coverage: {
+      reporter: ['text', 'json', 'html'],
+    },
+  },
+})
+
+----------------------------------------
+
+TITLE: File Hash Generation - TypeScript
+DESCRIPTION: Shows how to generate a file hash using the generateFileHash function from vitest/node.
+
+LANGUAGE: typescript
+CODE:
+import { generateFileHash } from 'vitest/node'
+
+const hash = generateFileHash(
+  '/file/path.js', // relative path
+  undefined, // the project name or `undefined` is not set
+)
+
+----------------------------------------
+
+TITLE: Filtering All Tests in TestCollection using TypeScript
+DESCRIPTION: Shows the 'allTests' method, which returns a generator of all TestCase objects in the collection and its children. The example demonstrates how to use this method to check for pending tests.
+
+LANGUAGE: typescript
+CODE:
+function allTests(state?: TestState): Generator<TestCase, undefined, void>
+
+LANGUAGE: typescript
+CODE:
+for (const test of module.children.allTests()) {
+  if (test.result().state === 'pending') {
+    console.log('test', test.fullName, 'did not finish')
+  }
+}
+
+----------------------------------------
+
+TITLE: Configuring Worker Pool in Vitest
+DESCRIPTION: Configuration for changing the worker pool type in Vitest to handle fetch and native module issues.
+
+LANGUAGE: typescript
+CODE:
+import { defineConfig } from 'vitest/config'
+
+export default defineConfig({
+  test: {
+    pool: 'forks',
+  },
+})
+
+LANGUAGE: bash
+CODE:
+vitest --pool=forks
+
+----------------------------------------
+
+TITLE: Suite Location Example - TypeScript
+DESCRIPTION: Demonstrates where suite location information is stored when includeTaskLocation is enabled.
+
+LANGUAGE: typescript
+CODE:
+import { describe } from 'vitest'
+
+describe('the validation works correctly', () => {
+  // ...
+})
+
+----------------------------------------
+
+TITLE: Retrieving TestCase or TestSuite by Index in TypeScript
+DESCRIPTION: Shows the signature of the 'at' method, which returns a TestCase or TestSuite at a specific index in the collection. This method supports negative indexes.
+
+LANGUAGE: typescript
+CODE:
+function at(index: number): TestCase | TestSuite | undefined
+
+----------------------------------------
+
+TITLE: Test Sharding with GitHub Actions
+DESCRIPTION: Complete example of implementing test sharding in a GitHub Actions workflow, including artifact handling and report merging.
+
+LANGUAGE: yaml
+CODE:
+name: Tests
+on:
+  push:
+    branches:
+      - main
+jobs:
+  tests:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        shardIndex: [1, 2, 3, 4]
+        shardTotal: [4]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: Install dependencies
+        run: pnpm i
+
+      - name: Run tests
+        run: pnpm run test --reporter=blob --shard=${{ matrix.shardIndex }}/${{ matrix.shardTotal }}
+
+      - name: Upload blob report to GitHub Actions Artifacts
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: blob-report-${{ matrix.shardIndex }}
+          path: .vitest-reports/*
+          include-hidden-files: true
+          retention-days: 1
+
+  merge-reports:
+    if: ${{ !cancelled() }}
+    needs: [tests]
+
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: Install dependencies
+        run: pnpm i
+
+      - name: Download blob reports from GitHub Actions Artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: .vitest-reports
+          pattern: blob-report-*
+          merge-multiple: true
+
+      - name: Merge reports
+        run: npx vitest --merge-reports
+
+----------------------------------------
+
+TITLE: Accessing Serialized Config in Vitest
+DESCRIPTION: Shows how to access and work with serialized configuration in Vitest projects. The config is serialized to ensure compatibility across test processes.
+
+LANGUAGE: typescript
+CODE:
+import type { SerializedConfig } from 'vitest'
+
+const config: SerializedConfig = vitest.projects[0].serializedConfig
+
+----------------------------------------
+
+TITLE: Defining Test Location in Vitest
+DESCRIPTION: Shows how the location property of a test is determined based on its position in the file.
+
+LANGUAGE: typescript
+CODE:
+import { test } from 'vitest'
+
+test('the validation works correctly', () => {
+  // ...
+})
+
+----------------------------------------
+
+TITLE: Basic Vi Import Example
+DESCRIPTION: Shows how to import the vi helper object from Vitest
+
+LANGUAGE: javascript
+CODE:
+import { vi } from 'vitest'
+
+----------------------------------------
+
+TITLE: Creating Test Specifications in Vitest
+DESCRIPTION: Shows how to create test specifications for running specific tests based on module ID and line locations.
+
+LANGUAGE: typescript
+CODE:
+import { createVitest } from 'vitest/node'
+import { resolve } from 'node:path/posix'
+
+const vitest = await createVitest('test')
+const project = vitest.projects[0]
+const specification = project.createSpecification(
+  resolve('./example.test.ts'),
+  [20, 40], // optional test lines
+)
+await vitest.runTestSpecifications([specification])
+
+----------------------------------------
+
+TITLE: Creating Nested Tests with Describe in Vitest
+DESCRIPTION: Illustrates how to create nested tests using describe and test functions, affecting the fullName property.
+
+LANGUAGE: typescript
+CODE:
+import { describe, test } from 'vitest'
+
+describe('the validation logic', () => {
+  test('the validation works correctly', () => {
+    // ...
+  })
+})
+
+----------------------------------------
+
+TITLE: Timer Mocking Example
+DESCRIPTION: Example of using fake timers to control time in tests
+
+LANGUAGE: typescript
+CODE:
+let i = 0
+setInterval(() => console.log(++i), 50)
+
+vi.advanceTimersByTime(150)
+
+// log: 1
+// log: 2
+// log: 3
+
+----------------------------------------
+
+TITLE: Defining resolveConfig Function Signature in TypeScript
+DESCRIPTION: Defines the function signature for resolveConfig, which resolves the Vitest and Vite configurations. It takes options and Vite overrides as parameters, returning a Promise resolving to an object with vitestConfig and viteConfig.
+
+LANGUAGE: typescript
+CODE:
+function resolveConfig(
+  options: UserConfig = {},
+  viteOverrides: ViteUserConfig = {},
+): Promise<{
+  vitestConfig: ResolvedConfig
+  viteConfig: ResolvedViteConfig
+}>
+
+----------------------------------------
+
+TITLE: Test Run End Reporter Implementation
+DESCRIPTION: Comprehensive reporter implementation handling different test run end scenarios including passed, failed and interrupted states.
+
+LANGUAGE: typescript
+CODE:
+import type {
+  Reporter,
+  SerializedError,
+  TestModule,
+  TestRunEndReason,
+  TestSpecification
+} from 'vitest/node'
+
+class MyReporter implements Reporter {
+  onTestRunEnd(
+    testModules: ReadonlyArray<TestModule>,
+    unhandledErrors: ReadonlyArray<SerializedError>,
+    reason: TestRunEndReason,
+  ) {
+    if (reason === 'passed') {
+      testModules.forEach(module => console.log(module.moduleId, 'succeeded'))
+    }
+    else if (reason === 'failed') {
+      for (const testCase of testModules.children.allTests()) {
+        if (testCase.result().state === 'failed') {
+          console.log(testCase.fullName, 'in', testCase.module.moduleId, 'failed')
+          console.log(testCase.result().errors)
+        }
+      }
+    }
+    else {
+      console.log('test run was interrupted, skipping report')
+    }
+  }
+}
+
+export default new MyReporter()
+
+----------------------------------------
+
+TITLE: Mock Implementation Example
+DESCRIPTION: Shows how to use mockImplementation() to define custom mock behavior, including argument handling and return values.
+
+LANGUAGE: typescript
+CODE:
+const mockFn = vi.fn().mockImplementation((apples: number) => apples + 1)
+// or: vi.fn(apples => apples + 1);
+
+const NelliesBucket = mockFn(0)
+const BobsBucket = mockFn(1)
+
+NelliesBucket === 1 // true
+BobsBucket === 2 // true
+
+mockFn.mock.calls[0][0] === 0 // true
+mockFn.mock.calls[1][0] === 1 // true
+
+----------------------------------------
+
+TITLE: Using resolveConfig Function in TypeScript
+DESCRIPTION: Demonstrates how to use the resolveConfig function to resolve Vitest and Vite configurations. It imports the function and resolves the config with custom parameters, including mode, configFile, resolve conditions, and test options.
+
+LANGUAGE: typescript
+CODE:
+import { resolveConfig } from 'vitest/node'
+
+// vitestConfig only has resolved "test" properties
+const { vitestConfig, viteConfig } = await resolveConfig({
+  mode: 'custom',
+  configFile: false,
+  resolve: {
+    conditions: ['custom']
+  },
+  test: {
+    setupFiles: ['/my-setup-file.js'],
+    pool: 'threads',
+  },
+})
+
+----------------------------------------
+
+TITLE: Custom Reporter with Vitest Instance
+DESCRIPTION: Implementation of a custom reporter that stores the Vitest instance reference and uses it to log test file information.
+
+LANGUAGE: typescript
+CODE:
+import type { Reporter, TestSpecification, Vitest } from 'vitest/node'
+
+class MyReporter implements Reporter {
+  private vitest!: Vitest
+
+  onInit(vitest: Vitest) {
+    this.vitest = vitest
+  }
+
+  onTestRunStart(specifications: TestSpecification[]) {
+    console.log(
+      specifications.length,
+      'test files will run in',
+      this.vitest.config.root,
+    )
+  }
+}
+
+export default new MyReporter()
+
+----------------------------------------
+
+TITLE: Sequential Mock Implementations
+DESCRIPTION: Demonstrates how to chain multiple implementations for sequential mock calls using mockImplementationOnce().
+
+LANGUAGE: typescript
+CODE:
+const myMockFn = vi
+  .fn(() => 'default')
+  .mockImplementationOnce(() => 'first call')
+  .mockImplementationOnce(() => 'second call')
+
+// 'first call', 'second call', 'default', 'default'
+console.log(myMockFn(), myMockFn(), myMockFn(), myMockFn())
+
+----------------------------------------
+
+TITLE: Using parseCLI Function in TypeScript
+DESCRIPTION: Demonstrates how to use the parseCLI function to parse CLI arguments. It imports the function and parses a CLI command string, returning an object with options and filter properties.
+
+LANGUAGE: typescript
+CODE:
+import { parseCLI } from 'vitest/node'
+
+const result = parseCLI('vitest ./files.ts --coverage --browser=chrome')
+
+result.options
+// {
+//   coverage: { enabled: true },
+//   browser: { name: 'chrome', enabled: true }
+// }
+
+result.filter
+// ['./files.ts']
+
+----------------------------------------
+
+TITLE: Accessing Test Results after Running Vitest
+DESCRIPTION: Shows how to access test results after running Vitest using the state.getTestModules API. It imports the TestModule type and logs the test modules after starting Vitest.
+
+LANGUAGE: typescript
+CODE:
+import type { TestModule } from 'vitest/node'
+
+const vitest = await startVitest('test')
+
+console.log(vitest.state.getTestModules()) // [TestModule]
+
+----------------------------------------
+
+TITLE: Defining Awaitable Type in TypeScript
+DESCRIPTION: Defines the Awaitable type used in the expect API type signatures.
+
+LANGUAGE: typescript
+CODE:
+type Awaitable<T> = T | PromiseLike<T>
+
+----------------------------------------
+
+TITLE: Using createVitest Function in JavaScript
+DESCRIPTION: Demonstrates how to use the createVitest function to create a Vitest instance without starting tests. It imports the function and creates an instance in 'test' mode with watch mode disabled.
+
+LANGUAGE: javascript
+CODE:
+import { createVitest } from 'vitest/node'
+
+const vitest = await createVitest('test', {
+  watch: false,
+})
+
+----------------------------------------
+
+TITLE: Defining createVitest Function Signature in TypeScript
+DESCRIPTION: Defines the function signature for createVitest, which creates a Vitest instance without starting tests. It takes mode, options, Vite overrides, and Vitest options as parameters, returning a Promise resolving to a Vitest instance.
+
+LANGUAGE: typescript
+CODE:
+function createVitest(
+  mode: VitestRunMode,
+  options: UserConfig,
+  viteOverrides: ViteUserConfig = {},
+  vitestOptions: VitestOptions = {},
+): Promise<Vitest>
+
+----------------------------------------
+
+TITLE: Configuring Inline Workspace in Vitest
+DESCRIPTION: Demonstrates how to configure an inline workspace in Vitest 3.0 using the 'workspace' field in the configuration file. This allows specifying multiple projects without separate files.
+
+LANGUAGE: jsx
+CODE:
+import { defineConfig } from 'vitest/config'
+
+export default defineConfig({
+  test: {
+    workspace: ['packages/*'],
+  },
+})
+
+----------------------------------------
+
+TITLE: Getting Test Specifications with Filters
+DESCRIPTION: Example showing how to get test specifications using glob patterns with string filters.
+
+LANGUAGE: typescript
+CODE:
+const specifications = await vitest.globTestSpecifications(['my-filter'])
+// [TestSpecification{ moduleId: '/tests/my-filter.test.ts' }]
+console.log(specifications)
+
+----------------------------------------
+
+TITLE: Defining startVitest Function Signature in TypeScript
+DESCRIPTION: Defines the function signature for startVitest, which starts running Vitest tests. It takes mode, CLI filters, options, Vite overrides, and Vitest options as parameters, returning a Promise resolving to a Vitest instance.
+
+LANGUAGE: typescript
+CODE:
+function startVitest(
+  mode: VitestRunMode,
+  cliFilters: string[] = [],
+  options: CliOptions = {},
+  viteOverrides?: ViteUserConfig,
+  vitestOptions?: VitestOptions,
+): Promise<Vitest>
+
+----------------------------------------
+
+TITLE: Using assertType for Type Checking in TypeScript with Vitest
+DESCRIPTION: This snippet demonstrates how to use the assertType function from Vitest to assert types in TypeScript. It shows examples with a concat function that has multiple overloads, asserting string and number types, and demonstrating a TypeScript error for mismatched types.
+
+LANGUAGE: typescript
+CODE:
+import { assertType } from 'vitest'
+
+function concat(a: string, b: string): string
+function concat(a: number, b: number): number
+function concat(a: string | number, b: string | number): string | number
+
+assertType<string>(concat('a', 'b'))
+assertType<number>(concat(1, 2))
+// @ts-expect-error wrong types
+assertType(concat('a', 2))
+
+----------------------------------------
+
+TITLE: Providing Values to Tests with TypeScript
+DESCRIPTION: Example of using the provide/inject API to pass values from the main thread to tests with proper TypeScript types.
+
+LANGUAGE: typescript
+CODE:
+import { createVitest } from 'vitest/node'
+
+const vitest = await createVitest('test', {
+  watch: false,
+})
+vitest.provide('wsPort', 3000)
+
+declare module 'vitest' {
+  export interface ProvidedContext {
+    wsPort: number
+  }
+}
+
+----------------------------------------
+
+TITLE: Running Vitest Command
+DESCRIPTION: Shows the command line instruction to execute Vitest tests using npx.
+
+LANGUAGE: bash
+CODE:
+$ npx vitest
+
+----------------------------------------
+
+TITLE: Registering Runtime Mocker in Vitest
+DESCRIPTION: Demonstrates how to register the runtime mocker in Vitest using either a server interceptor or MSW interceptor. This snippet shows importing necessary functions and creating the 'vi' object used for mocking.
+
+LANGUAGE: typescript
+CODE:
+import {
+  ModuleMockerMSWInterceptor,
+  ModuleMockerServerInterceptor,
+  registerModuleMocker
+} from '@vitest/mocker/register'
+
+// you can use either a server interceptor (relies on Vite's websocket connection)
+const vi = registerModuleMocker(() => new ModuleMockerServerInterceptor())
+// or you can use MSW to intercept requests directly in the browser
+const vi = registerModuleMocker(globalThisAccessor => new ModuleMockerMSWInterceptor({ globalThisAccessor }))
+
+----------------------------------------
+
+TITLE: Test Run Start Reporter Example
+DESCRIPTION: Simple reporter implementation showing how to handle the test run start event and log the number of test files.
+
+LANGUAGE: typescript
+CODE:
+import type { Reporter, TestSpecification } from 'vitest/node'
+
+class MyReporter implements Reporter {
+  onTestRunStart(specifications: TestSpecification[]) {
+    console.log(specifications.length, 'test files will run')
+  }
+}
+
+export default new MyReporter()
+
+----------------------------------------
+
+TITLE: Configuring pnpm Overrides for Local Vitest Testing in JSON
+DESCRIPTION: This snippet shows how to configure the package.json file to use a local copy of Vitest for testing. It demonstrates the use of pnpm.overrides to link a local Vitest package.
+
+LANGUAGE: json
+CODE:
+{
+  "dependencies": {
+    "vitest": "*"
+  },
+  "pnpm": {
+    "overrides": {
+      "vitest": "link:../path/to/vitest/packages/vitest"
+    }
+  }
+}
+
+----------------------------------------
+
+TITLE: Using MockerRegistry in Vitest
+DESCRIPTION: Demonstrates the usage of MockerRegistry, a cache that holds mocked modules. This snippet shows how to create a registry instance, register a mocked module, and retrieve it.
+
+LANGUAGE: typescript
+CODE:
+import { ManualMockedModule, MockerRegistry } from '@vitest/mocker'
+const registry = new MockerRegistry()
+
+// Vitest requites the original ID for better error messages,
+// You can pass down anything related to the module there
+registry.register('manual', './id.js', '/users/custom/id.js', factory)
+registry.get('/users/custom/id.js') instanceof ManualMockedModule
+
+----------------------------------------
+
+TITLE: Implementing Vitest Reporter Interface
+DESCRIPTION: Example of implementing the Reporter interface directly to create a custom reporter.
+
+LANGUAGE: typescript
+CODE:
+import type { Reporter } from 'vitest/node'
+
+export default class CustomReporter implements Reporter {
+  onCollected() {
+    // print something
+  }
+}
+
+----------------------------------------
+
+TITLE: Web Worker Testing Example
+DESCRIPTION: Example test file showing how to create and interact with a web worker in tests.
+
+LANGUAGE: typescript
+CODE:
+// worker.test.ts
+import '@vitest/web-worker'
+import MyWorker from '../worker?worker'
+
+let worker = new MyWorker()
+// new Worker is also supported
+worker = new Worker(new URL('../src/worker.ts', import.meta.url))
+
+worker.postMessage('hello')
+worker.onmessage = (e) => {
+  // e.data equals to 'hello world'
+}
+
+----------------------------------------
+
+TITLE: Using hoistMocks Function in Vitest
+DESCRIPTION: Shows how to use the hoistMocks function to hoist compiler hints, replace static imports with dynamic ones, and update exports access. This ensures mocks are resolved before importing user modules.
+
+LANGUAGE: typescript
+CODE:
+import { parseAst } from 'vite'
+
+hoistMocks(
+  `
+import { mocked } from './some-module.js'
+
+vi.mock('./some-module.js', () => {
+  return { mocked: true }
+})
+
+mocked === true
+  `,
+  '/my-module.js',
+  parseAst
+)
+
+----------------------------------------
+
+TITLE: Custom Pool API Interface Definition in TypeScript
+DESCRIPTION: This code defines the ProcessPool interface that custom pool implementations must adhere to. It includes methods for running tests, collecting tests, and optionally closing the pool.
+
+LANGUAGE: typescript
+CODE:
+import type { ProcessPool, TestSpecification } from 'vitest/node'
+
+export interface ProcessPool {
+  name: string
+  runTests: (files: TestSpecification[], invalidates?: string[]) => Promise<void>
+  collectTests: (files: TestSpecification[], invalidates?: string[]) => Promise<void>
+  close?: () => Promise<void>
+}
+
+----------------------------------------
+
+TITLE: Configuring Vitest Web Worker Setup
+DESCRIPTION: Configuration example showing how to set up web worker support globally using setupFiles in Vitest config.
+
+LANGUAGE: typescript
+CODE:
+import { defineConfig } from 'vitest/node'
+
+export default defineConfig({
+  test: {
+    setupFiles: ['@vitest/web-worker'],
+  },
+})
+
+----------------------------------------
+
+TITLE: Configuring dynamicImportPlugin in Vite
+DESCRIPTION: Demonstrates how to configure the dynamicImportPlugin in a Vite server. This plugin wraps every dynamic import with a mocker function to ensure mocks are resolved before importing user modules.
+
+LANGUAGE: typescript
+CODE:
+import { dynamicImportPlugin } from '@vitest/mocker/node'
+import { createServer } from 'vite'
+
+await createServer({
+  plugins: [
+    dynamicImportPlugin({
+      globalThisAccessor: 'Symbol.for("my-mocker")'
+    }),
+  ],
+})
+
+----------------------------------------
+
+TITLE: Creating RPC Methods for Inter-Process Communication in Vitest
+DESCRIPTION: This snippet demonstrates how to create RPC methods for communication between different processes in a custom pool implementation. It uses WebSockets and the 'birpc' library for serialization and communication.
+
+LANGUAGE: typescript
+CODE:
+import { createBirpc } from 'birpc'
+import { parse, stringify } from 'flatted'
+import { createMethodsRPC, TestProject } from 'vitest/node'
+
+function createRpc(project: TestProject, wss: WebSocketServer) {
+  return createBirpc(
+    createMethodsRPC(project),
+    {
+      post: msg => wss.send(msg),
+      on: fn => wss.on('message', fn),
+      serialize: stringify,
+      deserialize: parse,
+    },
+  )
+}
+
+----------------------------------------
+
+TITLE: Programmatic Vite Node Server and Runner Setup
+DESCRIPTION: Demonstrates how to programmatically set up a Vite Node server and runner in the same context, including source map support and module execution.
+
+LANGUAGE: typescript
+CODE:
+import { createServer, version as viteVersion } from 'vite'
+import { ViteNodeRunner } from 'vite-node/client'
+import { ViteNodeServer } from 'vite-node/server'
+import { installSourcemapsSupport } from 'vite-node/source-map'
+
+// create vite server
+const server = await createServer({
+  optimizeDeps: {
+    // It's recommended to disable deps optimization
+    disabled: true,
+  },
+})
+// For old Vite, this is need to initialize the plugins.
+if (Number(viteVersion.split('.')[0]) < 6) {
+  await server.pluginContainer.buildStart({})
+}
+
+// create vite-node server
+const node = new ViteNodeServer(server)
+
+// fixes stacktraces in Errors
+installSourcemapsSupport({
+  getSourceMap: source => node.getSourceMap(source),
+})
+
+// create vite-node runner
+const runner = new ViteNodeRunner({
+  root: server.config.root,
+  base: server.config.base,
+  // when having the server and runner in a different context,
+  // you will need to handle the communication between them
+  // and pass to this function
+  fetchModule(id) {
+    return node.fetchModule(id)
+  },
+  resolveId(id, importer) {
+    return node.resolveId(id, importer)
+  },
+})
+
+// execute the file
+await runner.executeFile('./example.ts')
+
+// close the vite server
+await server.close()
+
+----------------------------------------
+
+TITLE: Using startVitest Function in JavaScript
+DESCRIPTION: Demonstrates how to use the startVitest function to run Vitest tests. It imports the function, starts tests in 'test' mode, and closes the Vitest instance after completion.
+
+LANGUAGE: javascript
+CODE:
+import { startVitest } from 'vitest/node'
+
+const vitest = await startVitest('test')
+
+await vitest.close()
+
+----------------------------------------
+
+TITLE: Configuring Multiple Pools with Workspace in Vitest
+DESCRIPTION: This snippet shows how to use the workspace feature in Vitest to run tests in different pools. It extends the default configuration and specifies a 'threads' pool for a workspace.
+
+LANGUAGE: typescript
+CODE:
+export default defineConfig({
+  test: {
+    workspace: [
+      {
+        extends: true,
+        test: {
+          pool: 'threads',
+        },
+      },
+    ],
+  },
+})
+
+----------------------------------------
+
+TITLE: Starting Vitest UI Development Server
+DESCRIPTION: Terminal commands for running the Vitest UI development server and test API. These commands should be run in separate terminals at the project root.
+
+LANGUAGE: bash
+CODE:
+nr ui:dev
+
+LANGUAGE: bash
+CODE:
+nr test --api
+
+----------------------------------------
+
+TITLE: Defining parseCLI Function Signature in TypeScript
+DESCRIPTION: Defines the function signature for parseCLI, which parses CLI arguments. It takes argv (string or string array) and config options as parameters, returning an object with filter and options properties.
+
+LANGUAGE: typescript
+CODE:
+function parseCLI(argv: string | string[], config: CliParseOptions = {}): {
+  filter: string[]
+  options: CliOptions
+}
+
+----------------------------------------
+
+TITLE: Basic Type Equality Testing in TypeScript
+DESCRIPTION: Demonstrates how to use toEqualTypeOf matcher to check if types are fully equal to each other.
+
+LANGUAGE: typescript
+CODE:
+import { expectTypeOf } from 'vitest'
+
+expectTypeOf({ a: 1 }).toEqualTypeOf<{ a: number }>()
+expectTypeOf({ a: 1 }).toEqualTypeOf({ a: 1 })
+expectTypeOf({ a: 1 }).toEqualTypeOf({ a: 2 })
+expectTypeOf({ a: 1, b: 1 }).not.toEqualTypeOf<{ a: number }>()
+
+----------------------------------------
+
+TITLE: Using mockObject Function in Vitest
+DESCRIPTION: Shows how to use the mockObject function to deeply mock an object. This function is used internally by Vitest to automock modules.
+
+LANGUAGE: typescript
+CODE:
+import { mockObject } from '@vitest/mocker'
+import { spyOn } from '@vitest/spy'
+
+mockObject(
+  {
+    // this is needed because it can be used in vm context
+    globalConstructors: {
+      Object,
+      // ...
+    },
+    // you can provide your own spyOn implementation
+    spyOn,
+    mockType: 'automock' // or 'autospy'
+  },
+  {
+    myDeep: {
+      object() {
+        return {
+          willAlso: {
+            beMocked() {
+              return true
+            },
+          },
+        }
+      },
+    },
+  }
+)
+
+----------------------------------------
+
+TITLE: Importing VitePress Components and Team Data in Vue.js
+DESCRIPTION: This snippet imports necessary components from VitePress theme and team member data from a local file. It sets up the structure for rendering the team page.
+
+LANGUAGE: vue
+CODE:
+<script setup>
+import {
+  VPTeamPage,
+  VPTeamPageTitle,
+  VPTeamPageSection,
+  VPTeamMembers
+} from 'vitepress/theme'
+import { teamMembers, teamEmeritiMembers } from './.vitepress/contributors'
+</script>
+
+----------------------------------------
+
+TITLE: Type Matching Testing in TypeScript
+DESCRIPTION: Shows usage of toMatchTypeOf matcher to verify if one type extends another type.
+
+LANGUAGE: typescript
+CODE:
+import { expectTypeOf } from 'vitest'
+
+expectTypeOf({ a: 1, b: 1 }).toMatchTypeOf({ a: 1 })
+expectTypeOf<number>().toMatchTypeOf<string | number>()
+expectTypeOf<string | number>().not.toMatchTypeOf<number>()
+
+----------------------------------------
+
+TITLE: Configuring Vitest Mocker Plugin in Vite
+DESCRIPTION: Shows how to configure the Vitest mocker plugin in a Vite configuration file. This snippet demonstrates importing the plugin and adding it to the plugins array in the Vite config.
+
+LANGUAGE: typescript
+CODE:
+import { mockerPlugin } from '@vitest/mocker/node'
+
+export default defineConfig({
+  plugins: [mockerPlugin()],
+})
+
+----------------------------------------
+
+TITLE: Structuring Vitest Team Page with VitePress Components in Vue.js
+DESCRIPTION: This snippet demonstrates the structure of the Vitest team page using VitePress components. It includes sections for current team members and emeriti members, with customizable titles and descriptions.
+
+LANGUAGE: vue
+CODE:
+<VPTeamPage>
+  <VPTeamPageTitle>
+    <template #title>Meet the Team</template>
+    <template #lead>
+      The development of Vitest is guided by an international team, some of whom
+      have chosen to be featured below.
+    </template>
+  </VPTeamPageTitle>
+  <VPTeamMembers :members="teamMembers" />
+  <VPTeamPageSection>
+    <template #title>Team Emeriti</template>
+    <template #lead>
+      Here we honor some no-longer-active team members who have made valuable
+      contributions in the past.
+    </template>
+    <template #members>
+      <VPTeamMembers size="small" :members="teamEmeritiMembers" />
+    </template>
+  </VPTeamPageSection>
+</VPTeamPage>
+
+----------------------------------------
+
+TITLE: Referencing Playwright Types in TypeScript for Vitest
+DESCRIPTION: This snippet shows how to reference Playwright types in a TypeScript declaration file for Vitest. It ensures TypeScript recognizes Playwright-specific options and extra 'expect' properties.
+
+LANGUAGE: typescript
+CODE:
+/// <reference types="@vitest/browser/providers/playwright" />
+
+----------------------------------------
+
+TITLE: Configuring automockPlugin in Vite
+DESCRIPTION: Demonstrates how to configure the automockPlugin in a Vite server. This plugin allows mocking of any module in the browser using query parameters.
+
+LANGUAGE: typescript
+CODE:
+import { automockPlugin } from '@vitest/mocker/node'
+import { createServer } from 'vite'
+
+await createServer({
+  plugins: [
+    automockPlugin(),
+  ],
+})
+
+----------------------------------------
+
+TITLE: Configuring Vue Blog Component Import
+DESCRIPTION: Sets up the blog index page by importing and using the BlogIndex component. Includes VitePress frontmatter configuration to disable sidebar, edit links and outline.
+
+LANGUAGE: vue
+CODE:
+<script setup>
+import BlogIndex from './.vitepress/components/BlogIndex.vue'
+</script>
+
+# Latest From the Vitest Blog
+
+<BlogIndex />
+
+----------------------------------------
+
+TITLE: Configuring Playwright Types in tsconfig.json for Vitest
+DESCRIPTION: This JSON snippet demonstrates how to add Playwright types to the compiler options in tsconfig.json. It's an alternative to using a separate declaration file, but may disable auto-loading of other @types packages.
+
+LANGUAGE: json
+CODE:
+{
+  "compilerOptions": {
+    "types": ["@vitest/browser/providers/playwright"]
+  }
+}
+
+----------------------------------------
+
+TITLE: Using findMockRedirect Function in Vitest
+DESCRIPTION: Shows how to use the findMockRedirect function to locate mock files in the __mocks__ folder corresponding to the current file. This function uses synchronous file system APIs.
+
+LANGUAGE: typescript
+CODE:
+import { findMockRedirect } from '@vitest/mocker/node'
+
+// uses sync fs APIs
+const mockRedirect = findMockRedirect(
+  root,
+  'vscode',
+  'vscode', // if defined, will assume the file is a library name
+)
+// mockRedirect == ${root}/__mocks__/vscode.js
+
+----------------------------------------
+
+TITLE: Installing Vitest Web Worker Package
+DESCRIPTION: Commands for installing @vitest/web-worker package using different package managers (npm, pnpm, yarn).
+
+LANGUAGE: bash
+CODE:
+# with npm
+npm install -D @vitest/web-worker
+
+# with pnpm
+pnpm install -D @vitest/web-worker
+
+# with yarn
+yarn add --dev @vitest/web-worker
+
+----------------------------------------
+
+TITLE: Configuring Playwright Instances in Vitest Config
+DESCRIPTION: This TypeScript snippet shows how to configure Playwright instances in the Vitest configuration file. It demonstrates setting up a Firefox browser instance with custom launch and context options.
+
+LANGUAGE: typescript
+CODE:
+import { defineConfig } from 'vitest/config'
+
+export default defineConfig({
+  test: {
+    browser: {
+      instances: [
+        {
+          browser: 'firefox',
+          launch: {},
+          context: {},
+        },
+      ],
+    },
+  },
+})
+
+----------------------------------------
+
+TITLE: Auto-Registering Vitest Mocker
+DESCRIPTION: Shows how to auto-register the Vitest mocker using an import statement and create compiler hints. This approach uses the server interceptor by default and provides a simpler setup.
+
+LANGUAGE: typescript
+CODE:
+// you can also just import "auto-register" at the top of your entry point,
+// this will use the server interceptor by default
+import '@vitest/mocker/auto-register'
+// if you do this, you can create compiler hints with "createCompilerHints"
+// utility to use in your own code
+import { createCompilerHints } from '@vitest/mocker/browser'
+const vi = createCompilerHints()
+
+----------------------------------------
+
+TITLE: Executing TypeScript with Hashbang in Vite Node
+DESCRIPTION: Example showing how to create an executable TypeScript file using vite-node with a hashbang directive to access command line arguments.
+
+LANGUAGE: typescript
+CODE:
+#!/usr/bin/env vite-node --script
+
+console.log('argv:', process.argv.slice(2))
+
+----------------------------------------
+
+TITLE: Legacy WebdriverIO Configuration (Pre-Vitest 3)
+DESCRIPTION: Shows the deprecated configuration method for WebdriverIO provider options in Vitest versions before 3.0, using the providerOptions property.
+
+LANGUAGE: typescript
+CODE:
+export default defineConfig({
+  test: {
+    browser: {
+      providerOptions: {
+        capabilities: {},
+      },
+    },
+  },
+})
+
+----------------------------------------
+
+TITLE: Initializing Jest Matchers with Chai in Vitest
+DESCRIPTION: Shows how to import and configure Jest matchers as Chai plugins. Sets up JestExtend for custom matchers, JestChaiExpect for standard Jest matchers, and JestAsymmetricMatchers for special matching patterns like stringContaining.
+
+LANGUAGE: javascript
+CODE:
+import {
+  JestAsymmetricMatchers,
+  JestChaiExpect,
+  JestExtend,
+} from '@vitest/expect'
+import * as chai from 'chai'
+
+// allows using expect.extend instead of chai.use to extend plugins
+chai.use(JestExtend)
+// adds all jest matchers to expect
+chai.use(JestChaiExpect)
+// adds asymmetric matchers like stringContaining, objectContaining
+chai.use(JestAsymmetricMatchers)
+
+----------------------------------------
+
+TITLE: Configuring VitePress Homepage for Vitest Testing Framework
+DESCRIPTION: YAML frontmatter configuration that defines the structure and content of the Vitest landing page. Includes layout settings, hero section with call-to-action buttons, and feature highlights showcasing Vitest's core capabilities.
+
+LANGUAGE: yaml
+CODE:
+---
+layout: home
+sidebar: false
+
+title: Vitest
+titleTemplate: Next Generation testing framework
+
+hero:
+  name: Vitest
+  text: Next Generation Testing Framework
+  tagline: A Vite-native testing framework. It's fast!
+  image:
+    src: /logo-shadow.svg
+    alt: Vitest
+  actions:
+    - theme: brand
+      text: Get Started
+      link: /guide/
+    - theme: alt
+      text: Features
+      link: /guide/features
+    - theme: alt
+      text: Why Vitest?
+      link: /guide/why
+    - theme: alt
+      text: View on GitHub
+      link: https://github.com/vitest-dev/vitest
+
+features:
+  - title: Vite Powered
+    icon: <span class="i-logos:vitejs"></span>
+    details: Reuse Vite's config and plugins - consistent across your app and tests. But it's not required to use Vitest!
+  - title: Jest Compatible
+    icon: <span class="i-logos:jest"></span>
+    details: Expect, snapshot, coverage, and more - migrating from Jest is straightforward.
+  - title: Smart & instant watch mode
+    icon: ⚡
+    details: Only rerun the related changes, just like HMR for tests!
+  - title: ESM, TypeScript, JSX
+    icon: <span class="i-logos:typescript-icon"></span>
+    details: Out-of-box ESM, TypeScript and JSX support powered by esbuild.
+---
+
+----------------------------------------
+
+TITLE: Configuring WebdriverIO Browser Instances in Vitest
+DESCRIPTION: Demonstrates how to configure WebdriverIO browser instances in Vitest config file, including browser type and capabilities like version and platform.
+
+LANGUAGE: typescript
+CODE:
+import { defineConfig } from 'vitest/config'
+
+export default defineConfig({
+  test: {
+    browser: {
+      instances: [
+        {
+          browser: 'chrome',
+          capabilities: {
+            browserVersion: 86,
+            platformName: 'Windows 10',
+          },
+        },
+      ],
+    },
+  },
+})
+
+----------------------------------------
+
+TITLE: Test Skip Function Usage in TypeScript
+DESCRIPTION: Demonstrates how to use the skip function from test context to conditionally skip test execution.
+
+LANGUAGE: typescript
+CODE:
+import { expect, it } from 'vitest'
+
+it('math is hard', ({ skip }) => {
+  skip()
+  expect(2 + 2).toBe(5)
+})
+
+----------------------------------------
+
+TITLE: Configuring Multi-Browser Testing in Vitest
+DESCRIPTION: Shows how to set up multi-browser testing in Vitest 3.0 using the 'instances' array. This allows running tests in different browser setups with improved performance and caching.
+
+LANGUAGE: jsx
+CODE:
+import { defineConfig } from 'vitest/config'
+
+export default defineConfig({
+  test: {
+    browser: {
+      provider: 'playwright',
+      instances: [
+        {
+          browser: 'chromium',
+          launch: { devtools: true },
+        },
+        {
+          browser: 'firefox',
+          setupFiles: ['./setup.firefox.ts'],
+          provide: {
+            secret: 'my-secret',
+          },
+        },
+      ],
+    }
+  }
+})
+
+----------------------------------------
+
+TITLE: TypeScript Configuration for WebdriverIO Types
+DESCRIPTION: Configures TypeScript compiler options to include WebdriverIO type definitions. Note that specifying types will disable automatic loading of @types/* packages.
+
+LANGUAGE: json
+CODE:
+{
+  "compilerOptions": {
+    "types": ["@vitest/browser/providers/webdriverio"]
+  }
+}
+
+----------------------------------------
+
+TITLE: Custom Snapshot Serializer Configuration in Vitest
+DESCRIPTION: Shows how to configure a custom snapshot serializer in Vitest's configuration file.
+
+LANGUAGE: typescript
+CODE:
+import { defineConfig } from 'vitest/config'
+
+export default defineConfig({
+  test: {
+    snapshotSerializers: ['path/to/custom-serializer.ts'],
+  },
+})
+
+----------------------------------------
+
+TITLE: Configuring Coverage Thresholds
+DESCRIPTION: Example of setting coverage thresholds for different file patterns
+
+LANGUAGE: typescript
+CODE:
+{
+  coverage: {
+    thresholds: {
+      // Thresholds for all files
+      functions: 95,
+      branches: 70,
+
+      // Thresholds for matching glob pattern
+      'src/utils/**.ts': {
+        statements: 95,
+        functions: 90,
+        branches: 85,
+        lines: 80,
+      },
+
+      // Files matching this pattern will only have lines thresholds set.
+      // Global thresholds are not inherited.
+      '**/math.ts': {
+        lines: 100,
+      }
+    }
+  }
+}
+
+----------------------------------------
+
+TITLE: Filtering Projects in Vitest CLI
+DESCRIPTION: This snippet shows how to use the --project flag in the Vitest CLI to filter and run specific projects. It demonstrates running tests only for the 'chromium' project.
+
+LANGUAGE: shell
+CODE:
+$ vitest --project=chromium
+
+----------------------------------------
+
+TITLE: Configuring Vitest Default Reporter
+DESCRIPTION: Shows how to customize the default reporter by disabling the summary output.
+
+LANGUAGE: typescript
+CODE:
+export default defineConfig({
+  test: {
+    reporters: [
+      ['default', { summary: false }]
+    ]
+  },
+})
+
+----------------------------------------
+
+TITLE: Listing Vitest Tests with JSON Output in Bash
+DESCRIPTION: Shows how to use the 'list' command to output test information in JSON format.
+
+LANGUAGE: bash
+CODE:
+vitest list filename.spec.ts -t="some-test" --json=./file.json
+
+----------------------------------------
+
+TITLE: Configuring Different Browser Setups in Vitest
+DESCRIPTION: This snippet shows how to configure different setups for the same browser type (Chromium) in Vitest. It includes custom names, setup files, and injected values using the provide field.
+
+LANGUAGE: typescript
+CODE:
+import { defineConfig } from 'vitest/config'
+export default defineConfig({
+  test: {
+    browser: {
+      enabled: true,
+      provider: 'playwright',
+      headless: true,
+      instances: [
+        {
+          browser: 'chromium',
+          name: 'chromium-1',
+          setupFiles: ['./ratio-setup.ts'],
+          provide: {
+            ratio: 1,
+          }
+        },
+        {
+          browser: 'chromium',
+          name: 'chromium-2',
+          provide: {
+            ratio: 2,
+          }
+        },
+      ],
+    },
+  },
+})
+
+----------------------------------------
+
+TITLE: Debugging File Transformations in Vitest
+DESCRIPTION: This command shows how to run Vitest with debugging enabled for vite-node to analyze file transformations and executions. It uses the DEBUG environment variable to enable logging.
+
+LANGUAGE: bash
+CODE:
+$ DEBUG=vite-node:* vitest --run
+
+----------------------------------------
+
+TITLE: Configuring Test Runner Profiling for Forks in Vitest
+DESCRIPTION: This snippet demonstrates how to configure Vitest to generate CPU and heap profiles for the test runner using forks. It sets up the pool options to use forks and specifies the execution arguments for profiling.
+
+LANGUAGE: typescript
+CODE:
+import { defineConfig } from 'vitest/config'
+
+export default defineConfig({
+  test: {
+    pool: 'forks',
+    poolOptions: {
+      forks: {
+        execArgv: [
+          '--cpu-prof',
+          '--cpu-prof-dir=test-runner-profile',
+          '--heap-prof',
+          '--heap-prof-dir=test-runner-profile'
+        ],
+
+        // To generate a single profile
+        singleFork: true,
+      },
+    },
+  },
+})
+
+----------------------------------------
+
+TITLE: Configuring Multiple Browser Instances in Vitest
+DESCRIPTION: This snippet demonstrates how to configure Vitest to run tests in multiple browser instances, including Chromium, Firefox, and WebKit. It uses the browser.instances option to specify different browsers.
+
+LANGUAGE: typescript
+CODE:
+import { defineConfig } from 'vitest/config'
+export default defineConfig({
+  test: {
+    browser: {
+      enabled: true,
+      provider: 'playwright',
+      headless: true,
+      instances: [
+        { browser: 'chromium' },
+        { browser: 'firefox' },
+        { browser: 'webkit' },
+      ],
+    },
+  },
+})
+
+----------------------------------------
+
+TITLE: Configuring Test Runner Profiling for Threads in Vitest
+DESCRIPTION: This snippet shows how to configure Vitest to generate CPU and heap profiles for the test runner using threads. It sets up the pool options to use threads and specifies the execution arguments for profiling.
+
+LANGUAGE: typescript
+CODE:
+import { defineConfig } from 'vitest/config'
+
+export default defineConfig({
+  test: {
+    pool: 'threads',
+    poolOptions: {
+      threads: {
+        execArgv: [
+          '--cpu-prof',
+          '--cpu-prof-dir=test-runner-profile',
+          '--heap-prof',
+          '--heap-prof-dir=test-runner-profile'
+        ],
+
+        // To generate a single profile
+        singleThread: true,
+      },
+    },
+  },
+})
+
+----------------------------------------
+
+TITLE: Configuring .npmrc for Vitest Node Dependencies in Shell
+DESCRIPTION: This snippet shows the content of a .npmrc file used to specify the directories for Vitest node dependencies. It sets the VITE_NODE_DEPS_MODULE_DIRECTORIES environment variable.
+
+LANGUAGE: sh
+CODE:
+VITE_NODE_DEPS_MODULE_DIRECTORIES=/node_modules/,/packages/
+
+----------------------------------------
+
+TITLE: Defining getByRole Locator in TypeScript
+DESCRIPTION: Function signature for creating a locator to find elements by their ARIA role with optional configuration options.
+
+LANGUAGE: typescript
+CODE:
+function getByRole(
+  role: ARIARole | string,
+  options?: LocatorByRoleOptions,
+): Locator
+
+----------------------------------------
+
+TITLE: VS Code Compound Configuration for Vitest Browser Debugging
+DESCRIPTION: JSON configuration for VS Code to set up a compound debugger for Vitest browser tests. It includes configurations for running Vitest in browser mode and attaching to the browser debugger.
+
+LANGUAGE: json
+CODE:
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "type": "node",
+      "request": "launch",
+      "name": "Run Vitest Browser",
+      "program": "${workspaceRoot}/node_modules/vitest/vitest.mjs",
+      "console": "integratedTerminal",
+      "args": ["--inspect-brk", "--browser", "--no-file-parallelism"]
+    },
+    {
+      "type": "chrome",
+      "request": "attach",
+      "name": "Attach to Vitest Browser",
+      "port": 9229
+    }
+  ],
+  "compounds": [
+    {
+      "name": "Debug Vitest Browser",
+      "configurations": ["Attach to Vitest Browser", "Run Vitest Browser"],
+      "stopAll": true
+    }
+  ]
+}
+
+----------------------------------------
+
+TITLE: HTML Structure Example for Role-based Locators
+DESCRIPTION: Example HTML structure showing form elements that can be located using ARIA roles
+
+LANGUAGE: html
+CODE:
+<h3>Sign up</h3>
+<label>
+  Login
+  <input type="text" />
+</label>
+<label>
+  Password
+  <input type="password" />
+</label>
+<br/>
+<button>Submit</button>
+
+----------------------------------------
+
+TITLE: Running Vitest in Browser Debug Mode via CLI
+DESCRIPTION: Command-line instruction to run Vitest in browser mode with debugging enabled. It uses the --inspect-brk flag for debugging and disables file parallelism.
+
+LANGUAGE: bash
+CODE:
+vitest --inspect-brk --browser --no-file-parallelism
+
+----------------------------------------
+
+TITLE: TypeScript Reference Configuration for Vitest Browser Testing
+DESCRIPTION: Shows different TypeScript reference configurations for various browser providers in Vitest (preview, playwright, and webdriverio).
+
+LANGUAGE: typescript
+CODE:
+/// <reference types="@vitest/browser/matchers" />
+
+LANGUAGE: typescript
+CODE:
+/// <reference types="@vitest/browser/providers/playwright" />
+
+LANGUAGE: typescript
+CODE:
+/// <reference types="@vitest/browser/providers/webdriverio" />
+
+----------------------------------------
+
+TITLE: Configuring Coverage Reports Directory
+DESCRIPTION: Shows how to configure the directory where coverage reports are saved.
+
+LANGUAGE: javascript
+CODE:
+import { defineConfig } from 'vite'
+
+export default defineConfig({
+  test: {
+    coverage: {
+      reportsDirectory: './tests/unit/coverage'
+    }
+  }
+})
+
+----------------------------------------
+
+TITLE: Benchmarking with Vitest
+DESCRIPTION: Shows how to use Vitest's experimental benchmarking feature to compare performance results of different implementations.
+
+LANGUAGE: typescript
+CODE:
+import { bench, describe } from 'vitest'
+
+describe('sort', () => {
+  bench('normal', () => {
+    const x = [1, 5, 4, 2, 3]
+    x.sort((a, b) => {
+      return a - b
+    })
+  })
+
+  bench('reverse', () => {
+    const x = [1, 5, 4, 2, 3]
+    x.reverse().sort((a, b) => {
+      return a - b
+    })
+  })
+})
+
+----------------------------------------
+
+TITLE: Configuring Coverage Script in package.json
+DESCRIPTION: Shows how to add coverage testing scripts to package.json.
+
+LANGUAGE: json
+CODE:
+{
+  "scripts": {
+    "test": "vitest",
+    "coverage": "vitest run --coverage"
+  }
+}
+
+----------------------------------------
+
+TITLE: Mocking Functions with Vitest
+DESCRIPTION: Demonstrates how to use Vitest's built-in mocking capabilities, which are compatible with Jest's mocking APIs.
+
+LANGUAGE: typescript
+CODE:
+import { expect, vi } from 'vitest'
+
+const fn = vi.fn()
+
+fn('hello', 1)
+
+expect(vi.isMockFunction(fn)).toBe(true)
+expect(fn.mock.calls[0]).toEqual(['hello', 1])
+
+fn.mockImplementation((arg: string) => arg)
+
+fn('world', 2)
+
+expect(fn.mock.results[1].value).toBe('world')
+
+----------------------------------------
+
+TITLE: TypeScript Reference Declaration for WebdriverIO in Vitest
+DESCRIPTION: Adds type definitions for WebdriverIO provider options and custom expect properties in Vitest by adding a triple-slash reference directive.
+
+LANGUAGE: typescript
+CODE:
+/// <reference types="@vitest/browser/providers/webdriverio" />
+
+----------------------------------------
+
+TITLE: Extending TypeScript Declarations for Custom Matchers in Vitest
+DESCRIPTION: This snippet shows how to extend the default Assertion interface in TypeScript to include custom matchers. It should be placed in an ambient declaration file (e.g., vitest.d.ts) and included in the tsconfig.json.
+
+LANGUAGE: typescript
+CODE:
+import 'vitest'
+
+interface CustomMatchers<R = unknown> {
+  toBeFoo: () => R
+}
+
+declare module 'vitest' {
+  interface Assertion<T = any> extends CustomMatchers<T> {}
+  interface AsymmetricMatchersContaining extends CustomMatchers {}
+}
+
+----------------------------------------
+
+TITLE: Deprecated Playwright Configuration in Vitest Config
+DESCRIPTION: This TypeScript snippet shows the deprecated way of configuring Playwright options in Vitest. It uses the 'providerOptions' property, which is no longer recommended in favor of 'instances'.
+
+LANGUAGE: typescript
+CODE:
+export default defineConfig({
+  test: {
+    browser: {
+      providerOptions: {
+        launch: {},
+        context: {},
+      },
+    },
+  },
+})
+
+----------------------------------------
+
+TITLE: Running Vitest Tests via CLI
+DESCRIPTION: Command line instruction for executing Vitest tests.
+
+LANGUAGE: bash
+CODE:
+$ npx vitest
+
+----------------------------------------
+
+TITLE: Using Injected Values in Vitest Tests
+DESCRIPTION: This snippet demonstrates how to use injected values in a Vitest test file. It uses the inject function to access the provided ratio value and combines it with a global setup modifier.
+
+LANGUAGE: typescript
+CODE:
+import { expect, inject, test } from 'vitest'
+import { globalSetupModifier } from './example.js'
+
+test('ratio works', () => {
+  expect(inject('ratio') * globalSetupModifier).toBe(14)
+})
+
+----------------------------------------
+
+TITLE: Example JUnit XML Report Output
+DESCRIPTION: Provides an example of the XML output generated by the JUnit reporter in Vitest.
+
+LANGUAGE: xml
+CODE:
+<?xml version="1.0" encoding="UTF-8" ?>
+<testsuites name="vitest tests" tests="2" failures="1" errors="0" time="0.503">
+    <testsuite name="__tests__/test-file-1.test.ts" timestamp="2023-10-19T17:41:58.580Z" hostname="My-Computer.local" tests="2" failures="1" errors="0" skipped="0" time="0.013">
+        <testcase classname="__tests__/test-file-1.test.ts" name="first test file > 2 + 2 should equal 4" time="0.01">
+            <failure message="expected 5 to be 4 // Object.is equality" type="AssertionError">
+AssertionError: expected 5 to be 4 // Object.is equality
+ ❯ __tests__/test-file-1.test.ts:20:28
+            </failure>
+        </testcase>
+        <testcase classname="__tests__/test-file-1.test.ts" name="first test file > 4 - 2 should equal 2" time="0">
+        </testcase>
+    </testsuite>
+</testsuites>
+
+----------------------------------------
+
+TITLE: UserEvent Setup Example
+DESCRIPTION: Example demonstrating the difference between Vitest and testing-library userEvent behavior
+
+LANGUAGE: typescript
+CODE:
+import { userEvent as vitestUserEvent } from '@vitest/browser/context'
+import { userEvent as originalUserEvent } from '@testing-library/user-event'
+
+await vitestUserEvent.keyboard('{Shift}') // press shift without releasing
+await vitestUserEvent.keyboard('{/Shift}') // releases shift
+
+await originalUserEvent.keyboard('{Shift}') // press shift without releasing
+await originalUserEvent.keyboard('{/Shift}') // DID NOT release shift because the state is different
+
+----------------------------------------
+
+TITLE: Example JSON Report Output
+DESCRIPTION: Provides an example of the JSON output generated by the JSON reporter in Vitest.
+
+LANGUAGE: json
+CODE:
+{
+  "numTotalTestSuites": 4,
+  "numPassedTestSuites": 2,
+  "numFailedTestSuites": 1,
+  "numPendingTestSuites": 1,
+  "numTotalTests": 4,
+  "numPassedTests": 1,
+  "numFailedTests": 1,
+  "numPendingTests": 1,
+  "numTodoTests": 1,
+  "startTime": 1697737019307,
+  "success": false,
+  "testResults": [
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": [
+            "",
+            "first test file"
+          ],
+          "fullName": " first test file 2 + 2 should equal 4",
+          "status": "failed",
+          "title": "2 + 2 should equal 4",
+          "duration": 9,
+          "failureMessages": [
+            "expected 5 to be 4 // Object.is equality"
+          ],
+          "location": {
+            "line": 20,
+            "column": 28
+          },
+          "meta": {}
+        }
+      ],
+      "startTime": 1697737019787,
+      "endTime": 1697737019797,
+      "status": "failed",
+      "message": "",
+      "name": "/root-directory/__tests__/test-file-1.test.ts"
+    }
+  ],
+  "coverageMap": {}
+}
+
+----------------------------------------
+
+TITLE: Setup Type References for Providers
+DESCRIPTION: Code showing how to add type references for different providers (Playwright/WebdriverIO)
+
+LANGUAGE: typescript
+CODE:
+/// <reference types="@vitest/browser/providers/playwright" />
+
+----------------------------------------
+
+TITLE: Image Snapshot Test in Vitest
+DESCRIPTION: Shows how to use jest-image-snapshot for image snapshot testing in Vitest.
+
+LANGUAGE: typescript
+CODE:
+test('image snapshot', () => {
+  expect(readFileSync('./test/stubs/input-image.png'))
+    .toMatchImageSnapshot()
+})
+
+----------------------------------------
+
+TITLE: Installing Vitest Browser Mode Dependencies
+DESCRIPTION: Commands to install required packages for Vitest browser mode with different package managers.
+
+LANGUAGE: bash
+CODE:
+npx vitest init browser
+
+LANGUAGE: bash
+CODE:
+npm install -D vitest @vitest/browser
+
+----------------------------------------
+
+TITLE: Fake Timers Configuration in Vitest 3.0
+DESCRIPTION: Shows how to configure fake timers explicitly after removal of default configurations.
+
+LANGUAGE: typescript
+CODE:
+export default defineConfig({
+  test: {
+    fakeTimers: {
+      toFake: [
+        'setTimeout',
+        'clearTimeout',
+        'setInterval',
+        'clearInterval',
+        'setImmediate',
+        'clearImmediate',
+        'Date',
+      ]
+    },
+  },
+})
+
+----------------------------------------
+
+TITLE: Defining page API for Page Interaction in TypeScript
+DESCRIPTION: This snippet defines the page object, which provides utilities to interact with the current page. It includes methods for viewport manipulation, screenshots, and element locators.
+
+LANGUAGE: typescript
+CODE:
+export const page: {
+  viewport(width: number, height: number): Promise<void>
+  screenshot(options: Omit<ScreenshotOptions, 'base64'> & { base64: true }): Promise<{
+    path: string
+    base64: string
+  }>
+  screenshot(options?: ScreenshotOptions): Promise<string>
+  extend(methods: Partial<BrowserPage>): BrowserPage
+  elementLocator(element: Element): Locator
+
+  getByRole(role: ARIARole | string, options?: LocatorByRoleOptions): Locator
+  getByLabelText(text: string | RegExp, options?: LocatorOptions): Locator
+  getByTestId(text: string | RegExp): Locator
+  getByAltText(text: string | RegExp, options?: LocatorOptions): Locator
+  getByPlaceholder(text: string | RegExp, options?: LocatorOptions): Locator
+  getByText(text: string | RegExp, options?: LocatorOptions): Locator
+  getByTitle(text: string | RegExp, options?: LocatorOptions): Locator
+}
+
+----------------------------------------
+
+TITLE: Configuring Snapshot Testing
+DESCRIPTION: Example of customizing snapshot path resolution
+
+LANGUAGE: typescript
+CODE:
+import { defineConfig } from 'vitest/config'
+
+export default defineConfig({
+  test: {
+    resolveSnapshotPath: (testPath, snapExtension) => testPath + snapExtension,
+  },
+})
+
+----------------------------------------
+
+TITLE: Defining server API for Node.js Environment Access in TypeScript
+DESCRIPTION: This snippet defines the server object, which represents the Node.js environment where the Vitest server is running. It provides access to platform information, runtime version, and test configuration.
+
+LANGUAGE: typescript
+CODE:
+export const server: {
+  platform: Platform
+  version: string
+  provider: string
+  browser: string
+  commands: BrowserCommands
+  config: SerializedConfig
+}
+
+----------------------------------------
+
+TITLE: Simple JSON Workspace Configuration
+DESCRIPTION: Shows how to define a basic workspace configuration using JSON format.
+
+LANGUAGE: json
+CODE:
+[
+  "packages/*"
+]
+
+----------------------------------------
+
+TITLE: Defining userEvent API for Browser Interactions in TypeScript
+DESCRIPTION: This snippet defines the userEvent object, which provides methods for simulating user interactions in the browser. It includes functions for clicking, typing, hovering, and other common user actions.
+
+LANGUAGE: typescript
+CODE:
+export const userEvent: {
+  setup: () => UserEvent
+  cleanup: () => Promise<void>
+  click: (element: Element, options?: UserEventClickOptions) => Promise<void>
+  dblClick: (element: Element, options?: UserEventDoubleClickOptions) => Promise<void>
+  tripleClick: (element: Element, options?: UserEventTripleClickOptions) => Promise<void>
+  selectOptions: (
+    element: Element,
+    values: HTMLElement | HTMLElement[] | string | string[],
+    options?: UserEventSelectOptions,
+  ) => Promise<void>
+  keyboard: (text: string) => Promise<void>
+  type: (element: Element, text: string, options?: UserEventTypeOptions) => Promise<void>
+  clear: (element: Element) => Promise<void>
+  tab: (options?: UserEventTabOptions) => Promise<void>
+  hover: (element: Element, options?: UserEventHoverOptions) => Promise<void>
+  unhover: (element: Element, options?: UserEventHoverOptions) => Promise<void>
+  fill: (element: Element, text: string, options?: UserEventFillOptions) => Promise<void>
+  dragAndDrop: (source: Element, target: Element, options?: UserEventDragAndDropOptions) => Promise<void>
+}
+
+----------------------------------------
+
+TITLE: Package JSON Test Script Configuration
+DESCRIPTION: Shows how to configure the test script in package.json for running workspace tests.
+
+LANGUAGE: json
+CODE:
+{
+  "scripts": {
+    "test": "vitest"
+  }
+}
+
+----------------------------------------
+
+TITLE: Minimal Browser Configuration Structure
+DESCRIPTION: Shows the basic structure for configuring browser testing within the test property.
+
+LANGUAGE: typescript
+CODE:
+export default defineConfig({
+  test: {
+    browser: {},
+  },
+})
+
+----------------------------------------
+
+TITLE: Test Syntax Examples
+DESCRIPTION: Examples showing dot syntax vs object syntax for test configuration
+
+LANGUAGE: typescript
+CODE:
+// dot-syntax
+test.skip('skipped test', () => {
+  // some logic that fails right now
+})
+
+// object-syntax 
+test('skipped test', { skip: true }, () => {
+  // some logic that fails right now
+})
+
+----------------------------------------
+
+TITLE: Implementing Custom Playwright Commands in Vitest
+DESCRIPTION: Shows how to create custom commands specific to the Playwright provider in Vitest. This example demonstrates accessing Playwright-specific properties like page, frame, iframe, and context.
+
+LANGUAGE: typescript
+CODE:
+import { BrowserCommand } from 'vitest/node'
+
+export const myCommand: BrowserCommand<[string, number]> = async (
+  ctx,
+  arg1: string,
+  arg2: number
+) => {
+  if (ctx.provider.name === 'playwright') {
+    const element = await ctx.iframe.findByRole('alert')
+    const screenshot = await element.screenshot()
+    // do something with the screenshot
+    return difference
+  }
+}
+
+----------------------------------------
+
+TITLE: Dumping Transformed Files in Vitest
+DESCRIPTION: This command demonstrates how to run Vitest with the VITE_NODE_DEBUG_DUMP environment variable to write transformed files to the file system for inspection.
+
+LANGUAGE: bash
+CODE:
+$ VITE_NODE_DEBUG_DUMP=true vitest --run
+
+----------------------------------------
+
+TITLE: Accessing Chrome DevTools Protocol in Vitest Browser Tests
+DESCRIPTION: Shows how to use the cdp method to access raw Chrome DevTools Protocol in browser tests. This is primarily useful for library authors building tools on top of it.
+
+LANGUAGE: typescript
+CODE:
+import { cdp } from '@vitest/browser/context'
+
+const input = document.createElement('input')
+document.body.appendChild(input)
+input.focus()
+
+await cdp().send('Input.dispatchKeyEvent', {
+  type: 'keyDown',
+  text: 'a',
+})
+
+expect(input).toHaveValue('a')
+
+----------------------------------------
+
+TITLE: Running Vitest with Main Thread Profiling
+DESCRIPTION: This command demonstrates how to run Vitest with CPU profiling enabled for the main thread. It uses Node.js arguments to generate a CPU profile and specifies the output directory.
+
+LANGUAGE: bash
+CODE:
+$ node --cpu-prof --cpu-prof-dir=main-profile ./node_modules/vitest/vitest.mjs --run
+
+----------------------------------------
+
+TITLE: Using File Handling Commands in Vitest Browser Tests
+DESCRIPTION: Demonstrates how to use readFile, writeFile, and removeFile commands to handle files in browser tests. These commands are resolved relative to the test file and use utf-8 encoding by default.
+
+LANGUAGE: typescript
+CODE:
+import { server } from '@vitest/browser/context'
+
+const { readFile, writeFile, removeFile } = server.commands
+
+it('handles files', async () => {
+  const file = './test.txt'
+
+  await writeFile(file, 'hello world')
+  const content = await readFile(file)
+
+  expect(content).toBe('hello world')
+
+  await removeFile(file)
+})
+
+----------------------------------------
+
+TITLE: Setting Task Metadata in Vitest Tests
+DESCRIPTION: Demonstrates how to set metadata on test tasks using afterAll hooks and test context. The metadata can be accessed later in the Node.js process.
+
+LANGUAGE: typescript
+CODE:
+afterAll((suite) => {
+  suite.meta.done = true
+})
+
+test('custom', ({ task }) => {
+  task.meta.custom = 'some-custom-handler'
+})
+
+----------------------------------------
+
+TITLE: Configuring Test Environment
+DESCRIPTION: Setting up a custom test environment using @vitest-environment docblock
+
+LANGUAGE: javascript
+CODE:
+/**
+ * @vitest-environment jsdom
+ */
+
+test('use jsdom in this test file', () => {
+  const element = document.createElement('div')
+  expect(element).not.toBeNull()
+})
+
+----------------------------------------
+
+TITLE: Configuring and Using Vitest Snapshot Testing
+DESCRIPTION: Comprehensive example showing how to set up and use Vitest's snapshot testing functionality. Includes initialization of SnapshotClient, environment setup, inline snapshot handling, and snapshot management. Demonstrates both regular and inline snapshot assertions.
+
+LANGUAGE: javascript
+CODE:
+import { SnapshotClient } from '@vitest/snapshot'
+import { NodeSnapshotEnvironment } from '@vitest/snapshot/environment'
+import { SnapshotManager } from '@vitest/snapshot/manager'
+
+const client = new SnapshotClient({
+  isEqual: (received, expected) =>
+    equals(received, expected, [iterableEquality, subsetEquality]),
+})
+
+const environment = new NodeSnapshotEnvironment()
+
+function getCurrentFilepath() {
+  return '/file.spec.js'
+}
+function getCurrentTestName() {
+  return 'test1'
+}
+
+function wrapper(received) {
+  function __INLINE_SNAPSHOT__(inlineSnapshot, message) {
+    client.assert({
+      received,
+      message,
+      isInline: true,
+      inlineSnapshot,
+      filepath: getCurrentFilepath(),
+      name: getCurrentTestName(),
+    })
+  }
+  return {
+    toMatchInlineSnapshot: (...args) => __INLINE_SNAPSHOT__(...args),
+  }
+}
+
+const options = {
+  updateSnapshot: 'new',
+  snapshotEnvironment: environment,
+}
+
+await client.startCurrentRun(
+  getCurrentFilepath(),
+  getCurrentTestName(),
+  options
+)
+
+client.assert({
+  received: 'some text',
+  isInline: false,
+})
+
+wrapper('text 1').toMatchInlineSnapshot()
+wrapper('text 2').toMatchInlineSnapshot('"text 2"')
+
+const result = await client.finishCurrentRun()
+
+const manager = new SnapshotManager(options)
+manager.add(result)
+
+console.log(manager.summary)
+
+----------------------------------------
+
+TITLE: Defining VitestRunner Interface in TypeScript
+DESCRIPTION: This snippet defines the VitestRunner interface, which outlines the methods that can be implemented in a custom Vitest runner. It includes lifecycle hooks for test collection, execution, and reporting.
+
+LANGUAGE: typescript
+CODE:
+export interface VitestRunner {
+  onBeforeCollect?: (paths: string[]) => unknown
+  onCollected?: (files: File[]) => unknown
+  onCancel?: (reason: CancelReason) => unknown
+  onBeforeRunTask?: (test: TaskPopulated) => unknown
+  onBeforeTryTask?: (test: TaskPopulated, options: { retry: number; repeats: number }) => unknown
+  onAfterRunTask?: (test: TaskPopulated) => unknown
+  onAfterTryTask?: (test: TaskPopulated, options: { retry: number; repeats: number }) => unknown
+  onBeforeRunSuite?: (suite: Suite) => unknown
+  onAfterRunSuite?: (suite: Suite) => unknown
+  runSuite?: (suite: Suite) => Promise<void>
+  runTask?: (test: TaskPopulated) => Promise<void>
+  onTaskUpdate?: (task: [string, TaskResult | undefined, TaskMeta | undefined][]) => Promise<void>
+  onBeforeRunFiles?: (files: File[]) => unknown
+  onAfterRunFiles?: (files: File[]) => unknown
+  extendTaskContext?: (context: TestContext) => TestContext
+  importFile: (filepath: string, source: VitestRunnerImportSource) => unknown
+  injectValue?: (key: string) => unknown
+  config: VitestRunnerConfig
+  pool?: string
+}
+
+----------------------------------------
+
+TITLE: Web Worker Implementation Example
+DESCRIPTION: Example implementation of a worker file showing message handling.
+
+LANGUAGE: typescript
+CODE:
+// worker.ts
+self.onmessage = (e) => {
+  self.postMessage(`${e.data} world`)
+}
+
+----------------------------------------
+
+TITLE: Creating Custom Vitest Reporter with BaseReporter
+DESCRIPTION: Example of creating a custom reporter by extending the BaseReporter class and implementing the onCollected method.
+
+LANGUAGE: typescript
+CODE:
+import { BaseReporter } from 'vitest/reporters'
+
+export default class CustomReporter extends BaseReporter {
+  onCollected() {
+    const files = this.ctx.state.getFiles(this.watchFilters)
+    this.reportTestSummary(files)
+  }
+}
+
+----------------------------------------
+
+TITLE: Conditional Web Worker Definition
+DESCRIPTION: Example of conditionally defining web workers with custom clone options using the pure import.
+
+LANGUAGE: javascript
+CODE:
+import { defineWebWorkers } from '@vitest/web-worker/pure'
+
+if (process.env.SUPPORT_WORKERS) {
+  defineWebWorkers({ clone: 'none' })
+}
+
+----------------------------------------
+
+TITLE: Extending TypeScript Types for Task Metadata
+DESCRIPTION: Shows how to extend TypeScript type definitions to include custom task metadata properties.
+
+LANGUAGE: typescript
+CODE:
+declare module 'vitest' {
+  interface TaskMeta {
+    done?: boolean
+    custom?: string
+  }
+}
+
+----------------------------------------
+
+TITLE: Using Vitest Mocking in Code
+DESCRIPTION: Shows an example of using Vitest mocking in actual code. This snippet demonstrates mocking a module and asserting that the mock is working correctly.
+
+LANGUAGE: typescript
+CODE:
+import { mocked } from './some-module.js'
+
+vi.mock('./some-module.js', () => {
+  return { mocked: true }
+})
+
+mocked === true
+
+----------------------------------------
+
+TITLE: Handling Newly Added Test Files
+DESCRIPTION: Example of handling newly added test files using project glob patterns to identify and run tests for new files.
+
+LANGUAGE: typescript
+CODE:
+watcher.on('add', async (file) => {
+  const specifications = []
+  for (const project of vitest.projects) {
+    if (project.matchesGlobPattern(file)) {
+      specifications.push(project.createSpecification(file))
+    }
+  }
+
+  if (specifications.length) {
+    await vitest.rerunTestSpecifications(specifications)
+  }
+})
+
+----------------------------------------
+
+TITLE: Configuring hoistMocksPlugin in Vite
+DESCRIPTION: Demonstrates how to configure the hoistMocksPlugin in a Vite server. This plugin hoists compiler hints, replaces static imports with dynamic ones, and updates exports access.
+
+LANGUAGE: typescript
+CODE:
+import { hoistMocksPlugin } from '@vitest/mocker/node'
+import { createServer } from 'vite'
+
+await createServer({
+  plugins: [
+    hoistMocksPlugin({
+      hoistedModules: ['virtual:my-module'],
+      regexpHoistable: /myObj.(mock|hoist)/,
+      utilsObjectName: ['myObj'],
+      hoistableMockMethodNames: ['mock'],
+      // disable support for vi.mock(import('./path'))
+      dynamicImportMockMethodNames: [],
+      hoistedMethodNames: ['hoist'],
+    }),
+  ],
+})
+
+----------------------------------------
+
+TITLE: Disabling Vite Watcher Configuration
+DESCRIPTION: Demonstrates how to disable the Vite file watcher using server configuration options in Vite 5.3 or later.
+
+LANGUAGE: typescript
+CODE:
+await createVitest(
+  'test',
+  {},
+  {
+    plugins: [
+      {
+        name: 'stop-watcher',
+        async configureServer(server) {
+          await server.watcher.close()
+        }
+      }
+    ],
+    server: {
+      watch: null,
+    },
+  }
+)
+
+----------------------------------------
+
+TITLE: Configuring Custom Mocking Syntax in Vitest
+DESCRIPTION: Demonstrates how to configure custom mocking syntax in Vitest by modifying the mockerPlugin options. This allows for customization of the mocking function names and patterns.
+
+LANGUAGE: typescript
+CODE:
+import { mockerPlugin } from '@vitest/mocker/node'
+
+export default defineConfig({
+  plugins: [
+    mockerPlugin({
+      hoistMocks: {
+        regexpHoistable: /myObj.mock/,
+        // you will also need to update other options accordingly
+        utilsObjectName: ['myObj'],
+      },
+    }),
+  ],
+})
+
+----------------------------------------
+
+TITLE: Manual Test Rerunning with File Watcher
+DESCRIPTION: Shows how to implement manual test rerunning when files change using a watcher. Includes file invalidation and test specification handling.
+
+LANGUAGE: typescript
+CODE:
+watcher.on('change', async (file) => {
+  const specifications = vitest.getModuleSpecifications(file)
+  if (specifications.length) {
+    vitest.invalidateFile(file)
+    // you can use runTestSpecifications if "reporter.onWatcher*" hooks
+    // should not be invoked
+    await vitest.rerunTestSpecifications(specifications)
+  }
+})
+
+----------------------------------------
+
+TITLE: Using automockModule Function in Vitest
+DESCRIPTION: Shows how to use the automockModule function to replace every export with a mock in the code. This function is used internally by Vitest for module mocking.
+
+LANGUAGE: typescript
+CODE:
+import { automockModule } from '@vitest/mocker/node'
+import { parseAst } from 'vite'
+
+const ms = await automockModule(
+  `export function test() {}`,
+  'automock',
+  parseAst,
+)
+console.log(
+  ms.toString(),
+  ms.generateMap({ hires: 'boundary' })
+)
+
+----------------------------------------
+
+TITLE: Nested YAML Configuration with Bash Example
+DESCRIPTION: YAML configuration demonstrating multiple levels of nesting with a simple bash echo command included as an example.
+
+LANGUAGE: yaml
+CODE:
+example: |
+  {
+    echo "hello"
+  }
+some:
+  nesting:
+    - "hello world"
+even:
+  more:
+    nesting: true
+
+----------------------------------------
+
+TITLE: Test Lines Configuration Example
+DESCRIPTION: Demonstrates correct usage of testLines configuration with corresponding test file implementation showing line number matching.
+
+LANGUAGE: typescript
+CODE:
+const specification = project.createSpecification(
+  resolve('./example.test.ts'),
+  [3, 8, 9],
+)
+
+LANGUAGE: typescript
+CODE:
+import { test, describe } from 'vitest'
+
+test('verification works')
+
+describe('a group of tests', () => {
+  // ...
+
+  test('nested test')
+  test.skip('skipped test')
+})
+
+----------------------------------------
+
+TITLE: Installing and Building WASM Project Dependencies
+DESCRIPTION: Shell commands for installing dependencies and building the project, followed by manual steps to copy hello_world package and configure package.json for ES modules
+
+LANGUAGE: sh
+CODE:
+npm i
+npm run build
+# then
+# 1. copy `examples/hello_world/pkg` to this directory
+# 2. add { "type": "module" } to `package.json`
+#    (this will be automatically included after https://github.com/rustwasm/wasm-pack/pull/1061)
+
+----------------------------------------
+
+TITLE: Defining Dynamic Module Import Function in TypeScript
+DESCRIPTION: This function signature defines a generic method for dynamically importing modules. It takes a module identifier as a string and returns a Promise that resolves to the imported module of type T. This allows for type-safe, asynchronous module loading at runtime.
+
+LANGUAGE: typescript
+CODE:
+function import<T>(moduleId: string): Promise<T>
+
+----------------------------------------
+
+TITLE: Configuring Universal Web Crawler Access in robots.txt
+DESCRIPTION: This snippet defines rules for all web crawlers, allowing them to access any resource on the site. It uses the wildcard user-agent and the Allow directive to grant unrestricted access.
+
+LANGUAGE: plaintext
+CODE:
+User-agent: *
+Allow: /
+
+----------------------------------------
+
+TITLE: Executing Shell Command in YAML Configuration
+DESCRIPTION: This snippet shows how to include a shell command within a YAML configuration file using the pipe character for multi-line strings. The command simply echoes 'hello' to the console.
+
+LANGUAGE: YAML
+CODE:
+example: |
+  {
+    echo "hello"
+  }

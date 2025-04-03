@@ -1,0 +1,206 @@
+TITLE: Creating and Using an Endpoint in TypeScript
+DESCRIPTION: Demonstrates how to create an endpoint using createEndpoint, define its schema with Zod, and call it as a function.
+
+LANGUAGE: typescript
+CODE:
+import { createEndpoint, createRouter } from "better-call"
+import { z } from "zod"
+
+const createItem = createEndpoint("/item", {
+    method: "POST",
+    body: z.object({
+        id: z.string()
+    })
+}, async (ctx) => {
+    return {
+        item: {
+            id: ctx.body.id
+        }
+    }
+})
+
+// Now you can call the endpoint just as a normal function.
+const item = await createItem({
+    body: {
+        id: "123"
+    }
+})
+
+----------------------------------------
+
+TITLE: Creating Middleware in TypeScript
+DESCRIPTION: Demonstrates how to create and use middleware with Better Call endpoints.
+
+LANGUAGE: typescript
+CODE:
+import { createMiddleware, createEndpoint } from "better-call";
+
+const middleware = createMiddleware(async (ctx) => {
+    return {
+        name: "hello"
+    }
+})
+
+const endpoint = createEndpoint("/", {
+    method: "GET",
+    use: [middleware],
+}, async (ctx) => {
+   //this will be the context object returned by the middleware with the name property
+   ctx.context
+})
+
+----------------------------------------
+
+TITLE: Creating an Endpoint Creator with Middleware in TypeScript
+DESCRIPTION: Shows how to create an endpoint creator that applies a set of middlewares to all created endpoints.
+
+LANGUAGE: typescript
+CODE:
+const dbMiddleware = createMiddleware(async (ctx) => {
+   return {
+    db: new Database()
+   }
+})
+const create = createEndpoint.create({
+    use: [dbMiddleware]
+})
+
+const createItem = create("/item", {
+    method: "POST",
+    body: z.object({
+        id: z.string()
+    })
+}, async (ctx) => {
+    await ctx.context.db.save(ctx.body)
+})
+
+----------------------------------------
+
+TITLE: Creating and Using an RPC Client in TypeScript
+DESCRIPTION: Demonstrates how to create a typesafe RPC client for calling server-side endpoints from the client.
+
+LANGUAGE: typescript
+CODE:
+//client.ts
+import type { router } from "./router" // import router type
+import { createClient } from "better-call/client";
+
+const client = createClient<typeof router>({
+    baseURL: "http://localhost:3000"
+});
+const items = await client("/item", {
+    body: {
+        id: "123"
+    }
+});
+
+----------------------------------------
+
+TITLE: Creating a Router with Node Adapter in TypeScript
+DESCRIPTION: Shows how to create a router and use the Node adapter to serve it with a Node HTTP server.
+
+LANGUAGE: typescript
+CODE:
+import { createRouter } from "better-call";
+import { toNodeHandler } from "better-call/node";
+import { createItem } from "./item";
+import http from "http";
+
+const router = createRouter({
+    createItem
+})
+const server = http.createServer(toNodeHandler(router.handler))
+
+----------------------------------------
+
+TITLE: Handling Non-200 Responses with APIError in TypeScript
+DESCRIPTION: Shows how to use the APIError to return non-200 responses from an endpoint.
+
+LANGUAGE: typescript
+CODE:
+const createItem = createEndpoint("/item", {
+    method: "POST",
+    body: z.object({
+        id: z.string()
+    })
+}, async (ctx) => {
+    if(ctx.body.id === "123") {
+        throw ctx.error("Bad Request", {
+            message: "Id is not allowed"
+        })
+    }
+    return {
+        item: {
+            id: ctx.body.id
+        }
+    }
+})
+
+----------------------------------------
+
+TITLE: Configuring OpenAPI Schema for Better Call Router
+DESCRIPTION: Demonstrates how to configure the OpenAPI schema generation for a Better Call router.
+
+LANGUAGE: typescript
+CODE:
+const router = createRouter({
+    createItem
+}, {
+    openapi: {
+        disabled: false, //default false
+        path: "/api/reference", //default /api/reference
+        scalar: {
+            title: "My API",
+            version: "1.0.0",
+            description: "My API Description",
+            theme: "dark" //default saturn
+        }
+    }
+})
+
+----------------------------------------
+
+TITLE: Setting Headers and Cookies in an Endpoint
+DESCRIPTION: Demonstrates how to set headers and cookies in a Better Call endpoint.
+
+LANGUAGE: typescript
+CODE:
+const createItem = createEndpoint("/item", {
+    method: "POST",
+    body: z.object({
+        id: z.string()
+    })
+}, async (ctx) => {
+    ctx.setHeader("X-Custom-Header", "Hello World")
+    ctx.setCookie("my-cookie", "hello world")
+    return {
+        item: {
+            id: ctx.body.id
+        }
+    }
+})
+
+----------------------------------------
+
+TITLE: Mounting an Endpoint to a Router with Bun in TypeScript
+DESCRIPTION: Shows how to create a router with an endpoint and serve it using Bun's HTTP server.
+
+LANGUAGE: typescript
+CODE:
+const router = createRouter({
+    createItem
+})
+
+Bun.serve({
+    fetch: router.handler
+})
+
+----------------------------------------
+
+TITLE: Installing Better Call and Zod with pnpm
+DESCRIPTION: Commands to install Better Call and Zod (a validation library) using pnpm package manager.
+
+LANGUAGE: bash
+CODE:
+pnpm i better-call
+pnpm i zod

@@ -1,0 +1,4556 @@
+TITLE: Implementing Basic Asset Transformation in Parcel
+DESCRIPTION: Demonstrates how to create a basic transformer plugin that retrieves an asset's source code and source map, compiles it, and sets the results back on the asset.
+
+LANGUAGE: javascript
+CODE:
+import {Transformer} from '@parcel/plugin';
+
+export default new Transformer({
+  async transform({asset}) {
+    // Retrieve the asset's source code and source map.
+    let source = await asset.getCode();
+    let sourceMap = await asset.getMap();
+
+    // Run it through some compiler, and set the results 
+    // on the asset.
+    let {code, map} = compile(source, sourceMap);
+    asset.setCode(code);
+    asset.setMap(map);
+
+    // Return the asset
+    return [asset];
+  }
+});
+
+----------------------------------------
+
+TITLE: Installing Parcel using Package Managers
+DESCRIPTION: Commands to install Parcel as a development dependency using either Yarn or npm package managers.
+
+LANGUAGE: shell
+CODE:
+yarn add --dev parcel
+
+LANGUAGE: shell
+CODE:
+npm install --save-dev parcel
+
+----------------------------------------
+
+TITLE: Implementing Dynamic Imports in JavaScript
+DESCRIPTION: Demonstrates how to use dynamic imports to load a sub-page of an application on demand, resulting in smaller initial bundle sizes and faster load times.
+
+LANGUAGE: javascript
+CODE:
+import("./pages/about").then(function (page) {
+  // Render page
+  page.render();
+});
+
+LANGUAGE: javascript
+CODE:
+export function render() {
+  // Render the page
+}
+
+----------------------------------------
+
+TITLE: Basic Plugin Structure in JavaScript
+DESCRIPTION: Shows the fundamental structure of a Parcel plugin with async methods accepting and returning JSON objects.
+
+LANGUAGE: javascript
+CODE:
+import { NameOfPluginType } from "@parcel/plugin";
+
+export default new NameOfPluginType({
+  async methodName(opts: JSONObject): Promise<JSONObject> {
+    return result;
+  },
+});
+
+----------------------------------------
+
+TITLE: Creating Shared Bundles with Parcel in HTML and JavaScript
+DESCRIPTION: Demonstrates how Parcel automatically creates shared bundles for common dependencies across multiple pages, optimizing load times and caching.
+
+LANGUAGE: html
+CODE:
+<!doctype html>
+<div id="app"></div>
+<script type="module" src="home.js"></script>
+
+LANGUAGE: javascript
+CODE:
+import { createRoot } from 'react-dom';
+
+createRoot(app).render(<h1>Home</h1>, app);
+
+LANGUAGE: html
+CODE:
+<!doctype html>
+<div id="app"></div>
+<script type="module" src="profile.js"></script>
+
+LANGUAGE: javascript
+CODE:
+import { createRoot } from 'react-dom';
+
+createRoot(app).render(<h1>Profile</h1>, app);
+
+----------------------------------------
+
+TITLE: Implementing Hot Module Replacement in JavaScript
+DESCRIPTION: This snippet demonstrates how to opt into Hot Module Replacement (HMR) using the module.hot API. It checks for the existence of module.hot and calls the accept method to enable HMR.
+
+LANGUAGE: javascript
+CODE:
+if (module.hot) {
+  module.hot.accept();
+}
+
+----------------------------------------
+
+TITLE: Starting Parcel Development Server
+DESCRIPTION: Commands to start Parcel's development server using either Yarn or npm.
+
+LANGUAGE: shell
+CODE:
+yarn parcel src/index.html
+
+LANGUAGE: shell
+CODE:
+npx parcel src/index.html
+
+----------------------------------------
+
+TITLE: Configuring package.json for Parcel Library Build
+DESCRIPTION: JSON configuration in package.json to set up source and output files for a Parcel library project.
+
+LANGUAGE: json
+CODE:
+{
+  "name": "my-library",
+  "version": "1.0.0",
+  "source": "src/index.js",
+  "main": "dist/main.js",
+  "devDependencies": {
+    "parcel": "latest"
+  }
+}
+
+----------------------------------------
+
+TITLE: Advanced Hot Module Replacement with State Management
+DESCRIPTION: This code shows how to use module.hot.dispose and module.hot.accept for more advanced HMR scenarios. It demonstrates saving and restoring state during module replacement.
+
+LANGUAGE: javascript
+CODE:
+if (module.hot) {
+  module.hot.dispose(function (data) {
+    // module is about to be replaced.
+    // You can save data that should be accessible to the new asset in `data`
+    data.updated = Date.now();
+  });
+
+  module.hot.accept(function (getParents) {
+    // module or one of its dependencies was just updated.
+    // data stored in `dispose` is available in `module.hot.data`
+    let { updated } = module.hot.data;
+  });
+}
+
+----------------------------------------
+
+TITLE: ES Modules Example
+DESCRIPTION: Demonstrates ES module syntax for importing and exporting values between files using a multiply function example.
+
+LANGUAGE: javascript
+CODE:
+import {multiply} from './math.js';
+
+export function square(x) {
+  return multiply(x, x);
+}
+
+LANGUAGE: javascript
+CODE:
+export function multiply(a, b) {
+  return a * b;
+}
+
+----------------------------------------
+
+TITLE: Installing Parcel Core Dependencies
+DESCRIPTION: Shows how to install the required Parcel core packages using yarn package manager.
+
+LANGUAGE: shell
+CODE:
+yarn add @parcel/core @parcel/config-default
+
+----------------------------------------
+
+TITLE: Configuring Side Effects in package.json
+DESCRIPTION: Demonstrates how to use the sideEffects field in package.json to indicate which files have side effects, allowing for better tree shaking.
+
+LANGUAGE: json
+CODE:
+{
+  "name": "math"
+  "sideEffects": false
+}
+
+----------------------------------------
+
+TITLE: Basic Parcel Constructor Implementation
+DESCRIPTION: Demonstrates basic initialization of the Parcel bundler with minimal configuration.
+
+LANGUAGE: javascript
+CODE:
+import {Parcel} from '@parcel/core';
+
+let bundler = new Parcel({
+  entries: 'a.js',
+  defaultConfig: '@parcel/config-default'
+});
+
+----------------------------------------
+
+TITLE: Running a Build
+DESCRIPTION: Shows how to execute a build and handle success/failure cases.
+
+LANGUAGE: javascript
+CODE:
+import {Parcel} from '@parcel/core';
+
+let bundler = new Parcel({
+  entries: 'a.js',
+  defaultConfig: '@parcel/config-default'
+});
+
+try {
+  let {bundleGraph, buildTime} = await bundler.run();
+  let bundles = bundleGraph.getBundles();
+  console.log(`✨ Built ${bundles.length} bundles in ${buildTime}ms!`);
+} catch (err) {
+  console.log(err.diagnostics);
+}
+
+----------------------------------------
+
+TITLE: Basic Parcel Optimizer Plugin Implementation
+DESCRIPTION: Shows the basic structure of a Parcel optimizer plugin that transforms bundle contents and source maps. The optimize method receives bundle contents and map, returning transformed versions.
+
+LANGUAGE: javascript
+CODE:
+import {Optimizer} from '@parcel/plugin';
+
+export default new Optimizer({
+  async optimize({contents, map}) {
+    let {code, sourceMap} = optimize(contents, map);
+    return {
+      contents: code,
+      map: sourceMap
+    };
+  }
+});
+
+----------------------------------------
+
+TITLE: Dev Server Configuration
+DESCRIPTION: Shows how to set up a development server with hot module reloading.
+
+LANGUAGE: javascript
+CODE:
+import {Parcel} from '@parcel/core';
+
+let bundler = new Parcel({
+  entries: 'a.js',
+  defaultConfig: '@parcel/config-default',
+  serveOptions: {
+    port: 3000
+  },
+  hmrOptions: {
+    port: 3000
+  }
+});
+
+await bundler.watch();
+
+----------------------------------------
+
+TITLE: Integrated HTML with CSS and JavaScript
+DESCRIPTION: Updated HTML file showing how to link CSS and JavaScript files in a Parcel project.
+
+LANGUAGE: html
+CODE:
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8"/>
+    <title>My First Parcel App</title>
+    <link rel="stylesheet" href="styles.css" />
+    <script type="module" src="app.js"></script>
+  </head>
+  <body>
+    <h1>Hello, World!</h1>
+  </body>
+</html>
+
+----------------------------------------
+
+TITLE: Implementing Basic Reporter Plugin in JavaScript
+DESCRIPTION: This snippet demonstrates how to create a basic Reporter plugin that logs the number of bundles and build time when a build is successful. It uses the @parcel/plugin package and writes output to stdout.
+
+LANGUAGE: javascript
+CODE:
+import {Reporter} from '@parcel/plugin';
+
+export default new Reporter({
+  report({event}) {
+    if (event.type === 'buildSuccess') {
+      let bundles = event.bundleGraph.getBundles();
+      process.stdout.write(`✨ Built ${bundles.length} bundles in ${event.buildTime}ms!\n`);
+    }
+  }
+});
+
+----------------------------------------
+
+TITLE: Configuring Production Targets
+DESCRIPTION: Shows how to configure Parcel for production mode with specific browser targets.
+
+LANGUAGE: javascript
+CODE:
+import {Parcel} from '@parcel/core';
+
+let bundler = new Parcel({
+  entries: 'a.js',
+  defaultConfig: '@parcel/config-default',
+  mode: 'production',
+  defaultTargetOptions: {
+    engines: {
+      browsers: ['last 1 Chrome version']
+    }
+  }
+});
+
+----------------------------------------
+
+TITLE: Service Worker Configuration
+DESCRIPTION: Example service worker implementation using @parcel/service-worker for pre-caching static assets.
+
+LANGUAGE: javascript
+CODE:
+import {manifest, version} from '@parcel/service-worker';
+
+async function install() {
+  const cache = await caches.open(version);
+  await cache.addAll(manifest);
+}
+addEventListener('install', e => e.waitUntil(install()));
+
+async function activate() {
+  const keys = await caches.keys();
+  await Promise.all(
+    keys.map(key => key !== version && caches.delete(key))
+  );
+}
+addEventListener('activate', e => e.waitUntil(activate()));
+
+----------------------------------------
+
+TITLE: Implementing a Bundler Plugin in Parcel using JavaScript
+DESCRIPTION: This snippet demonstrates the basic structure for creating a Bundler plugin in Parcel. It includes the main 'bundle' and 'optimize' methods that operate on the asset graph. The Bundler is responsible for grouping assets into output bundles.
+
+LANGUAGE: javascript
+CODE:
+import { Bundler } from "@parcel/plugin";
+
+export default new Bundler({
+  async bundle({ graph }) {
+    // ...
+  },
+
+  async optimize({ graph }) {
+    // ...
+  },
+});
+
+----------------------------------------
+
+TITLE: Setting up Basic React App Structure with Parcel
+DESCRIPTION: Basic HTML and React setup showing the entry point structure with root element and component mounting
+
+LANGUAGE: html
+CODE:
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>My Parcel App</title>
+  </head>
+  <body>
+    <div id="app"></div>
+    <script type="module" src="index.js"></script>
+  </body>
+</html>
+
+LANGUAGE: jsx
+CODE:
+import { createRoot } from "react-dom/client";
+import { App } from "./App";
+
+const container = document.getElementById("app");
+const root = createRoot(container)
+root.render(<App />);
+
+LANGUAGE: jsx
+CODE:
+export function App() {
+  return <h1>Hello world!</h1>;
+}
+
+----------------------------------------
+
+TITLE: Configuring Manual Shared Bundles in Parcel
+DESCRIPTION: Demonstrates how to manually specify shared bundles in Parcel, including options for naming, root file, asset matching, and bundle splitting.
+
+LANGUAGE: json
+CODE:
+{
+  "@parcel/bundler-default": {
+   "manualSharedBundles": [
+      {
+        "name": "vendor",
+        "root": "manual.js",
+        "assets": ["**/*"],
+        "types": ["js"],
+        "split": 3
+      }
+    ]
+  }
+}
+
+----------------------------------------
+
+TITLE: Handling Source Maps in Parcel Transformer
+DESCRIPTION: Illustrates how to handle source maps in a transformer plugin, including transforming existing source maps and creating new ones using @parcel/source-map.
+
+LANGUAGE: javascript
+CODE:
+import {Transformer} from '@parcel/plugin';
+import SourceMap from '@parcel/source-map';
+
+export default new Transformer({
+  async transform({asset, options}) {
+    let source = await asset.getCode();
+    let sourceMap = await asset.getMap();
+
+    // Convert the input source map to JSON.
+    let result = compile(source, sourceMap.toVLQ());
+    asset.setCode(result.code);
+
+    // Convert returned JSON source map to a Parcel SourceMap.
+    let map = new SourceMap(options.projectRoot);
+    map.addVLQMap(result.map);
+    asset.setMap(map);
+
+    return [asset];
+  }
+});
+
+----------------------------------------
+
+TITLE: Configuring ES Module Output in package.json
+DESCRIPTION: JSON configuration in package.json to set up both CommonJS and ES module outputs for a Parcel library project.
+
+LANGUAGE: json
+CODE:
+{
+  "name": "my-library",
+  "version": "1.0.0",
+  "source": "src/index.js",
+  "main": "dist/main.js",
+  "module": "dist/module.js",
+  "devDependencies": {
+    "parcel": "latest"
+  }
+}
+
+----------------------------------------
+
+TITLE: Parcel Build Command Example
+DESCRIPTION: Demonstrates the build command for creating a production build with optimizations enabled
+
+LANGUAGE: bash
+CODE:
+parcel build src/index.html
+
+----------------------------------------
+
+TITLE: Tree Shaking Examples with Dynamic Imports in JavaScript
+DESCRIPTION: Illustrates various ways to use dynamic imports that allow Parcel to perform tree shaking on unused exports.
+
+LANGUAGE: javascript
+CODE:
+let { x: y } = await import("./b.js");
+
+LANGUAGE: javascript
+CODE:
+let ns = await import("./b.js");
+console.log(ns.x);
+
+LANGUAGE: javascript
+CODE:
+import("./b.js").then((ns) => console.log(ns.x));
+
+LANGUAGE: javascript
+CODE:
+import("./b.js").then(({ x: y }) => console.log(y));
+
+----------------------------------------
+
+TITLE: Configuring TypeScript Support in package.json
+DESCRIPTION: JSON configuration in package.json to set up TypeScript support and type definitions output for a Parcel library project.
+
+LANGUAGE: json
+CODE:
+{
+  "name": "my-library",
+  "version": "1.0.0",
+  "source": "src/index.ts",
+  "main": "dist/main.js",
+  "module": "dist/module.js",
+  "types": "dist/types.d.ts",
+  "devDependencies": {
+    "parcel": "latest"
+  }
+}
+
+----------------------------------------
+
+TITLE: Configuring API Proxy in Parcel
+DESCRIPTION: This JSON configuration file (.proxyrc or .proxyrc.json) sets up an API proxy for Parcel. It redirects requests from /api to a local server running on port 8000.
+
+LANGUAGE: json
+CODE:
+{
+  "/api": {
+    "target": "http://localhost:8000/",
+    "pathRewrite": {
+      "^/api": ""
+    }
+  }
+}
+
+----------------------------------------
+
+TITLE: React Code Splitting Implementation
+DESCRIPTION: Example of implementing code splitting in React using React.lazy and Suspense
+
+LANGUAGE: jsx
+CODE:
+import React, {Suspense} from 'react';
+
+const Profile = React.lazy(() => import('./Profile'));
+
+export function Home() {
+  let [showProfile, setShowProfile] = React.useState(false);
+
+  return (
+    <main>
+      <h1>Home</h1>
+      <button onClick={() => setShowProfile(true)}>
+        Show Profile
+      </button>
+      {showProfile &&
+        <Suspense fallback={<div>Loading...</div>}>
+          <Profile />
+        </Suspense>
+      }
+    </main>
+  );
+}
+
+LANGUAGE: jsx
+CODE:
+export default function Profile() {
+  return <h2>Profile</h2>;
+}
+
+----------------------------------------
+
+TITLE: Configuring Parcel for Improved Tree Shaking
+DESCRIPTION: JSON configuration in .parcelrc to use the library bundler plugin for better tree shaking support.
+
+LANGUAGE: json
+CODE:
+{
+  "extends": "@parcel/config-default",
+  "bundler": "@parcel/bundler-library"
+}
+
+----------------------------------------
+
+TITLE: Watch Mode Implementation
+DESCRIPTION: Demonstrates how to implement watch mode for continuous rebuilds.
+
+LANGUAGE: javascript
+CODE:
+import {Parcel} from '@parcel/core';
+
+let bundler = new Parcel({
+  entries: 'a.js',
+  defaultConfig: '@parcel/config-default'
+});
+
+let subscription = await bundler.watch((err, event) => {
+  if (err) {
+    throw err;
+  }
+
+  if (event.type === 'buildSuccess') {
+    let bundles = event.bundleGraph.getBundles();
+    console.log(`✨ Built ${bundles.length} bundles in ${event.buildTime}ms!`);
+  } else if (event.type === 'buildFailure') {
+    console.log(event.diagnostics);
+  }
+});
+
+// some time later...
+await subscription.unsubscribe();
+
+----------------------------------------
+
+TITLE: Implementing Content Hashing in Parcel Namer Plugin
+DESCRIPTION: A Namer plugin that adds content hashing to bundle names for cache invalidation, while respecting the needsStableName property for certain bundles that require consistent naming.
+
+LANGUAGE: javascript
+CODE:
+import {Namer} from '@parcel/plugin';
+
+export default new Namer({
+  name({bundle}) {
+    let name = yourNamingFunction(bundle);
+    if (!bundle.needsStableName) {
+      name += "." + bundle.hashReference;
+    }
+    return name + "." + bundle.type;
+  }
+});
+
+----------------------------------------
+
+TITLE: Configuring Parcel Bundler Options in package.json
+DESCRIPTION: Shows how to configure Parcel's bundling options, including minimum bundle size and maximum parallel requests, in the project's package.json file.
+
+LANGUAGE: json
+CODE:
+{
+  "@parcel/bundler-default": {
+    "minBundles": 1,
+    "minBundleSize": 3000,
+    "maxParallelRequests": 20
+  }
+}
+
+----------------------------------------
+
+TITLE: TypeScript Configuration for Parcel Features
+DESCRIPTION: Example of configuring TypeScript to support Parcel features like absolute and tilde dependency specifiers.
+
+LANGUAGE: json
+CODE:
+{
+  "compilerOptions": {
+    "baseUrl": ".",
+    "paths": {
+      "~*": ["./*/"]
+    }
+  }
+}
+
+----------------------------------------
+
+TITLE: Using Pipelines with '...' Syntax in .parcelrc
+DESCRIPTION: Shows how to use the '...' syntax to extend existing pipelines when configuring transformers in a .parcelrc file.
+
+LANGUAGE: json
+CODE:
+{
+  "transformers": {
+    "icons/*.svg": ["@company/parcel-transformer-svg-icons", "..."],
+    "*.svg": ["@parcel/transformer-svg"]
+  }
+}
+
+----------------------------------------
+
+TITLE: CLI Entry Points in Parcel
+DESCRIPTION: Examples of specifying entry points via Parcel CLI, including file paths and glob patterns.
+
+LANGUAGE: shell
+CODE:
+$ parcel src/a.html src/b.html
+
+LANGUAGE: shell
+CODE:
+$ parcel './src/*.html'
+
+----------------------------------------
+
+TITLE: Including a TypeScript Module in HTML with Parcel
+DESCRIPTION: Shows how to include a TypeScript module in an HTML file using a script tag with type="module".
+
+LANGUAGE: html
+CODE:
+<!DOCTYPE html>
+<html>
+  <head>
+    <script type="module" src="app.ts" />
+  </head>
+  <body>
+    <h1>My Parcel app</h1>
+  </body>
+</html>
+
+LANGUAGE: typescript
+CODE:
+console.log('Hello world!')
+
+----------------------------------------
+
+TITLE: Source Map Transformation in Transformer Plugin - JavaScript
+DESCRIPTION: Shows how to handle source maps in a Parcel transformer plugin, including converting compiler output to Parcel SourceMap format and extending existing mappings.
+
+LANGUAGE: javascript
+CODE:
+import {Transformer} from '@parcel/plugin';
+import SourceMap from '@parcel/source-map';
+
+export default new Transformer({
+  async generate({asset, ast, resolve, options}) {
+    let compilationResult = someCompiler(await asset.getAST());
+
+    let map = null;
+    if (compilationResult.map) {
+      map = new SourceMap(options.projectRoot);
+      map.addVLQMap(compilationResult.map);
+      let originalMap = await asset.getMap();
+      if (originalMap) {
+        map.extends(originalMap);
+      }
+    }
+
+    return {
+      code: compilationResult.code,
+      map,
+    };
+  },
+});
+
+----------------------------------------
+
+TITLE: Target-Specific Source Configuration
+DESCRIPTION: Example of configuring different entry points for multiple build targets in package.json.
+
+LANGUAGE: json
+CODE:
+{
+  "targets": {
+    "frontend": {
+      "source": "app/index.html"
+    },
+    "backend": {
+      "source": "api/index.js"
+    }
+  }
+}
+
+----------------------------------------
+
+TITLE: Vue SFC with Multiple Languages - Vue, SCSS, Less, Pug, CoffeeScript
+DESCRIPTION: Illustrates the use of different languages within a Vue SFC, including SCSS and Less for styling, Pug for templating, and CoffeeScript for scripting.
+
+LANGUAGE: html
+CODE:
+<style lang="scss" scoped>
+  /* This style will only apply to this module */
+  $red: red;
+  h1 {
+    background: $red;
+  }
+</style>
+
+<style lang="less">
+  @green: green;
+  h1 {
+    color: @green;
+  }
+</style>
+
+<style src="./App.module.css">
+  /* The content of blocks with a `src` attribute is ignored and replaced with
+   the content of `src`. */
+</style>
+
+<template lang="pug"> div h1 This is the app </template>
+
+<script lang="coffee">
+  module.exports =
+    data: ->
+      msg: 'Hello from coffee!'
+</script>
+
+----------------------------------------
+
+TITLE: Source Map Concatenation in Packager - JavaScript
+DESCRIPTION: Demonstrates how to concatenate source maps when packaging multiple assets together in a Parcel packager plugin.
+
+LANGUAGE: javascript
+CODE:
+import {Packager} from '@parcel/plugin';
+import SourceMap from '@parcel/source-map';
+
+export default new Packager({
+  async package({bundle, options}) {
+    let promises = [];
+    bundle.traverseAssets(asset => {
+      promises.push(Promise.all([
+        asset.getCode(),
+        asset.getMap()
+      ]);
+    });
+
+    let results = await Promise.all(promises);
+    let contents = '';
+    let map = new SourceMap(options.projectRoot);
+    let lineOffset = 0;
+
+    for (let [code, map] of assets) {
+      contents += code + '\n';
+      if (map) {
+        map.addSourceMap(map, lineOffset);
+      }
+      lineOffset += countLines(code) + 1;
+    }
+
+    return {contents, map};
+  },
+});
+
+----------------------------------------
+
+TITLE: Demonstrating Scope Hoisting in JavaScript
+DESCRIPTION: Shows how Parcel concatenates modules and renames variables for scope hoisting. The example includes two modules that are compiled into a single scope with renamed functions.
+
+LANGUAGE: javascript
+CODE:
+import {add} from './math';
+
+console.log(add(2, 3));
+
+LANGUAGE: javascript
+CODE:
+export function add(a, b) {
+  return a + b;
+}
+
+export function square(a) {
+  return a * a;
+}
+
+LANGUAGE: javascript
+CODE:
+function $fa6943ce8a6b29$add(a, b) {
+  return a + b;
+}
+
+console.log($fa6943ce8a6b29$add(2, 3));
+
+----------------------------------------
+
+TITLE: Extending Default Parcel Config in .parcelrc
+DESCRIPTION: Shows how to extend the default Parcel configuration in a .parcelrc file using the 'extends' field.
+
+LANGUAGE: json
+CODE:
+{
+  "extends": "@parcel/config-default"
+}
+
+----------------------------------------
+
+TITLE: Handling URL Dependencies in Parcel Transformer
+DESCRIPTION: Shows how to handle URL dependencies in a transformer, using placeholders for bundle URLs that will be replaced later in the build process.
+
+LANGUAGE: javascript
+CODE:
+import {Transformer} from '@parcel/plugin';
+
+export default new Transformer({
+  async transform({asset}) {
+    let code = await asset.getCode();
+    let result = code.replace(/import "(.*?)"/g, (m, dep) => {
+      // Replace the original specifier with a dependency id 
+      // as a placeholder. This will be replaced later with 
+      // the final bundle URL.
+      let depId = asset.addURLDependency(dep);
+      return `import "${depId}"`;
+    });
+
+    asset.setCode(result);
+    return [asset];
+  }
+});
+
+----------------------------------------
+
+TITLE: Dynamic Member Access Examples in JavaScript
+DESCRIPTION: Demonstrates static and dynamic property accesses on imported modules. Static accesses allow for optimization, while dynamic accesses require preserving all exports.
+
+LANGUAGE: javascript
+CODE:
+import * as math from './math';
+
+// ✅ Static property access
+console.log(math.add(2, 3));
+
+// 🚫 Dynamic property access
+console.log(math[op](2, 3));
+
+----------------------------------------
+
+TITLE: Using Async/Await with Dynamic Imports in JavaScript
+DESCRIPTION: Shows how to use async/await syntax with dynamic imports for asynchronous module loading.
+
+LANGUAGE: javascript
+CODE:
+async function load() {
+  const page = await import("./pages/about");
+  // Render page
+  page.render();
+}
+load();
+
+LANGUAGE: javascript
+CODE:
+export function render() {
+  // Render the page
+}
+
+----------------------------------------
+
+TITLE: Handling Diagnostics in JavaScript for Parcel Resolver Plugin
+DESCRIPTION: This resolver plugin demonstrates how to handle and report errors using diagnostics. It attempts to read an alias configuration file and provides helpful error messages and hints when the file cannot be read.
+
+LANGUAGE: javascript
+CODE:
+import {Resolver} from '@parcel/plugin';
+import path from 'path';
+
+export default new Resolver({
+  async resolve({specifier, options}) {
+    let aliasFile = path.join(options.projectRoot, 'alias.json');
+
+    try {
+      let aliasConfig = await options.inputFS.readFile(aliasFile);
+      let aliases = JSON.parse(aliasConfig);
+      return {
+        filePath: aliases[specifier] || null,
+        invalidateOnFileChange: [aliasFile]
+      };
+    } catch (err) {
+      return {
+        invalidateOnFileCreate: [{filePath: aliasFile}],
+        diagnostics: [
+        {
+          message: 'Could not read alias.json',
+          hints: ['Create an alias.json file in the project root.']
+        }]
+      };
+    }
+  }
+});
+
+----------------------------------------
+
+TITLE: Dynamic Import Patterns in JavaScript
+DESCRIPTION: Shows various patterns of dynamic imports, including destructuring and static member access. Some patterns allow for tree shaking, while others require preserving all exports.
+
+LANGUAGE: javascript
+CODE:
+// ✅ Destructuring await
+let {add} = await import('./math');
+
+// ✅ Static member access of await
+let math = await import('./math');
+console.log(math.add(2, 3));
+
+// ✅ Destructuring Promise#then
+import('./math').then(({add}) => console.log(add(2, 3)));
+
+// ✅ Static member access of Promise#then
+import('./math').then(math => console.log(math.add(2, 3)));
+
+// 🚫 Dynamic property access of await
+let math = await import('./math');
+console.log(math[op](2, 3));
+
+// 🚫 Dynamic property access of Promise#then
+import('./math').then(math => console.log(math[op](2, 3)));
+
+// 🚫 Unknown use of returned Promise
+doSomething(import('./math'));
+
+// 🚫 Unknown argument passed to Promise#then
+import('./math').then(doSomething);
+
+----------------------------------------
+
+TITLE: Using PURE Annotations in JavaScript
+DESCRIPTION: Shows how to use the /*#__PURE__*/ annotation to mark function calls as side-effect free, allowing for better tree shaking of unused results.
+
+LANGUAGE: javascript
+CODE:
+export const radius = 23;
+export const circumference = /*#__PURE__*/ calculateCircumference(radius);
+
+----------------------------------------
+
+TITLE: Throwing a ThrowableDiagnostic in JavaScript
+DESCRIPTION: Demonstrates how to create and throw a ThrowableDiagnostic object with a simple error message.
+
+LANGUAGE: javascript
+CODE:
+import ThrowableDiagnostic from '@parcel/diagnostic';
+
+throw new ThrowableDiagnostic({
+  diagnostic: {
+    message: 'An error occurred'
+  }
+});
+
+----------------------------------------
+
+TITLE: CommonJS Import Patterns in JavaScript
+DESCRIPTION: Shows various CommonJS import patterns, indicating which ones allow for static analysis and tree shaking, and which ones cause bailouts.
+
+LANGUAGE: javascript
+CODE:
+// ✅ Static property access
+const math = require('./math');
+console.log(math.add(2, 3));
+
+// ✅ Static destructuring
+const {add} = require('./math');
+
+// ✅ Static property assignment
+const add = require('./math').add;
+
+// 🚫 Non-static property access
+const math = require('./math');
+console.log(math[op](2, 3));
+
+// 🚫 Inline require
+doSomething(require('./math'));
+console.log(require('./math').add(2, 3));
+
+----------------------------------------
+
+TITLE: Linking CSS in HTML
+DESCRIPTION: Shows how to reference a CSS file using a <link> tag in an HTML file.
+
+LANGUAGE: html
+CODE:
+<link rel="stylesheet" href="index.css" />
+
+----------------------------------------
+
+TITLE: Starting Parcel Dev Server with HTTPS
+DESCRIPTION: This shell command shows how to start the Parcel development server with HTTPS enabled using an automatically generated self-signed certificate.
+
+LANGUAGE: shell
+CODE:
+parcel src/index.html --https
+
+----------------------------------------
+
+TITLE: CommonJS Modules Example
+DESCRIPTION: Shows CommonJS module syntax using require() and exports for sharing functionality between files.
+
+LANGUAGE: javascript
+CODE:
+let math = require('./math');
+
+exports.square = function(x) {
+  return math.multiply(x, x);
+};
+
+LANGUAGE: javascript
+CODE:
+exports.multiply = function(a, b) {
+  return a * b;
+};
+
+----------------------------------------
+
+TITLE: Importing CSS in JavaScript
+DESCRIPTION: Demonstrates how to import a CSS file from a JavaScript file.
+
+LANGUAGE: javascript
+CODE:
+import './index.css';
+
+----------------------------------------
+
+TITLE: Starting Parcel Dev Server with Custom HTTPS Certificate
+DESCRIPTION: This shell command demonstrates how to start the Parcel development server with HTTPS enabled using a custom certificate and private key.
+
+LANGUAGE: shell
+CODE:
+parcel src/index.html --cert certificate.cert --key private.key
+
+----------------------------------------
+
+TITLE: CSS url() Function Example
+DESCRIPTION: Shows how to use the url() function in CSS to reference an image file.
+
+LANGUAGE: css
+CODE:
+body {
+  background: url(images/background.png);
+}
+
+----------------------------------------
+
+TITLE: CSS @import Example
+DESCRIPTION: Shows how to use the @import rule in CSS to inline another CSS file.
+
+LANGUAGE: css
+CODE:
+@import 'other.css';
+
+----------------------------------------
+
+TITLE: Multiple Target Configuration
+DESCRIPTION: Example of configuring multiple build targets with different browser support levels.
+
+LANGUAGE: json
+CODE:
+{
+  "targets": {
+    "modern": {
+      "engines": {
+        "browsers": "Chrome 80"
+      }
+    },
+    "legacy": {
+      "engines": {
+        "browsers": "> 0.5%, last 2 versions, not dead"
+      }
+    }
+  }
+}
+
+----------------------------------------
+
+TITLE: CSS Module Example
+DESCRIPTION: Shows a simple CSS module with a class definition.
+
+LANGUAGE: css
+CODE:
+.body {
+  background: skyblue;
+}
+
+----------------------------------------
+
+TITLE: Inlining CSS Bundle as Text in JavaScript
+DESCRIPTION: Demonstrates how to inline a compiled CSS bundle as plain text in JavaScript, which can be used to inject styles at runtime, such as into a Shadow DOM.
+
+LANGUAGE: javascript
+CODE:
+import cssText from 'bundle-text:./test.css';
+
+// inject <style> tag
+let style = document.createElement('style');
+style.textContent = cssText;
+shadowRoot.appendChild(style);
+
+----------------------------------------
+
+TITLE: Library Configuration Example
+DESCRIPTION: Configuration example for building a library with multiple output formats.
+
+LANGUAGE: json
+CODE:
+{
+  "name": "my-library",
+  "version": "1.0.0",
+  "source": "src/index.js",
+  "main": "dist/main.js",
+  "module": "dist/module.js",
+  "types": "dist/types.d.ts"
+}
+
+----------------------------------------
+
+TITLE: Enabling CSS Modules Globally
+DESCRIPTION: Demonstrates how to enable CSS modules for all source files in the project's package.json.
+
+LANGUAGE: json
+CODE:
+{
+  "@parcel/transformer-css": {
+    "cssModules": true
+  }
+}
+
+----------------------------------------
+
+TITLE: Basic Macro Usage with RegexGen
+DESCRIPTION: Demonstrates using a macro to generate an optimized regular expression at build time using the regexgen library
+
+LANGUAGE: typescript
+CODE:
+import regexgen from 'regexgen' with {type: 'macro'};
+
+const regex = regexgen(['foobar', 'foobaz', 'foozap', 'fooza']);
+console.log(regex);
+
+----------------------------------------
+
+TITLE: Creating Code Frames in Parcel Diagnostics
+DESCRIPTION: Shows how to create a diagnostic with a code frame, including file path, source code, and code highlights.
+
+LANGUAGE: javascript
+CODE:
+throw new ThrowableDiagnostic({
+  diagnostic: {
+    message: md`Could not parse ${asset.filePath}`,
+    codeFrames: [{
+      filePath: asset.filePath,
+      code: await asset.getCode(),
+      codeHighlights: [
+        {
+          start: {
+            line: 1,
+            column: 5,
+          },
+          end: {
+            line: 2,
+            column: 3,
+          },
+          message: 'Expected a string but got a number'
+        }
+      ]
+    }]
+  }
+});
+
+----------------------------------------
+
+TITLE: Enabling CSS Nesting
+DESCRIPTION: Demonstrates how to enable the CSS nesting draft feature in the project's package.json.
+
+LANGUAGE: json
+CODE:
+{
+  "@parcel/transformer-css": {
+    "drafts": {
+      "nesting": true
+    }
+  }
+}
+
+----------------------------------------
+
+TITLE: Asset Generation Macro Example
+DESCRIPTION: Shows how to create a macro that generates CSS assets and returns class names at build time
+
+LANGUAGE: typescript
+CODE:
+import type {MacroContext} from '@parcel/macros';
+
+export async function css(this: MacroContext | void, code: string) {
+  let className = hash(code);
+  code = `.${className} { ${code} }`;
+
+  this?.addAsset({
+    type: 'css',
+    content: code
+  });
+
+  return className;
+}
+
+----------------------------------------
+
+TITLE: Extending Multiple Parcel Configs in .parcelrc
+DESCRIPTION: Demonstrates how to extend multiple Parcel configurations in a .parcelrc file using an array of config names.
+
+LANGUAGE: json
+CODE:
+{
+  "extends": ["@parcel/config-default", "@company/parcel-config"]
+}
+
+----------------------------------------
+
+TITLE: Configuring PostCSS
+DESCRIPTION: Shows an example PostCSS configuration file using the Tailwind CSS plugin.
+
+LANGUAGE: json
+CODE:
+{
+  "plugins": {
+    "tailwindcss": true
+  }
+}
+
+----------------------------------------
+
+TITLE: Importing GraphQL Query in JavaScript with Parcel
+DESCRIPTION: Demonstrates how to import a GraphQL query from a separate file into a JavaScript module using Parcel.
+
+LANGUAGE: javascript
+CODE:
+import query from './query.graphql';
+
+LANGUAGE: graphql
+CODE:
+{
+  user(id: 5) {
+    firstName,
+    lastName
+  }
+}
+
+----------------------------------------
+
+TITLE: Inline Styles and Scripts in HTML with Parcel
+DESCRIPTION: Demonstrates how Parcel processes inline styles and scripts, including imports from external files.
+
+LANGUAGE: html
+CODE:
+<!DOCTYPE html>
+<html>
+  <body>
+    <style>
+      @import "./style.scss";
+    </style>
+    <script type="module">
+      import value from "./other.ts";
+      console.log(value);
+    </script>
+  </body>
+</html>
+
+----------------------------------------
+
+TITLE: Importing GraphQL Fragments using Special Comments
+DESCRIPTION: Shows how to import GraphQL fragments from separate files using special comment syntax. This allows for modular GraphQL queries.
+
+LANGUAGE: graphql
+CODE:
+# import "fragments.graphql"
+# import * from "fragments.graphql"
+
+# import UserFragment, AddressFragment from "fragments.graphql"
+
+----------------------------------------
+
+TITLE: Inlining fs.readFileSync with Parcel in JavaScript
+DESCRIPTION: Demonstrates how Parcel inlines fs.readFileSync calls for static file paths, replacing them with file contents at build time.
+
+LANGUAGE: javascript
+CODE:
+import fs from "fs";
+import path from "path";
+
+const data = fs.readFileSync(path.join(__dirname, "data.json"), "utf8");
+console.log(data);
+
+----------------------------------------
+
+TITLE: Configuring PostHTML with Parcel
+DESCRIPTION: Shows how to configure PostHTML plugins using a .posthtmlrc file in JSON format.
+
+LANGUAGE: json
+CODE:
+{
+  "plugins": {
+    "posthtml-doctype": { "doctype": "HTML 5" }
+  }
+}
+
+----------------------------------------
+
+TITLE: Complex GraphQL Query with Fragment Imports
+DESCRIPTION: Illustrates a complete example of a GraphQL query that imports fragments from multiple files, demonstrating how to compose larger queries from modular parts.
+
+LANGUAGE: graphql
+CODE:
+# import UserFragment from "user.graphql"
+# import "address.graphql"
+
+query UserQuery($id: ID) {
+  user(id: $id) {
+    ...UserFragment
+    address {
+      ...AddressFragment
+    }
+  }
+}
+
+LANGUAGE: graphql
+CODE:
+fragment UserFragment on User {
+  firstName
+  lastName
+}
+
+LANGUAGE: graphql
+CODE:
+fragment AddressFragment on Address {
+  city
+  state
+  country
+}
+
+----------------------------------------
+
+TITLE: Handling Environment in Parcel Transformer
+DESCRIPTION: Illustrates how to consider the asset's environment when compiling code, ensuring compatibility and optimization for the target platform.
+
+LANGUAGE: javascript
+CODE:
+import {Transformer} from '@parcel/plugin';
+
+export default new Transformer({
+  async transform({asset}) {
+    let code = await asset.getCode();
+
+    let result = asset.env.isBrowser()
+      ? compileForBrowser(code, asset.engines.browser)
+      : compileForNode(code, asset.engines.node);
+
+    asset.setCode(result);
+    return [asset];
+  }
+});
+
+----------------------------------------
+
+TITLE: Configuring htmlnano for HTML Minification in Parcel
+DESCRIPTION: Demonstrates how to configure htmlnano for HTML minification in production builds using a .htmlnanorc file.
+
+LANGUAGE: json
+CODE:
+{
+  "removeComments": false
+}
+
+----------------------------------------
+
+TITLE: Setting Up Isolated Modules in TypeScript
+DESCRIPTION: Configuration to enable isolated modules mode for TypeScript compilation in Parcel.
+
+LANGUAGE: json
+CODE:
+{
+  "compilerOptions": {
+    "isolatedModules": true
+  }
+}
+
+----------------------------------------
+
+TITLE: Parcel Compression Configuration
+DESCRIPTION: Configuration for enabling Gzip and Brotli compression in .parcelrc
+
+LANGUAGE: json
+CODE:
+{
+  "compressors": {
+    "*.{html,css,js,svg,map}": [
+      "...",
+      "@parcel/compressor-gzip",
+      "@parcel/compressor-brotli"
+    ]
+  }
+}
+
+----------------------------------------
+
+TITLE: Importing SCSS as CSS Module in JavaScript with Parcel
+DESCRIPTION: This example shows how to import a Sass/SCSS file as a CSS module in JavaScript or TypeScript when using Parcel. It demonstrates importing classes and applying them to DOM elements.
+
+LANGUAGE: javascript
+CODE:
+import * as classes from './style.module.scss';
+
+document.body.className = classes.body;
+
+----------------------------------------
+
+TITLE: Configuring TSC Transformer in Parcel
+DESCRIPTION: Parcel configuration to use the TypeScript compiler (TSC) transformer instead of the default transpiler.
+
+LANGUAGE: json
+CODE:
+{
+  "extends": "@parcel/config-default",
+  "transformers": {
+    "*.{ts,tsx}": ["@parcel/transformer-typescript-tsc"]
+  }
+}
+
+----------------------------------------
+
+TITLE: CommonJS Export Patterns in JavaScript
+DESCRIPTION: Illustrates various CommonJS export patterns, showing which ones allow for static analysis and tree shaking, and which ones cause bailouts.
+
+LANGUAGE: javascript
+CODE:
+// ✅ Static exports assignments
+exports.foo = 2;
+module.exports.foo = 2;
+this.foo = 2;
+
+// ✅ module.exports assignment
+module.exports = 2;
+
+// 🚫 Dynamic exports assignments
+exports[someVar] = 2;
+module.exports[someVar] = 2;
+this[someVar] = 2;
+
+// 🚫 Exports re-assignment
+let e = exports;
+e.foo = 2;
+
+// 🚫 Module re-assignment
+let m = module;
+m.exports.foo = 2;
+
+// 🚫 Unknown exports usage
+doSomething(exports);
+doSomething(this);
+
+// 🚫 Unknown module usage
+doSomething(module);
+
+----------------------------------------
+
+TITLE: Compiling Sass/SCSS Using Parcel CLI
+DESCRIPTION: This command demonstrates how to directly compile a Sass/SCSS file using the Parcel CLI. It's useful for standalone compilation without a full project setup.
+
+LANGUAGE: shell
+CODE:
+parcel build style.scss
+
+----------------------------------------
+
+TITLE: Adding Dependencies in Parcel Transformer
+DESCRIPTION: Demonstrates how to add dependencies to an asset within a transformer, which is crucial for languages not natively supported by Parcel.
+
+LANGUAGE: javascript
+CODE:
+import {Transformer} from '@parcel/plugin';
+
+export default new Transformer({
+  async transform({asset}) {
+    let code = await asset.getCode();
+    let deps = code.matchAll(/import "(.*?)"/g);
+    
+    for (let dep of deps) {
+      asset.addDependency({
+        specifier: dep,
+        specifierType: 'esm'
+      });
+    }
+
+    return [asset];
+  }
+});
+
+----------------------------------------
+
+TITLE: Multiple Target Configuration
+DESCRIPTION: Shows how to configure multiple build targets with different browser support.
+
+LANGUAGE: javascript
+CODE:
+import {Parcel} from '@parcel/core';
+
+let bundler = new Parcel({
+  entries: 'a.js',
+  defaultConfig: '@parcel/config-default',
+  mode: 'production',
+  targets: {
+    modern: {
+      engines: {
+        browsers: ['last 1 Chrome version']
+      }
+    },
+    legacy: {
+      engines: {
+        browsers: ['IE 11']
+      }
+    }
+  }
+});
+
+----------------------------------------
+
+TITLE: Importing Less as CSS Module (JavaScript)
+DESCRIPTION: Demonstrates how to import a Less file as a CSS module in JavaScript or TypeScript, allowing the use of class names as object properties.
+
+LANGUAGE: javascript
+CODE:
+import * as classes from './style.module.less';
+
+document.body.className = classes.body;
+
+----------------------------------------
+
+TITLE: Handling Query Parameters in Parcel Transformer
+DESCRIPTION: Demonstrates how to use query parameters in a transformer to customize asset processing, such as resizing images based on width and height parameters.
+
+LANGUAGE: javascript
+CODE:
+import {Transformer} from '@parcel/plugin';
+
+export default new Transformer({
+  async transform({asset}) {
+    let buffer = await asset.getBuffer();
+
+    let result = resize(
+      buffer,
+      asset.query.width,
+      asset.query.height
+    );
+
+    asset.setBuffer(result);
+    return [asset];
+  }
+});
+
+----------------------------------------
+
+TITLE: Configuring Parcel JavaScript Transformer Options
+DESCRIPTION: Shows how to configure Parcel's JavaScript transformer options in package.json to disable inlining of environment variables and fs.readFileSync calls.
+
+LANGUAGE: json
+CODE:
+{
+  "name": "my-project",
+  "dependencies": {
+    ...
+  },
+  "@parcel/transformer-js": {
+    "inlineFS": false,
+    "inlineEnvironment": false
+  }
+}
+
+LANGUAGE: json
+CODE:
+{
+  "name": "my-project",
+  "dependencies": {
+    ...
+  },
+  "@parcel/transformer-js": {
+    "inlineEnvironment": ["SENTRY_*"]
+  }
+}
+
+----------------------------------------
+
+TITLE: Compiling Less with Parcel CLI (Shell)
+DESCRIPTION: Shows the command to directly compile a Less file using the Parcel CLI.
+
+LANGUAGE: shell
+CODE:
+parcel build style.less
+
+----------------------------------------
+
+TITLE: Creating Runtime Plugin in Parcel
+DESCRIPTION: Basic structure for creating a Parcel runtime plugin that can insert assets into bundles. The plugin receives bundle and bundleGraph parameters and should return assets to be inserted.
+
+LANGUAGE: javascript
+CODE:
+import { Runtime } from "@parcel/plugin";
+
+export default new Runtime({
+  async apply({ bundle, bundleGraph }) {
+    // ...
+    return assets;
+  },
+});
+
+----------------------------------------
+
+TITLE: Referencing and Transforming Images in JavaScript with Parcel
+DESCRIPTION: Demonstrates how to reference an image in JavaScript using the URL constructor, applying transformation parameters like format conversion and resizing.
+
+LANGUAGE: javascript
+CODE:
+const imageUrl = new URL(
+  'image.jpeg?as=webp&width=250',
+  import.meta.url
+);
+
+----------------------------------------
+
+TITLE: Importing Stylus as CSS Module in JavaScript
+DESCRIPTION: Demonstrates how to import a Stylus file as a CSS module in JavaScript/TypeScript and use the imported classes.
+
+LANGUAGE: javascript
+CODE:
+import * as classes from './style.module.styl';
+
+document.body.className = classes.body;
+
+----------------------------------------
+
+TITLE: Handling Build Start Event in Parcel Reporter
+DESCRIPTION: This snippet shows how to handle the 'buildStart' event in a Parcel Reporter plugin. It writes a message to stdout when a build starts, which is useful for both initial builds and rebuilds in watch mode.
+
+LANGUAGE: javascript
+CODE:
+import {Reporter} from '@parcel/plugin';
+
+export default new Reporter({
+  report({event}) {
+    if (event.type === 'buildStart') {
+      process.stdout.write('Started build!\n');
+    }
+  }
+});
+
+----------------------------------------
+
+TITLE: Importing CoffeeScript Module in HTML
+DESCRIPTION: Demonstrates how to include a CoffeeScript module in an HTML file using a script tag with type="module".
+
+LANGUAGE: html
+CODE:
+<script type="module" src="app.coffee"></script>
+
+----------------------------------------
+
+TITLE: Creating a Vue Component - Vue SFC
+DESCRIPTION: Shows how to create a Single File Component (SFC) in Vue. This example includes a template with interpolation and a script section defining component data.
+
+LANGUAGE: html
+CODE:
+<template>
+  <div>Hello {{ name }}!</div>
+</template>
+
+<script>
+  export default {
+    data() {
+      return {
+        name: "Vue",
+      };
+    },
+  };
+</script>
+
+----------------------------------------
+
+TITLE: URL Reference Resolution in Packager Plugin
+DESCRIPTION: Shows how to handle URL dependency references in bundled code using replaceURLReferences utility.
+
+LANGUAGE: javascript
+CODE:
+import {Packager} from '@parcel/plugin';
+import {replaceURLReferences} from '@parcel/utils';
+
+export default new Packager({
+  async package({bundle, bundleGraph}) {
+    // ...
+
+    ({contents, map} = replaceURLReferences({
+      bundle,
+      bundleGraph,
+      contents,
+      map
+    }));
+
+    return {contents, map};
+  }
+});
+
+----------------------------------------
+
+TITLE: Linking SugarSS Stylesheet in HTML
+DESCRIPTION: Example of how to reference a SugarSS stylesheet file in an HTML document using a link tag.
+
+LANGUAGE: html
+CODE:
+<link rel="stylesheet" href="style.sss" />
+
+----------------------------------------
+
+TITLE: Using Vue 3 Composition API - Vue SFC
+DESCRIPTION: Demonstrates the use of Vue 3's Composition API in a component. It includes reactive state, computed properties, and event handling.
+
+LANGUAGE: html
+CODE:
+<template>
+  <button @click="increment">
+    Count is: {{ state.count }} Double is: {{ state.double }}
+  </button>
+</template>
+
+<script>
+  import { reactive, computed } from "vue";
+
+  export default {
+    setup() {
+      const state = reactive({
+        count: 0,
+        double: computed(() => state.count * 2),
+      });
+
+      function increment() {
+        state.count++;
+      }
+
+      return {
+        state,
+        increment,
+      };
+    },
+  };
+</script>
+
+----------------------------------------
+
+TITLE: Conditional Optimization in Parcel Plugin
+DESCRIPTION: Demonstrates how to implement conditional optimization based on the bundle's environment settings, allowing the plugin to skip optimization in development mode.
+
+LANGUAGE: javascript
+CODE:
+import {Optimizer} from '@parcel/plugin';
+
+export default new Optimizer({
+  async optimize({contents, map, bundle}) {
+    // Don't minify if shouldOptimize is false.
+    if (!bundle.env.shouldOptimize) {
+      return {contents, map};
+    }
+
+    let {code, sourceMap} = minify(contents, map);
+    return {
+      contents: code,
+      map: sourceMap
+    };
+  }
+});
+
+----------------------------------------
+
+TITLE: Installing MDX React dependency
+DESCRIPTION: Command to install the @mdx-js/react package, which is required for rendering MDX files as React components in Parcel projects.
+
+LANGUAGE: shell
+CODE:
+yarn add @mdx-js/react@^1
+
+----------------------------------------
+
+TITLE: Configuring Custom Blocks in Vue - JSON
+DESCRIPTION: Shows how to configure custom blocks in Vue components using a .vuerc file. This example defines a 'docs' custom block and its preprocessor.
+
+LANGUAGE: json
+CODE:
+{
+  "customBlocks": {
+    "docs": "./src/docs-preprocessor.js"
+  }
+}
+
+----------------------------------------
+
+TITLE: Implementing Custom Image Naming in Parcel Namer Plugin
+DESCRIPTION: A Namer plugin that places PNG and JPG files into an 'images' folder while maintaining their original filenames. Returns null for other file types to allow other namers to handle them.
+
+LANGUAGE: javascript
+CODE:
+import {Namer} from '@parcel/plugin';
+import path from 'path';
+
+export default new Namer({
+  name({bundle}) {
+    if (bundle.type === 'png' || bundle.type === 'jpg') {
+      let filePath = bundle.getMainEntry().filePath;
+      return `images/${path.basename(filePath)}`;
+    }
+
+    // Allow the next namer to handle this bundle.
+    return null;
+  }
+});
+
+----------------------------------------
+
+TITLE: Building Stylus with Parcel CLI
+DESCRIPTION: Command line example showing how to directly compile Stylus files using the Parcel CLI.
+
+LANGUAGE: bash
+CODE:
+parcel build style.styl
+
+----------------------------------------
+
+TITLE: Accessing Custom Block Content in Parent Component - Vue SFC
+DESCRIPTION: Shows how to access and display custom block content from a child component in a parent component using Vue's component system.
+
+LANGUAGE: html
+CODE:
+<template>
+  <div>
+    <child></child>
+    docs: {{ docs.standard }} in brief: {{ docs.brief }}
+  </div>
+</template>
+
+<script>
+  import Child from "./HomePage.vue";
+  export default {
+    components: {
+      child: Child,
+    },
+    data() {
+      let docs = { standard: Child.__docs, brief: Child.__briefDocs };
+      return { docs };
+    },
+  };
+</script>
+
+----------------------------------------
+
+TITLE: Defining Shared Parcel Configuration Package in JSON
+DESCRIPTION: This snippet shows the package.json file for a shared Parcel configuration package. It specifies the package name, main file, version, and compatible Parcel versions.
+
+LANGUAGE: json
+CODE:
+{
+  "name": "@company/parcel-config",
+  "main": "index.json",
+  "version": "1.0.0",
+  "engines": {
+    "parcel": "2.x"
+  }
+}
+
+----------------------------------------
+
+TITLE: Configuring Shared Parcel Settings in JSON
+DESCRIPTION: This snippet demonstrates the content of index.json for a shared Parcel configuration. It extends the default Parcel config and adds custom transformers, namers, and compressors.
+
+LANGUAGE: json
+CODE:
+{
+  "extends": "@parcel/config-default",
+  "transformers": {
+    "*.svg": ["...", "@parcel/transformer-svg-react"]
+  },
+  "namers": ["@company/parcel-namer", "..."],
+  "compressors": {
+    "*.{js,html,css}": [
+      "...",
+      "@parcel/compressor-gzip", 
+      "@parcel/compressor-brotli"
+    ]
+  }
+}
+
+----------------------------------------
+
+TITLE: Setting up HTML structure for Elm application
+DESCRIPTION: This HTML snippet sets up the basic structure for an Elm application, including a root div and a script tag to load the JavaScript module.
+
+LANGUAGE: html
+CODE:
+<!DOCTYPE html>
+<div id="root"></div>
+<script type="module" src="index.js"></script>
+
+----------------------------------------
+
+TITLE: Updating Parcel Package in package.json
+DESCRIPTION: Change the package name from 'parcel-bundler' to 'parcel' in the devDependencies of package.json.
+
+LANGUAGE: json
+CODE:
+{
+  "devDependencies": {
+    "parcel": "^2.0.0"
+  }
+}
+
+----------------------------------------
+
+TITLE: Creating a Web Worker in CoffeeScript
+DESCRIPTION: Shows how to create a Web Worker in CoffeeScript using the __filename variable with the 'file:' prefix to convert it to a URL.
+
+LANGUAGE: coffeescript
+CODE:
+new Worker new URL('worker.js', 'file:' + __filename),
+  type: 'module'
+
+----------------------------------------
+
+TITLE: Initializing Elm application in JavaScript
+DESCRIPTION: This JavaScript code imports the Elm module and initializes the Elm application by attaching it to the root DOM element.
+
+LANGUAGE: javascript
+CODE:
+import { Elm } from "./Main.elm";
+
+Elm.Main.init({ node: document.getElementById("root") });
+
+----------------------------------------
+
+TITLE: Using URL Constructor for Non-Code Asset Imports in JavaScript
+DESCRIPTION: Replace direct imports of non-code assets with the URL constructor for better compatibility in Parcel 2.
+
+LANGUAGE: javascript
+CODE:
+const downloadUrl = new URL('download.zip', import.meta.url);
+
+document.body.innerHTML = `<a href="${downloadUrl}">Download</a>`;
+
+----------------------------------------
+
+TITLE: Configuring Global Image Quality in Parcel
+DESCRIPTION: Demonstrates how to set a global quality setting for all images in a Parcel project using a sharp.config.json file.
+
+LANGUAGE: json
+CODE:
+{
+  "quality": 80
+}
+
+----------------------------------------
+
+TITLE: Creating a basic Elm counter application
+DESCRIPTION: This Elm code creates a simple counter application with increment and decrement buttons. It demonstrates the basic structure of an Elm application including the Model, Update, and View functions.
+
+LANGUAGE: elm
+CODE:
+module Main exposing (..)
+
+import Browser
+import Html exposing (Html, button, div, text)
+import Html.Events exposing (onClick)
+
+main =
+  Browser.sandbox { init = init, update = update, view = view }
+
+type alias Model = Int
+
+init : Model
+init =
+  0
+
+type Msg = Increment | Decrement
+
+update : Msg -> Model -> Model
+update msg model =
+  case msg of
+    Increment ->
+      model + 1
+
+    Decrement ->
+      model - 1
+
+
+view : Model -> Html Msg
+view model =
+  div []
+    [ button [ onClick Decrement ] [ text "-" ]
+    , div [] [ text (String.fromInt model) ]
+    , button [ onClick Increment ] [ text "+" ]
+    ]
+
+----------------------------------------
+
+TITLE: Configuring Browserslist in package.json
+DESCRIPTION: Add a browserslist field to package.json to define supported browser targets for transpilation in Parcel 2.
+
+LANGUAGE: json
+CODE:
+{
+  "name": "my-project",
+  "browserslist": "> 0.5%, last 2 versions, not dead",
+  "scripts": {
+    "start": "parcel index.html",
+    "build": "parcel build index.html"
+  },
+  "devDependencies": {
+    "parcel": "latest"
+  }
+}
+
+----------------------------------------
+
+TITLE: Running Parcel Build Command
+DESCRIPTION: Basic command to build a Parcel project for production using the entry point src/index.html
+
+LANGUAGE: shell
+CODE:
+parcel build src/index.html
+
+----------------------------------------
+
+TITLE: Importing and rendering MDX in React
+DESCRIPTION: Example of how to import an MDX file into a JavaScript file and render it as a React component. This demonstrates the integration of MDX content within a React application.
+
+LANGUAGE: javascript
+CODE:
+import Hello from './hello.mdx';
+
+export function App() {
+  return <Hello />;
+}
+
+----------------------------------------
+
+TITLE: Updating CLI Command for Node.js Target
+DESCRIPTION: Replace the --target CLI option with an engines field in package.json to specify the Node.js target.
+
+LANGUAGE: json
+CODE:
+{
+  "engines": {
+    "node": "10"
+  }
+}
+
+----------------------------------------
+
+TITLE: Implementing Target Support in Parcel Namer Plugin
+DESCRIPTION: A Namer plugin that handles bundle targets, using the configured distEntry for entry bundles while respecting bundle groups and entry assets.
+
+LANGUAGE: javascript
+CODE:
+import {Namer} from '@parcel/plugin';
+
+export default new Namer({
+  name({bundle, bundleGraph}) {
+    let bundleGroup = bundleGraph
+      .getBundleGroupsContainingBundle(bundle)[0];
+    let isEntry = bundleGraph.isEntryBundleGroup(bundleGroup);
+    let bundleGroupBundles = bundleGraph
+      .getBundlesInBundleGroup(bundleGroup);
+    let mainBundle = bundleGroupBundles.find(b =>
+      b.getEntryAssets()
+       .some(a => a.id === bundleGroup.entryAssetId),
+  );
+
+    if (
+      isEntry && 
+      bundle.id === mainBundle.id && 
+      bundle.target?.distEntry
+    ) {
+      return bundle.target.distEntry;
+    }
+
+    // ...
+  }
+});
+
+----------------------------------------
+
+TITLE: Sample MDX content
+DESCRIPTION: An example of basic MDX content, showing how to write Markdown with JSX support. This snippet demonstrates the syntax for headers and paragraphs in an MDX file.
+
+LANGUAGE: markdown
+CODE:
+# Hello, MDX!
+
+This is a pretty cool MDX file.
+
+----------------------------------------
+
+TITLE: Modifying Package.json Configuration
+DESCRIPTION: Updates to package.json to replace CRA scripts with Parcel commands and add source entry point
+
+LANGUAGE: json
+CODE:
+{
+  "source": "public/index.html",
+  "scripts": {
+    "start": "parcel",
+    "build": "parcel build"
+  }
+}
+
+----------------------------------------
+
+TITLE: PostCSS Property AST Example
+DESCRIPTION: Example showing how PostCSS represents a CSS background property in its Abstract Syntax Tree.
+
+LANGUAGE: json
+CODE:
+{
+  "type": "decl",
+  "prop": "background",
+  "value": "url(img.png) 20px 10px / 50px 100px"
+}
+
+----------------------------------------
+
+TITLE: Importing JSON Data in JavaScript with Parcel
+DESCRIPTION: This snippet demonstrates how to import a JSON file into a JavaScript file using Parcel. It shows the syntax for importing the data and accessing a nested property.
+
+LANGUAGE: javascript
+CODE:
+import data from './data.json';
+console.log(data.hello[0]);
+// => "world"
+
+----------------------------------------
+
+TITLE: Setting Up Jest Configuration
+DESCRIPTION: Complete Jest configuration for testing React applications with Parcel
+
+LANGUAGE: json
+CODE:
+{
+  "roots": ["<rootDir>/src"],
+  "collectCoverageFrom": ["src/**/*.{js,jsx,ts,tsx}", "!src/**/*.d.ts"],
+  "setupFilesAfterEnv": ["<rootDir>/src/setupTests.js"],
+  "testMatch": [
+    "<rootDir>/src/**/__tests__/**/*.{js,jsx,ts,tsx}",
+    "<rootDir>/src/**/*.{spec,test}.{js,jsx,ts,tsx}"
+  ],
+  "testEnvironment": "jsdom",
+  "transform": {
+    "^.+\\.(js|jsx|mjs|cjs|ts|tsx)$": "<rootDir>/config/jest/babelTransform.js",
+    "^(?!.*\\.(js|jsx|mjs|cjs|ts|tsx|css|json)$)": "<rootDir>/config/jest/fileTransform.js"
+  },
+  "transformIgnorePatterns": [
+    "[/\\\\]node_modules[/\\\\].+\\.(js|jsx|mjs|cjs|ts|tsx)$",
+    "^.+\\.module\\.(css|sass|scss)$"
+  ],
+  "modulePaths": [],
+  "moduleNameMapper": {
+    "^react-native$": "react-native-web",
+    "^.+\\.(css|sass|scss)$": "identity-obj-proxy",
+    "^jsx:.+\\.svg": "<rootDir>/config/jest/SvgComponent.js"
+  },
+  "moduleFileExtensions": ["web.js", "js", "web.ts", "ts", "web.tsx", "tsx", "json", "web.jsx", "jsx", "node"],
+  "watchPlugins": [
+    "jest-watch-typeahead/filename",
+    "jest-watch-typeahead/testname"
+  ],
+  "resetMocks": true
+}
+
+----------------------------------------
+
+TITLE: Importing Pug Template as HTML in JavaScript
+DESCRIPTION: This JavaScript snippet shows how to import a Pug template as inline HTML using Parcel's bundle-text scheme. The imported HTML is then set as the innerHTML of the document body.
+
+LANGUAGE: javascript
+CODE:
+import html from 'bundle-text:./index.pug';
+
+document.body.innerHTML = html;
+
+----------------------------------------
+
+TITLE: Sample JSON Data Structure
+DESCRIPTION: This snippet shows an example of a JSON data structure that can be imported into a JavaScript file. It contains an object with a nested array.
+
+LANGUAGE: json
+CODE:
+{
+  "hello": [
+    "world",
+    "computer"
+  ]
+}
+
+----------------------------------------
+
+TITLE: Importing YAML Data in JavaScript with Parcel
+DESCRIPTION: Demonstrates how to import data from a YAML file in a JavaScript file using Parcel. The example shows importing a YAML file and accessing its content.
+
+LANGUAGE: javascript
+CODE:
+import data from './data.yaml';
+console.log(data.hello[0]);
+// => "world"
+
+----------------------------------------
+
+TITLE: Basic Asset Concatenation Packager in JavaScript
+DESCRIPTION: A simple Packager plugin that concatenates all assets in a bundle together using the traverseAsset method.
+
+LANGUAGE: javascript
+CODE:
+import {Packager} from '@parcel/plugin';
+
+export default new Packager({
+  async package({bundle}) {
+    let promises = [];
+    bundle.traverseAssets(asset => {
+      promises.push(asset.getCode());
+    });
+
+    let contents = await Promise.all(promises);
+    return {
+      contents: contents.join('\n')
+    };
+  }
+});
+
+----------------------------------------
+
+TITLE: Linking RSS Feed in HTML
+DESCRIPTION: Example showing how to reference an RSS feed from an HTML file using the link element with appropriate mime type.
+
+LANGUAGE: html
+CODE:
+<link
+  href="feed.xml"
+  rel="alternate"
+  type="application/rss+xml"
+  title="Blog RSS feed" />
+
+----------------------------------------
+
+TITLE: Defining Data Structure in YAML for Parcel
+DESCRIPTION: Shows the structure of a YAML file that can be imported in a Parcel project. The example defines a simple data structure with a list under the 'hello' key.
+
+LANGUAGE: yaml
+CODE:
+hello:
+  - world
+  - computer
+
+----------------------------------------
+
+TITLE: Resolving URLs and Paths in JavaScript for Parcel Resolver Plugin
+DESCRIPTION: This example demonstrates how to create a resolver plugin that handles both URL and file path resolutions based on the specifier type. It uses Node.js built-in modules to convert between file URLs and paths.
+
+LANGUAGE: javascript
+CODE:
+import {Resolver} from '@parcel/plugin';
+import path from 'path';
+import {fileURLToPath, pathToFileURL} from 'url';
+
+export default new Resolver({
+  async resolve({specifier, dependency}) {
+    return {
+      filePath: dependency.specifierType === 'url'
+        ? fileURLToPath(
+          new URL(specifier, pathToFileURL(dependency.resolveFrom))
+        )
+        : path.resolve(dependency.resolveFrom, specifier)
+    };
+  }
+});
+
+----------------------------------------
+
+TITLE: Example Atom Feed Structure
+DESCRIPTION: Complete example of an Atom feed with a single entry, demonstrating URL references in link elements and embedded image content that will be processed by Parcel.
+
+LANGUAGE: xml
+CODE:
+<?xml version="1.0" encoding="utf-8"?>
+<feed xmlns="http://www.w3.org/2005/Atom">
+  <title>Example Feed</title>
+  <subtitle>A subtitle.</subtitle>
+  <link href="/" />
+  <id>urn:uuid:60a76c80-d399-11d9-b91C-0003939e0af6</id>
+  <updated>2021-12-13T18:30:02Z</updated>
+  <entry>
+    <title>Awesome post</title>
+    <link href="post.html" />
+    <id>urn:uuid:1225c695-cfb8-4ebb-aaaa-80da344efa6a</id>
+    <updated>2021-12-13T18:30:02Z</updated>
+    <summary>Some text.</summary>
+    <content type="xhtml">
+      <div xmlns="http://www.w3.org/1999/xhtml">
+        <p>This is the entry content.</p>
+        <img src="image.png" />
+      </div>
+    </content>
+    <author>
+      <name>John Doe</name>
+      <email>johndoe@example.com</email>
+    </author>
+  </entry>
+</feed>
+
+----------------------------------------
+
+TITLE: Custom Block Preprocessor - JavaScript
+DESCRIPTION: Defines a preprocessor function for custom 'docs' blocks in Vue components. It handles both brief and full documentation blocks.
+
+LANGUAGE: js
+CODE:
+export default function (component, blockContent, blockAttrs) {
+  if (blockAttrs.brief) {
+    component.__briefDocs = blockContent;
+  } else {
+    component.__docs = blockContent;
+  }
+}
+
+----------------------------------------
+
+TITLE: SVG with Mixed Dependencies
+DESCRIPTION: Example showing SVG with multiple dependencies including SCSS and TypeScript
+
+LANGUAGE: xml
+CODE:
+<svg viewBox="0 0 240 80" xmlns="http://www.w3.org/2000/svg">
+  <circle cx="50" cy="50" r="50" />
+  <style>
+    @import './style.scss';
+  </style>
+  <script type="module">
+    import {setup} from './interactions.ts';
+    let circle = document.querySelector('circle');
+    setup(circle);
+  </script>
+</svg>
+
+LANGUAGE: scss
+CODE:
+$fill: blue;
+
+circle {
+  fill: $fill;
+}
+
+LANGUAGE: typescript
+CODE:
+export function setup(element: SVGElement) {
+  element.addEventListener('click', () => {
+    element.setAttribute('fill', 'red');
+  });
+}
+
+----------------------------------------
+
+TITLE: Creating HTML Structure with Pug in Parcel
+DESCRIPTION: This snippet demonstrates how to create a basic HTML structure using Pug syntax. It includes a doctype declaration, HTML structure, and references to external CSS and JavaScript files.
+
+LANGUAGE: pug
+CODE:
+doctype html
+html(lang="en")
+  head
+    link(rel="stylesheet", href="style.css")
+  body
+    h1 Hello Pug!
+    p.
+      Pug is a terse and simple templating language with a
+      strong focus on performance and powerful features.
+    script(type="module", src="index.js")
+
+----------------------------------------
+
+TITLE: Importing TOML Data in JavaScript with Parcel
+DESCRIPTION: Demonstrates how to import a TOML file into JavaScript and access its data. Uses the @parcel/transformer-toml plugin which is automatically installed when .toml files are detected.
+
+LANGUAGE: javascript
+CODE:
+import data from './data.toml';
+console.log(data.hello[0]);
+// => "world"
+
+----------------------------------------
+
+TITLE: Loading an Image in CoffeeScript
+DESCRIPTION: Demonstrates how to create an image element and set its source using a URL in CoffeeScript.
+
+LANGUAGE: coffeescript
+CODE:
+img = document.createElement 'img'
+img.src = new URL 'hero.jpg', 'file:' + __filename
+document.body.appendChild img
+
+----------------------------------------
+
+TITLE: Running Parcel with Pug Entry Point
+DESCRIPTION: This command shows how to use a Pug file as an entry point for Parcel bundler. It demonstrates that Pug files can be used directly as entry files, similar to HTML.
+
+LANGUAGE: shell
+CODE:
+parcel index.pug
+
+----------------------------------------
+
+TITLE: TOML Configuration File Structure
+DESCRIPTION: Example TOML configuration file showing array data structure that can be imported into JavaScript.
+
+LANGUAGE: toml
+CODE:
+hello = [
+  "world",
+  "computer"
+]
+
+----------------------------------------
+
+TITLE: Excluding Modules in JavaScript for Parcel Resolver Plugin
+DESCRIPTION: This resolver plugin example shows how to exclude specific modules from the build process. It demonstrates excluding the 'aws-sdk' module, which is typically provided by the AWS hosting environment.
+
+LANGUAGE: javascript
+CODE:
+import {Resolver} from '@parcel/plugin';
+
+export default new Resolver({
+  async resolve({specifier}) {
+    if (specifier === 'aws-sdk') {
+      return {isExcluded: true};
+    }
+
+    return null;
+  }
+});
+
+----------------------------------------
+
+TITLE: Configuring Pug Locals in Parcel
+DESCRIPTION: This JSON configuration snippet demonstrates how to set up locals for Pug templates in Parcel. It defines a 'name' variable that can be used in Pug templates.
+
+LANGUAGE: json
+CODE:
+{
+  "locals": {
+    "name": "Puggy"
+  }
+}
+
+----------------------------------------
+
+TITLE: Including Stylus Stylesheet in HTML
+DESCRIPTION: Example of how to reference a Stylus file in an HTML document using a link tag.
+
+LANGUAGE: html
+CODE:
+<link rel="stylesheet" href="style.styl" />
+
+----------------------------------------
+
+TITLE: Using CSS Modules in JavaScript
+DESCRIPTION: Demonstrates how to import and use CSS modules in a JavaScript file.
+
+LANGUAGE: javascript
+CODE:
+import * as classes from './styles.module.css';
+
+document.body.className = classes.body;
+
+----------------------------------------
+
+TITLE: Importing SugarSS Module in JavaScript
+DESCRIPTION: Demonstrates how to import a SugarSS file as a CSS module in JavaScript or TypeScript and apply classes dynamically.
+
+LANGUAGE: javascript
+CODE:
+import * as classes from './style.module.sss';
+
+document.body.className = classes.body;
+
+----------------------------------------
+
+TITLE: SVGO Configuration for Production
+DESCRIPTION: Configuration example for SVGO optimization in production builds
+
+LANGUAGE: json
+CODE:
+{
+  "plugins": [
+    {
+      "name": "preset-default",
+      "params": {
+        "overrides": {
+          "inlineStyles": false
+        }
+      }
+    }
+  ]
+}
+
+----------------------------------------
+
+TITLE: Creating a Simple JavaScript Module
+DESCRIPTION: Example of a basic JavaScript module exporting a function, to be used as the entry point for the library.
+
+LANGUAGE: javascript
+CODE:
+export function add(a, b) {
+  return a + b;
+}
+
+----------------------------------------
+
+TITLE: Compiling SugarSS with Parcel CLI
+DESCRIPTION: Command line instruction for building a SugarSS file using the Parcel CLI.
+
+LANGUAGE: bash
+CODE:
+parcel build style.sss
+
+----------------------------------------
+
+TITLE: Referencing SCSS File in HTML with Parcel
+DESCRIPTION: This snippet demonstrates how to link an SCSS file in an HTML document when using Parcel. The bundler will automatically process and compile the SCSS file.
+
+LANGUAGE: html
+CODE:
+<link rel="stylesheet" href="style.scss" />
+
+----------------------------------------
+
+TITLE: Logging a Warning with Code Frame in Parcel Transformer
+DESCRIPTION: Shows how to use the logger in a Parcel transformer to log a warning with a code frame, hints, and a documentation URL.
+
+LANGUAGE: javascript
+CODE:
+import {Transformer} from '@parcel/plugin';
+
+export default new Transformer({
+  async transform({asset, logger}) {
+    // ...
+
+    logger.warn({
+      message: 'This feature is deprecated.',
+      codeFrames: [{
+        filePath: asset.filePath,
+        code: await asset.getCode(),
+        codeHighlights: [{
+          start: {
+            line: 1,
+            column: 5
+          },
+          end: {
+            line: 1,
+            column: 10
+          }
+        }]
+      }],
+      hints: ['Please use this other feature instead.'],
+      documentationURL: 'http://example.com/'
+    });
+  },
+});
+
+----------------------------------------
+
+TITLE: Basic CoffeeScript Console Log
+DESCRIPTION: A simple CoffeeScript example that logs 'Hello world!' to the console.
+
+LANGUAGE: coffeescript
+CODE:
+console.log 'Hello world!'
+
+----------------------------------------
+
+TITLE: Using Configured Locals in Pug Template
+DESCRIPTION: This Pug snippet shows how to use a configured local variable within a Pug template. It demonstrates the interpolation of the 'name' variable set in the Pug configuration.
+
+LANGUAGE: pug
+CODE:
+h1 Hello, #{name}!
+
+----------------------------------------
+
+TITLE: Implementing Cache Invalidation in JavaScript for Parcel Resolver Plugin
+DESCRIPTION: This example shows how to properly implement cache invalidation in a resolver plugin. It reads an alias configuration file and sets up invalidation rules for both file changes and file creation scenarios.
+
+LANGUAGE: javascript
+CODE:
+import {Resolver} from '@parcel/plugin';
+import path from 'path';
+
+export default new Resolver({
+  async resolve({specifier, options}) {
+    let aliasFile = path.join(options.projectRoot, 'alias.json');
+
+    try {
+      let aliasConfig = await options.inputFS.readFile(aliasFile);
+      let aliases = JSON.parse(aliasConfig);
+      return {
+        filePath: aliases[specifier] || null,
+        invalidateOnFileChange: [aliasFile]
+      };
+    } catch (err) {
+      return {
+        invalidateOnFileCreate: [{filePath: aliasFile}]
+      };
+    }
+  }
+});
+
+----------------------------------------
+
+TITLE: Changing Asset Type in Parcel Transformer
+DESCRIPTION: Shows how to change an asset's type within a transformer, which affects how it will be processed in subsequent pipelines.
+
+LANGUAGE: javascript
+CODE:
+import {Transformer} from '@parcel/plugin';
+
+export default new Transformer({
+  async transform({asset}) {
+    let code = await asset.getCode();
+
+    let result = compile(code);
+    asset.type = 'js';
+    asset.setCode(result);
+
+    return [asset];
+  }
+});
+
+----------------------------------------
+
+TITLE: Referencing a Stylesheet in HTML with Parcel
+DESCRIPTION: Demonstrates how to link a Less stylesheet in an HTML file, which Parcel will process and compile to CSS.
+
+LANGUAGE: html
+CODE:
+<!DOCTYPE html>
+<html>
+  <head>
+    <link rel="stylesheet" href="./style.less" />
+  </head>
+  <body>
+    <h1>My Parcel app</h1>
+  </body>
+</html>
+
+LANGUAGE: less
+CODE:
+h1 {
+  color: darkslategray;
+}
+
+----------------------------------------
+
+TITLE: Responsive Image Optimization HTML
+DESCRIPTION: Example of using image optimization features with responsive images using srcset and multiple formats
+
+LANGUAGE: html
+CODE:
+<picture>
+  <source
+    type="image/webp"
+    srcset="image.jpg?as=webp&width=400, image.jpg?as=webp&width=800 2x"
+  />
+  <source
+    type="image/jpeg"
+    srcset="image.jpg?width=400, image.jpg?width=800 2x"
+  />
+  <img src="image.jpg?width=400" width="400" />
+</picture>
+
+----------------------------------------
+
+TITLE: Processing Binary Data in Parcel Transformer
+DESCRIPTION: Shows how to handle binary content in a transformer plugin using Node.js Buffer.
+
+LANGUAGE: javascript
+CODE:
+import {Transformer} from '@parcel/plugin';
+
+export default new Transformer({
+  async transform({asset}) {
+    let buffer = await asset.getBuffer();
+
+    let result = transform(buffer);
+    asset.setBuffer(result);
+
+    return [asset];
+  }
+});
+
+----------------------------------------
+
+TITLE: Importing GLSL Shader in JavaScript
+DESCRIPTION: This snippet demonstrates how to import a GLSL fragment shader file into a JavaScript file and use it with WebGL.
+
+LANGUAGE: javascript
+CODE:
+import frag from './shader.frag'
+
+// ...
+gl.shaderSource(..., frag);
+// ...
+
+----------------------------------------
+
+TITLE: SQL Query for Build Phase Breakdown
+DESCRIPTION: This SQL query analyzes the trace data to provide a breakdown of the build by its main phases (building, bundling, packaging). It helps identify which phase takes the most time.
+
+LANGUAGE: sql
+CODE:
+select
+  name, SUM(CAST(dur AS double)/1000/1000) as dur_ms
+from
+  slice s
+where
+  s.category = "Core"
+group by name
+order by dur_ms desc
+
+----------------------------------------
+
+TITLE: Returning Multiple Assets from Parcel Transformer
+DESCRIPTION: Shows how to return multiple assets from a transformer, including creating virtual assets and adding dependencies between them.
+
+LANGUAGE: javascript
+CODE:
+import {Transformer} from '@parcel/plugin';
+
+export default new Transformer({
+  async transform({asset}) {
+    let code = await asset.getCode();
+
+    // Extract inline assets to return in addition to this asset.
+    let assets = [asset];
+
+    let uniqueKey = `${asset.id}-style`;
+    assets.push({
+      type: 'css',
+      content: '...',
+      uniqueKey,
+      bundleBehavior: 'inline'
+    });
+
+    // Add a dependency, using the uniqueKey as a specifier.
+    asset.addDependency({
+      specifier: uniqueKey,
+      specifierType: 'esm'
+    });
+
+    return assets;
+  }
+});
+
+----------------------------------------
+
+TITLE: Compiling multiple Elm files into a single JavaScript output
+DESCRIPTION: This JavaScript snippet demonstrates how to use the 'with' query parameter to compile multiple Elm sources into the same bundle. This approach helps reduce bundle size by sharing common code and runtime.
+
+LANGUAGE: javascript
+CODE:
+import { Elm } from "./Main.elm?with=./MainB.elm&with=./MainC.elm";
+
+Elm.Main.init({ node: document.getElementById("root") });
+Elm.MainB.init({ node: document.getElementById("rootB") });
+Elm.MainC.init({ node: document.getElementById("rootC") });
+
+----------------------------------------
+
+TITLE: Using Dependencies in GLSL Shader
+DESCRIPTION: This example shows how to use dependencies within a GLSL fragment shader file, including importing functions from other files and node_modules.
+
+LANGUAGE: glsl
+CODE:
+// import a function from another file
+#pragma glslify: calc_frag_color = require('./lib.glsl')
+
+precision mediump float;
+varying vec3 vpos;
+
+void main() {
+  gl_FragColor = calc_frag_color(vpos);
+}
+
+----------------------------------------
+
+TITLE: Monitoring Build Progress in Parcel Reporter
+DESCRIPTION: This example demonstrates how to handle the 'buildProgress' event in a Parcel Reporter plugin. It shows different messages based on the build phase, such as transforming, resolving, bundling, packaging, and optimizing.
+
+LANGUAGE: javascript
+CODE:
+import {Reporter} from '@parcel/plugin';
+
+export default new Reporter({
+  report({event}) {
+    if (event.type === 'buildProgress') {
+      switch (event.phase) {
+        case 'transforming':
+          process.stdout.write(`Transforming ${event.filePath}...\n`);
+          break;
+        case 'resolving':
+          process.stdout.write(`Resolving ${event.dependency.specifier}...\n`);
+          break;
+        case 'bundling':
+          process.stdout.write('Bundling...\n');
+          break;
+        case 'packaging':
+          process.stdout.write(`Packaging ${event.bundle.displayName}...\n`);
+          break;
+        case 'optimizing':
+          process.stdout.write(`Optimizing ${event.bundle.displayName}...\n`);
+         break;
+      }
+    }
+  }
+});
+
+----------------------------------------
+
+TITLE: Configuring CSS Modules in package.json
+DESCRIPTION: Shows how to configure CSS modules options in the project's package.json file.
+
+LANGUAGE: json
+CODE:
+{
+  "@parcel/transformer-css": {
+    "cssModules": {
+      "pattern": "my-company-[name]-[hash]-[local]"
+    }
+  }
+}
+
+----------------------------------------
+
+TITLE: Parcel Gzip-Only Configuration
+DESCRIPTION: Configuration for enabling only Gzip compression in .parcelrc
+
+LANGUAGE: json
+CODE:
+{
+  "compressors": {
+    "*.{html,css,js,svg,map}": ["@parcel/compressor-gzip"]
+  }
+}
+
+----------------------------------------
+
+TITLE: Reporting Build Success in Parcel Reporter
+DESCRIPTION: This snippet shows how to handle the 'buildSuccess' event in a Parcel Reporter plugin. It reports the number of changed assets and the total build time when a build completes successfully.
+
+LANGUAGE: javascript
+CODE:
+import {Reporter} from '@parcel/plugin';
+
+export default new Reporter({
+  report({event}) {
+    if (event.type === 'buildSuccess') {
+      process.stdout.write(`✨ Rebuilt ${event.changedAssets.size} assets in ${event.buildTime}ms!\n`);
+    }
+  }
+});
+
+----------------------------------------
+
+TITLE: Configuring Browser Targets
+DESCRIPTION: Shows how to configure browser targets in package.json for CSS transpilation.
+
+LANGUAGE: json
+CODE:
+{
+  "browserslist": "> 0.5%, last 2 versions, not dead"
+}
+
+----------------------------------------
+
+TITLE: Source Map Integration in Parcel Optimizer
+DESCRIPTION: Demonstrates how to handle source maps in a Parcel optimizer plugin, including converting between formats and adding source map references to the output code.
+
+LANGUAGE: javascript
+CODE:
+import {Optimizer} from '@parcel/plugin';
+import SourceMap from '@parcel/source-map';
+
+export default new Optimizer({
+  async optimize({contents, map, getSourceMapReference}) {
+    // Convert the input source map to JSON.
+    let result = optimize(contents, map.toVLQ());
+
+    // Convert returned JSON source map to a Parcel SourceMap.
+    let sourceMap = new SourceMap(options.projectRoot);
+    sourceMap.addVLQMap(result.map);
+
+    // Add source map reference to compiled code
+    let url = await getSourceMapReference(sourceMap);
+    result.code += `\n//# sourceMappingURL=${url}\n`
+
+    return {
+      contents: result.code,
+      sourceMap
+    };
+  }
+});
+
+----------------------------------------
+
+TITLE: Handling Build Failure in Parcel Reporter
+DESCRIPTION: This example demonstrates how to handle the 'buildFailure' event in a Parcel Reporter plugin. It reports the number of errors when a build fails, using the diagnostics provided in the event object.
+
+LANGUAGE: javascript
+CODE:
+import {Reporter} from '@parcel/plugin';
+
+export default new Reporter({
+  report({event}) {
+    if (event.type === 'buildFailure') {
+      process.stdout.write(`🚨 Build failed with ${event.diagnostics.length} errors.\n`);
+    }
+  }
+});
+
+----------------------------------------
+
+TITLE: Basic HTML Entry Point Setup
+DESCRIPTION: Initial HTML file setup that serves as the entry point for a Parcel application.
+
+LANGUAGE: html
+CODE:
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8"/>
+    <title>My First Parcel App</title>
+  </head>
+  <body>
+    <h1>Hello, World!</h1>
+  </body>
+</html>
+
+----------------------------------------
+
+TITLE: Implementing Differential Bundling with HTML Script Tags
+DESCRIPTION: Shows how Parcel 2 automatically generates module and nomodule script tags for modern and legacy browser support.
+
+LANGUAGE: html
+CODE:
+<script type="module" src="app.js"></script>
+
+LANGUAGE: html
+CODE:
+<script type="module" src="app.c9a6fe.js"></script>
+<script nomodule src="app.f7d631.js"></script>
+
+----------------------------------------
+
+TITLE: Source Map Generation in Packager Plugin
+DESCRIPTION: Demonstrates how to generate and combine source maps for bundled assets using @parcel/source-map library.
+
+LANGUAGE: javascript
+CODE:
+import {Packager} from '@parcel/plugin';
+import SourceMap from '@parcel/source-map';
+import {countLines} from '@parcel/utils';
+
+export default new Packager({
+  async package({bundle, options, getSourceMapReference}) {
+    let promises = [];
+    bundle.traverseAssets(asset => {
+      promises.push(Promise.all([
+        asset.getCode(),
+        asset.getMap()
+      ]));
+    });
+
+    let assets = await Promise.all(promises);
+    let contents = '';
+    let map = new SourceMap(options.projectRoot);
+    let lineOffset = 0;
+
+    for (let [code, map] of assets) {
+      contents += code + '\n';
+      map.addSourceMap(map, lineOffset);
+      lineOffset += countLines(code) + 1;
+    }
+
+    contents += `\n//# sourceMappingURL=${await getSourceMapReference(map)}\n`;
+    return {contents, map};
+  }
+});
+
+----------------------------------------
+
+TITLE: Adding JavaScript Functionality
+DESCRIPTION: Basic JavaScript file showing console output.
+
+LANGUAGE: javascript
+CODE:
+console.log('Hello world!');
+
+----------------------------------------
+
+TITLE: Parcel Watch Command Example
+DESCRIPTION: Shows how to use the watch command for automatically rebuilding on changes without starting a dev server
+
+LANGUAGE: bash
+CODE:
+parcel watch src/index.html
+
+----------------------------------------
+
+TITLE: Bundle Inlining Implementation in Packager
+DESCRIPTION: Implements bundle inlining functionality using replaceInlineReferences to handle inline bundle contents.
+
+LANGUAGE: javascript
+CODE:
+import {Packager} from '@parcel/plugin';
+import {replaceInlineReferences} from '@parcel/utils';
+
+export default new Packager({
+  async package({bundle, bundleGraph, getInlineBundleContents}) {
+    // ...
+
+    ({contents, map} = replaceInlineReferences({
+      bundle,
+      bundleGraph,
+      contents,
+      map,
+      getInlineBundleContents,
+      getInlineReplacement: (dependency, inlineType, contents) => ({
+        from: dependency.id,
+        to: contents
+      })
+    }));
+
+    return {contents, map};
+  }
+});
+
+----------------------------------------
+
+TITLE: Installing Parcel with npm
+DESCRIPTION: Command to install Parcel as a dev dependency using npm package manager.
+
+LANGUAGE: shell
+CODE:
+npm install --save-dev parcel
+
+----------------------------------------
+
+TITLE: Configuring CSS Modules Naming Pattern
+DESCRIPTION: Shows how to configure custom naming patterns for CSS modules using @parcel/transformer-css configuration in package.json.
+
+LANGUAGE: json
+CODE:
+{
+  "@parcel/transformer-css": {
+    "cssModules": {
+      "pattern": "my-company-[name]-[hash]-[local]"
+    }
+  }
+}
+
+----------------------------------------
+
+TITLE: Implementing Stateless Validator Plugin in Parcel
+DESCRIPTION: Example of a stateless validator plugin that validates individual assets independently. The validator throws diagnostic errors with code frame highlighting and hints for invalid code patterns.
+
+LANGUAGE: javascript
+CODE:
+import { Validator } from "@parcel/plugin";
+
+export default new Validator({
+  async validate({ asset }) {
+    // ...
+    throw new ThrowableDiagnostic({
+      diagnostic: {
+        message: "Unexpected console statement",
+        filePath: asset.filePath,
+        language: asset.type,
+        stack: err.stack,
+        name: err.name,
+        codeFrame: {
+          code: await asset.getCode(),
+          codeHighlights: [
+            {
+              start: {
+                line: 1,
+                column: 5,
+              },
+              end: {
+                line: 2,
+                column: 3,
+              },
+              message: "This console statement is not allowed",
+            },
+          ],
+        },
+        hints: ["Remove the console.log(...)"],
+      },
+    });
+  },
+});
+
+----------------------------------------
+
+TITLE: Adding Build Scripts to package.json
+DESCRIPTION: JSON configuration to add watch and build scripts for Parcel in package.json.
+
+LANGUAGE: json
+CODE:
+{
+  "name": "my-library",
+  "version": "1.0.0",
+  "source": "src/index.js",
+  "main": "dist/main.js",
+  "scripts": {
+    "watch": "parcel watch",
+    "build": "parcel build"
+  },
+  "devDependencies": {
+    "parcel": "latest"
+  }
+}
+
+----------------------------------------
+
+TITLE: Config Loading in Parcel Transformer
+DESCRIPTION: Demonstrates how to load configuration files in a Parcel transformer plugin using the Config object.
+
+LANGUAGE: javascript
+CODE:
+import {Transformer} from '@parcel/plugin';
+
+export default new Transformer({
+  async loadConfig({config}) {
+    let {contents, filePath} = await config.getConfig([
+      'tool.config.json'
+    ]);
+
+    return contents;
+  },
+  async transform({asset, config}) {
+    // ...
+    return [asset];
+  }
+});
+
+----------------------------------------
+
+TITLE: Implementing Stateful Validator Plugin in Parcel
+DESCRIPTION: Example of a stateful validator plugin that maintains project-wide state and processes multiple assets simultaneously. This implementation uses a shared state variable and runs on a single thread.
+
+LANGUAGE: javascript
+CODE:
+import { Validator } from "@parcel/plugin";
+
+// You keep the state in a top-level variable
+let state = {};
+
+export default new Validator({
+  async validateAll({ assets, logger }) {
+    // ...
+    for (let asset of assets) {
+      // ...validation logic
+
+      if (hasWarning) {
+        logger.warn({
+          message: "A validation warning",
+          filePath: asset.filePath,
+          language: asset.type,
+        });
+      }
+    }
+  },
+});
+
+----------------------------------------
+
+TITLE: Enabling Tracing in Parcel API
+DESCRIPTION: This snippet demonstrates how to enable tracing when using Parcel's API. It shows the configuration options needed to generate a trace JSON file.
+
+LANGUAGE: javascript
+CODE:
+import {Parcel} from '@parcel/core';
+
+let bundler = new Parcel({
+  // ...
+  shouldTrace: true,
+  additionalReporters: [{
+    packageName: '@parcel/reporter-tracer',
+    resolveFrom: __dirname,
+  }],
+});
+
+----------------------------------------
+
+TITLE: Defining and Exporting GLSL Functions
+DESCRIPTION: This snippet demonstrates how to define a GLSL function, import a dependency from node_modules, and export the function for use in other shaders.
+
+LANGUAGE: glsl
+CODE:
+// import a function from node_modules
+#pragma glslify: noise = require('glsl-noise/simplex/3d')
+
+vec4 calc_frag_color(vec3 pos) {
+  return vec4(vec3(noise(pos * 25.0)), 1.0);
+}
+
+// export a function
+#pragma glslify: export(calc_frag_color)
+
+----------------------------------------
+
+TITLE: Implementing a Basic Resolver Plugin in JavaScript for Parcel
+DESCRIPTION: This example demonstrates how to create a basic resolver plugin that overrides the resolution of a specific module and falls back to the default resolver for others. It uses the Parcel plugin API to define a resolver that handles a 'special-module' dependency.
+
+LANGUAGE: javascript
+CODE:
+import {Resolver} from '@parcel/plugin';
+import path from 'path';
+
+export default new Resolver({
+  async resolve({specifier}) {
+    if (specifier === 'special-module') {
+      return {
+        filePath: path.join(__dirname, 'special-module.js')
+      };
+    }
+
+    // Let the next resolver in the pipeline handle
+    // this dependency.
+    return null;
+  }
+});
+
+----------------------------------------
+
+TITLE: Memory File System Implementation
+DESCRIPTION: Demonstrates how to use an in-memory file system for build output.
+
+LANGUAGE: javascript
+CODE:
+import {Parcel, createWorkerFarm} from '@parcel/core';
+import {MemoryFS} from '@parcel/fs';
+
+let workerFarm = createWorkerFarm();
+let outputFS = new MemoryFS(workerFarm);
+
+let bundler = new Parcel({
+  entries: 'a.js',
+  defaultConfig: '@parcel/config-default',
+  workerFarm,
+  outputFS
+});
+
+try {
+  let {bundleGraph} = await bundler.run();
+
+  for (let bundle of bundleGraph.getBundles()) {
+    console.log(bundle.filePath);
+    console.log(await outputFS.readFile(bundle.filePath, 'utf8'));
+  }
+} finally {
+  await workerFarm.end();
+}
+
+----------------------------------------
+
+TITLE: Differential Bundling HTML Example
+DESCRIPTION: Example of how Parcel handles differential bundling with modern and legacy browser support.
+
+LANGUAGE: html
+CODE:
+<script type="module" src="app.c9a6fe.js"></script>
+<script nomodule src="app.f7d631.js"></script>
+
+----------------------------------------
+
+TITLE: Adding Mappings to SourceMap - JavaScript
+DESCRIPTION: Demonstrates different ways to add mappings to a SourceMap instance including indexed mappings, VLQ mappings, and buffer operations.
+
+LANGUAGE: javascript
+CODE:
+import SourceMap from '@parcel/source-map';
+
+let sourcemap = new SourceMap(projectRoot);
+
+let lineOffset = 0;
+let columnOffset = 0;
+
+sourcemap.addIndexedMappings(
+  [
+    {
+      generated: {
+        line: 1,
+        column: 4,
+      },
+      original: {
+        line: 1,
+        column: 4,
+      },
+      source: "index.js",
+      name: "A",
+    },
+  ],
+  lineOffset,
+  columnOffset
+);
+
+sourcemap.addVLQMap(
+  {
+    file: "min.js",
+    names: ["bar", "baz", "n"],
+    sources: ["one.js", "two.js"],
+    sourceRoot: "/the/root",
+    mappings:
+      "CAAC,IAAI,IAAM,SAAUA,GAClB,OAAOC,IAAID;CCDb,IAAI,IAAM,SAAUE,GAClB,OAAOA",
+  },
+  lineOffset,
+  columnOffset
+);
+
+----------------------------------------
+
+TITLE: Specifying Build Targets
+DESCRIPTION: Demonstrates how to specify which build targets to include in the build process.
+
+LANGUAGE: javascript
+CODE:
+import {Parcel} from '@parcel/core';
+
+let bundler = new Parcel({
+  entries: 'a.js',
+  defaultConfig: '@parcel/config-default',
+  targets: ['modern']
+});
+
+----------------------------------------
+
+TITLE: Defining Multi-Plugin Parcel Package in JSON
+DESCRIPTION: This snippet shows the package.json file for a multi-plugin Parcel package. It specifies the package name, main file, version, and compatible Parcel versions for an XML-specific configuration.
+
+LANGUAGE: json
+CODE:
+{
+  "name": "parcel-config-xml",
+  "main": "index.json",
+  "version": "1.0.0",
+  "engines": {
+    "parcel": "2.x"
+  }
+}
+
+----------------------------------------
+
+TITLE: Formatting Markdown Messages in Parcel Diagnostics
+DESCRIPTION: Shows how to use the md tagged template literal for escaping interpolated expressions in Markdown strings for diagnostics.
+
+LANGUAGE: javascript
+CODE:
+import {md} from '@parcel/diagnostic';
+
+throw new ThrowableDiagnostic({
+  diagnostic: {
+    message: md`**Error**: Could not parse ${filePath}`
+  }
+});
+
+----------------------------------------
+
+TITLE: Environment Variable Configuration
+DESCRIPTION: Example of setting environment variables for the build process.
+
+LANGUAGE: javascript
+CODE:
+import {Parcel} from '@parcel/core';
+
+let bundler = new Parcel({
+  entries: 'a.js',
+  defaultConfig: '@parcel/config-default',
+  mode: 'production',
+  env: {
+    NODE_ENV: 'production'
+  }
+});
+
+----------------------------------------
+
+TITLE: Package.json Source Configuration
+DESCRIPTION: Configuration of entry points in package.json using the source field for single or multiple entries.
+
+LANGUAGE: json
+CODE:
+{
+  "source": "src/index.html"
+}
+
+LANGUAGE: json
+CODE:
+{
+  "source": ["src/a.html", "src/b.html"]
+}
+
+----------------------------------------
+
+TITLE: Formatting Interpolated Expressions in Parcel Diagnostics
+DESCRIPTION: Demonstrates the use of utility functions for formatting interpolated expressions in diagnostic messages.
+
+LANGUAGE: javascript
+CODE:
+import {md} from '@parcel/diagnostic';
+
+throw new ThrowableDiagnostic({
+  diagnostic: {
+    message: md`**Error**: Could not parse ${md.underline(filePath)}`
+  }
+});
+
+----------------------------------------
+
+TITLE: Accessing Environment Variables in JavaScript with Parcel
+DESCRIPTION: Demonstrates how to access environment variables in JavaScript using Parcel's Node emulation. Shows both direct access and destructuring syntax.
+
+LANGUAGE: javascript
+CODE:
+if (process.env.NODE_ENV === 'development') {
+  console.log('Happy developing!');
+}
+
+LANGUAGE: javascript
+CODE:
+let {NODE_ENV, API_TOKEN} = process.env;
+
+----------------------------------------
+
+TITLE: Parcel Entry Point Examples
+DESCRIPTION: Shows various ways to specify entry points including single files, multiple files, globs, and package.json configurations
+
+LANGUAGE: bash
+CODE:
+# Single file
+parcel src/index.html
+
+# Multiple files
+parcel src/a.html src/b.html
+
+# Glob (quotes required)
+parcel 'src/*.html'
+
+# Directory with package.json#source
+parcel packages/frontend
+
+# Multiple packages with a glob
+parcel 'packages/*'
+
+# Current directory with package.json#source
+parcel
+
+----------------------------------------
+
+TITLE: Adding Hints and Documentation URLs to Parcel Diagnostics
+DESCRIPTION: Demonstrates how to include hints and a documentation URL in a diagnostic for providing additional help to users.
+
+LANGUAGE: javascript
+CODE:
+throw new ThrowableDiagnostic({
+  diagnostic: {
+    message: 'Could not find a config file',
+    hints: ['Create a tool.config.json file in the project root.'],
+    documentationURL: 'http://example.com/'
+  }
+});
+
+----------------------------------------
+
+TITLE: JSON Data File for fs.readFileSync Example
+DESCRIPTION: Sample JSON file content used in the fs.readFileSync inlining example.
+
+LANGUAGE: json
+CODE:
+{
+  "foo": "bar"
+}
+
+----------------------------------------
+
+TITLE: Creating a Virtual Module Resolver in JavaScript for Parcel
+DESCRIPTION: This snippet shows how to implement a resolver plugin that generates a virtual module on demand. It returns both a file path and the code content directly, allowing for programmatic module generation without writing to the file system.
+
+LANGUAGE: javascript
+CODE:
+import {Resolver} from '@parcel/plugin';
+import path from 'path';
+
+export default new Resolver({
+  async resolve({specifier}) {
+    if (specifier === 'special-module') {
+      return {
+        filePath: path.join(__dirname, 'special-module.js'),
+        code: 'export default "This is a special module!";'
+      };
+    }
+
+    return null;
+  }
+});
+
+----------------------------------------
+
+TITLE: Implementing Parcel Compressor Plugin in JavaScript
+DESCRIPTION: Example implementation of a Parcel compressor plugin that applies gzip compression to bundle output streams. The plugin receives an input stream and returns a transformed stream along with the 'gz' file extension type.
+
+LANGUAGE: javascript
+CODE:
+import {Compressor} from '@parcel/plugin';
+
+export default new Compressor({
+  async compress({stream}) {
+    return {
+      stream: gzipStream(stream),
+      type: 'gz'
+    };
+  },
+});
+
+----------------------------------------
+
+TITLE: Configuring Complex API Proxy in Parcel
+DESCRIPTION: This JavaScript file (.proxyrc.js) demonstrates a more complex API proxy configuration for Parcel using the http-proxy-middleware package. It sets up the same proxy as the JSON example but allows for more advanced customization.
+
+LANGUAGE: javascript
+CODE:
+const { createProxyMiddleware } = require("http-proxy-middleware");
+
+module.exports = function (app) {
+  app.use(
+    "/api",
+    createProxyMiddleware({
+      target: "http://localhost:8000/",
+      pathRewrite: {
+        "^/api": "",
+      },
+    })
+  );
+};
+
+----------------------------------------
+
+TITLE: Interactive SVG with JavaScript Module
+DESCRIPTION: Demonstrates how to add interactivity to SVG using JavaScript modules with the script element
+
+LANGUAGE: xml
+CODE:
+<svg viewBox="0 0 240 80" xmlns="http://www.w3.org/2000/svg">
+  <circle cx="50" cy="50" r="50" fill="red" />
+  <script type="module" href="interactions.js" />
+</svg>
+
+LANGUAGE: javascript
+CODE:
+let circle = document.querySelector('circle');
+circle.addEventListener('click', () => {
+  circle.setAttribute('fill', 'blue');
+});
+
+----------------------------------------
+
+TITLE: Binary Content Handling in Parcel Optimizer
+DESCRIPTION: Shows how to handle binary content in a Parcel optimizer plugin using utility functions from @parcel/utils to convert between different content representations.
+
+LANGUAGE: javascript
+CODE:
+import {Optimizer} from '@parcel/plugin';
+import {blobToBuffer} from '@parcel/utils';
+
+export default new Optimizer({
+  async optimize({contents}) {
+    let buffer = await blobToBuffer(contents);
+    let optimized = optimize(buffer);
+    return {contents: optimized};
+  }
+});
+
+----------------------------------------
+
+TITLE: Package Exports Configuration in package.json
+DESCRIPTION: Example of configuring package exports in package.json to define public entry points and conditional exports.
+
+LANGUAGE: json
+CODE:
+{
+  "name": "foo",
+  "exports": {
+    ".": "./dist/index.js",
+    "./bar": "./dist/bar.js"
+  }
+}
+
+----------------------------------------
+
+TITLE: Parcel Serve Command Example
+DESCRIPTION: Demonstrates using the serve command to start a development server with hot reloading
+
+LANGUAGE: bash
+CODE:
+parcel src/index.html
+
+----------------------------------------
+
+TITLE: Using Glob Maps for Transformer Configuration
+DESCRIPTION: Illustrates how to use glob maps to configure transformers for specific file patterns in a .parcelrc file.
+
+LANGUAGE: json
+CODE:
+{
+  "transformers": {
+    "icons/*.svg": ["highest-priority"],
+    "*.svg": ["lowest-priority"]
+  }
+}
+
+----------------------------------------
+
+TITLE: Configuring Aliases in package.json
+DESCRIPTION: Example of configuring aliases in package.json to override normal dependency resolution.
+
+LANGUAGE: json
+CODE:
+{
+  "alias": {
+    "react": "preact/compat",
+    "react-dom": "preact/compat"
+  }
+}
+
+----------------------------------------
+
+TITLE: Using Custom Named Pipeline in JavaScript
+DESCRIPTION: Demonstrates how to use a custom named pipeline 'arraybuffer:' to import a file as an ArrayBuffer in JavaScript.
+
+LANGUAGE: javascript
+CODE:
+import buffer from 'arraybuffer:./file.png';
+
+----------------------------------------
+
+TITLE: Plugin Package Configuration
+DESCRIPTION: Example of required package.json configuration for Parcel plugins including engine specifications.
+
+LANGUAGE: json
+CODE:
+{
+  "name": "parcel-transformer-imagemin",
+  "engines": {
+    "parcel": "2.x"
+  }
+}
+
+----------------------------------------
+
+TITLE: Inlining File Contents Without Transformation in Node.js
+DESCRIPTION: Demonstrates how to inline the contents of a file as a string without running it through Parcel transformers, using Node.js fs module.
+
+LANGUAGE: javascript
+CODE:
+import fs from 'fs';
+
+const sourceCode = fs.readFileSync(__dirname + '/foo.js', 'utf8');
+
+----------------------------------------
+
+TITLE: Using Named Pipelines in CSS
+DESCRIPTION: Demonstrates how to use a named pipeline 'data-url:' to inline an image as a data URL in CSS.
+
+LANGUAGE: css
+CODE:
+.logo {
+  background: url(data-url:./logo.png);
+}
+
+----------------------------------------
+
+TITLE: Using Responsive Images in HTML with Parcel
+DESCRIPTION: Shows how to use the <picture> element in HTML to provide multiple image formats and sizes, leveraging Parcel's image transformation capabilities.
+
+LANGUAGE: html
+CODE:
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <title>HTML Example</title>
+  </head>
+  <body>
+    <picture>
+      <source srcset="image.jpeg?as=avif&width=800" type="image/avif" />
+      <source srcset="image.jpeg?as=webp&width=800" type="image/webp" />
+      <source srcset="image.jpeg?width=800" type="image/jpeg" />
+      <img src="image.jpeg?width=200" alt="test image" />
+    </picture>
+  </body>
+</html>
+
+----------------------------------------
+
+TITLE: Service Worker Registration with Parcel Manifest
+DESCRIPTION: Example of using Parcel's new service worker runtime to implement file pre-caching. Shows how to access the manifest of URLs and version hash for cache management.
+
+LANGUAGE: javascript
+CODE:
+import {manifest, version} from '@parcel/service-worker';
+
+async function install() {
+  const cache = await caches.open(version);
+  await cache.addAll(manifest);
+}
+
+addEventListener('install', e => e.waitUntil(install()));
+
+----------------------------------------
+
+TITLE: Extending Multiple Parcel Configurations in JSON
+DESCRIPTION: This snippet shows how to extend multiple Parcel configurations in a .parcelrc file. It combines the default Parcel config with a custom XML config.
+
+LANGUAGE: json
+CODE:
+{
+  "extends": ["@parcel/config-default", "parcel-config-xml"]
+}
+
+----------------------------------------
+
+TITLE: Advanced Image Format Configuration in Parcel
+DESCRIPTION: Shows how to configure advanced options for different image formats in Parcel using a sharp.config.json file.
+
+LANGUAGE: json
+CODE:
+{
+  "jpeg": {
+    "quality": 75,
+    "chromaSubsampling": "4:4:4"
+  },
+  "webp": {
+    "nearLossless": true
+  },
+  "png": {
+    "palette": true
+  }
+}
+
+----------------------------------------
+
+TITLE: Enabling CSS Modules Globally in Parcel v2.4.0
+DESCRIPTION: Configuration for enabling CSS modules globally in Parcel v2.4.0 using package.json. This replaces the previous method of using the 'modules' option in PostCSS config.
+
+LANGUAGE: json
+CODE:
+{
+  "@parcel/transformer-css": {
+    "cssModules": true
+  }
+}
+
+----------------------------------------
+
+TITLE: Installing Parcel with Yarn
+DESCRIPTION: Command to install Parcel as a dev dependency using Yarn package manager.
+
+LANGUAGE: shell
+CODE:
+yarn add --dev parcel
+
+----------------------------------------
+
+TITLE: Installing Parcel Web Extension Config
+DESCRIPTION: Command to install the Parcel web extension configuration package as a dev dependency.
+
+LANGUAGE: shell
+CODE:
+yarn add @parcel/config-webextension --dev
+
+----------------------------------------
+
+TITLE: Using Macros with Regexgen in TypeScript
+DESCRIPTION: Demonstrates importing and using a macro function to generate an optimized regular expression at build time using the regexgen library.
+
+LANGUAGE: typescript
+CODE:
+import regexgen from 'regexgen' with {type: 'macro'};
+
+const regex = regexgen(['foobar', 'foobaz', 'foozap', 'fooza']);
+console.log(regex);
+
+LANGUAGE: javascript
+CODE:
+console.log(/foo(?:zap?|ba[rz])/);
+
+----------------------------------------
+
+TITLE: Configuring TypeScript Compiler Options in Parcel
+DESCRIPTION: Basic TypeScript configuration file showing how to enable experimental decorators and configure JSX import source.
+
+LANGUAGE: json
+CODE:
+{
+  "compilerOptions": {
+    "experimentalDecorators": true,
+    "jsxImportSource": "preact"
+  }
+}
+
+----------------------------------------
+
+TITLE: Package.json Scripts Configuration
+DESCRIPTION: NPM scripts configuration for development and production builds of the web extension.
+
+LANGUAGE: json
+CODE:
+{
+  "scripts": {
+    "start": "parcel watch src/manifest.json --host localhost --config @parcel/config-webextension",
+    "build": "parcel build src/manifest.json --config @parcel/config-webextension"
+  }
+}
+
+----------------------------------------
+
+TITLE: Generating CSS with Macros in TypeScript
+DESCRIPTION: Shows how to use macros to generate CSS at build time, creating a simple CSS-in-JS solution with static extraction.
+
+LANGUAGE: typescript
+CODE:
+import {css} from './css.ts' with {type: 'macro'};
+
+<div className={css('color: red; &:hover { color: green }')}>
+  Hello!
+</div>
+
+LANGUAGE: typescript
+CODE:
+import type {MacroContext} from '@parcel/macros';
+
+export async function css(this: MacroContext | void, code: string) {
+  let className = hash(code);
+  code = `.${className} { ${code} }`;
+
+  this?.addAsset({
+    type: 'css',
+    content: code
+  });
+
+  return className;
+}
+
+----------------------------------------
+
+TITLE: Configuring Visual Studio Code for Parcel debugging
+DESCRIPTION: This JSON configuration sets up Visual Studio Code for debugging Parcel projects with Chrome. It includes necessary settings for source map path overrides and breakpoint loading.
+
+LANGUAGE: json
+CODE:
+{
+  // Use IntelliSense to learn about possible attributes.
+  // Hover to view descriptions of existing attributes.
+  // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "type": "chrome",
+      "request": "launch",
+      "name": "Launch Chrome against localhost",
+      "url": "http://localhost:1234",
+      "webRoot": "${workspaceFolder}",
+      "breakOnLoad": true,
+      "sourceMapPathOverrides": {
+        "/__parcel_source_root/*": "${webRoot}/*"
+      }
+    }
+  ]
+}
+
+----------------------------------------
+
+TITLE: Inlining Image as Data URL in CSS
+DESCRIPTION: Shows how to inline a small image as a data URL within a CSS file using Parcel's data-url scheme.
+
+LANGUAGE: css
+CODE:
+.foo {
+  background: url(data-url:./background.png);
+}
+
+----------------------------------------
+
+TITLE: Creating ES Module Workers in JavaScript
+DESCRIPTION: Demonstrates the new syntax for creating ES module web workers using the URL constructor and module type option.
+
+LANGUAGE: javascript
+CODE:
+new Worker(
+  new URL('worker.js', import.meta.url),
+  {type: 'module'}
+);
+
+----------------------------------------
+
+TITLE: Importing CSS from npm
+DESCRIPTION: Demonstrates how to import a CSS file from an npm package using the npm: scheme.
+
+LANGUAGE: css
+CODE:
+@import 'npm:bootstrap/bootstrap.css';
+
+----------------------------------------
+
+TITLE: Configuring Named Pipelines for Bundle Inlining in Parcel
+DESCRIPTION: Demonstrates the configuration of named pipelines in Parcel's config file for bundle-text and data-url schemes, using transformers and optimizers.
+
+LANGUAGE: json
+CODE:
+{
+  "transformers": {
+    "bundle-text:*": ["...", "@parcel/transformer-inline-string"],
+    "data-url:*": ["...", "@parcel/transformer-inline-string"]
+  },
+  "optimizers": {
+    "data-url:*": ["...", "@parcel/optimizer-data-url"]
+  }
+}
+
+----------------------------------------
+
+TITLE: Parcel CSS Background Property Representation
+DESCRIPTION: Example of how Parcel CSS represents a background property with fully parsed and interpreted values in Rust.
+
+LANGUAGE: rust
+CODE:
+Background([Background {
+  image: Url(Url { url: "img.png" }),
+  color: CssColor(RGBA(RGBA { red: 0, green: 0, blue: 0, alpha: 0 })),
+  position: Position {
+    x: Length(Dimension(Px(20.0))),
+    y: Length(Dimension(Px(10.0))),
+  },
+  repeat: BackgroundRepeat {
+    x: Repeat,
+    y: Repeat,
+  },
+  size: Explicit {
+    width: LengthPercentage(Dimension(Px(50.0))),
+    height: LengthPercentage(Dimension(Px(100.0))),
+  },
+  attachment: Scroll,
+  origin: PaddingBox,
+  clip: BorderBox,
+}])
+
+----------------------------------------
+
+TITLE: Running Parcel in Lazy Mode
+DESCRIPTION: This shell command demonstrates how to start Parcel in lazy mode, which defers building files until they are requested in the browser. This can significantly reduce development build times for large applications.
+
+LANGUAGE: shell
+CODE:
+parcel 'pages/*.html' --lazy
+
+----------------------------------------
+
+TITLE: Custom Optimizer Plugin for ArrayBuffer Inlining in JavaScript
+DESCRIPTION: Illustrates how to create a custom Optimizer plugin to inline a file as an ArrayBuffer, demonstrating Parcel's extensibility for custom inlining scenarios.
+
+LANGUAGE: javascript
+CODE:
+import {Optimizer} from '@parcel/plugin';
+import {blobToBuffer} from '@parcel/utils';
+
+export default new Optimizer({
+  async optimize({contents}) {
+    let buffer = await blobToBuffer(contents);
+    return {
+      contents: `new Uint8Array(${JSON.stringify(Array.from(buffer))}).buffer`
+    };
+  }
+});
+
+----------------------------------------
+
+TITLE: Web Extension Manifest Configuration
+DESCRIPTION: Example manifest.json configuration for a web extension using Manifest V3, defining background service worker and content scripts.
+
+LANGUAGE: json
+CODE:
+{
+  "manifest_version": 3,
+  "name": "Sample Web Extension",
+  "version": "0.0.1",
+  "background": {
+    "service_worker": "background.ts",
+    "type": "module"
+  },
+  "content_scripts": [{
+    "matches": ["*://github.com/parcel-bundler/*"],
+    "js": ["parcel-content-script.ts"]
+  }]
+}
+
+----------------------------------------
+
+TITLE: Package Configuration for TypeScript Library
+DESCRIPTION: Package.json configuration for building a TypeScript library with type definitions output.
+
+LANGUAGE: json
+CODE:
+{
+  "source": "src/index.ts",
+  "module": "dist/index.js",
+  "types": "dist/index.d.ts"
+}
+
+----------------------------------------
+
+TITLE: Importing Bare Specifiers in JavaScript
+DESCRIPTION: Example of importing a bare specifier 'react' in a JavaScript file, which resolves to a package in node_modules.
+
+LANGUAGE: javascript
+CODE:
+import 'react';
+
+----------------------------------------
+
+TITLE: Parcel Configuration File
+DESCRIPTION: Configuration file extending the Parcel web extension config.
+
+LANGUAGE: json
+CODE:
+{
+  "extends": "@parcel/config-webextension"
+}
+
+----------------------------------------
+
+TITLE: SQL Query for Time-Consuming Plugins
+DESCRIPTION: This SQL query identifies the plugins that take the most time during the Parcel build. It can help spot custom or third-party plugins that might be optimization candidates.
+
+LANGUAGE: sql
+CODE:
+select
+  s.category, name, SUM(CAST(dur AS double)/1000/1000) as dur_ms
+from
+  slice s
+left join
+  args using(arg_set_id)
+where
+  args.flat_key = "args.name"
+group by s.category, name
+order by dur_ms desc
+
+----------------------------------------
+
+TITLE: Development Branch Removal Example
+DESCRIPTION: Example showing how to use NODE_ENV environment variable for development-only code that gets stripped in production
+
+LANGUAGE: javascript
+CODE:
+if (process.env.NODE_ENV !== "production") {
+  // Only runs in development and will be stripped in production builds.
+}
+
+----------------------------------------
+
+TITLE: Content Script CSS Example
+DESCRIPTION: CSS example showing proper asset handling in content scripts with URL resolution considerations.
+
+LANGUAGE: css
+CODE:
+.my-class {
+  /* Equivalent to: https://injected-site.com/custom-bg.png */
+  /* This is probably not what you want! */
+  background-image: url(./custom-bg.png);
+}
+
+.my-other-class {
+  /* This will use the local file custom-bg.png */
+  background-image: url(data-url:./custom-bg.png);
+}
+
+----------------------------------------
+
+TITLE: Implementing AST Reuse in Parcel Transformer
+DESCRIPTION: Demonstrates how to implement AST reuse in a transformer plugin, including methods for checking AST compatibility, parsing, transforming, and generating code.
+
+LANGUAGE: javascript
+CODE:
+import {Transformer} from '@parcel/plugin';
+import semver from 'semver';
+
+export default new Transformer({
+  async canReuseAST({ast}) {
+    return ast.type === 'my-compiler' 
+      && semver.satisfies(ast.version, '^1.0.0');
+  },
+  async parse({asset}) {
+    return {
+      type: 'my-compiler',
+      version: '1.0.0',
+      program: parse(await asset.getCode())
+    };
+  },
+  async transform({asset}) {
+    let ast = await asset.getAST();
+
+    let compiledAST = compile(ast.program);
+    asset.setAST({
+      type: 'my-compiler',
+      version: '1.0.0',
+      program: compiledAST
+    });
+
+    return [asset];
+  },
+  async generate({ast}) {
+    let {content, map} = generate(ast.program);
+    return {
+      content,
+      map
+    };
+  }
+});
+
+----------------------------------------
+
+TITLE: Example Parcel Trace JSON Event
+DESCRIPTION: This snippet shows the format of a single event in the Parcel trace JSON file. It includes metadata such as timestamp, process ID, thread ID, and duration.
+
+LANGUAGE: json
+CODE:
+{"ts":6020131,"pid":11738,"tid":4,"ph":"X","name":"@parcel/transformer-js","cat":"transform","args":{"name":"src/index.html"},"dur":11642}
+
+----------------------------------------
+
+TITLE: Content Script Resource Import
+DESCRIPTION: JavaScript example demonstrating how to properly import and use resources in content scripts.
+
+LANGUAGE: javascript
+CODE:
+import myImage from 'url:./image.png';
+
+const injectedImage = document.createElement('img');
+injectedImage.src = myImage;
+document.body.appendChild(injectedImage);
+
+----------------------------------------
+
+TITLE: SQL Query for Time-Consuming Babel Plugins
+DESCRIPTION: This SQL query identifies which Babel plugins executed by @parcel/transform-babel take the most time. It can help prioritize which plugins to remove or replace with Parcel transforms.
+
+LANGUAGE: sql
+CODE:
+select
+  name, SUM(CAST(dur AS double)/1000/1000) as dur_ms
+from
+  slice s
+left join
+  args using(arg_set_id)
+where
+  args.flat_key = "args.name" AND
+  s.category LIKE "transform:@parcel/transformer-babel%"
+group by name
+order by dur_ms desc
+
+----------------------------------------
+
+TITLE: Disabling Image Optimization in Parcel
+DESCRIPTION: Demonstrates how to disable the default image optimization for JPEGs and PNGs in production mode using a .parcelrc configuration file.
+
+LANGUAGE: json
+CODE:
+{
+  "extends": "@parcel/config-default",
+  "optimizers": {
+    "*.{jpg,jpeg,png}": []
+  }
+}
+
+----------------------------------------
+
+TITLE: File Reading Macro with Cache Invalidation
+DESCRIPTION: Example of a macro that reads file contents and implements cache invalidation based on file changes
+
+LANGUAGE: typescript
+CODE:
+import type {MacroContext} from '@parcel/macros';
+import fs from 'fs';
+
+export async function readFile(this: MacroContext | void, filePath: string) {
+  this?.invalidateOnFileChange(filePath);
+  return fs.readFileSync(filePath, 'utf8');
+}
+
+----------------------------------------
+
+TITLE: Creating TypeScript content for Parcel debugging
+DESCRIPTION: This TypeScript snippet shows a simple script that sets the innerHTML of an element. It's used to demonstrate debugging capabilities in Parcel projects.
+
+LANGUAGE: typescript
+CODE:
+const variable: string = "Hello, World!";
+
+document.getElementById("greeting").innerHTML = variable;
+
+----------------------------------------
+
+TITLE: Babel Configuration for Import Attributes
+DESCRIPTION: Configuration setup for enabling import attributes in Babel
+
+LANGUAGE: json
+CODE:
+{
+  "presets": [
+    [
+      "@babel/preset-env",
+      {
+        "shippedProposals": true
+      }
+    ]
+  ]
+}
+
+----------------------------------------
+
+TITLE: Config Invalidation Handling
+DESCRIPTION: Shows how to handle config file invalidation and file change tracking in a Parcel transformer plugin.
+
+LANGUAGE: javascript
+CODE:
+import {Transformer} from '@parcel/plugin';
+
+export default new Transformer({
+  async loadConfig({config}) {
+    let {result, files} = await loadToolConfigSomehow(config.searchPath);
+
+    if (result) {
+      // Invalidate whenever one of the loaded files changes.
+      for (let file of files) {
+        config.invalidateOnFileChange(file);
+      }
+    } else {
+      // Invalidate when a new config is created.
+      config.invalidateOnFileCreate({
+        fileName: 'tool.config.json',
+        aboveFilePath: config.searchPath
+      });
+    }
+
+    return result;
+  }
+});
+
+----------------------------------------
+
+TITLE: ESLint Configuration for Import Attributes
+DESCRIPTION: ESLint configuration for supporting import attributes with TypeScript parser
+
+LANGUAGE: javascript
+CODE:
+module.exports = {
+  parser: '@typescript-eslint/parser'
+};
+
+----------------------------------------
+
+TITLE: Configuring Eleventy Navigation for Parcel Plugin System API Page
+DESCRIPTION: This YAML snippet defines the layout and navigation properties for the Parcel plugin system API documentation page. It sets the layout, navigation key, title, order, and summary for the page.
+
+LANGUAGE: yaml
+CODE:
+---
+layout: layout.njk
+eleventyNavigation:
+  key: plugin-system-api
+  title: API
+  order: 17
+summary: "The remaining types specified in `@parcel/types`"
+---
+
+----------------------------------------
+
+TITLE: Running Automatic Migration Script
+DESCRIPTION: Command to run the automatic migration tool that converts a CRA project to use Parcel
+
+LANGUAGE: bash
+CODE:
+npx cra-to-parcel
+
+----------------------------------------
+
+TITLE: Adding a Note and Including API Index in Parcel Plugin System Documentation
+DESCRIPTION: This snippet uses Liquid templating to add a note about the most important data types and includes the API index file. It provides context and additional resources for the plugin system documentation.
+
+LANGUAGE: liquid
+CODE:
+{% note %}
+The most important data types are listed on the page of the relevant plugin type.
+{% endnote %}
+
+{% include "../../api/index.html" %}
+
+----------------------------------------
+
+TITLE: Updating Package Dependencies
+DESCRIPTION: Commands to remove react-scripts and install Parcel as the new bundler
+
+LANGUAGE: bash
+CODE:
+npm rm react-scripts
+npm install parcel --save-dev
+
+----------------------------------------
+
+TITLE: Configuring SVG React Transform
+DESCRIPTION: Parcel configuration for handling SVG imports as React components
+
+LANGUAGE: json
+CODE:
+{
+  "extends": "@parcel/config-default",
+  "transformers": {
+    "jsx:*.svg": ["...", "@parcel/transformer-svg-react"],
+    "jsx:*": ["..."]
+  }
+}
+
+----------------------------------------
+
+TITLE: Modifying Script Tag for Module Support in HTML
+DESCRIPTION: Update the script tag in HTML to include type="module" for proper module support in Parcel 2.
+
+LANGUAGE: html
+CODE:
+<!doctype html>
+<html>
+  <head>
+    <script type="module" src="app.js"></script>
+  </head>
+</html>
+
+----------------------------------------
+
+TITLE: Compiled Output of CSS-in-JS Macro
+DESCRIPTION: Demonstrates the bundled output of the CSS-in-JS macro example, showing the generated JavaScript and CSS.
+
+LANGUAGE: javascript
+CODE:
+<div className="ax63jk4">
+  Hello!
+</div>
+
+LANGUAGE: css
+CODE:
+.ax63jk4 {
+  color: red;
+  &:hover {
+    color: green;
+  }
+}
+
+----------------------------------------
+
+TITLE: Configuring Package Exports in Parcel
+DESCRIPTION: Configuration snippet showing how to enable package.json exports support in Parcel v2.9.0. This must be added to the project's root package.json to opt-in to the exports resolution feature.
+
+LANGUAGE: json
+CODE:
+{
+  "@parcel/resolver-default": {
+    "packageExports": true
+  }
+}
+
+----------------------------------------
+
+TITLE: CSS Module Variable Reference
+DESCRIPTION: Demonstrates the new syntax for referencing CSS variables from other CSS module files, enabling explicit dependency declaration and tree shaking of unused variables.
+
+LANGUAGE: css
+CODE:
+.button {
+  background: var(--accent-color from "./vars.module.css");
+}
+
+----------------------------------------
+
+TITLE: NPM Package Glob Import
+DESCRIPTION: Example of using glob imports to import multiple files from npm packages, demonstrating the enhanced functionality of @parcel/resolver-glob plugin.
+
+LANGUAGE: javascript
+CODE:
+import * as locales from '@company/pkg/i18n/*.js';
+
+console.log(locales.en.message);
+
+----------------------------------------
+
+TITLE: NPM Package URL Reference in HTML
+DESCRIPTION: Demonstrates the new npm: URL scheme for referencing node_modules packages directly in HTML script tags
+
+LANGUAGE: html
+CODE:
+<script src="npm:focus-visible"></script>
+
+----------------------------------------
+
+TITLE: Configuring Glob Resolver in Parcel
+DESCRIPTION: Shows how to enable glob imports by adding the glob resolver plugin to .parcelrc configuration.
+
+LANGUAGE: json
+CODE:
+{
+  "extends": "@parcel/config-default",
+  "resolvers": ["@parcel/resolver-glob", "..."]
+}
+
+----------------------------------------
+
+TITLE: PostCSS Value Parser Tokenization
+DESCRIPTION: Demonstration of how postcss-value-parser tokenizes a CSS background property value.
+
+LANGUAGE: javascript
+CODE:
+[
+  {
+    type: 'function',
+    value: 'url',
+    nodes: [ { type: 'word', value: 'img.png' } ]
+  },
+  { type: 'space', value: ' ' },
+  { type: 'word', value: '20px' },
+  { type: 'space', value: ' ' },
+  { type: 'word', value: '10px' },
+  { type: 'div', value: '/' },
+  { type: 'word', value: '50px' },
+  { type: 'space', value: ' ' },
+  { type: 'word', value: '100px' }
+]
+
+----------------------------------------
+
+TITLE: Parcel CSS Configuration
+DESCRIPTION: Configuration example for enabling Parcel CSS as a transformer and optimizer in .parcelrc file.
+
+LANGUAGE: json
+CODE:
+{
+  "extends": "@parcel/config-default",
+  "transformers": {
+    "*.css": ["@parcel/transformer-css-experimental"]
+  },
+  "optimizers": {
+    "*.css": ["@parcel/optimizer-css"]
+  }
+}

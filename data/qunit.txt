@@ -1,0 +1,1170 @@
+TITLE: Async/Await QUnit Test
+DESCRIPTION: Shows how to use async/await syntax with QUnit for cleaner asynchronous testing. Includes a utility function that returns a Promise and demonstrates multiple await operations.
+
+LANGUAGE: javascript
+CODE:
+function squareAfter1Second(x) {
+  return new Promise(resolve => {
+    setTimeout(() => {
+      resolve(x * x);
+    }, 1000);
+  });
+}
+
+const { test } = QUnit;
+
+test( "an async test", async t => {
+  var a = await squareAfter1Second(2);
+  var b = await squareAfter1Second(3);
+
+  t.equal( a, 4 );
+  t.equal( b, 9 );
+  t.equal( await squareAfter1Second(5), 25 );
+});
+
+----------------------------------------
+
+TITLE: Handling Multiple Asynchronous Operations with assert.async() in QUnit
+DESCRIPTION: This example shows how to use assert.async() for multiple asynchronous operations in a single QUnit test. It creates two separate async callbacks and uses them in different timeouts.
+
+LANGUAGE: javascript
+CODE:
+QUnit.test( "two async calls", function( assert ) {
+  assert.expect( 2 );
+
+  var done1 = assert.async();
+  var done2 = assert.async();
+  setTimeout(function() {
+    assert.ok( true, "test resumed from async operation 1" );
+    done1();
+  }, 500 );
+  setTimeout(function() {
+    assert.ok( true, "test resumed from async operation 2" );
+    done2();
+  }, 150);
+});
+
+----------------------------------------
+
+TITLE: QUnit Async Promise Hooks
+DESCRIPTION: Demonstrates handling asynchronous Promise-based operations in QUnit module hooks for database connections.
+
+LANGUAGE: javascript
+CODE:
+QUnit.module( "Database connection", {
+  before: function() {
+    return new Promise( function( resolve, reject ) {
+      DB.connect( function( err ) {
+        if ( err ) {
+          reject( err );
+        } else {
+          resolve();
+        }
+      } );
+    } );
+  },
+  after: function() {
+    return new Promise( function( resolve, reject ) {
+      DB.disconnect( function( err ) {
+        if ( err ) {
+          reject( err );
+        } else {
+          resolve();
+        }
+      } );
+    } );
+  }
+} );
+
+----------------------------------------
+
+TITLE: Promise-based Async QUnit Test
+DESCRIPTION: Demonstrates handling asynchronous testing using Promises in QUnit. Shows how to use expect() for managing assertion count and returning a Promise for async resolution.
+
+LANGUAGE: javascript
+CODE:
+QUnit.test( "a Promise-returning test", function( assert ) {
+  assert.expect( 1 );
+
+  var thenable = new Promise(function( resolve, reject ) {
+    setTimeout(function() {
+      assert.ok( true );
+      resolve( "result" );
+    }, 500 );
+  });
+  return thenable;
+});
+
+----------------------------------------
+
+TITLE: QUnit Module Hooks Implementation
+DESCRIPTION: Demonstrates the usage of before, beforeEach, afterEach, and after hooks in QUnit modules for test setup and cleanup.
+
+LANGUAGE: javascript
+CODE:
+QUnit.module( "module A", {
+  before: function() {
+    // prepare something once for all tests
+  },
+  beforeEach: function() {
+    // prepare something before each test
+  },
+  afterEach: function() {
+    // clean up after each test
+  },
+  after: function() {
+    // clean up once after all tests are done
+  }
+});
+
+----------------------------------------
+
+TITLE: Using assert.async() with Multiple Callbacks in QUnit
+DESCRIPTION: This example demonstrates how to use assert.async() with a specified number of expected callbacks. It sets up three timeouts, each calling the same done() function, and the test completes after all three callbacks are executed.
+
+LANGUAGE: javascript
+CODE:
+QUnit.test( "multiple call done()", function( assert ) {
+  assert.expect( 3 );
+  var done = assert.async( 3 );
+
+  setTimeout(function() {
+    assert.ok( true, "first call done." );
+    done();
+  }, 500 );
+
+  setTimeout(function() {
+    assert.ok( true, "second call done." );
+    done();
+  }, 500 );
+
+  setTimeout(function() {
+    assert.ok( true, "third call done." );
+    done();
+  }, 500 );
+});
+
+----------------------------------------
+
+TITLE: Modern QUnit Test Syntax
+DESCRIPTION: Shows modern ES6+ syntax for QUnit testing using destructuring and arrow functions. Demonstrates multiple assertions in a single test case.
+
+LANGUAGE: javascript
+CODE:
+function square( x ) {
+  return x * x;
+}
+
+const { test } = QUnit;
+
+test( "square()", t => {
+  t.equal( square( 2 ), 4, "square(2) equals 4" );
+  t.equal( square( 3 ), 9, "square(3) equals 9" );
+});
+
+----------------------------------------
+
+TITLE: Testing Exception Throwing with QUnit in JavaScript
+DESCRIPTION: This snippet demonstrates various ways to use the QUnit 'throws' assertion method. It shows how to test for thrown errors with different expected values, including string messages, regular expressions, constructor functions, and custom comparison functions.
+
+LANGUAGE: javascript
+CODE:
+QUnit.test( "throws", function( assert ) {
+
+  function CustomError( message ) {
+    this.message = message;
+  }
+
+  CustomError.prototype.toString = function() {
+    return this.message;
+  };
+
+  assert.throws(
+    function() {
+      throw "error"
+    },
+    "throws with just a message, not using the 'expected' argument"
+  );
+
+  assert.throws(
+    function() {
+      throw new CustomError("some error description");
+    },
+    /description/,
+    "raised error message contains 'description'"
+  );
+
+  assert.throws(
+    function() {
+      throw new CustomError();
+    },
+    CustomError,
+    "raised error is an instance of CustomError"
+  );
+
+  assert.throws(
+    function() {
+      throw new CustomError("some error description");
+    },
+    new CustomError("some error description"),
+    "raised error instance matches the CustomError instance"
+  );
+
+  assert.throws(
+    function() {
+      throw new CustomError("some error description");
+    },
+    function( err ) {
+      return err.toString() === "some error description";
+    },
+    "raised error instance satisfies the callback function"
+  );
+});
+
+----------------------------------------
+
+TITLE: Nested QUnit Modules Example
+DESCRIPTION: Shows how to create nested test modules with hierarchical labeling. Includes both callback-style module definitions and nested module structures.
+
+LANGUAGE: javascript
+CODE:
+QUnit.module( "module a", function() {
+  QUnit.test( "a basic test example", function( assert ) {
+    assert.ok( true, "this test is fine" );
+  });
+});
+
+QUnit.module( "module b", function() {
+  QUnit.test( "a basic test example 2", function( assert ) {
+    assert.ok( true, "this test is fine" );
+  });
+
+  QUnit.module( "nested module b.1", function() {
+    QUnit.test( "a basic test example 3", function( assert ) {
+      assert.ok( true, "this test is fine" );
+    });
+  });
+});
+
+----------------------------------------
+
+TITLE: Comparing Object Values with QUnit deepEqual Assertion in JavaScript
+DESCRIPTION: This example demonstrates how to use the QUnit deepEqual assertion to compare the values of two objects. It shows that objects with the same key-value pairs are considered equal, regardless of their identity.
+
+LANGUAGE: javascript
+CODE:
+QUnit.test( "deepEqual test", function( assert ) {
+  var obj = { foo: "bar" };
+
+  assert.deepEqual( obj, { foo: "bar" }, "Two objects can be the same in value" );
+});
+
+----------------------------------------
+
+TITLE: Using assert.async() for Single Asynchronous Operation in QUnit
+DESCRIPTION: This example demonstrates how to use assert.async() to wait for a single asynchronous operation in a QUnit test. It focuses on an input element and checks if it's the active element after a timeout.
+
+LANGUAGE: javascript
+CODE:
+QUnit.test( "assert.async() test", function( assert ) {
+  var done = assert.async();
+  var input = $( "#test-input" ).focus();
+  setTimeout(function() {
+    assert.equal( document.activeElement, input[0], "Input was focused" );
+    done();
+  });
+});
+
+----------------------------------------
+
+TITLE: Testing Strict Equality in QUnit Using strictEqual()
+DESCRIPTION: Demonstrates how to use QUnit's strictEqual() assertion to compare two values for strict equality. The example shows comparing two numeric values of the same type and value, illustrating the basic usage of the assertion method.
+
+LANGUAGE: javascript
+CODE:
+QUnit.test( "strictEqual test", function( assert ) {
+  assert.strictEqual( 1, 1, "1 and 1 have the same value and type" );
+});
+
+----------------------------------------
+
+TITLE: Testing Boolean Assertions with QUnit ok() Method
+DESCRIPTION: Demonstrates various use cases of QUnit's ok() assertion method, showing both passing and failing test cases. The example illustrates how the method evaluates truthy and falsy values in JavaScript, including edge cases like empty strings, null, and undefined.
+
+LANGUAGE: javascript
+CODE:
+QUnit.test( "ok test", function( assert ) {
+  assert.ok( true, "true succeeds" );
+  assert.ok( "non-empty", "non-empty string succeeds" );
+
+  assert.ok( false, "false fails" );
+  assert.ok( 0, "0 fails" );
+  assert.ok( NaN, "NaN fails" );
+  assert.ok( "", "empty string fails" );
+  assert.ok( null, "null fails" );
+  assert.ok( undefined, "undefined fails" );
+});
+
+----------------------------------------
+
+TITLE: Using assert.expect() in QUnit Tests (JavaScript)
+DESCRIPTION: This snippet demonstrates how to use assert.expect() to establish an expected assertion count in a QUnit test. It shows a test function that expects two assertions: one checking if a callback is called, and another verifying the result of a calculation.
+
+LANGUAGE: javascript
+CODE:
+QUnit.test( "a test", function( assert ) {
+  assert.expect( 2 );
+
+  function calc( x, operation ) {
+    return operation( x );
+  }
+
+  var result = calc( 2, function( x ) {
+    assert.ok( true, "calc() calls operation function" );
+    return x * x;
+  });
+
+  assert.equal( result, 4, "2 squared equals 4" );
+});
+
+----------------------------------------
+
+TITLE: Basic QUnit Module Group Test Example
+DESCRIPTION: Demonstrates basic usage of QUnit.module() to group related tests under labeled sections. Shows both traditional and modern syntax approaches.
+
+LANGUAGE: javascript
+CODE:
+QUnit.module( "group a" );
+QUnit.test( "a basic test example", function( assert ) {
+  assert.ok( true, "this test is fine" );
+});
+QUnit.test( "a basic test example 2", function( assert ) {
+  assert.ok( true, "this test is fine" );
+});
+
+QUnit.module( "group b" );
+QUnit.test( "a basic test example 3", function( assert ) {
+  assert.ok( true, "this test is fine" );
+});
+QUnit.test( "a basic test example 4", function( assert ) {
+  assert.ok( true, "this test is fine" );
+});
+
+----------------------------------------
+
+TITLE: Comprehensive QUnit Equal Assertion Examples
+DESCRIPTION: Shows multiple equal assertions demonstrating various comparison scenarios including zeros, empty strings, and type coercion cases. Includes both passing and failing assertion examples.
+
+LANGUAGE: javascript
+CODE:
+QUnit.test( "equal test", function( assert ) {
+  assert.equal( 0, 0, "Zero, Zero; equal succeeds" );
+  assert.equal( "", 0, "Empty, Zero; equal succeeds" );
+  assert.equal( "", "", "Empty, Empty; equal succeeds" );
+
+  assert.equal( "three", 3, "Three, 3; equal fails" );
+  assert.equal( null, false, "null, false; equal fails" );
+});
+
+----------------------------------------
+
+TITLE: Using verifySteps for Asynchronous Flow Testing in JavaScript with QUnit
+DESCRIPTION: This example demonstrates how to use the verifySteps assertion in QUnit to verify the order of execution steps in an asynchronous process. It sets up step assertions for start, middle, and end functions, then verifies their order after the process completes.
+
+LANGUAGE: javascript
+CODE:
+QUnit.test( "step test", function( assert ) {
+  obj.start = function() {
+    assert.step('start');
+  };
+  obj.middle = function() {
+    assert.step('middle');
+  };
+  obj.end = function() {
+    assert.step('end');
+  };
+
+  return obj.process().then(function() {
+    assert.verifySteps(['start', 'middle', 'end']);
+  });
+});
+
+----------------------------------------
+
+TITLE: Creating Custom Modulo Assertion in QUnit
+DESCRIPTION: Example demonstrating how to create a custom mod2 assertion that tests if numbers are equivalent in modulo 2. The code shows both the assertion definition and its usage in a test case, utilizing pushResult to report test outcomes to QUnit.
+
+LANGUAGE: javascript
+CODE:
+QUnit.assert.mod2 = function( value, expected, message ) {
+    var actual = value % 2;
+    this.pushResult( {
+        result: actual === expected,
+        actual: actual,
+        expected: expected,
+        message: message
+    } );
+};
+
+QUnit.test( "mod2", function( assert ) {
+    assert.expect( 2 );
+
+    assert.mod2( 2, 0, "2 % 2 == 0" );
+    assert.mod2( 3, 1, "3 % 2 == 1" );
+});
+
+----------------------------------------
+
+TITLE: Using QUnit.todo for Testing Unfinished Code in JavaScript
+DESCRIPTION: This example demonstrates how to use QUnit.todo to create a test for a method that is still under development. It sets up a module for a Robot class and creates a todo test for the fireLazer method, which is expected to fail as it's not fully implemented yet.
+
+LANGUAGE: javascript
+CODE:
+QUnit.module( "robot", {
+  beforeEach: function() {
+    this.robot = new Robot();
+  }
+});
+
+// fireLazer hasn't been properly implemented yet, so this is a todo test
+QUnit.todo( "fireLazer returns the correct value", function( assert ) {
+  var result = this.robot.fireLazer(); // Currently returns undefined
+  assert.equal( result, "I'm firing my lazer!" );
+});
+
+----------------------------------------
+
+TITLE: Implementing QUnit.only() with Modern Syntax
+DESCRIPTION: Shows the same QUnit.only() functionality using modern JavaScript syntax with destructuring and arrow functions. This example demonstrates the contemporary approach to focusing on a single test case.
+
+LANGUAGE: javascript
+CODE:
+const { test, only } = QUnit;
+
+QUnit.module( "robot", {
+  beforeEach: function() {
+    this.robot = new Robot();
+  }
+});
+
+test( "say", t => {
+  t.ok( false, "I'm not quite ready yet" );
+});
+
+test( "stomp", t => {
+  t.ok( false, "I'm not quite ready yet" );
+});
+
+// You're currently working on the laser feature, so we run only this test
+only( "laser", function( t ) {
+  t.ok( this.robot.laser() );
+});
+
+----------------------------------------
+
+TITLE: Skipping Tests Using Modern QUnit Syntax
+DESCRIPTION: Shows the modern approach to skipping tests using destructured QUnit methods. Demonstrates the same functionality as the traditional syntax but with more concise code.
+
+LANGUAGE: javascript
+CODE:
+const { test, skip } = QUnit;
+
+QUnit.module( "robot", {
+  beforeEach() {
+    this.robot = new Robot();
+  }
+});
+
+test( "say", function( t ) {
+  t.strictEqual( this.robot.say(), "Exterminate!" );
+});
+
+// Robot doesn't have a laser method, yet, skip this test
+// Will show up as skipped in the results
+skip( "laser", function( t ) {
+  t.ok( this.robot.laser() );
+});
+
+----------------------------------------
+
+TITLE: Basic QUnit Equal Assertion Example
+DESCRIPTION: Demonstrates a simple QUnit test case using the equal assertion to compare a number and string with the same value. Shows basic equality comparison between different types.
+
+LANGUAGE: javascript
+CODE:
+QUnit.test( "a test", function( assert ) {
+  assert.equal( 1, "1", "String '1' and number 1 have the same value" );
+});
+
+----------------------------------------
+
+TITLE: Using notOk Assertion in QUnit Tests
+DESCRIPTION: Demonstrates various use cases of the notOk assertion to test falsy values in QUnit. The method accepts a state parameter and an optional message parameter. It passes when the provided state evaluates to false.
+
+LANGUAGE: javascript
+CODE:
+QUnit.test( "notOk test", function( assert ) {
+  assert.notOk( false, "false succeeds" );
+  assert.notOk( "", "empty string succeeds" );
+  assert.notOk( NaN, "NaN succeeds" );
+  assert.notOk( null, "null succeeds" );
+  assert.notOk( undefined, "undefined succeeds" );
+
+  assert.notOk( true, "true fails" );
+  assert.notOk( 1, "1 fails" );
+  assert.notOk( "not-empty", "not-empty string fails" );
+});
+
+----------------------------------------
+
+TITLE: Testing Non-Strict Inequality with QUnit notEqual
+DESCRIPTION: Demonstrates how to use QUnit's notEqual assertion to compare values for inequality using non-strict comparison. The example shows comparing a number and string with different values to verify they are not equal.
+
+LANGUAGE: javascript
+CODE:
+QUnit.test( "a test", function( assert ) {
+  assert.notEqual( 1, "2", "String '2' and number 1 don't have the same value" );
+});
+
+----------------------------------------
+
+TITLE: Testing Object Inequality with QUnit notDeepEqual
+DESCRIPTION: Demonstrates how to use notDeepEqual assertion to compare objects for inequality. The example shows comparing two objects with the same structure but different values to ensure they are not deeply equal.
+
+LANGUAGE: javascript
+CODE:
+QUnit.test( "notDeepEqual test", function( assert ) {
+  var obj = { foo: "bar" };
+
+  assert.notDeepEqual( obj, { foo: "bla" }, "Different object, same key, different value, not equal" );
+});
+
+----------------------------------------
+
+TITLE: Using notStrictEqual Assertion in QUnit Test (JavaScript)
+DESCRIPTION: Demonstrates how to use the notStrictEqual assertion in a QUnit test. This example compares a number and a string with the same value but different types, expecting them to be not strictly equal.
+
+LANGUAGE: javascript
+CODE:
+QUnit.test( "a test", function( assert ) {
+  assert.notStrictEqual( 1, "1", "String '1' and number 1 have the same value but not the same type" );
+});
+
+----------------------------------------
+
+TITLE: Using notPropEqual for Object Property Comparison in JavaScript with QUnit
+DESCRIPTION: This snippet demonstrates how to use the notPropEqual assertion in QUnit to compare the properties of two objects. It creates two instances of a custom Foo object with different property values and asserts that they are not equal.
+
+LANGUAGE: javascript
+CODE:
+QUnit.test( "notPropEqual test", function( assert ) {
+  function Foo( x, y, z ) {
+    this.x = x;
+    this.y = y;
+    this.z = z;
+  }
+  Foo.prototype.doA = function () {};
+  Foo.prototype.doB = function () {};
+  Foo.prototype.bar = 'prototype';
+
+  var foo = new Foo( 1, "2", [] );
+  var bar = new Foo( "1", 2, {} );
+  assert.notPropEqual( foo, bar, "Properties values are strictly compared." );
+});
+
+----------------------------------------
+
+TITLE: Comparing Object Properties with propEqual in JavaScript
+DESCRIPTION: This example demonstrates how to use QUnit's propEqual() assertion to compare the properties of two objects. It creates a Foo constructor with prototype methods and compares an instance of Foo with a plain object, expecting them to have strictly the same properties without comparing their constructors.
+
+LANGUAGE: javascript
+CODE:
+QUnit.test( "propEqual test", function( assert ) {
+  function Foo( x, y, z ) {
+    this.x = x;
+    this.y = y;
+    this.z = z;
+  }
+  Foo.prototype.doA = function () {};
+  Foo.prototype.doB = function () {};
+  Foo.prototype.bar = 'prototype';
+
+  var foo = new Foo( 1, "2", [] );
+  var bar = {
+    x : 1,
+    y : "2",
+    z : []
+  };
+  assert.propEqual( foo, bar, "Strictly the same properties without comparing objects constructors." );
+});
+
+----------------------------------------
+
+TITLE: Starting Asynchronous Tests with QUnit.start() in JavaScript
+DESCRIPTION: This snippet demonstrates how to use QUnit.start() to begin a test run when autostart is disabled. It uses an AMD-style require call to load test modules before starting the tests.
+
+LANGUAGE: javascript
+CODE:
+QUnit.config.autostart = false;
+
+require(["test/tests1.js", "test/tests2.js"], function() {
+  QUnit.start();
+});
+
+----------------------------------------
+
+TITLE: Implementing QUnit.only() with Traditional Syntax
+DESCRIPTION: Demonstrates how to use QUnit.only() to focus testing on a single test case within a module. The example shows a robot test module where only the laser test will run while other tests are ignored.
+
+LANGUAGE: javascript
+CODE:
+QUnit.module( "robot", {
+  beforeEach: function() {
+    this.robot = new Robot();
+  }
+});
+
+QUnit.test( "say", function( assert ) {
+  assert.ok( false, "I'm not quite ready yet" );
+});
+
+QUnit.test( "stomp", function( assert ) {
+  assert.ok( false, "I'm not quite ready yet" );
+});
+
+// You're currently working on the laser feature, so we run only this test
+QUnit.only( "laser", function( assert ) {
+  assert.ok( this.robot.laser() );
+});
+
+----------------------------------------
+
+TITLE: Skipping Tests Using Traditional QUnit Syntax
+DESCRIPTION: Demonstrates how to skip tests using QUnit.skip() with traditional JavaScript syntax. Shows module setup with beforeEach hook and comparison between regular test and skipped test.
+
+LANGUAGE: javascript
+CODE:
+QUnit.module( "robot", {
+  beforeEach: function() {
+    this.robot = new Robot();
+  }
+});
+
+QUnit.test( "say", function( assert ) {
+  assert.strictEqual( this.robot.say(), "Exterminate!" );
+});
+
+// Robot doesn't have a laser method, yet, skip this test
+// Will show up as skipped in the results
+QUnit.skip( "laser", function( assert ) {
+  assert.ok( this.robot.laser() );
+});
+
+----------------------------------------
+
+TITLE: Preconfiguring QUnit Before Load
+DESCRIPTION: Demonstrates how to set QUnit configuration options before the testing framework is loaded.
+
+LANGUAGE: javascript
+CODE:
+// QUnit is not yet loaded here
+window.QUnit = {
+  config: {
+    autoStart: false,
+    noGlobals: true,
+  }
+};
+
+----------------------------------------
+
+TITLE: Accessing Current Test Name in QUnit
+DESCRIPTION: Shows how to access the current test name during test execution using QUnit.config.current.
+
+LANGUAGE: javascript
+CODE:
+QUnit.test("some test", function() {
+  // a few regular assertions
+  // then a call to another tool
+  speedTest( QUnit.config.current.testName, codeUnderTest );
+});
+
+----------------------------------------
+
+TITLE: Using QUnit Assert Object in Test Callback
+DESCRIPTION: Demonstrates how to use QUnit assertions through the assert object passed to the test callback function. Shows specifically how to use the 'ok' assertion method to validate a condition.
+
+LANGUAGE: javascript
+CODE:
+QUnit.test( "`ok` assertion defined in the callback parameter", function( assert ) {
+  assert.ok( true, "on the object passed to the `test` function" );
+});
+
+----------------------------------------
+
+TITLE: Registering QUnit Test Completion Callback - Modern Syntax
+DESCRIPTION: Shows how to register a QUnit.testDone callback using modern ES6+ arrow function syntax with destructuring. Captures and logs the same test result information as the traditional syntax version.
+
+LANGUAGE: javascript
+CODE:
+QUnit.testDone( ( { module, name, total, passed, failed, skipped, runtime } ) => {
+  var result = {
+    "Module name": module,
+    "Test name": name,
+    "Assertions": {
+      "Total": total,
+      "Passed": passed,
+      "Failed": failed
+    },
+    "Skipped": skipped,
+    "Runtime": runtime
+  };
+
+  console.log( JSON.stringify( result, null, 2 ) );
+} );
+
+----------------------------------------
+
+TITLE: Registering QUnit Test Completion Callback - Traditional Syntax
+DESCRIPTION: Demonstrates how to register a callback function with QUnit.testDone that logs test results including module name, test name, assertions count, skip status, and runtime. Uses traditional function syntax.
+
+LANGUAGE: javascript
+CODE:
+QUnit.testDone( function( details ) {
+  var result = {
+    "Module name": details.module,
+    "Test name": details.name,
+    "Assertions": {
+      "Total": details.total,
+      "Passed": details.passed,
+      "Failed": details.failed
+    },
+    "Skipped": details.skipped,
+    "Runtime": details.runtime
+  };
+
+  console.log( JSON.stringify( result, null, 2 ) );
+} );
+
+----------------------------------------
+
+TITLE: QUnit Event Handling - Modern Syntax
+DESCRIPTION: Example demonstrating the same runEnd event handling using modern JavaScript syntax with arrow functions and object destructuring for cleaner code.
+
+LANGUAGE: javascript
+CODE:
+QUnit.on( "runEnd", ( { testCounts: { passed, failed, skipped, todo, total } } ) => {
+  console.log( `Passed: ${passed}` );
+  console.log( `Failed: ${failed}` );
+  console.log( `Skipped: ${skipped}` );
+  console.log( `Todo: ${todo}` );
+  console.log( `Total: ${total}` );
+} );
+
+----------------------------------------
+
+TITLE: QUnit Event Handling - Traditional Syntax
+DESCRIPTION: Example showing how to register a callback for the runEnd event using traditional JavaScript syntax. The callback logs test count statistics including passed, failed, skipped, todo, and total tests.
+
+LANGUAGE: javascript
+CODE:
+QUnit.on( "runEnd", function( data ) {
+  console.log( "Passed: " + data.testCounts.passed );
+  console.log( "Failed: " + data.testCounts.failed );
+  console.log( "Skipped: " + data.testCounts.skipped );
+  console.log( "Todo: " + data.testCounts.todo );
+  console.log( "Total: " + data.testCounts.total );
+} );
+
+----------------------------------------
+
+TITLE: Registering QUnit Module Completion Callback - Modern Syntax
+DESCRIPTION: Example demonstrating how to register a module completion callback using ES6+ arrow function syntax and object destructuring. This modern approach provides a more concise way to access the details object properties.
+
+LANGUAGE: javascript
+CODE:
+QUnit.moduleDone( ( { name, failed, total } ) => {
+  console.log( `Finished running: ${name} Failed/total: ${failed}, ${total}` );
+});
+
+----------------------------------------
+
+TITLE: Registering QUnit Module Completion Callback - Traditional Syntax
+DESCRIPTION: Example showing how to register a callback function that logs module test results using traditional JavaScript function syntax. The callback receives a details object containing module name, failed/passed counts, and runtime information.
+
+LANGUAGE: javascript
+CODE:
+QUnit.moduleDone(function( details ) {
+  console.log( "Finished running: ", details.name, "Failed/total: ", details.failed, details.total );
+});
+
+----------------------------------------
+
+TITLE: Modern Syntax Detailed QUnit Log Callback
+DESCRIPTION: Comprehensive example showing how to log detailed information for failed assertions using ES6 syntax with destructuring and template literals.
+
+LANGUAGE: javascript
+CODE:
+QUnit.log( ( { result, module, name, message, actual, expected, source } ) => {
+  if ( result ) {
+    return;
+  }
+
+  let output = `FAILED: ${module}: ${name}: `;
+
+  if ( message ) {
+    output += `${message}, `;
+  }
+  if ( actual ) {
+    output += `expected: ${expected}, actual: ${actual}`;
+  }
+  if ( source ) {
+    output += `, ${source}`;
+  }
+
+  console.log( output );
+});
+
+----------------------------------------
+
+TITLE: Detailed QUnit Log Callback Implementation
+DESCRIPTION: Comprehensive example showing how to log detailed information for failed assertions using traditional function syntax.
+
+LANGUAGE: javascript
+CODE:
+QUnit.log(function( details ) {
+  if ( details.result ) {
+    return;
+  }
+  var loc = details.module + ": " + details.name + ": ",
+    output = "FAILED: " + loc + ( details.message ? details.message + ", " : "" );
+
+  if ( details.actual ) {
+    output += "expected: " + details.expected + ", actual: " + details.actual;
+  }
+  if ( details.source ) {
+    output += ", " + details.source;
+  }
+  console.log( output );
+});
+
+----------------------------------------
+
+TITLE: Modern Syntax QUnit Log Callback Example
+DESCRIPTION: Example of registering a log callback using ES6 arrow function syntax and destructuring.
+
+LANGUAGE: javascript
+CODE:
+QUnit.log( ( { result, message } ) => {
+  console.log( `Log: ${result}, ${message}` );
+});
+
+----------------------------------------
+
+TITLE: Basic QUnit Log Callback Example
+DESCRIPTION: Simple example showing how to register a callback that logs assertion results and messages using traditional function syntax.
+
+LANGUAGE: javascript
+CODE:
+QUnit.log(function( details ) {
+  console.log( "Log: ", details.result, details.message );
+});
+
+----------------------------------------
+
+TITLE: Registering QUnit Test Completion Callback - Modern Syntax
+DESCRIPTION: Example demonstrating how to register a callback function using modern JavaScript arrow function syntax and object destructuring for cleaner code structure.
+
+LANGUAGE: javascript
+CODE:
+QUnit.done( ( { total, failed, passed, runtime } ) => {
+  console.log( `Total: ${total}, Failed: ${failed}, Passed: ${passed}, Runtime: ${runtime}` );
+});
+
+----------------------------------------
+
+TITLE: Registering QUnit Test Completion Callback - Traditional Syntax
+DESCRIPTION: Example showing how to register a callback function that logs test results to console using traditional JavaScript function syntax. The callback receives a details object containing test statistics.
+
+LANGUAGE: javascript
+CODE:
+QUnit.done(function( details ) {
+  console.log( "Total: ", details.total, " Failed: ", details.failed, " Passed: ", details.passed, " Runtime: ", details.runtime );
+});
+
+----------------------------------------
+
+TITLE: Registering QUnit.begin Callback with Modern JavaScript Syntax
+DESCRIPTION: This example shows how to use QUnit.begin() with ES6 arrow function syntax and object destructuring to log the total number of tests in the test suite.
+
+LANGUAGE: javascript
+CODE:
+QUnit.begin( ( { totalTests } ) => {
+  console.log( `Test amount: ${totalTests}` );
+});
+
+----------------------------------------
+
+TITLE: Registering QUnit.begin Callback in JavaScript
+DESCRIPTION: This snippet demonstrates how to use QUnit.begin() to register a callback that logs the total number of tests in the test suite. The callback receives a details object containing the totalTests count.
+
+LANGUAGE: javascript
+CODE:
+QUnit.begin(function( details ) {
+  console.log( "Test amount:", details.totalTests );
+});
+
+----------------------------------------
+
+TITLE: Limiting Output Depth with QUnit.dump.parse in JavaScript
+DESCRIPTION: This example demonstrates how to control the depth of object serialization using QUnit.dump.maxDepth property when parsing nested objects with QUnit.dump.parse.
+
+LANGUAGE: javascript
+CODE:
+var input = {
+  parts: {
+    front: [],
+    back: []
+  }
+};
+QUnit.dump.maxDepth = 1;
+console.log( QUnit.dump.parse( input ) );
+// Logs: { "parts": [object Object] }
+
+QUnit.dump.maxDepth = 2;
+console.log( QUnit.dump.parse( input ) );
+// Logs: { "parts": { "back": [object Array], "front": [object Array] } }
+
+----------------------------------------
+
+TITLE: Parsing DOM Element with QUnit.dump.parse in JavaScript
+DESCRIPTION: This snippet shows how to use QUnit.dump.parse to serialize a DOM element (qunit-header) into its string representation.
+
+LANGUAGE: javascript
+CODE:
+var qHeader = document.getElementById( "qunit-header" ),
+  parsed = QUnit.dump.parse( qHeader );
+
+console.log( parsed );
+
+// Logs: "<h1 id=\"qunit-header\"></h1>"
+
+----------------------------------------
+
+TITLE: Parsing QUnit Log Data with QUnit.dump.parse in JavaScript
+DESCRIPTION: This example demonstrates how to use QUnit.dump.parse to serialize actual and expected test results before sending them as messages in a QUnit test environment.
+
+LANGUAGE: javascript
+CODE:
+QUnit.log(function( obj ) {
+
+  // Parse some stuff before sending it.
+  var actual = QUnit.dump.parse( obj.actual );
+  var expected = QUnit.dump.parse( obj.expected );
+
+  // Send it.
+  sendMessage( "qunit.log", obj.result, actual, expected, obj.message, obj.source );
+});
+
+----------------------------------------
+
+TITLE: Testing QUnit.extend Object Property Modification
+DESCRIPTION: Demonstrates how QUnit.extend modifies object properties by copying from a mixin object to a target object. Shows handling of existing properties, new properties, and undefined values which remove properties.
+
+LANGUAGE: javascript
+CODE:
+QUnit.test( "QUnit.extend", function( assert ) {
+  var base = {
+    a: 1,
+    b: 2,
+    z: 3
+  };
+  QUnit.extend( base, {
+    b: 2.5,
+    c: 3,
+    z: undefined
+  } );
+
+  assert.equal( base.a, 1, "Unspecified values are not modified" );
+  assert.equal( base.b, 2.5, "Existing values are updated" );
+  assert.equal( base.c, 3, "New values are defined" );
+  assert.ok( !( "z" in base ), "Values specified as `undefined` are removed" );
+});
+
+----------------------------------------
+
+TITLE: Adding Version Dropdown to QUnit Toolbar
+DESCRIPTION: Shows how to add a dropdown menu to QUnit's toolbar for selecting jQuery versions.
+
+LANGUAGE: javascript
+CODE:
+QUnit.config.urlConfig.push({
+  id: "jquery",
+  label: "jQuery version",
+  value: [ "1.7.2", "1.8.3", "1.9.1" ],
+  tooltip: "What jQuery Core version to test against"
+});
+
+----------------------------------------
+
+TITLE: Adding Custom Checkbox to QUnit Toolbar
+DESCRIPTION: Example of extending QUnit's toolbar with a custom checkbox for toggling minified source files.
+
+LANGUAGE: javascript
+CODE:
+QUnit.config.urlConfig.push({
+  id: "min",
+  label: "Minified source",
+  tooltip: "Load minified source files instead of the regular unminified ones."
+});
+
+----------------------------------------
+
+TITLE: Configuring Async Test Loading with RequireJS in QUnit
+DESCRIPTION: Demonstrates how to disable autostart and manually trigger tests after async loading using RequireJS.
+
+LANGUAGE: javascript
+CODE:
+QUnit.config.autostart = false;
+require(
+  [ "tests/testModule1", "tests/testModule2" ],
+  function() {
+    QUnit.start();
+  }
+);
+
+----------------------------------------
+
+TITLE: Logging Stack Traces with QUnit
+DESCRIPTION: Example showing how to use QUnit.stack() within a log callback to capture the line number of passing assertions. The offset parameter is set to 5 to reference the assertion method line.
+
+LANGUAGE: javascript
+CODE:
+QUnit.log( function( details ) {
+  if ( details.result ) {
+
+    // 5 is the line reference for the assertion method, not the following line.
+    console.log( QUnit.stack( 5 ) );
+  }
+} );
+
+QUnit.test( "foo", function( assert ) {
+
+  // the log callback will report the position of the following line.
+  assert.ok( true );
+} );
+
+----------------------------------------
+
+TITLE: Using step() Assertion in QUnit Test
+DESCRIPTION: This example demonstrates how to use the step() assertion in a QUnit test. It shows a test case where a hook function is called indirectly, and the step() assertion is used to verify that the hook is executed.
+
+LANGUAGE: javascript
+CODE:
+QUnit.test( "step test", function( assert ) {
+  assert.expect( 1 );
+  obj.hook = function() {
+    assert.step('Hook is called!');
+  };
+  obj.invokeHookIndirectly();
+});
+
+----------------------------------------
+
+TITLE: Configuring Jekyll Front Matter for QUnit Assertions Page
+DESCRIPTION: YAML front matter configuration for a Jekyll documentation page about QUnit assertions. Specifies the page layout, title, and categorizes the content under 'assert' and 'topics'.
+
+LANGUAGE: yaml
+CODE:
+---
+layout: page
+title: Assertions
+category: assert
+categories:
+  - topics
+---
+
+----------------------------------------
+
+TITLE: Using QUnit.push for Custom Assertions in JavaScript
+DESCRIPTION: Demonstrates the deprecated QUnit.push method for reporting custom assertion results. Takes boolean result, actual value, expected value, and message parameters. Should be replaced with assert.pushResult() for better async handling.
+
+LANGUAGE: javascript
+CODE:
+QUnit.push( result, actual, expected, message )
+
+----------------------------------------
+
+TITLE: Registering QUnit Test Start Callback - Modern Syntax
+DESCRIPTION: Example showing how to register a callback function using modern JavaScript arrow function syntax and object destructuring. The callback logs the module and test name using template literals.
+
+LANGUAGE: javascript
+CODE:
+QUnit.testStart( ( { module, name } ) => {
+  console.log( `Now running: ${module}: ${name}` );
+});
+
+----------------------------------------
+
+TITLE: Registering QUnit Test Start Callback - Traditional Syntax
+DESCRIPTION: Example showing how to register a callback function that logs the module and test name whenever a test begins using traditional JavaScript function syntax. The callback receives a details object containing test information.
+
+LANGUAGE: javascript
+CODE:
+QUnit.testStart(function( details ) {
+  console.log( "Now running: ", details.module, details.name );
+});
+
+----------------------------------------
+
+TITLE: Registering QUnit Module Start Callback using Modern JavaScript Syntax
+DESCRIPTION: This snippet shows how to register a QUnit module start callback using modern JavaScript syntax, including arrow functions and template literals. It destructures the 'name' property from the details object and logs it to the console.
+
+LANGUAGE: javascript
+CODE:
+QUnit.moduleStart( ( { name } ) => {
+  console.log( `Now running: ${name}` );
+});
+
+----------------------------------------
+
+TITLE: Registering QUnit Module Start Callback in JavaScript
+DESCRIPTION: This snippet demonstrates how to register a callback function using QUnit.moduleStart. The callback receives an object with details about the module, including its name. The example logs the module name to the console when it starts.
+
+LANGUAGE: javascript
+CODE:
+QUnit.moduleStart(function( details ) {
+  console.log( "Now running: ", details.name );
+});
+
+----------------------------------------
+
+TITLE: Running QUnit API Documentation Site Locally with Jekyll
+DESCRIPTION: Start a local development server for the QUnit API documentation site using Jekyll. This allows for testing and previewing changes before deployment.
+
+LANGUAGE: shell
+CODE:
+bundle exec jekyll serve
+
+----------------------------------------
+
+TITLE: Installing Jekyll and Bundler for QUnit API Documentation
+DESCRIPTION: Install the required Jekyll and Bundler gems using Ruby's gem package manager. This is a prerequisite for building the QUnit API documentation site.
+
+LANGUAGE: shell
+CODE:
+gem install jekyll bundler
+bundle install
+
+----------------------------------------
+
+TITLE: Configuring Jekyll Home Layout
+DESCRIPTION: YAML frontmatter configuration that sets the default layout to 'home' for a Jekyll site. The file is intentionally minimal, directing users to modify the theme's home layout for customizations.
+
+LANGUAGE: yaml
+CODE:
+---
+# You don't need to edit this file, it's empty on purpose.
+# Edit theme's home layout instead if you wanna make some changes
+# See: https://jekyllrb.com/docs/themes/#overriding-theme-defaults
+layout: home
+---

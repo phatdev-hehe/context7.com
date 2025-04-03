@@ -1,0 +1,1901 @@
+TITLE: Configuring Apache SSL Reverse Proxy for Rocket.Chat
+DESCRIPTION: This Apache configuration sets up an SSL reverse proxy for multiple Rocket.Chat instances, including load balancing and WebSocket support.
+
+LANGUAGE: apacheconf
+CODE:
+<VirtualHost *:443>
+    ServerAdmin it@domain.com
+    ServerName chat.domain.com
+
+    LogLevel info
+    ErrorLog /var/log/chat.domain.com_error.log
+    TransferLog /var/log/chat.domain.com_access.log
+
+    SSLEngine On
+    SSLCertificateFile /etc/ssl/certs/chat.domain.com.crt
+    SSLCertificateKeyFile /etc/ssl/private/chat.domain.com.key
+
+    Header add Set-Cookie "ROUTEID=.%{BALANCER_WORKER_ROUTE}e; path=/" env=BALANCER_ROUTE_CHANGED
+    ProxyPreserveHost On
+
+    <Proxy balancer://http>
+        BalancerMember http://localhost:3000 route=1
+        BalancerMember http://localhost:3001 route=2
+        ...
+        ProxySet stickysession=ROUTEID
+    </Proxy>
+
+    <Proxy balancer://ws>
+        BalancerMember ws://localhost:3000 route=1
+        BalancerMember ws://localhost:3001 route=2
+        ...
+        ProxySet stickysession=ROUTEID
+    </Proxy>
+
+    <Location />
+        Require all granted
+    </Location>
+
+    RewriteEngine On
+    RewriteCond %{HTTP:Upgrade} =websocket [NC]
+    RewriteRule /(.*)           balancer://ws/$1 [P,L]
+    RewriteCond %{HTTP:Upgrade} !=websocket [NC]
+    RewriteRule /(.*)           balancer://http/$1 [P,L]
+
+    ProxyPassReverse /          http://localhost/
+</VirtualHost>
+
+----------------------------------------
+
+TITLE: Installing Docker
+DESCRIPTION: Command to install Docker using the official Docker installation script.
+
+LANGUAGE: bash
+CODE:
+curl -L https://get.docker.com | sh
+
+----------------------------------------
+
+TITLE: Configuring Nginx SSL Reverse Proxy for Rocket.Chat
+DESCRIPTION: This Nginx server block configures an SSL reverse proxy for Rocket.Chat, including SSL certificate settings and proxy settings for the backend instances.
+
+LANGUAGE: nginx
+CODE:
+# HTTPS Server
+server {
+    listen 443;
+    server_name your_hostname.com;
+
+    error_log /var/log/nginx/rocketchat.access.log;
+
+    ssl on;
+    ssl_certificate /etc/nginx/certificate.crt;
+    ssl_certificate_key /etc/nginx/certificate.key;
+    ssl_protocols TLSv1 TLSv1.1 TLSv1.2; # don't use SSLv3 ref: POODLE
+
+    location / {
+        proxy_pass http://backend;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection "upgrade";
+        proxy_set_header Host $http_host;
+
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto https;
+        proxy_set_header X-Nginx-Proxy true;
+
+        proxy_redirect off;
+        client_max_body_size 0;
+    }
+}
+
+----------------------------------------
+
+TITLE: Configuring Nginx Upstream for Multiple Rocket.Chat Instances
+DESCRIPTION: This Nginx configuration sets up an upstream backend for load balancing between multiple Rocket.Chat instances running on different ports.
+
+LANGUAGE: nginx
+CODE:
+# Upstreams
+upstream backend {
+    server 127.0.0.1:3000;
+    server 127.0.0.1:3001;
+    #server 127.0.0.1:3002;
+    #server 127.0.0.1:3003;
+    .
+    .
+    .
+}
+
+----------------------------------------
+
+TITLE: DDP Streamer Scaling Configuration
+DESCRIPTION: YAML configuration for setting replica count for the DDP streamer service.
+
+LANGUAGE: yaml
+CODE:
+ddpStreamer:
+  replicas: 2
+
+----------------------------------------
+
+TITLE: Sample Rocket.Chat Helm Values Configuration
+DESCRIPTION: Example YAML configuration for deploying Rocket.Chat with custom settings using Helm.
+
+LANGUAGE: yaml
+CODE:
+image:
+  pullPolicy: IfNotPresent
+  repository: registry.rocket.chat/rocketchat/rocket.chat
+  tag: <release>
+
+mongodb:
+  enabled: true
+  auth:
+    passwords:
+      - rocketchat
+    rootPassword: rocketchatroot
+
+microservices:
+  enabled: false
+host: domain.xyz 
+ingress:
+  enabled: true
+  ingressClassName: nginx
+  annotations:
+    cert-manager.io/cluster-issuer: production-cert-issuer
+  tls:
+    - secretName: rckube
+      hosts:
+        - domain.xyz
+
+----------------------------------------
+
+TITLE: Enabling Microservices Configuration
+DESCRIPTION: YAML configuration to enable microservices in the Rocket.Chat Helm deployment.
+
+LANGUAGE: yaml
+CODE:
+microservices:
+  enabled: true
+
+----------------------------------------
+
+TITLE: Docker User Configuration
+DESCRIPTION: Commands to add current user to Docker group and reboot the system for changes to take effect.
+
+LANGUAGE: bash
+CODE:
+sudo usermod -aG docker $USER
+sudo reboot
+
+----------------------------------------
+
+TITLE: Docker Compose Management Commands
+DESCRIPTION: Basic Docker Compose commands for managing Rocket.Chat containers including starting, stopping, and viewing logs.
+
+LANGUAGE: bash
+CODE:
+docker compose up -d
+docker compose down
+docker compose logs -f rocketchat
+
+----------------------------------------
+
+TITLE: Ingress Configuration
+DESCRIPTION: YAML configuration for setting up ingress with nginx controller for the deployment.
+
+LANGUAGE: yaml
+CODE:
+host: # the host to access your rocket.chat instance from, omit the protocol
+ingress:
+  enabled: true
+  ingressClassName: nginx
+
+----------------------------------------
+
+TITLE: Nginx Server Configuration
+DESCRIPTION: Nginx configuration file for setting up SSL and reverse proxy for Rocket.Chat.
+
+LANGUAGE: nginx
+CODE:
+server {
+    listen 443 ssl;
+
+    server_name <ABC.DOMAIN.COM>;
+
+    ssl_certificate /etc/letsencrypt/live/<ABC.DOMAIN.COM>/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/<ABC.DOMAIN.COM>/privkey.pem;
+    ssl_protocols TLSv1 TLSv1.1 TLSv1.2;
+    ssl_prefer_server_ciphers on;
+    ssl_ciphers 'EECDH+AESGCM:EDH+AESGCM:AES256+EECDH:AES256+EDH';
+
+    root /usr/share/nginx/html;
+    index index.html index.htm;
+
+    server_name localhost;
+
+    location / {
+        proxy_pass http://localhost:3000/;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection "upgrade";
+        proxy_set_header Host $http_host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto http;
+        proxy_set_header X-Nginx-Proxy true;
+        proxy_redirect off;
+    }
+}
+
+server {
+    listen 80;
+
+    server_name <ABC.DOMAIN.COM>;
+
+    return 301 https://$host$request_uri;
+}
+
+----------------------------------------
+
+TITLE: Microservices Component Configuration
+DESCRIPTION: YAML configuration structure for individual microservice components in values.yml file.
+
+LANGUAGE: yaml
+CODE:
+presence: {}
+ddpStreamer: {}
+account: {}
+authorization: {}
+streamHub: {}
+
+----------------------------------------
+
+TITLE: Configuring Multiple Rocket.Chat Instances with Systemd
+DESCRIPTION: This systemd service template allows running multiple Rocket.Chat instances on different ports. It uses the %I variable to specify the port number.
+
+LANGUAGE: systemd
+CODE:
+[Unit]
+Description=Rocket.Chat Server
+After=syslog.target
+After=network.target
+
+[Service]
+Type=simple
+Restart=always
+StandardOutput=syslog
+SyslogIdentifier=RocketChat
+User=rocketchat
+Group=rocketchat
+Environment=MONGO_URL=mongodb://your_mongodb:27017/your_database?replicaSet=your_replica_set_name
+Environment=MONGO_OPLOG_URL=mongodb://your_mongodb1:27017/local?replicaSet=your_replica_set_name
+Environment=ROOT_URL=https://your_rocketchat_domain.com
+Environment=PORT=%I
+WorkingDirectory=/path.to.rocketchat/rocket.chat
+ExecStart=/usr/local/bin/node /path.to.rocketchat/rocket.chat/bundle/main.js
+
+[Install]
+    WantedBy=multi-user.target
+
+----------------------------------------
+
+TITLE: Creating the Rocket.Chat Application in OpenShift
+DESCRIPTION: Command to create a new Rocket.Chat application in OpenShift, specifying MongoDB database parameters. This step deploys the Rocket.Chat application with the necessary database configuration.
+
+LANGUAGE: bash
+CODE:
+oc new-app rocket-chat -p MONGODB_DATABASE=rocketchat,MONGODB_USER=rocketchat-admin,MONGODB_PASS=rocketchat
+
+----------------------------------------
+
+TITLE: Creating Ansible Playbook for Rocket.Chat Deployment
+DESCRIPTION: YAML configuration for the rocket_chat.yml playbook file, which applies the Rocket.Chat Ansible role to all servers in the chat_servers group.
+
+LANGUAGE: yaml
+CODE:
+---
+
+  - name: Apply the RocketChat.Server role to all chat_servers
+    hosts: chat_servers
+
+    roles:
+      - RocketChat.Server
+
+----------------------------------------
+
+TITLE: Generating RSA-OAEP Key Pair in JavaScript
+DESCRIPTION: This code snippet demonstrates how to generate an RSA-OAEP key pair for client-side encryption using the Web Crypto API. The key pair is used for encrypting and decrypting the session key in Rocket.Chat's E2EE implementation.
+
+LANGUAGE: JavaScript
+CODE:
+crypto.subtle.generateKey({name: 'RSA-OAEP', modulusLength: 2048, publicExponent: new Uint8Array([0x01, 0x00, 0x01]), hash: {name: 'SHA-256'}}, true, ['encrypt', 'decrypt']);
+
+----------------------------------------
+
+TITLE: Starting MongoDB and Initializing Replica Set for Rocket.Chat
+DESCRIPTION: These commands start the MongoDB service and initialize the replica set required for Rocket.Chat operation.
+
+LANGUAGE: bash
+CODE:
+sudo systemctl enable --now mongod
+
+LANGUAGE: bash
+CODE:
+mongo --eval "printjson(rs.initiate())"
+
+----------------------------------------
+
+TITLE: Rocket.Chat Service Configuration
+DESCRIPTION: SystemD service configuration for Rocket.Chat including environment variables and service dependencies
+
+LANGUAGE: bash
+CODE:
+cat << EOF |sudo tee -a /lib/systemd/system/rocketchat.service
+[Unit]
+Description=The Rocket.Chat server
+After=network.target remote-fs.target nss-lookup.target nginx.service mongod.service
+[Service]
+ExecStart=$NODE_PATH /opt/Rocket.Chat/main.js
+StandardOutput=syslog
+StandardError=syslog
+SyslogIdentifier=rocketchat
+User=rocketchat
+[Install]
+WantedBy=multi-user.target
+EOF
+
+----------------------------------------
+
+TITLE: MongoDB Configuration Settings
+DESCRIPTION: YAML configuration for MongoDB including storage engine and replication settings
+
+LANGUAGE: yaml
+CODE:
+storage:
+  dbPath: /var/lib/mongodb
+  journal:
+    enabled: true
+  engine: wiredTiger
+
+systemLog:
+  destination: file
+  logAppend: true
+  path: /var/log/mongodb/mongod.log
+
+net:
+  port: 27017
+  bindIp: 127.0.0.1
+
+processManagement:
+  fork: true
+  timeZoneInfo: /usr/share/zoneinfo
+
+replication:
+  replSetName: rs01
+
+----------------------------------------
+
+TITLE: Configuring MongoDB for Rocket.Chat on CentOS
+DESCRIPTION: These commands configure the MongoDB storage engine and set up replication, which is required for Rocket.Chat versions 1.0.0 and above.
+
+LANGUAGE: bash
+CODE:
+sudo sed -i "s/^#  engine:/  engine: mmapv1/"  /etc/mongod.conf
+
+LANGUAGE: bash
+CODE:
+sudo sed -i "s/^#replication:/replication:\n  replSetName: rs01/" /etc/mongod.conf
+
+----------------------------------------
+
+TITLE: Docker Image Management Commands
+DESCRIPTION: Commands for pulling different versions of Rocket.Chat Docker images including official, latest, and development versions.
+
+LANGUAGE: bash
+CODE:
+docker pull registry.rocket.chat/rocketchat/rocket.chat
+docker pull registry.rocket.chat/rocketchat/rocket.chat:latest
+docker pull registry.rocket.chat/rocketchat/rocket.chat:<release-tag>
+docker pull registry.rocket.chat/rocketchat/rocket.chat:develop
+
+----------------------------------------
+
+TITLE: Configuring Rocket.Chat deployment with docker-compose
+DESCRIPTION: YAML configuration for docker-compose to set up Rocket.Chat, MongoDB, and MongoDB replica initialization.
+
+LANGUAGE: yaml
+CODE:
+version: '2'
+
+services:
+  rocketchat:
+    image: rocket.chat:latest
+    restart: unless-stopped
+    volumes:
+      - ./uploads:/app/uploads
+    environment:
+      - PORT=3000
+      - ROOT_URL=http://chat.inumio.com
+      - MONGO_URL=mongodb://mongo:27017/rocketchat
+      - MONGO_OPLOG_URL=mongodb://mongo:27017/local
+      - Accounts_UseDNSDomainCheck=True
+    depends_on:
+      - mongo
+    ports:
+      - 8818:3000
+
+  mongo:
+    image: mongo
+    restart: unless-stopped
+    volumes:
+     - $PWD/data:/data/db
+     - $PWD/dump:/dump
+    command: mongod --smallfiles --oplogSize 128 --replSet rs0 --storageEngine=mmapv1
+
+  # this container's job is just run the command to initialize the replica set.
+  # it will run the command and remove himself (it will not stay running)
+  mongo-init-replica:
+    image: mongo
+    command: 'bash -c "for i in `seq 1 30`; do mongo mongo/rocketchat --eval \"rs.initiate({ _id: 'rs0', members: [ { _id: 0, host: 'localhost:27017' } ]})\" && s=$$? && break || s=$$?; echo \"Tried $$i times. Waiting 5 secs...\"; sleep 5; done; (exit $$s)"'
+    depends_on:
+      - mongo
+
+----------------------------------------
+
+TITLE: Installing Rocket.Chat with Helm
+DESCRIPTION: Command to install Rocket.Chat using Helm with a custom values file.
+
+LANGUAGE: bash
+CODE:
+helm install rocketchat -f values.yaml rocketchat/rocketchat
+
+----------------------------------------
+
+TITLE: Configuring Rocket.Chat Systemd Service
+DESCRIPTION: This systemd service configuration file sets up a Rocket.Chat instance as a system service. It specifies environment variables, working directory, and execution parameters.
+
+LANGUAGE: systemd
+CODE:
+[Unit]
+Description=Rocket.Chat Server
+After=syslog.target
+After=network.target
+
+[Service]
+Type=simple
+Restart=always
+StandardOutput=syslog
+SyslogIdentifier=RocketChat
+User=rocketchat
+Group=rocketchat
+Environment=MONGO_URL=mongodb://your_mongodb:27017/your_database?replicaSet=your_replica_set_name
+Environment=MONGO_OPLOG_URL=mongodb://your_mongodb1:27017/local?replicaSet=your_replica_set_name
+Environment=ROOT_URL=https://your_rocketchat_domain.com
+Environment=PORT=3000
+WorkingDirectory=/path.to.rocketchat/rocket.chat
+ExecStart=/usr/local/bin/node /path.to.rocketchat/rocket.chat/bundle/main.js
+
+[Install]
+WantedBy=multi-user.target
+
+----------------------------------------
+
+TITLE: Updating Rocket.Chat Deployment
+DESCRIPTION: Command to upgrade an existing Rocket.Chat deployment using Helm.
+
+LANGUAGE: bash
+CODE:
+helm upgrade rocketchat -f values.yaml rocketchat/rocketchat
+
+----------------------------------------
+
+TITLE: Uninstalling Rocket.Chat
+DESCRIPTION: Command to uninstall the Rocket.Chat deployment using Helm.
+
+LANGUAGE: bash
+CODE:
+helm delete rocketchat
+
+----------------------------------------
+
+TITLE: Installing Required Packages for Rocket.Chat on Ubuntu
+DESCRIPTION: This command installs the necessary packages and dependencies for Rocket.Chat, including curl, build-essential, and graphicsmagick.
+
+LANGUAGE: bash
+CODE:
+sudo apt install -y curl build-essential graphicsmagick
+
+----------------------------------------
+
+TITLE: Security Advisory Table in Markdown
+DESCRIPTION: A markdown table displaying security vulnerabilities with their IDs, severity levels, details, affected versions, and fix versions. Covers multiple security issues including IDOR, DOS, OTP brute-force, rate-limiter bypass, and OAuth access vulnerabilities.
+
+LANGUAGE: markdown
+CODE:
+| ID             | Severity | Details                                                                                                                        | Affected Versions        | Fixed Versions     |
+| -------------- | -------- | ------------------------------------------------------------------------------------------------------------------------------ | ------------------------ | ------------------ |
+| RCSA-2023-0001 | Medium   | Fixed an Insecure Direct Object Reference (IDOR) issue where a user could access any attachment if they have the correct link. | <=6.3.12,<=6.4.8,<=6.5.0 | 6.3.13,6.4.9,6.5.1 |
+| RCSA-2023-0002 | Low      | Fixed an issue where a user could cause Denial of Service (DOS) if they request a very large user or room avatar.              | <=6.3.12,<=6.4.8,<=6.5.0 | 6.3.13,6.4.9,6.5.1 |
+| RCSA-2023-0003 | High     | Fixed an issue where a user could brute-force the email OTP code.                                                              | <=6.3.12,<=6.4.8,<=6.5.0 | 6.3.13,6.4.9,6.5.1 |
+| RCSA-2023-0004 | Medium   | Fixed an issue where a user could bypass the rate-limiter protection by modifying the `User-Agent` HTTP header.                | <=6.3.12,<=6.4.8,<=6.5.0 | 6.3.13,6.4.9,6.5.1 |
+| RCSA-2023-0005 | High     | Fixed an issue where an authenticated user could access all Oauth app details by knowing the application ID.                   | <=6.3.12,<=6.4.8,<=6.5.0 | 6.3.13,6.4.9,6.5.1 |
+
+----------------------------------------
+
+TITLE: Creating Rocket.Chat Systemd Service File on Ubuntu
+DESCRIPTION: This command creates a systemd service file for Rocket.Chat, allowing it to be managed as a system service.
+
+LANGUAGE: bash
+CODE:
+cat << EOF |sudo tee -a /lib/systemd/system/rocketchat.service
+[Unit]
+Description=The Rocket.Chat server
+After=network.target remote-fs.target nss-lookup.target nginx.service mongod.service
+[Service]
+ExecStart=$NODE_PATH /opt/Rocket.Chat/main.js
+StandardOutput=syslog
+StandardError=syslog
+SyslogIdentifier=rocketchat
+User=rocketchat
+[Install]
+WantedBy=multi-user.target
+EOF
+
+----------------------------------------
+
+TITLE: nginx Configuration for Rocket.Chat
+DESCRIPTION: nginx configuration file for Rocket.Chat, including SSL settings and proxy pass to the Rocket.Chat server.
+
+LANGUAGE: nginx
+CODE:
+server {
+  listen 443 ssl;
+  server_name YOUR.SERVER.NAME;
+  ssl_certificate /etc/letsencrypt/live/YOUR.SERVER.NAME/fullchain.pem;
+  ssl_certificate_key /etc/letsencrypt/live/YOUR.SERVER.NAME/privkey.pem;
+  ssl_protocols TLSv1 TLSv1.1 TLSv1.2;
+  ssl_prefer_server_ciphers on;
+  ssl_ciphers 'EECDH+AESGCM:EDH+AESGCM:AES256+EECDH:AES256+EDH';
+  root /usr/share/nginx/html;
+  index index.html index.htm;
+  # Make site accessible from http://localhost/
+  server_name localhost;
+  location / {
+    proxy_pass http://localhost:3000/;
+    proxy_http_version 1.1;
+    proxy_set_header Upgrade $http_upgrade;
+    proxy_set_header Connection "upgrade";
+    proxy_set_header Host $http_host;
+    proxy_set_header X-Real-IP $remote_addr;
+    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    proxy_set_header X-Forwarded-Proto https;
+    proxy_set_header X-Nginx-Proxy true;
+    proxy_redirect off;
+  }
+}
+server {
+  listen 80;
+  server_name YOUR.SERVER.NAME;
+  return 301 https://$host$request_uri;
+}
+
+----------------------------------------
+
+TITLE: Executing Ansible Playbook for Rocket.Chat Deployment
+DESCRIPTION: Command to run the Ansible playbook, which deploys Rocket.Chat to the specified servers using the inventory file.
+
+LANGUAGE: bash
+CODE:
+ansible-playbook -i inventory rocket_chat.yml
+
+----------------------------------------
+
+TITLE: MongoDB Backup and Restore Commands
+DESCRIPTION: Commands for backing up and restoring MongoDB data in Docker containers.
+
+LANGUAGE: bash
+CODE:
+docker ps -a
+docker exec <container_name> sh -c 'mongodump --archive' > db.dump
+docker exec -i <container_name> sh -c 'mongorestore --archive' < db.dump
+
+----------------------------------------
+
+TITLE: Configuring MongoDB for Rocket.Chat on Ubuntu
+DESCRIPTION: This YAML configuration sets up MongoDB with the WiredTiger storage engine and enables replication for use with Rocket.Chat.
+
+LANGUAGE: yaml
+CODE:
+storage:
+  dbPath: /var/lib/mongodb
+  journal:
+    enabled: true
+  engine: wiredTiger
+
+systemLog:
+  destination: file
+  logAppend: true
+  path: /var/log/mongodb/mongod.log
+
+net:
+  port: 27017
+  bindIp: 127.0.0.1
+
+processManagement:
+  fork: true
+  timeZoneInfo: /usr/share/zoneinfo
+
+replication:
+  replSetName: rs01
+
+----------------------------------------
+
+TITLE: Starting Rocket.Chat Service on Ubuntu
+DESCRIPTION: This command enables and starts the Rocket.Chat service using systemd.
+
+LANGUAGE: bash
+CODE:
+sudo systemctl enable --now rocketchat
+
+----------------------------------------
+
+TITLE: Configuring Galaxy Environment Settings
+DESCRIPTION: JSON configuration file for Galaxy deployment settings including MongoDB connection, ROOT_URL, and mail settings
+
+LANGUAGE: json
+CODE:
+{
+  "galaxy.meteor.com": {
+    "env": {
+      "MONGO_URL": "mongodb://<user>:<password>@<host>:<port>/<database>?replicaSet=rs01",
+      "MONGO_OPLOG_URL": "mongodb://<oplog_username>:<oplog_password>@<db_server_host>:<db_server_port>/<oplog_db_name>?authSource=admin&replicaSet=rs01",
+      "ROOT_URL": "...",
+      "MAIL_URL": "..."
+    }
+  }
+}
+
+----------------------------------------
+
+TITLE: Initializing MongoDB Replica Set
+DESCRIPTION: Configures the MongoDB replica set required for Rocket.Chat operation.
+
+LANGUAGE: bash
+CODE:
+rs.initiate({ _id: 'rs0', members: [ { _id: 0, host: 'mongo:27017' } ]})
+
+----------------------------------------
+
+TITLE: Nginx Installation and Configuration
+DESCRIPTION: Series of commands to install and configure Nginx web server.
+
+LANGUAGE: bash
+CODE:
+sudo apt-get install nginx
+cd /etc/nginx/sites-available
+sudo mv default default.reference
+sudo nano /etc/nginx/sites-available/default
+
+----------------------------------------
+
+TITLE: Creating Rocket.Chat Service File on CentOS
+DESCRIPTION: This command creates a systemd service file for Rocket.Chat, defining how the service should be started and managed.
+
+LANGUAGE: bash
+CODE:
+cat << EOF |sudo tee -a /lib/systemd/system/rocketchat.service
+[Unit]
+Description=The Rocket.Chat server
+After=network.target remote-fs.target nss-lookup.target nginx.service mongod.service
+[Service]
+ExecStart=/usr/local/bin/node /opt/Rocket.Chat/main.js
+StandardOutput=syslog
+StandardError=syslog
+SyslogIdentifier=rocketchat
+User=rocketchat
+Environment=MONGO_URL=mongodb://localhost:27017/rocketchat?replicaSet=rs01 MONGO_OPLOG_URL=mongodb://localhost:27017/local?replicaSet=rs01 ROOT_URL=http://localhost:3000/ PORT=3000
+[Install]
+WantedBy=multi-user.target
+EOFash
+
+----------------------------------------
+
+TITLE: Enabling and Starting Rocket.Chat Service on CentOS
+DESCRIPTION: This command enables the Rocket.Chat service to start on boot and starts the service immediately.
+
+LANGUAGE: bash
+CODE:
+sudo systemctl enable rocketchat && sudo systemctl start rocketchat
+
+----------------------------------------
+
+TITLE: Enabling and Starting MongoDB for Rocket.Chat on CentOS
+DESCRIPTION: These commands enable MongoDB to start on boot, start the MongoDB service, and initialize the replica set.
+
+LANGUAGE: bash
+CODE:
+sudo systemctl enable mongod && sudo systemctl start mongod
+
+LANGUAGE: bash
+CODE:
+mongo --eval "printjson(rs.initiate())"
+
+----------------------------------------
+
+TITLE: Pulling and Pushing Rocket.Chat Docker Image for OpenShift
+DESCRIPTION: Commands to pull the Rocket.Chat Docker image from Docker Hub and push it to the internal OpenShift registry. This step is necessary for making the image available within the OpenShift environment.
+
+LANGUAGE: bash
+CODE:
+docker pull registry.rocket.chat/rocketchat/rocket.chat
+docker tag rocketchat/rocket.chat hub.openshift.rhel-cdk.10.1.2.2.xip.io/openshift/rocket-chat
+docker push hub.openshift.rhel-cdk.10.1.2.2.xip.io/openshift/rocket-chat
+
+----------------------------------------
+
+TITLE: Downloading Docker Compose File
+DESCRIPTION: Command to download the example compose.yml file from Rocket.Chat's official repository.
+
+LANGUAGE: bash
+CODE:
+curl -L https://raw.githubusercontent.com/RocketChat/Docker.Official.Image/master/compose.yml -O
+
+----------------------------------------
+
+TITLE: Logging into OpenShift and Creating a New Project
+DESCRIPTION: Commands to log into OpenShift using the OpenShift Client tool and create a new project named 'rocket-chat'. This step sets up the environment for deploying Rocket.Chat.
+
+LANGUAGE: bash
+CODE:
+oc login -u openshift-devel https://10.1.2.2:8443
+oc new-project rocket-chat
+
+----------------------------------------
+
+TITLE: Configuring Rocket.Chat Service
+DESCRIPTION: Commands for setting up system service configuration including user permissions and systemd service file creation.
+
+LANGUAGE: bash
+CODE:
+sudo useradd -M rocketchat && sudo usermod -L rocketchat
+
+LANGUAGE: bash
+CODE:
+sudo chown -R rocketchat:rocketchat /opt/Rocket.Chat
+
+LANGUAGE: bash
+CODE:
+cat << EOF |sudo tee -a /lib/systemd/system/rocketchat.service
+[Unit]
+Description=The Rocket.Chat server
+After=network.target remote-fs.target nss-lookup.target nginx.service mongod.service
+[Service]
+ExecStart=/usr/local/bin/node /opt/Rocket.Chat/main.js
+StandardOutput=syslog
+StandardError=syslog
+SyslogIdentifier=rocketchat
+User=rocketchat
+Environment=MONGO_URL=mongodb://localhost:27017/rocketchat?replicaSet=rs01 MONGO_OPLOG_URL=mongodb://localhost:27017/local?replicaSet=rs01 ROOT_URL=http://localhost:3000/ PORT=3000
+[Install]
+WantedBy=multi-user.target
+EOF
+
+----------------------------------------
+
+TITLE: Deploying Rocket.Chat to IBM Cloud
+DESCRIPTION: This command pushes the Rocket.Chat application to IBM Cloud using the meteor-buildpack-horse buildpack. It allocates 512MB of memory to the app. Replace '<your app name>' with the name you gave your app in the IBM Cloud dashboard.
+
+LANGUAGE: bash
+CODE:
+cf push <your app name> -m 512M -b https://github.com/RocketChat/meteor-buildpack-horse.git
+
+----------------------------------------
+
+TITLE: Installing Node.js and Core Dependencies
+DESCRIPTION: Commands for installing Node.js 12.x and essential build tools including MongoDB, GraphicsMagick, and related dependencies.
+
+LANGUAGE: bash
+CODE:
+sudo apt-get -y update && sudo apt-get install -y curl && curl -sL https://deb.nodesource.com/setup_12.x | sudo bash -
+
+LANGUAGE: bash
+CODE:
+sudo apt-get install -y build-essential libcurl3 mongodb-org-server mongodb-org nodejs graphicsmagick
+
+LANGUAGE: bash
+CODE:
+sudo npm install -g inherits n && sudo n 12.18.4
+
+----------------------------------------
+
+TITLE: Installing MongoDB Dependencies on Kali
+DESCRIPTION: Commands to update package list and configure MongoDB repository with required authentication keys.
+
+LANGUAGE: bash
+CODE:
+sudo apt-get -y update
+
+LANGUAGE: bash
+CODE:
+sudo apt-get install -y dirmngr gnupg && sudo apt-key adv --keyserver hkp://keyserver.ubuntu.com:80 --recv 9DA31620334BD75D9DCB49F368818C72E52529D4
+
+LANGUAGE: bash
+CODE:
+echo "deb http://repo.mongodb.org/apt/debian stretch/mongodb-org/4.0 main" | sudo tee /etc/apt/sources.list.d/mongodb-org-4.0.list
+
+----------------------------------------
+
+TITLE: Configuring MongoDB and Starting Services
+DESCRIPTION: Commands for configuring MongoDB storage engine, replication, and starting both MongoDB and Rocket.Chat services.
+
+LANGUAGE: bash
+CODE:
+sudo sed -i "s/^#  engine:/  engine: wiredTiger/"  /etc/mongod.conf
+
+LANGUAGE: bash
+CODE:
+sudo sed -i "s/^#replication:/replication:\n  replSetName: rs01/" /etc/mongod.conf
+
+LANGUAGE: bash
+CODE:
+sudo systemctl enable mongod && sudo systemctl start mongod
+
+LANGUAGE: bash
+CODE:
+mongo --eval "printjson(rs.initiate())"
+
+LANGUAGE: bash
+CODE:
+sudo systemctl enable rocketchat && sudo systemctl start rocketchat
+
+----------------------------------------
+
+TITLE: Configuring MongoDB for Rocket.Chat on Windows
+DESCRIPTION: This MongoDB configuration file sets up the system log, storage path, and replication set for use with Rocket.Chat on Windows.
+
+LANGUAGE: yaml
+CODE:
+systemLog:
+    destination: file
+    path: [Data Path]\logs\mongod.log
+storage:
+    dbPath: [Data Path]\data
+replication:
+    replSetName: rs1
+
+----------------------------------------
+
+TITLE: Setting up MongoDB for Rocket.Chat on Windows
+DESCRIPTION: These commands create necessary directories, install MongoDB as a service, start the service, and initialize the replica set for Rocket.Chat.
+
+LANGUAGE: batch
+CODE:
+> mkdir [Data Path]
+> cd [Data Path]
+> mkdir [Data Path]\db
+> mkdir [Data Path]\logs
+
+> cd [Installation Path]\bin
+> mongod.exe --config "[Installation Path]\mongod.cfg" --install
+> net start MongoDB
+
+> mongo.exe
+> rs.initiate()
+> exit
+
+----------------------------------------
+
+TITLE: Installing Rocket.Chat Ansible Role
+DESCRIPTION: Command to use ansible-galaxy for installing the Rocket.Chat Ansible role based on the requirements file.
+
+LANGUAGE: bash
+CODE:
+ansible-galaxy install -p roles/ -r roles/requirements.yml
+
+----------------------------------------
+
+TITLE: Installing Node.js Dependencies for Rocket.Chat on Windows
+DESCRIPTION: This script sets environment variables, installs necessary Node.js packages, and configures the Rocket.Chat service on Windows Server.
+
+LANGUAGE: batch
+CODE:
+> SetEnv /x86
+> cd [Installation Path]
+> npm install nave -g
+> npm install node-windows
+
+> npm config set python /Python27/python.exe --global
+> npm config set msvs_version 2010 --global
+
+> set PORT=[Port to Use]
+> set ROOT_URL=[Rocket.Chat URL]
+> set MONGO_URL=mongodb://[Address to Mongo]:27017/[MongoDB Database]
+> set MONGO_OPLOG_URL=mongodb://[Address to Mongo]:27017/local
+> set SCRIPT_PATH=[Installation Path]\main.js
+
+> cd programs\server
+> npm install
+
+> cd ../..
+> node rocket.service.js install
+> net start Rocket.Chat
+
+----------------------------------------
+
+TITLE: Creating Ansible Galaxy Requirements File
+DESCRIPTION: YAML configurations for the requirements.yml file used by ansible-galaxy to fetch the Rocket.Chat Ansible role. Different versions are shown for Ansible 1.9.4 and 2.0.
+
+LANGUAGE: yaml
+CODE:
+- src: RocketChat.Server
+  version: master
+
+LANGUAGE: yaml
+CODE:
+- src: RocketChat.Server
+  version: v2.2.2
+
+----------------------------------------
+
+TITLE: Configuring Ansible Inventory for Rocket.Chat Servers
+DESCRIPTION: Example configurations for the Ansible inventory file, including how to group servers and set SSH passwords if necessary.
+
+LANGUAGE: yaml
+CODE:
+chat.my.domain
+
+LANGUAGE: yaml
+CODE:
+[chat_servers]
+chat.my.domain
+talk.my.domain
+
+LANGUAGE: yaml
+CODE:
+[chat_servers]
+chat.my.domain ansible_ssh_pass=SuP3rseCre7pA$sw0rd
+talk.my.domain
+
+----------------------------------------
+
+TITLE: Downloading and Installing Rocket.Chat
+DESCRIPTION: Commands for downloading, extracting, and installing Rocket.Chat with proper permissions and user configuration.
+
+LANGUAGE: bash
+CODE:
+curl -L https://releases.rocket.chat/latest/download -o /tmp/rocket.chat.tgz
+
+LANGUAGE: bash
+CODE:
+tar -xzf /tmp/rocket.chat.tgz -C /tmp
+
+LANGUAGE: bash
+CODE:
+cd /tmp/bundle/programs/server && npm install
+
+LANGUAGE: bash
+CODE:
+sudo mv /tmp/bundle /opt/Rocket.Chat
+
+----------------------------------------
+
+TITLE: Creating Ansible Directory and Inventory File
+DESCRIPTION: Commands to create a directory for Ansible files and an inventory file to list the servers for Rocket.Chat deployment.
+
+LANGUAGE: bash
+CODE:
+mkdir ansible
+cd ansible
+ansible $
+
+LANGUAGE: bash
+CODE:
+touch inventory
+
+----------------------------------------
+
+TITLE: Downloading Rocket.Chat Package
+DESCRIPTION: Commands for downloading Rocket.Chat using curl or wget, including version-specific downloads
+
+LANGUAGE: bash
+CODE:
+curl -L https://releases.rocket.chat/latest/download -o /tmp/rocket.chat.tgz
+
+----------------------------------------
+
+TITLE: Installing Ansible via PIP
+DESCRIPTION: Commands to install Ansible using pip, the Python package manager. Also includes steps for installing pip on Mac OS X if not already available.
+
+LANGUAGE: bash
+CODE:
+sudo pip install ansible
+
+LANGUAGE: bash
+CODE:
+sudo easy_install pip 
+sudo pip install ansible
+
+----------------------------------------
+
+TITLE: SSH Connection to EC2 Instance
+DESCRIPTION: Command to establish SSH connection to the AWS EC2 instance using a key file.
+
+LANGUAGE: bash
+CODE:
+ssh -i <path_to_key_file.pem> ubuntu@<public_ip_address>
+
+----------------------------------------
+
+TITLE: Rocket.Chat Server Installation and Configuration
+DESCRIPTION: User-level commands for cloning Meteor, extracting Rocket.Chat, installing dependencies, and configuring environment variables for server startup.
+
+LANGUAGE: shell
+CODE:
+$ git clone --depth 1 -b release-1.2.1-universal https://github.com/4commerce-technologies-AG/meteor
+$ cd meteor
+$ ./meteor --version
+$ cd $HOME
+$ tar xf rocket.chat-freebsd-develop.tgz
+$ cd $HOME/bundle/programs/server
+$ $HOME/meteor/dev_bundle/bin/npm install
+$ cd $HOME/bundle
+$ export MONGO_URL=mongodb://localhost:27017/rocketchat
+$ export Accounts_UseDNSDomainCheck=false
+$ export ROOT_URL=http://your.host:3000
+$ export PORT=3000
+$ export ADMIN_PASS=supersecret
+$ export ADMIN_USER=admin
+$ $HOME/meteor/dev_bundle/bin/node $HOME/bundle/main.js
+
+----------------------------------------
+
+TITLE: Installing System Dependencies and User Setup on FreeBSD
+DESCRIPTION: Root-level commands for installing required packages, enabling MongoDB, and creating a dedicated Rocket.Chat user account.
+
+LANGUAGE: shell
+CODE:
+# pkg install bash git GraphicsMagick mongodb python scons gmake
+# sysrc mongod_enable=YES
+# service mongod start
+# pw groupadd rocketchat
+# pw useradd rocketchat -g rocketchat -s /usr/local/bin/bash -m
+# su -l rocketchat
+
+----------------------------------------
+
+TITLE: Cloning Rocket.Chat Repository
+DESCRIPTION: This command clones the latest version of Rocket.Chat from GitHub to your local machine. It's the first step in deploying Rocket.Chat to IBM Cloud.
+
+LANGUAGE: bash
+CODE:
+git clone https://github.com/RocketChat/Rocket.Chat.git
+
+----------------------------------------
+
+TITLE: Installing and Starting Rocket.Chat
+DESCRIPTION: Downloads Rocket.Chat, installs dependencies, sets environment variables, and starts the Rocket.Chat server.
+
+LANGUAGE: bash
+CODE:
+groupadd -g 2000 rocket
+useradd -g rocket -u 2000 rocket
+
+cd /opt
+curl -L https://releases.rocket.chat/latest/download -o rocket.chat.tgz
+tar zxvf rocket.chat.tgz
+mv bundle Rocket.Chat
+chown -R rocket:rocket /opt/Rocket.Chat
+
+su - rocket
+cd /opt/Rocket.Chat/programs/server
+npm install
+cd ../..
+
+export ROOT_URL=http://YOUR.SERVER.NAME/
+export MONGO_URL=mongodb://rocket:4rgl3b4rgl3@localhost:27017/rocketchat
+export PORT=3000
+
+node main.js
+
+----------------------------------------
+
+TITLE: Creating Rocket.Chat User and Setting Permissions on CentOS
+DESCRIPTION: These commands create a system user for Rocket.Chat and set the appropriate permissions on the Rocket.Chat directory.
+
+LANGUAGE: bash
+CODE:
+sudo useradd -M rocketchat && sudo usermod -L rocketchat
+
+LANGUAGE: bash
+CODE:
+sudo chown -R rocketchat:rocketchat /opt/Rocket.Chat
+
+----------------------------------------
+
+TITLE: Configuring nginx for Rocket.Chat
+DESCRIPTION: Sets up nginx configuration directories, creates symbolic links, and enables nginx service.
+
+LANGUAGE: bash
+CODE:
+cd /etc/nginx
+mkdir sites-enabled sites-available
+
+cd /etc/nginx/sites-enabled
+ln -s ../sites-available/rocket_chat.conf .
+
+systemctl enable nginx
+systemctl start nginx
+
+----------------------------------------
+
+TITLE: System Update Commands for Debian
+DESCRIPTION: Updates the system packages and performs system upgrade
+
+LANGUAGE: bash
+CODE:
+sudo apt -y update
+sudo apt -y upgrade
+
+----------------------------------------
+
+TITLE: Installing Let's Encrypt SSL Certificates
+DESCRIPTION: Clones Let's Encrypt repository and generates SSL certificates for the Rocket.Chat server domain.
+
+LANGUAGE: bash
+CODE:
+git clone https://github.com/letsencrypt/letsencrypt /opt/letsencrypt
+cd /opt/letsencrypt && ./letsencrypt-auto certonly --standalone --email YOUR@EMAIL.ADDRESS -d YOUR.SERVER.NAME
+
+----------------------------------------
+
+TITLE: Configuring MongoDB for Rocket.Chat
+DESCRIPTION: Starts MongoDB service, creates admin user, and sets up database and user for Rocket.Chat application.
+
+LANGUAGE: bash
+CODE:
+systemctl enable mongodb
+systemctl start mongodb
+
+mongo
+use admin
+
+db.createUser({
+    user: "root",
+    pwd: "fl!bb3rtyJ!bb3tt",
+    roles: [ "root" ]
+})
+
+exit
+
+mongo --authenticationDatabase admin -u root -p
+
+use rocketchat
+
+db.createUser({
+    user: "rocket",
+    pwd: "4rgl3b4rgl3",
+    roles: [ "readWrite", "dbAdmin" ]
+})
+
+exit
+
+----------------------------------------
+
+TITLE: Extracting Rocket.Chat Archive on CentOS
+DESCRIPTION: This command extracts the downloaded Rocket.Chat archive to the /tmp directory.
+
+LANGUAGE: bash
+CODE:
+tar -xzf /tmp/rocket.chat.tgz -C /tmp
+
+----------------------------------------
+
+TITLE: Installing Required Packages on OpenSUSE Leap 42.2
+DESCRIPTION: Adds MongoDB repository, updates system packages, and installs necessary software including MongoDB, Node.js, npm, nginx, and GraphicsMagick.
+
+LANGUAGE: bash
+CODE:
+zypper addrepo http://download.opensuse.org/repositories/server:database/openSUSE_Leap_42.2/server:database.repo
+zypper refresh
+zypper -n update
+zypper -n install mongodb nodejs4 npm4 nginx GraphicsMagick gcc-c++
+
+----------------------------------------
+
+TITLE: Installing GraphicsMagick Dependency for Rocket.Chat on CentOS
+DESCRIPTION: This command installs the GraphicsMagick package, which is a required dependency for Rocket.Chat.
+
+LANGUAGE: bash
+CODE:
+sudo yum install -y GraphicsMagick
+
+----------------------------------------
+
+TITLE: Requesting AWS Spot Instance for OpenSUSE Leap 42.2
+DESCRIPTION: Uses AWS CLI to request a spot instance for running OpenSUSE Leap 42.2. Requires pre-configured AWS CLI and a JSON file with instance specifications.
+
+LANGUAGE: bash
+CODE:
+aws ec2 request-spot-instances --cli-input-json file://spot_instance.json
+
+----------------------------------------
+
+TITLE: Verifying Docker installation
+DESCRIPTION: Command to verify that Docker is installed correctly by listing running containers.
+
+LANGUAGE: bash
+CODE:
+docker ps
+
+----------------------------------------
+
+TITLE: Starting Rocket.Chat server
+DESCRIPTION: Command to start the Rocket.Chat server container using docker-compose.
+
+LANGUAGE: bash
+CODE:
+docker compose up -d rocketchat
+
+----------------------------------------
+
+TITLE: Initializing MongoDB replica set for Rocket.Chat
+DESCRIPTION: Command to start the MongoDB replica set initialization container using docker-compose.
+
+LANGUAGE: bash
+CODE:
+docker compose up -d mongo-init-replica
+
+----------------------------------------
+
+TITLE: Nginx Testing and Restart
+DESCRIPTION: Commands to test Nginx configuration and restart the service.
+
+LANGUAGE: bash
+CODE:
+sudo nginx -t
+sudo systemctl restart nginx
+
+----------------------------------------
+
+TITLE: Starting MongoDB for Rocket.Chat
+DESCRIPTION: Command to start the MongoDB container using docker-compose.
+
+LANGUAGE: bash
+CODE:
+docker compose up -d mongo
+
+----------------------------------------
+
+TITLE: Creating Docker Network for Rocket.Chat
+DESCRIPTION: Creates a Docker network named 'chatNetwork' for communication between Rocket.Chat and MongoDB containers.
+
+LANGUAGE: bash
+CODE:
+sudo docker network create chatNetwork
+
+----------------------------------------
+
+TITLE: Pulling Docker images for Rocket.Chat deployment
+DESCRIPTION: Commands to download the required Docker images for MongoDB and Rocket.Chat.
+
+LANGUAGE: bash
+CODE:
+docker pull mongo
+docker pull registry.rocket.chat/rocketchat/rocket.chat
+
+----------------------------------------
+
+TITLE: Checking Container Status
+DESCRIPTION: Displays the status of all Docker containers running on the instance.
+
+LANGUAGE: bash
+CODE:
+sudo docker ps -a
+
+----------------------------------------
+
+TITLE: Creating directories for Rocket.Chat
+DESCRIPTION: Commands to create the necessary directories for Rocket.Chat and MongoDB data storage.
+
+LANGUAGE: bash
+CODE:
+mkdir /home/rocketchat
+cd /home/rocketchat
+mkdir data
+mkdir dump
+
+----------------------------------------
+
+TITLE: Installing docker-compose on Ubuntu
+DESCRIPTION: Commands to download and install docker-compose, including setting execution permissions.
+
+LANGUAGE: bash
+CODE:
+curl -L https://github.com/docker/compose/releases/download/1.5.0/docker-compose-`uname -s`-`uname -m` > /usr/local/bin/docker-compose
+
+LANGUAGE: bash
+CODE:
+chmod +x /usr/local/bin/docker-compose
+
+----------------------------------------
+
+TITLE: Disabling Domain Check in Rocket.Chat MongoDB
+DESCRIPTION: MongoDB commands to disable the domain check code in Rocket.Chat. This step modifies the database settings to allow the use of email addresses without domain validation.
+
+LANGUAGE: javascript
+CODE:
+use rocketchat
+db.auth('rocketchat-admin','rocketchat')
+db.rocketchat_settings.update({_id:'Accounts_UseDNSDomainCheck'},{$set:{value:false}})
+
+----------------------------------------
+
+TITLE: Installing Docker on Ubuntu
+DESCRIPTION: Command to install Docker using a shell script fetched from get.docker.com.
+
+LANGUAGE: bash
+CODE:
+curl -sSL https://get.docker.com/ | sh
+
+----------------------------------------
+
+TITLE: Stopping Rocket.Chat Service - Linux SystemD Command
+DESCRIPTION: Command to stop the Rocket.Chat service before performing an update
+
+LANGUAGE: bash
+CODE:
+sudo systemctl stop rocketchat
+
+----------------------------------------
+
+TITLE: Updating Ubuntu repositories and installing curl
+DESCRIPTION: Commands to update the package lists and install curl on Ubuntu.
+
+LANGUAGE: bash
+CODE:
+apt-get update
+
+LANGUAGE: bash
+CODE:
+apt-get install curl
+
+----------------------------------------
+
+TITLE: FreeBSD RC Script for Rocket.Chat
+DESCRIPTION: System startup script for Rocket.Chat service initialization. Includes environment configuration and service dependencies.
+
+LANGUAGE: shell
+CODE:
+#!/bin/sh
+
+# PROVIDE: rocketchat
+# REQUIRE: LOGIN mongod
+# KEYWORD: shutdown
+#
+# Add the following lines to /etc/rc.conf.local or /etc/rc.conf
+# to enable this service:
+#
+# rocketchat_enable (bool): Set to "NO" by default.
+# rocketchat_env (str): List of environment variables passed to rocketchat
+#
+
+. /etc/rc.subr
+
+name="rocketchat"
+rcvar=rocketchat_enable
+
+load_rc_config $name
+
+: ${rocketchat_enable="NO"}
+: ${rocketchat_env="MONGO_URL=mongodb://localhost:27017/rocketchat PORT=3000"}
+: ${rocketchat_user="rocketchat"}
+: ${rocketchat_group="rocketchat"}
+
+command=/home/rocketchat/meteor/dev_bundle/bin/node
+command_args="/home/rocketchat/Rocket.Chat/.meteor/local/build/main.js"
+
+run_rc_command "$1"
+
+----------------------------------------
+
+TITLE: Configuring Rocket.Chat User and Permissions on Ubuntu
+DESCRIPTION: These commands create a rocketchat user, lock the account, and set the correct permissions for the Rocket.Chat installation directory.
+
+LANGUAGE: bash
+CODE:
+sudo useradd -M rocketchat && sudo usermod -L rocketchat
+
+LANGUAGE: bash
+CODE:
+sudo chown -R rocketchat:rocketchat /opt/Rocket.Chat
+
+----------------------------------------
+
+TITLE: Moving Rocket.Chat Files to Installation Directory on Ubuntu
+DESCRIPTION: This command moves the extracted Rocket.Chat files to the /opt directory for installation.
+
+LANGUAGE: bash
+CODE:
+sudo mv /tmp/bundle /opt/Rocket.Chat
+
+----------------------------------------
+
+TITLE: Extracting Rocket.Chat Files on Ubuntu
+DESCRIPTION: These commands extract the downloaded Rocket.Chat tarball and install the required npm packages for the server.
+
+LANGUAGE: bash
+CODE:
+tar -xzf /tmp/rocket.chat.tgz -C /tmp
+
+LANGUAGE: bash
+CODE:
+cd /tmp/bundle/programs/server && npm install --production
+
+----------------------------------------
+
+TITLE: Downloading Latest Rocket.Chat Release on Ubuntu
+DESCRIPTION: This command downloads the latest release of Rocket.Chat from the official repository and saves it as a tarball in the /tmp directory.
+
+LANGUAGE: bash
+CODE:
+curl -L https://releases.rocket.chat/latest/download -o /tmp/rocket.chat.tgz
+
+----------------------------------------
+
+TITLE: Moving Rocket.Chat Files to /opt Directory on CentOS
+DESCRIPTION: This command moves the extracted Rocket.Chat files from the temporary directory to the /opt directory.
+
+LANGUAGE: bash
+CODE:
+sudo mv /tmp/bundle /opt/Rocket.Chat
+
+----------------------------------------
+
+TITLE: Installing Rocket.Chat Server Dependencies on CentOS
+DESCRIPTION: This command navigates to the server directory and installs the necessary npm packages for Rocket.Chat.
+
+LANGUAGE: bash
+CODE:
+cd /tmp/bundle/programs/server && npm install
+
+----------------------------------------
+
+TITLE: Downloading Latest Rocket.Chat Release on CentOS
+DESCRIPTION: This command downloads the latest release of Rocket.Chat from the official repository and saves it as a tar file in the /tmp directory.
+
+LANGUAGE: bash
+CODE:
+curl -L https://releases.rocket.chat/latest/download -o /tmp/rocket.chat.tgz
+
+----------------------------------------
+
+TITLE: Running Rocket.Chat Container
+DESCRIPTION: Deploys the Rocket.Chat container with necessary environment variables and network configuration.
+
+LANGUAGE: bash
+CODE:
+docker run --name rocketchat -d -p 80:3000 \
+--network chatNetwork --env PORT=3000 \
+--env ROOT_URL=https://<your-domain> \
+--env MONGO_URL=mongodb://mongo:27017/rocketchat \
+--env MONGO_OPLOG_URL=mongodb://mongo:27017/local rocket.chat:latest
+
+----------------------------------------
+
+TITLE: Accessing MongoDB Container Shell
+DESCRIPTION: Opens an interactive MongoDB shell within the running MongoDB container.
+
+LANGUAGE: bash
+CODE:
+sudo docker exec -it mongo mongosh
+
+----------------------------------------
+
+TITLE: Running MongoDB Container
+DESCRIPTION: Launches a MongoDB container with replica set configuration and oplog sizing for Rocket.Chat.
+
+LANGUAGE: bash
+CODE:
+sudo docker run --name mongo --network chatNetwork -d mongo  --oplogSize 128 --replSet rs0
+
+----------------------------------------
+
+TITLE: Installing Docker on GCE Instance
+DESCRIPTION: Downloads and installs Docker on the Google Compute Engine instance using the official Docker installation script.
+
+LANGUAGE: bash
+CODE:
+sudo wget -qO- https://get.docker.com/ | sh
+
+----------------------------------------
+
+TITLE: Installing Required Dependencies
+DESCRIPTION: Installs necessary packages including curl, build-essential, and graphicsmagick
+
+LANGUAGE: bash
+CODE:
+sudo apt install -y curl build-essential graphicsmagick
+
+----------------------------------------
+
+TITLE: Starting Rocket.Chat Service
+DESCRIPTION: Command to start the Rocket.Chat service after update completion
+
+LANGUAGE: bash
+CODE:
+sudo systemctl start rocketchat
+
+----------------------------------------
+
+TITLE: Installing Dependencies and Setting Permissions
+DESCRIPTION: Commands to install npm dependencies and set proper ownership permissions
+
+LANGUAGE: bash
+CODE:
+cd /tmp/bundle/programs/server && npm install
+sudo mv /tmp/bundle /opt/Rocket.Chat
+sudo chown -R rocketchat:rocketchat /opt/Rocket.Chat
+
+----------------------------------------
+
+TITLE: Downloading Latest Rocket.Chat Version
+DESCRIPTION: Commands to download and extract the latest version of Rocket.Chat
+
+LANGUAGE: bash
+CODE:
+curl -L https://releases.rocket.chat/latest/download -o /tmp/rocket.chat.tgz
+tar -xzf /tmp/rocket.chat.tgz -C /tmp
+
+----------------------------------------
+
+TITLE: Installing Specific Node.js Version
+DESCRIPTION: Command to install a specific Node.js version required by Rocket.Chat
+
+LANGUAGE: bash
+CODE:
+sudo n install <x.x.x>
+
+----------------------------------------
+
+TITLE: Installing Debian Build Dependencies
+DESCRIPTION: Command to install required build packages for Debian systems
+
+LANGUAGE: bash
+CODE:
+sudo apt-get install -y build-essential graphicsmagick
+
+----------------------------------------
+
+TITLE: Removing Rocket.Chat Installation Directory
+DESCRIPTION: Command to remove the existing Rocket.Chat installation directory
+
+LANGUAGE: bash
+CODE:
+sudo rm -rf /opt/Rocket.Chat
+
+----------------------------------------
+
+TITLE: Helm Installation Command
+DESCRIPTION: Command to install Rocket.Chat using Helm with the configured values file.
+
+LANGUAGE: bash
+CODE:
+helm install rocketchat -f values.yaml rocketchat/rocketchat
+
+----------------------------------------
+
+TITLE: Monolith Replica Configuration
+DESCRIPTION: YAML configuration for setting the replica count for the monolith deployment.
+
+LANGUAGE: yaml
+CODE:
+replicaCount: 2
+
+----------------------------------------
+
+TITLE: Adding RocketChat Helm Repository
+DESCRIPTION: Command to add the RocketChat helm repository to your system for deploying microservices.
+
+LANGUAGE: sh
+CODE:
+helm repo add rocketchat https://rocketchat.github.io/helm-charts
+
+----------------------------------------
+
+TITLE: Adding Rocket.Chat Helm Repository
+DESCRIPTION: Command to add the Rocket.Chat Helm chart repository to your local Helm installation.
+
+LANGUAGE: bash
+CODE:
+helm repo add rocketchat https://rocketchat.github.io/helm-charts
+
+----------------------------------------
+
+TITLE: Obtaining Let's Encrypt Certificate
+DESCRIPTION: Command to obtain SSL certificate from Let's Encrypt for the domain.
+
+LANGUAGE: bash
+CODE:
+sudo certbot certonly --standalone --email <emailaddress@email.com> -d <domain.com> -d <subdomain.domain.com>
+
+----------------------------------------
+
+TITLE: Installing Certbot for SSL
+DESCRIPTION: Commands to install Certbot for obtaining Let's Encrypt SSL certificates.
+
+LANGUAGE: bash
+CODE:
+sudo apt update
+sudo apt install certbot
+
+----------------------------------------
+
+TITLE: Bamboo Webhook URL Format
+DESCRIPTION: Example format of the webhook URL used to connect Bamboo with Rocket.Chat
+
+LANGUAGE: markdown
+CODE:
+https://example.com:3000/api/apps/private/6a7b5a37-b9bb-4d49-ae38-c6ebcb3fe479/ejDjQ9Kyh2wBgrSwt/webhook
+
+----------------------------------------
+
+TITLE: Bamboo Webhook Command
+DESCRIPTION: Slash command used to initialize Bamboo integration in a Rocket.Chat channel
+
+LANGUAGE: markdown
+CODE:
+/bamboo install
+
+----------------------------------------
+
+TITLE: Structuring Encrypted Message Object in JavaScript
+DESCRIPTION: This code snippet demonstrates how an encrypted message is structured before sending it in Rocket.Chat's E2EE implementation. The encrypted message is wrapped in an object with a type indicator for E2EE.
+
+LANGUAGE: JavaScript
+CODE:
+final_message: {
+  msg: <encrypted_message>,
+  T: "e2e"
+}
+
+----------------------------------------
+
+TITLE: Generating AES-CBC Session Key in JavaScript
+DESCRIPTION: This code snippet shows how to generate an AES-CBC session key for encrypting messages in Rocket.Chat's E2EE implementation. The session key is used for the actual encryption of messages and files.
+
+LANGUAGE: JavaScript
+CODE:
+RocketChat.E2E.crypto.generateKey({name: 'AES-CBC', length: 128}, true, ['encrypt', 'decrypt'])
+
+----------------------------------------
+
+TITLE: Linking to Rocket.Chat Security Policy in Markdown
+DESCRIPTION: This markdown snippet provides a link to the Security Policy section of the Rocket.Chat handbook. It uses a header and a hyperlink to guide users to the full policy documentation.
+
+LANGUAGE: markdown
+CODE:
+# Security Policy
+
+Refer to the [Security Policy](https://handbook.rocket.chat/departments-and-operations/security/security-policy) on our Handbook.
+
+----------------------------------------
+
+TITLE: Cloud Services Center Header
+DESCRIPTION: Markdown header defining the Cloud Services Center section
+
+LANGUAGE: markdown
+CODE:
+# Cloud Services Center
+
+----------------------------------------
+
+TITLE: Disabling domain check for email validation in Rocket.Chat
+DESCRIPTION: Commands to port-forward MongoDB pod, connect to the database, and update the setting to disable domain check for email validation.
+
+LANGUAGE: bash
+CODE:
+# oc port-forward <mongodb_pod> 27017
+# mongo localhost:27017
+
+> use rocketchat
+> db.auth('rocketchat-admin','rocketchat')
+> db.rocketchat_settings.update({_id:'Accounts_UseDNSDomainCheck'},{$set:{value:false}})
+
+----------------------------------------
+
+TITLE: Creating Rocket.Chat application in OpenShift
+DESCRIPTION: Command to create the Rocket.Chat application using the imported template and specifying MongoDB parameters.
+
+LANGUAGE: bash
+CODE:
+# oc new-app rocket-chat -p MONGODB_DATABASE=rocketchat -p MONGODB_USER=rocketchat-admin -p MONGODB_PASSWORD=rocketchat
+
+----------------------------------------
+
+TITLE: Importing Rocket.Chat ImageStream and templates to OpenShift
+DESCRIPTION: Commands to clone the Rocket.Chat GitHub repository and import the templates to the OpenShift project.
+
+LANGUAGE: bash
+CODE:
+# git clone https://github.com/RocketChat/Rocket.Chat
+# cd Rocket.Chat
+# oc create -f .openshift/rocket-chat-ephemeral.json
+# oc create -f .openshift/rocket-chat-persistent.json
+
+----------------------------------------
+
+TITLE: Creating a new OpenShift project for Rocket.Chat
+DESCRIPTION: Command to create a new project in OpenShift to host the Rocket.Chat application.
+
+LANGUAGE: bash
+CODE:
+$ oc new-project rocket-chat
+
+----------------------------------------
+
+TITLE: Logging into OpenShift API using CLI
+DESCRIPTION: Command to log in to OpenShift Online Next Gen using the API token. The API token can be found in the about page of the Web console.
+
+LANGUAGE: bash
+CODE:
+# oc login https://api.preview.openshift.com --token=<api_token>
+
+----------------------------------------
+
+TITLE: Deploying to Galaxy Command
+DESCRIPTION: Command line instruction for deploying the application to Galaxy servers with region-specific settings
+
+LANGUAGE: bash
+CODE:
+DEPLOY_HOSTNAME=[region] meteor deploy [hostname] --settings [filepath.json]
+
+----------------------------------------
+
+TITLE: Cloning Rocket.Chat Repository
+DESCRIPTION: Commands to clone the Rocket.Chat source code repository and navigate to its directory
+
+LANGUAGE: bash
+CODE:
+git clone https://github.com/RocketChat/Rocket.Chat.git
+cd Rocket.Chat
+
+----------------------------------------
+
+TITLE: Cloning and Installing Rocket.Chat
+DESCRIPTION: Download Rocket.Chat source code and install dependencies including bcrypt
+
+LANGUAGE: bash
+CODE:
+$ cd $HOME
+$ git clone https://github.com/RocketChat/Rocket.Chat.git
+$ cd Rocket.Chat
+$ npm install --clang=1 bcrypt
+
+----------------------------------------
+
+TITLE: Building Meteor Development Bundle
+DESCRIPTION: Clone and build the FreeBSD-compatible version of Meteor from source
+
+LANGUAGE: bash
+CODE:
+$ cd $HOME
+$ git clone -b freebsd https://github.com/williambr/meteor
+$ cd meteor
+$ ./scripts/build-mongo-for-dev-bundle.sh
+$ ./scripts/build-node-for-dev-bundle.sh
+$ ./scripts/generate-dev-bundle.sh
+
+----------------------------------------
+
+TITLE: Setting Environment Variables for Build
+DESCRIPTION: Configure environment variables required for building Rocket.Chat on FreeBSD
+
+LANGUAGE: bash
+CODE:
+$ export MAKE_CMD=gmake
+$ export CXX=clang++
+$ export CC=clang
+
+----------------------------------------
+
+TITLE: Installing and Configuring PM2
+DESCRIPTION: Install PM2 process manager globally and set it up to run on FreeBSD startup
+
+LANGUAGE: bash
+CODE:
+$ sudo npm install pm2 -g
+$ sudo pm2 startup freebsd
+
+----------------------------------------
+
+TITLE: Installing Required FreeBSD Packages
+DESCRIPTION: Install necessary system packages for Rocket.Chat deployment including git, scons, python, gcc48, gmake, npm, and bash
+
+LANGUAGE: bash
+CODE:
+$ sudo pkg install git scons python gcc48 gmake npm bash wget
+
+----------------------------------------
+
+TITLE: Post-Connection Welcome Message
+DESCRIPTION: Welcome message displayed after successful SSH connection to the Rocket.Chat droplet, providing information about the Docker-based deployment and useful documentation links.
+
+LANGUAGE: bash
+CODE:
+##################################################################################################################################################################
+Rocket.Chat is the leading open source team chat software solution. Free, unlimited and completely customizable with on-premises and SaaS cloud hosting.
+Replace email, HipChat & Slack with the ultimate team chat software solution.
+
+This Rocket.Chat image uses docker under the hood. To learn more, please read our docker documentation - https://docs.rocket.chat/deploy/prepare-for-your-deployment/rapid-deployment-methods/docker-and-docker-compose
+
+You can find the compose project in $HOME/rocketchat directory.
+
+Looking for how to use Rocket.Chat? Be sure to check our docs: https://docs.rocket.chat
+Need some help? Join our community forums https://forums.rocket.chat and https://open.rocket.chat
+##################################################################################################################################################################
+
+----------------------------------------
+
+TITLE: SSH Connection to Digital Ocean Droplet
+DESCRIPTION: Command to establish SSH connection to the Rocket.Chat droplet on Digital Ocean. Requires the droplet's IP address and root password for authentication.
+
+LANGUAGE: bash
+CODE:
+ssh root@your_droplet_ip
+
+----------------------------------------
+
+TITLE: Logging into IBM Cloud CLI
+DESCRIPTION: This command logs you into the IBM Cloud command-line interface. It's necessary to authenticate before pushing your app to IBM Cloud.
+
+LANGUAGE: bash
+CODE:
+ibmcloud cf login
+
+----------------------------------------
+
+TITLE: Port Forwarding and Accessing MongoDB
+DESCRIPTION: Commands to set up port forwarding for the MongoDB pod and access the MongoDB shell. This step is necessary for making changes to the Rocket.Chat database configuration.
+
+LANGUAGE: bash
+CODE:
+oc port-forward <mongodb_pod> 27017
+mongo localhost:27017
+
+----------------------------------------
+
+TITLE: Cloning Repository and Adding Templates to OpenShift
+DESCRIPTION: Commands to clone the Rocket.Chat OpenShift repository and add the necessary templates and ImageStream to the OpenShift namespace. This step prepares the OpenShift environment with the required configurations for Rocket.Chat deployment.
+
+LANGUAGE: bash
+CODE:
+git clone https://github.com/rimolive/rocketchat-openshift
+oc create -n openshift -f rocket-chat-is.json
+oc create -n openshift -f rocket-chat-ephemeral.json
+
+----------------------------------------
+
+TITLE: AWS Spot Instance Configuration JSON
+DESCRIPTION: JSON configuration for requesting an AWS spot instance with OpenSUSE Leap 42.2 AMI, specifying instance type, subnet, security group, and other parameters.
+
+LANGUAGE: json
+CODE:
+{
+  "InstanceCount": 1,
+  "SpotPrice": "0.015",
+  "LaunchSpecification":
+    {
+      "ImageId": "ami-49570529",
+      "InstanceType": "m3.medium",
+      "SubnetId": "subnet-########",
+      "KeyName": "tinyjoy",
+      "IamInstanceProfile": {
+        "Arn": "arn:aws:iam::############:instance-profile/IAMS-PROFILE-NAME"
+      },
+      "SecurityGroupIds": ["sg-########"]
+    },
+  "Type": "one-time"
+}

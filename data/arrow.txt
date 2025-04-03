@@ -1,0 +1,4690 @@
+TITLE: Querying SQLite with ADBC Python Driver
+DESCRIPTION: Example of using the ADBC SQLite driver in Python to execute a SQL query and fetch results as an Arrow table. Shows how the same ADBC interface works across different databases.
+
+LANGUAGE: python
+CODE:
+import adbc_driver_sqlite.dbapi
+
+uri = "file:mydb.sqlite"
+with adbc_driver_sqlite.dbapi.connect(uri) as conn:
+    with conn.cursor() as cur:
+        cur.execute("SELECT * FROM customer")
+        table = cur.fetch_arrow_table()
+        # Process the results
+
+----------------------------------------
+
+TITLE: Converting Spark DataFrame to Pandas with Arrow Optimization
+DESCRIPTION: Example showing performance comparison between traditional and Arrow-optimized DataFrame conversion using toPandas(). Demonstrates enabling Arrow support and converting a large DataFrame with numerical data.
+
+LANGUAGE: python
+CODE:
+Welcome to
+      ____              __
+     / __/__  ___ _____/ /__
+    _\ \/ _ \/ _ `/ __/  '_/
+   /__ / .__/\_,_/_/ /_/\_\   version 2.3.0-SNAPSHOT
+      /_/
+
+Using Python version 2.7.13 (default, Dec 20 2016 23:09:15)
+SparkSession available as 'spark'.
+
+In [1]: from pyspark.sql.functions import rand
+   ...: df = spark.range(1 << 22).toDF("id").withColumn("x", rand())
+   ...: df.printSchema()
+   ...: 
+root
+ |-- id: long (nullable = false)
+ |-- x: double (nullable = false)
+
+
+In [2]: %time pdf = df.toPandas()
+CPU times: user 17.4 s, sys: 792 ms, total: 18.1 s
+Wall time: 20.7 s
+
+In [3]: spark.conf.set("spark.sql.execution.arrow.enabled", "true")
+
+In [4]: %time pdf = df.toPandas()
+CPU times: user 40 ms, sys: 32 ms, total: 72 ms                                 
+Wall time: 737 ms
+
+In [5]: pdf.describe()
+Out[5]: 
+                 id             x
+count  4.194304e+06  4.194304e+06
+mean   2.097152e+06  4.998996e-01
+std    1.210791e+06  2.887247e-01
+min    0.000000e+00  8.291929e-07
+25%    1.048576e+06  2.498116e-01
+50%    2.097152e+06  4.999210e-01
+75%    3.145727e+06  7.498380e-01
+max    4.194303e+06  9.999996e-01
+
+----------------------------------------
+
+TITLE: Querying PostgreSQL with ADBC Python Driver
+DESCRIPTION: Example of using the ADBC PostgreSQL driver in Python to execute a SQL query and fetch results as an Arrow table. Demonstrates the DBAPI 2.0 style interface with Arrow extensions.
+
+LANGUAGE: python
+CODE:
+import adbc_driver_postgresql.dbapi
+
+uri = "postgresql://localhost:5432/postgres?user=postgres&password=password"
+with adbc_driver_postgresql.dbapi.connect(uri) as conn:
+    with conn.cursor() as cur:
+        cur.execute("SELECT * FROM customer")
+        table = cur.fetch_arrow_table()
+        # Process the results
+
+----------------------------------------
+
+TITLE: Defining Complex Nested JSON Data Structure in Python
+DESCRIPTION: Example of three JSON documents showcasing nested data structures with lists of structs and structs of lists. The structure includes nullable and non-nullable fields at various nesting levels.
+
+LANGUAGE: python
+CODE:
+{
+  "a": [1],
+  "b": [
+    {
+      "b1": 1
+    },
+    {
+      "b1": 1,
+      "b2": [
+        3, 4
+      ]
+    }
+  ]
+}
+
+{
+  "b": [
+    {
+      "b1": 2
+    },
+  ]
+}
+
+{
+  "a": [null, null],
+  "b": [null]
+}
+
+----------------------------------------
+
+TITLE: Querying NYC Taxi Dataset with DuckDB and Arrow in R
+DESCRIPTION: This snippet demonstrates how to analyze the NYC Taxi Dataset using DuckDB and Arrow in R. It filters data, performs group-by operations, and calculates average fares and tip percentages.
+
+LANGUAGE: R
+CODE:
+library(duckdb)
+library(arrow)
+library(dplyr)
+
+ds <- arrow::open_dataset("nyc-taxi", partitioning = c("year", "month"))
+
+ds %>%
+  filter(year > 2014 & passenger_count > 0 & trip_distance > 0.25 & fare_amount > 0) %>%
+  to_duckdb() %>%
+  group_by(passenger_count) %>%
+  mutate(tip_pct = tip_amount / fare_amount) %>%
+  summarise(
+    fare_amount = mean(fare_amount, na.rm = TRUE),
+    tip_amount = mean(tip_amount, na.rm = TRUE),
+    tip_pct = mean(tip_pct, na.rm = TRUE)
+  ) %>%
+  arrange(passenger_count) %>%
+  collect()
+
+----------------------------------------
+
+TITLE: Demonstrating Arrow C Data Interface with R and Python
+DESCRIPTION: This code snippet demonstrates how to use the Arrow C Data Interface to share data between R and Python Arrow libraries. It creates arrays in both languages, applies operations, and concatenates them using zero-copy data sharing.
+
+LANGUAGE: R
+CODE:
+library(arrow)
+library(reticulate)
+use_virtualenv("arrow")
+pa <- import("pyarrow")
+
+# Create an array in PyArrow
+a <- pa$array(c(1, 2, 3))
+a
+
+## Array
+## <double>
+## [
+##   1,
+##   2,
+##   3
+## ]
+
+# Apply R methods on the PyArrow-created array:
+a[a > 1]
+
+## Array
+## <double>
+## [
+##   2,
+##   3
+## ]
+
+# Create an array in R and pass it to PyArrow
+b <- Array$create(c(5, 6, 7))
+a_and_b <- pa$concat_arrays(r_to_py(list(a, b)))
+a_and_b
+
+## Array
+## <double>
+## [
+##   1,
+##   2,
+##   3,
+##   5,
+##   6,
+##   7
+## ]
+
+----------------------------------------
+
+TITLE: Serialization Benchmark Implementation
+DESCRIPTION: Complete implementation for benchmarking serialization performance between pickle and Ray/Arrow, including visualization code.
+
+LANGUAGE: python
+CODE:
+import pickle
+import pyarrow
+import matplotlib.pyplot as plt
+import numpy as np
+import timeit
+
+
+def benchmark_object(obj, number=10):
+    # Time serialization and deserialization for pickle.
+    pickle_serialize = timeit.timeit(
+        lambda: pickle.dumps(obj, protocol=pickle.HIGHEST_PROTOCOL),
+        number=number)
+    serialized_obj = pickle.dumps(obj, pickle.HIGHEST_PROTOCOL)
+    pickle_deserialize = timeit.timeit(lambda: pickle.loads(serialized_obj),
+                                       number=number)
+
+    # Time serialization and deserialization for Ray.
+    ray_serialize = timeit.timeit(
+        lambda: pyarrow.serialize(obj).to_buffer(), number=number)
+    serialized_obj = pyarrow.serialize(obj).to_buffer()
+    ray_deserialize = timeit.timeit(
+        lambda: pyarrow.deserialize(serialized_obj), number=number)
+
+    return [[pickle_serialize, pickle_deserialize],
+            [ray_serialize, ray_deserialize]]
+
+
+def plot(pickle_times, ray_times, title, i):
+    fig, ax = plt.subplots()
+    fig.set_size_inches(3.8, 2.7)
+
+    bar_width = 0.35
+    index = np.arange(2)
+    opacity = 0.6
+
+    plt.bar(index, pickle_times, bar_width,
+            alpha=opacity, color='r', label='Pickle')
+
+    plt.bar(index + bar_width, ray_times, bar_width,
+            alpha=opacity, color='c', label='Ray')
+
+    plt.title(title, fontweight='bold')
+    plt.ylabel('Time (seconds)', fontsize=10)
+    labels = ['serialization', 'deserialization']
+    plt.xticks(index + bar_width / 2, labels, fontsize=10)
+    plt.legend(fontsize=10, bbox_to_anchor=(1, 1))
+    plt.tight_layout()
+    plt.yticks(fontsize=10)
+    plt.savefig('plot-' + str(i) + '.png', format='png')
+
+
+test_objects = [
+    [np.random.randn(50000) for i in range(100)],
+    {'weight-' + str(i): np.random.randn(50000) for i in range(100)},
+    {i: set(['string1' + str(i), 'string2' + str(i)]) for i in range(100000)},
+    [str(i) for i in range(200000)]
+]
+
+titles = [
+    'List of large numpy arrays',
+    'Dictionary of large numpy arrays',
+    'Large dictionary of small sets',
+    'Large list of strings'
+]
+
+for i in range(len(test_objects)):
+    plot(*benchmark_object(test_objects[i]), titles[i], i)
+
+----------------------------------------
+
+TITLE: Grouped Aggregation with NYC Taxi Dataset in R Arrow
+DESCRIPTION: Demonstrates how to perform grouped aggregation on a large dataset using Arrow's dplyr interface. Shows filtering, grouping and summarizing operations on a 1.5B row dataset.
+
+LANGUAGE: R
+CODE:
+ds <- open_dataset("nyc-taxi", partitioning = c("year", "month"))
+ds %>%
+  filter(
+    passenger_count > 0,
+    passenger_count < 6,
+    grepl("csh", payment_type, ignore.case = TRUE)
+  ) %>%
+  group_by(passenger_count) %>%
+  summarize(
+    avg = mean(total_amount, na.rm = TRUE),
+    count = n()
+  ) %>%
+  arrange(desc(count)) %>%
+  collect()
+
+----------------------------------------
+
+TITLE: Querying NYC Taxi Dataset with DuckDB and Arrow in Python
+DESCRIPTION: This snippet shows how to analyze the NYC Taxi Dataset using DuckDB's Relational API in Python. It performs similar operations as the R example, including filtering and aggregation.
+
+LANGUAGE: Python
+CODE:
+import duckdb
+import pyarrow as pa
+import pyarrow.dataset as ds
+
+nyc = ds.dataset('nyc-taxi/', partitioning=["year", "month"])
+
+nyc = duckdb.arrow(nyc)
+
+nyc.filter("year > 2014 & passenger_count > 0 & trip_distance > 0.25 & fare_amount > 0")
+    .aggregate("SELECT AVG(fare_amount), AVG(tip_amount), AVG(tip_amount / fare_amount) as tip_pct","passenger_count").arrow()
+
+----------------------------------------
+
+TITLE: Executing SQL Queries with DataFusion in Rust
+DESCRIPTION: Demonstrates how to create an execution context, define a schema, register a CSV data source, and execute a SQL query that performs aggregation with grouping and filtering. Shows how to iterate through and process the query results.
+
+LANGUAGE: rust
+CODE:
+// create execution context
+let mut ctx = ExecutionContext::new();
+
+// define schema for data source (csv file)
+let schema = Arc::new(Schema::new(vec![
+    Field::new("c1", DataType::Utf8, false),
+    Field::new("c2", DataType::UInt32, false),
+    Field::new("c3", DataType::Int8, false),
+    Field::new("c4", DataType::Int16, false),
+    Field::new("c5", DataType::Int32, false),
+    Field::new("c6", DataType::Int64, false),
+    Field::new("c7", DataType::UInt8, false),
+    Field::new("c8", DataType::UInt16, false),
+    Field::new("c9", DataType::UInt32, false),
+    Field::new("c10", DataType::UInt64, false),
+    Field::new("c11", DataType::Float32, false),
+    Field::new("c12", DataType::Float64, false),
+    Field::new("c13", DataType::Utf8, false),
+]));
+
+// register csv file with the execution context
+let csv_datasource =
+    CsvDataSource::new("test/data/aggregate_test_100.csv", schema.clone(), 1024);
+ctx.register_datasource("aggregate_test_100", Rc::new(RefCell::new(csv_datasource)));
+
+let sql = "SELECT c1, MIN(c12), MAX(c12) FROM aggregate_test_100 WHERE c11 > 0.1 AND c11 < 0.9 GROUP BY c1";
+
+// execute the query
+let relation = ctx.sql(&sql).unwrap();
+let mut results = relation.borrow_mut();
+
+// iterate over the results
+while let Some(batch) = results.next().unwrap() {
+    println!(
+        "RecordBatch has {} rows and {} columns",
+        batch.num_rows(),
+        batch.num_columns()
+    );
+
+    let c1 = batch
+        .column(0)
+        .as_any()
+        .downcast_ref::<BinaryArray>()
+        .unwrap();
+
+    let min = batch
+        .column(1)
+        .as_any()
+        .downcast_ref::<Float64Array>()
+        .unwrap();
+
+    let max = batch
+        .column(2)
+        .as_any()
+        .downcast_ref::<Float64Array>()
+        .unwrap();
+
+    for i in 0..batch.num_rows() {
+        let c1_value: String = String::from_utf8(c1.value(i).to_vec()).unwrap();
+        println!("{}, Min: {}, Max: {}", c1_value, min.value(i), max.value(i),);
+    }
+}
+
+----------------------------------------
+
+TITLE: Benchmarking Arrow Flight Data Transfer Speed in Shell
+DESCRIPTION: This code snippet demonstrates running a benchmark for Arrow Flight data transfer, showing the transfer of approximately 12 gigabytes of data in about 4 seconds, achieving a speed of over 3 GB/s.
+
+LANGUAGE: shell
+CODE:
+$ ./arrow-flight-benchmark --records_per_stream 100000000
+Bytes read: 12800000000
+Nanos: 3900466413
+Speed: 3129.63 MB/s
+
+----------------------------------------
+
+TITLE: Executing SQL Query on Parquet Data
+DESCRIPTION: Example SQL query demonstrating projection and predicate pushdown on Parquet data. The query selects column B where column A is greater than 35.
+
+LANGUAGE: SQL
+CODE:
+SELECT B from table where A > 35
+
+----------------------------------------
+
+TITLE: Querying Top User-SearchPhrase Combinations in SQL
+DESCRIPTION: SQL query to find the top ten user and search phrase combinations across all clicks in the ClickBench hits dataset.
+
+LANGUAGE: SQL
+CODE:
+SELECT "UserID", "SearchPhrase", COUNT(*)
+FROM hits
+GROUP BY "UserID", "SearchPhrase"
+ORDER BY COUNT(*)
+DESC LIMIT 10;
+
+----------------------------------------
+
+TITLE: Basic PyArrow Serialization Example
+DESCRIPTION: Demonstrates basic usage of PyArrow serialization API for converting Python objects to and from Arrow format.
+
+LANGUAGE: python
+CODE:
+x = [(1, 2), 'hello', 3, 4, np.array([5.0, 6.0])]
+serialized_x = pyarrow.serialize(x).to_buffer()
+deserialized_x = pyarrow.deserialize(serialized_x)
+
+----------------------------------------
+
+TITLE: DuckDB Integration with Arrow in R
+DESCRIPTION: Demonstrates moving data between Arrow and DuckDB systems for advanced query operations. Shows filtering, window functions, and aggregations across both systems.
+
+LANGUAGE: R
+CODE:
+flights_filtered <- arrow_table(nycflights13::flights) %>%
+  select(carrier, origin, dest, arr_delay) %>%
+  mutate(arr_delay = pmax(arr_delay, 0)) %>%
+  to_duckdb() %>%
+  group_by(carrier, origin, dest) %>%
+  mutate(arr_delay_rank = percent_rank(arr_delay)) %>%
+  filter(arr_delay_rank > 0.95)
+
+----------------------------------------
+
+TITLE: Joining Flight Data with Airlines in R Arrow
+DESCRIPTION: Shows how to perform a left join between flight data and airline information using Arrow tables. Demonstrates filtering and joining operations.
+
+LANGUAGE: R
+CODE:
+arrow_table(nycflights13::flights) %>%
+  filter(
+    year == 2013,
+    month == 10,
+    day == 9,
+    origin == "JFK",
+    dest == "LAS"
+    ) %>%
+  select(dep_time, arr_time, carrier) %>%
+  left_join(
+    arrow_table(nycflights13::airlines)
+   ) %>%
+  collect()
+
+----------------------------------------
+
+TITLE: Inserting Data into External Table in DataFusion SQL
+DESCRIPTION: Demonstrates creating an external table and inserting data using DataFusion SQL. This snippet showcases the new DML capabilities in DataFusion 34.0.0.
+
+LANGUAGE: SQL
+CODE:
+CREATE EXTERNAL TABLE awesome_table(x INT) STORED AS PARQUET LOCATION '/tmp/my_awesome_table';
+
+INSERT INTO awesome_table SELECT x * 10 FROM my_source_table;
+
+----------------------------------------
+
+TITLE: Working with Arrays in DataFusion SQL
+DESCRIPTION: Demonstrates array operations in DataFusion SQL, including element access and array length calculation. This showcases the improved ARRAY support in version 34.0.0.
+
+LANGUAGE: SQL
+CODE:
+SELECT column1, 
+       column1[1] AS first_element, 
+       array_length(column1) AS len 
+FROM my_table;
+
+----------------------------------------
+
+TITLE: Executing Query with Arrow Flight SQL in C++
+DESCRIPTION: Demonstrates how to execute a SQL query using Flight SQL client, fetch FlightInfo describing results, and retrieve data partitions. Shows handling of query execution, result streaming, and table conversion.
+
+LANGUAGE: cpp
+CODE:
+flight::FlightCallOptions call_options;
+
+// Execute the query, getting a FlightInfo describing how to fetch the results
+std::cout << "Executing query: '" << FLAGS_query << "'" << std::endl;
+ARROW_ASSIGN_OR_RAISE(std::unique_ptr<flight::FlightInfo> flight_info,
+                      client->Execute(call_options, FLAGS_query));
+
+// Fetch each partition sequentially (though this can be done in parallel)
+for (const flight::FlightEndpoint& endpoint : flight_info->endpoints()) {
+  // Here we assume each partition is on the same server we originally queried, but this
+  // isn't true in general: the server may split the query results between multiple
+  // other servers, which we would have to connect to.
+
+  // The "ticket" in the endpoint is opaque to the client. The server uses it to
+  // identify which part of the query results to return.
+  ARROW_ASSIGN_OR_RAISE(auto stream, client->DoGet(call_options, endpoint.ticket));
+  // Read all results into an Arrow Table, though we can iteratively process record
+  // batches as they arrive as well
+  std::shared_ptr<arrow::Table> table;
+  ARROW_RETURN_NOT_OK(stream->ReadAll(&table));
+  std::cout << "Read one partition:" << std::endl;
+  std::cout << table->ToString() << std::endl;
+}
+
+----------------------------------------
+
+TITLE: Parquet RLE-Bitpacking Encoding Example
+DESCRIPTION: Illustrates how Parquet uses run-length encoding (RLE) and bit-packing to compress dictionary indices for repeated values.
+
+LANGUAGE: text
+CODE:
+['apple', 'apple', 'apple', 'apple', 'apple', 'apple', 'orange']
+
+[rle-run=(6, 0),
+ bit-packed-run=[1]]
+
+----------------------------------------
+
+TITLE: Streaming Data from Arrow Dataset with DuckDB in Python
+DESCRIPTION: This snippet shows how to stream data from an Arrow Dataset using DuckDB in Python. It demonstrates reading data in batches, which is useful for larger-than-memory datasets.
+
+LANGUAGE: Python
+CODE:
+nyc_dataset = ds.dataset('nyc-taxi/', partitioning=["year", "month"])
+
+con = duckdb.connect()
+
+query = con.execute("SELECT * FROM nyc_dataset")
+record_batch_reader = query.fetch_record_batch()
+chunk = record_batch_reader.read_next_batch()
+
+----------------------------------------
+
+TITLE: Defining JSON-like Nested Data Structure in Python
+DESCRIPTION: Example of three JSON documents with nested structures, including nullable and non-nullable fields, demonstrating the use of structs and nested fields.
+
+LANGUAGE: python
+CODE:
+{
+  "a": 1,
+  "b": {
+    "b1": 1,
+    "b2": 3
+   },
+  "d": {
+   "d1":  1
+  }
+}
+
+{
+  "a": 2,
+  "b": {
+    "b2": 4
+  },
+  "c": {
+    "c1": 6
+  },
+  "d": {
+    "d1": 2,
+    "d2": 1
+  }
+}
+
+{
+  "b": {
+    "b1": 5,
+    "b2": 6
+  },
+  "c": {
+    "c1": 7
+  }
+}
+
+----------------------------------------
+
+TITLE: Illustrating Columnar Data Representation in Python
+DESCRIPTION: Example of how data is represented in a columnar format, with each column's data stored contiguously and null values handled.
+
+LANGUAGE: python
+CODE:
+Column1: [1, 3, 5]
+Column2: [2, 4, 4]
+Column3: [null, 5, 5]
+
+----------------------------------------
+
+TITLE: Creating Objects in Plasma Store with Python
+DESCRIPTION: Demonstrates how to create and initialize an object in the Plasma store. The process involves creating an object ID, allocating a buffer, writing to the buffer, and sealing the object to make it immutable and available to other clients.
+
+LANGUAGE: python
+CODE:
+# Create an object.
+object_id = pyarrow.plasma.ObjectID(20 * b'a')
+object_size = 1000
+buffer = memoryview(client.create(object_id, object_size))
+
+# Write to the buffer.
+for i in range(1000):
+    buffer[i] = 0
+
+# Seal the object making it immutable and available to other clients.
+client.seal(object_id)
+
+----------------------------------------
+
+TITLE: Benchmarking Data Collection with Arrow
+DESCRIPTION: Compares performance of collecting data from Spark to R with and without Arrow using microbenchmark package.
+
+LANGUAGE: R
+CODE:
+microbenchmark::microbenchmark(
+  setup = library(arrow),
+  arrow_on = {
+    collect(sparklyr_df)
+  },
+  arrow_off = {
+    if ("arrow" %in% .packages()) detach("package:arrow")
+    collect(sparklyr_df)
+  },
+  times = 10
+) %T>% print() %>% ggplot2::autoplot()
+
+----------------------------------------
+
+TITLE: Reading and Querying Arrow Table with DuckDB in Python
+DESCRIPTION: This snippet demonstrates how to read a Parquet file into an Arrow Table and query it using DuckDB's Relational API in Python.
+
+LANGUAGE: Python
+CODE:
+arrow_table = pq.read_table('integers.parquet')
+
+rel_from_arrow = duckdb.arrow(arrow_table)
+
+print(rel_from_arrow.query('arrow_table', 'SELECT SUM(data) FROM arrow_table WHERE data > 50').fetchone())
+
+arrow_table_from_duckdb = rel_from_arrow.arrow()
+
+----------------------------------------
+
+TITLE: Printing Array Elements in C using nanoarrow
+DESCRIPTION: This snippet shows how to extract and print elements from an Arrow array using nanoarrow's C API. It initializes an array view, checks the storage type, and iterates through the array elements.
+
+LANGUAGE: c
+CODE:
+#include <stdio.h>
+#include "nanoarrow.h"
+
+int print_simple_array(struct ArrowArray* array, struct ArrowSchema* schema) {
+  struct ArrowError error;
+  struct ArrowArrayView array_view;
+  NANOARROW_RETURN_NOT_OK(ArrowArrayViewInitFromSchema(&array_view, schema, &error));
+
+  if (array_view.storage_type != NANOARROW_TYPE_INT32) {
+    printf("Array has storage that is not int32\n");
+  }
+
+  int result = ArrowArrayViewSetArray(&array_view, array, &error);
+  if (result != NANOARROW_OK) {
+    ArrowArrayViewReset(&array_view);
+    return result;
+  }
+
+  for (int64_t i = 0; i < array->length; i++) {
+    printf("%d\n", (int)ArrowArrayViewGetIntUnsafe(&array_view, i));
+  }
+
+  ArrowArrayViewReset(&array_view);
+  return NANOARROW_OK;
+}
+
+----------------------------------------
+
+TITLE: Reading Parquet Files with Apache Arrow in R
+DESCRIPTION: Shows how to read a Parquet file into a data.frame using the read_parquet() function from the arrow package.
+
+LANGUAGE: R
+CODE:
+library(arrow)
+df <- read_parquet("path/to/file.parquet")
+
+----------------------------------------
+
+TITLE: Displaying CArrayView representation in Python
+DESCRIPTION: This example demonstrates how to use nanoarrow to print a detailed view of a string array's internal structure using the CArrayView wrapper.
+
+LANGUAGE: python
+CODE:
+na.c_array_view(pa.array(["one", "two", "three", None]))
+
+----------------------------------------
+
+TITLE: Using nanoarrow Python classes
+DESCRIPTION: Examples of using nanoarrow's Schema, Array, and ArrayStream classes in Python.
+
+LANGUAGE: python
+CODE:
+import nanoarrow as na
+
+na.int32()
+#> <Schema> int32
+
+na.Array([1, 2, 3], na.int32())
+#> nanoarrow.Array<int32>[3]
+#> 1
+#> 2
+#> 3
+
+url = "https://github.com/apache/arrow-experiments/raw/main/data/arrow-commits/arrow-commits.arrows"
+na.ArrayStream.from_url(url)
+#> nanoarrow.ArrayStream<non-nullable struct<commit: string, time: timestamp('us', 'UTC'), files: int3...>
+
+----------------------------------------
+
+TITLE: Selecting Columns when Reading Parquet Files in R
+DESCRIPTION: Demonstrates how to use the col_select argument with tidyselect helpers to read only specific columns from a Parquet file.
+
+LANGUAGE: R
+CODE:
+df <- read_parquet("iris.parquet", col_select = starts_with("Sepal"))
+
+----------------------------------------
+
+TITLE: Configuring Arrow dependency source in CMake
+DESCRIPTION: Example of setting the source for Arrow dependencies in CMake. Options include SYSTEM (use system-provided libraries), BUNDLED (build from source), and AUTO (try system first, fallback to bundled).
+
+LANGUAGE: CMake
+CODE:
+set(${Library}_SOURCE SYSTEM|BUNDLED|AUTO)
+
+----------------------------------------
+
+TITLE: Reading Arrow IPC streams with nanoarrow in R
+DESCRIPTION: Example of using read_nanoarrow() to read an Arrow IPC stream from a URL in R.
+
+LANGUAGE: r
+CODE:
+library(nanoarrow)
+
+url <- "https://github.com/apache/arrow-experiments/raw/main/data/arrow-commits/arrow-commits.arrows"
+
+read_nanoarrow(url) |>
+  tibble::as_tibble()
+#> # A tibble: 15,487 × 5
+#>    commit                                time                files merge message
+#>    <chr>                                 <dttm>              <int> <lgl> <chr>
+#>  1 49cdb0fe4e98fda19031c864a18e6156c6ed… 2024-03-07 02:00:52     2 FALSE GH-403…
+#>  2 1d966e98e41ce817d1f8c5159c0b9caa4de7… 2024-03-06 21:51:34     1 FALSE GH-403…
+#>  3 96f26a89bd73997f7532643cdb27d04b7097… 2024-03-06 20:29:15     1 FALSE GH-402…
+#>  4 ee1a8c39a55f3543a82fed900dadca791f6e… 2024-03-06 07:46:45     1 FALSE GH-403…
+#>  5 3d467ac7bfae03cf2db09807054c5672e195… 2024-03-05 16:13:32     1 FALSE GH-201…
+#>  6 ef6ea6beed071ed070daf03508f4c14b4072… 2024-03-05 14:53:13    20 FALSE GH-403…
+#>  7 53e0c745ad491af98a5bf18b67541b12d779… 2024-03-05 12:31:38     2 FALSE GH-401…
+#>  8 3ba6d286caad328b8572a3b9228045da8c8d… 2024-03-05 08:15:42     6 FALSE GH-400…
+#>  9 4ce9a5edd2710fb8bf0c642fd0e3863b01c2… 2024-03-05 07:56:25     2 FALSE GH-401…
+#> 10 2445975162905bd8d9a42ffc9cd0daa0e19d… 2024-03-05 01:04:20     1 FALSE GH-403…
+#> # ℹ 15,477 more rows
+
+----------------------------------------
+
+TITLE: Type Casting Arrays in Python with PyArrow
+DESCRIPTION: Demonstrates how to perform type casting of Arrow arrays in Python using the pyarrow library. Shows conversion from Boolean to Int32 array type while preserving null values.
+
+LANGUAGE: python
+CODE:
+import pyarrow as pa
+
+arr = pa.array([True, False, None, True])
+
+arr
+Out[19]:
+<pyarrow.lib.BooleanArray object at 0x7ff6fb069b88>
+[
+  True,
+  False,
+  NA,
+  True
+]
+
+arr.cast(pa.int32())
+Out[20]:
+<pyarrow.lib.Int32Array object at 0x7ff6fb0383b8>
+[
+  1,
+  0,
+  NA,
+  1
+]
+
+----------------------------------------
+
+TITLE: Installing Arrow on Debian/Ubuntu Systems
+DESCRIPTION: Shell commands to install Arrow C++ and GLib packages on Debian-based Linux distributions using apt package manager
+
+LANGUAGE: shell
+CODE:
+sudo apt update
+sudo apt install -y -V ca-certificates lsb-release wget
+wget https://apache.jfrog.io/artifactory/arrow/$(lsb_release --id --short | tr 'A-Z' 'a-z')/apache-arrow-apt-source-latest-$(lsb_release --codename --short).deb
+sudo apt install -y -V ./apache-arrow-apt-source-latest-$(lsb_release --codename --short).deb
+sudo apt update
+sudo apt install -y -V libarrow-dev # For C++
+sudo apt install -y -V libarrow-glib-dev # For GLib (C)
+
+----------------------------------------
+
+TITLE: Simplified Dynamic Arrow Schema in Go
+DESCRIPTION: Example of a simplified Arrow schema that would be dynamically generated based on actual data usage patterns. Shows how unused fields are removed and dictionary encodings are optimized.
+
+LANGUAGE: go
+CODE:
+var (
+  TracesSchema = arrow.NewSchema([]arrow.Field{
+    {Name: constants.ID, Type: arrow.PrimitiveTypes.Uint16, Nullable: true},
+    {Name: constants.StartTimeUnixNano, Type: arrow.FixedWidthTypes.Timestamp_ns},
+    {Name: constants.TraceId, Type: &arrow.FixedSizeBinaryType{ByteWidth: 16}},
+    {Name: constants.SpanId, Type: &arrow.FixedSizeBinaryType{ByteWidth: 8}},
+    {Name: constants.Name, Type: &arrow.DictionaryType {
+      IndexType: arrow.PrimitiveTypes.Uint8,
+      ValueType: arrow.BinaryTypes.String}},
+    {Name: constants.KIND, Type: &arrow.DictionaryType {
+      IndexType: arrow.PrimitiveTypes.Uint8,
+      ValueType: arrow.PrimitiveTypes.Int32,
+    }, Nullable: true},
+  }, nil)
+)
+
+----------------------------------------
+
+TITLE: Writing Parquet Files with Apache Arrow in R
+DESCRIPTION: Shows how to write a data.frame to a Parquet file using the write_parquet() function from the arrow package.
+
+LANGUAGE: R
+CODE:
+write_parquet(df, "path/to/different_file.parquet")
+
+----------------------------------------
+
+TITLE: Memory Allocation with Standard POSIX APIs in C
+DESCRIPTION: Example showing incremental vector building using standard POSIX aligned memory allocation APIs. This approach requires explicit memory copying when expanding allocations.
+
+LANGUAGE: c
+CODE:
+size_t size = 128 * 1024;
+void* ptr = aligned_alloc(64, size);
+for (int i = 0; i < 10; i++) {
+  size_t new_size = size * 2;
+  void* ptr2 = aligned_alloc(64, new_size);
+  memcpy(ptr2, ptr, size);
+  free(ptr);
+  ptr = ptr2;
+  size = new_size;
+}
+free(ptr);
+
+----------------------------------------
+
+TITLE: Installing PyArrow via pip
+DESCRIPTION: Command to install the Python Arrow package (pyarrow) using pip package manager with version pinning
+
+LANGUAGE: shell
+CODE:
+pip install 'pyarrow=={{site.data.versions['current'].pinned_number}}'
+
+----------------------------------------
+
+TITLE: Memory Allocation with jemalloc APIs in C
+DESCRIPTION: Improved version using jemalloc's specialized APIs for aligned memory allocation. This approach can avoid explicit memory copying by using in-place expansion when possible.
+
+LANGUAGE: c
+CODE:
+size_t size = 128 * 1024;
+void* ptr = mallocx(size, MALLOCX_ALIGN(64));
+for (int i = 0; i < 10; i++) {
+  size *= 2;
+  ptr = rallocx(ptr, size, MALLOCX_ALIGN(64));
+}
+dallocx(ptr, MALLOCX_ALIGN(64));
+
+----------------------------------------
+
+TITLE: Exporting PostgreSQL Table to Binary Format
+DESCRIPTION: SQL command to export the 'demo' table to a binary file using the COPY command.
+
+LANGUAGE: sql
+CODE:
+COPY demo TO '/tmp/demo.bin' WITH BINARY;
+
+----------------------------------------
+
+TITLE: Dataset Column Projection Example
+DESCRIPTION: Example of using expressions for column projection when scanning datasets in Python.
+
+LANGUAGE: python
+CODE:
+ds.field('a') / ds.field('b')
+
+----------------------------------------
+
+TITLE: Printing Array Elements in C++ using nanoarrow
+DESCRIPTION: This snippet demonstrates the use of nanoarrow's experimental C++ interface. It provides a more concise way to print elements from an Arrow array using unique_ptr-like wrappers for nanoarrow C objects.
+
+LANGUAGE: cpp
+CODE:
+#include <stdio.h>
+#include "nanoarrow.hpp"
+
+int print_simple_array2(struct ArrowArray* array, struct ArrowSchema* schema) {
+  struct ArrowError error;
+  nanoarrow::UniqueArrayView array_view;
+  NANOARROW_RETURN_NOT_OK(ArrowArrayViewInitFromSchema(array_view.get(), schema, &error));
+  NANOARROW_RETURN_NOT_OK(ArrowArrayViewSetArray(array_view.get(), array, &error));
+  for (int64_t i = 0; i < array->length; i++) {
+    printf("%d\n", (int)ArrowArrayViewGetIntUnsafe(array_view.get(), i));
+  }
+  return NANOARROW_OK;
+}
+
+----------------------------------------
+
+TITLE: Creating and Populating PostgreSQL Table
+DESCRIPTION: SQL commands to create a sample table named 'demo' and insert three rows of data into it.
+
+LANGUAGE: sql
+CODE:
+CREATE TABLE demo (id BIGINT, val TEXT, val2 BIGINT);
+INSERT INTO demo VALUES (1, 'foo', 64), (2, 'a longer string', 128), (3, 'yet another string', 10);
+
+----------------------------------------
+
+TITLE: Creating an Arrow Array in R using nanoarrow
+DESCRIPTION: This R code snippet demonstrates how to use the nanoarrow R package to convert an R vector to an Arrow array. It shows the installation of the package and the creation of a simple integer array.
+
+LANGUAGE: r
+CODE:
+# install.packages("remotes")
+remotes::install_github("apache/arrow-nanoarrow/r", build = FALSE)
+library(nanoarrow)
+
+as_nanoarrow_array(1:5)
+#> <nanoarrow_array int32[5]>
+#>  $ length    : int 5
+#>  $ null_count: int 0
+#>  $ offset    : int 0
+#>  $ buffers   :List of 2
+#>   ..$ :<nanoarrow_buffer_validity[0 b] at 0x0>
+#>   ..$ :<nanoarrow_buffer_data_int32[20 b] at 0x135d13c28>
+#>  $ dictionary: NULL
+#>  $ children  : list()
+
+----------------------------------------
+
+TITLE: Installing Arrow via Conda
+DESCRIPTION: Commands to install Arrow packages through conda package manager from conda-forge channel
+
+LANGUAGE: shell
+CODE:
+conda install libarrow-all={{site.data.versions['current'].pinned_number}} -c conda-forge
+conda install arrow-c-glib={{site.data.versions['current'].pinned_number}} -c conda-forge
+conda install pyarrow={{site.data.versions['current'].pinned_number}} -c conda-forge
+conda install r-arrow={{site.data.versions['current'].pinned_number}} -c conda-forge
+
+----------------------------------------
+
+TITLE: Naive Python Implementation for Grouping and Counting
+DESCRIPTION: A simple Python script demonstrating the basic concept of grouping and counting using a dictionary, which is inefficient for large datasets.
+
+LANGUAGE: python
+CODE:
+import pandas as pd
+from collections import defaultdict
+from operator import itemgetter
+
+# read file
+hits = pd.read_parquet('hits.parquet', engine='pyarrow')
+
+# build groups
+counts = defaultdict(int)
+for index, row in hits.iterrows():
+    group = (row['UserID'], row['SearchPhrase']);
+    # update the dict entry for the corresponding key
+    counts[group] += 1
+
+# Print the top 10 values
+print (dict(sorted(counts.items(), key=itemgetter(1), reverse=True)[:10]))
+
+----------------------------------------
+
+TITLE: Retrieving Objects from Plasma Store with Python
+DESCRIPTION: Shows how to retrieve an object from the Plasma store using its object ID. The get operation blocks until the object has been sealed if it hasn't been sealed yet.
+
+LANGUAGE: python
+CODE:
+# Get the object from the store. This blocks until the object has been sealed.
+object_id = pyarrow.plasma.ObjectID(20 * b'a')
+[buff] = client.get([object_id])
+buffer = memoryview(buff)
+
+----------------------------------------
+
+TITLE: Demonstrating lexicographical sorting with Python
+DESCRIPTION: Example of using a lexsort_to_indices function to sort multi-column data and return sorted indices.
+
+LANGUAGE: python
+CODE:
+> lexsort_to_indices([
+    ["MA", "MA", "CA", "WA", "WA", "CA", "MA"]
+  ])
+
+[2, 5, 0, 1, 6, 3, 4]
+
+> lexsort_to_indices([
+    ["MA", "MA", "CA", "WA", "WA",   "CA", "MA"],
+    [10.10, 8.44, 3.25, 6.00, 132.50, 9.33, 1.30]
+  ])
+
+[2, 5, 6, 1, 0, 3, 4]
+
+----------------------------------------
+
+TITLE: Implementing lexicographical sorting with a comparator function in Python
+DESCRIPTION: Pseudocode for implementing lexicographical sorting using a comparator function that compares rows column by column.
+
+LANGUAGE: python
+CODE:
+def lexsort_to_indices(columns):
+  comparator = build_comparator(columns)
+
+  # Construct a list of integers from 0 to the number of rows
+  # and sort it according to the comparator
+  [0..columns.num_rows()].sort_by(comparator)
+
+def build_comparator(columns):
+  def comparator(left_idx, right_idx):
+    for column in columns:
+      # call a compare function which performs
+      # dynamic dispatch on type of left and right columns
+      ordering = compare(column, left_idx,right_idx)
+      if ordering != Equal {
+        return ordering
+      }
+    # All values equal
+    Equal
+  # Return comparator function
+  comparator
+
+  def compare(column, left_idx, right_idx):
+    # Choose comparison based on type of column ("dynamic dispatch")
+    if column.type == Int:
+     cmp(column[left_idx].as_int(), column[right_idx].as_int())
+    elif column.type == Float:
+     cmp(column[left_idx].as_float(), column[right_idx].as_float())
+    ...
+
+----------------------------------------
+
+TITLE: Converting String Data to Arrow and Back to Pandas
+DESCRIPTION: Demonstrates converting a large array of strings to Arrow format and back to pandas, with and without object deduplication, to compare memory usage and performance.
+
+LANGUAGE: python
+CODE:
+values = generate_strings(100000000, 10000)
+arr = pa.array(values)
+arr_as_pandas = arr.to_pandas()
+arr_as_pandas_no_dedup = arr.to_pandas(deduplicate_objects=False)
+
+%time arr_as_pandas_time = arr.to_pandas()
+%time arr_as_pandas_no_dedup_time = arr.to_pandas(deduplicate_objects=False)
+
+----------------------------------------
+
+TITLE: Memory Usage Profiling Function
+DESCRIPTION: Defines a function to measure current memory usage using the memory_profiler package.
+
+LANGUAGE: python
+CODE:
+import memory_profiler
+def mem():
+    return memory_profiler.memory_usage()[0]
+
+----------------------------------------
+
+TITLE: Installing Arrow R Package
+DESCRIPTION: R command to install the Arrow package from CRAN
+
+LANGUAGE: r
+CODE:
+install.packages("arrow")
+
+----------------------------------------
+
+TITLE: Measuring Object Size in Python
+DESCRIPTION: Uses sys.getsizeof() to measure the memory size of empty bytes and unicode objects, revealing their overhead.
+
+LANGUAGE: python
+CODE:
+import sys
+sys.getsizeof(val)
+sys.getsizeof(unicode_val)
+
+----------------------------------------
+
+TITLE: Using Python Buffer Protocol with pyarrow
+DESCRIPTION: Demonstrates integration between Arrow buffers and Python's buffer protocol and memoryviews, allowing zero-copy reads and slices.
+
+LANGUAGE: Python
+CODE:
+import pyarrow as pa
+
+buf = pa.frombuffer(b'foobarbaz')
+
+buf
+
+memoryview(buf)
+
+buf.to_pybytes()
+
+----------------------------------------
+
+TITLE: Example of Dictionary-Encoded Array in Python
+DESCRIPTION: Demonstrates how a string array can be represented in dictionary-encoded form, showing the original array, dictionary, and indices.
+
+LANGUAGE: python
+CODE:
+['apple', 'orange', 'apple', NULL, 'orange', 'orange']
+
+dictionary: ['apple', 'orange']
+indices: [0, 1, 0, NULL, 1, 1]
+
+----------------------------------------
+
+TITLE: Defining Parquet Schema for Nested Data Structure in Python
+DESCRIPTION: Parquet schema definition for the complex nested data structure, including field names, nullability, and data types for lists and structs.
+
+LANGUAGE: python
+CODE:
+message schema {
+  optional group a (LIST) {
+    repeated group list {
+      optional int32 element;
+    }
+  }
+  required group b (LIST) {
+    repeated group list {
+      optional group element {
+        required int32 b1;
+        optional group b2 (LIST) {
+          repeated group list {
+            required int32 element;
+          }
+        }
+      }
+    }
+  }
+}
+
+----------------------------------------
+
+TITLE: Installing DataFusion Python Package
+DESCRIPTION: Commands to install the DataFusion Python bindings using pip package manager.
+
+LANGUAGE: bash
+CODE:
+pip install datafusion
+
+LANGUAGE: bash
+CODE:
+python -m pip install datafusion
+
+----------------------------------------
+
+TITLE: Defining Arrow Schema for Nested Struct Data
+DESCRIPTION: Arrow schema definition for the nested struct data structure, specifying field names, nullability, and data types for the hierarchical data.
+
+LANGUAGE: python
+CODE:
+Field(name: "a", nullable: true, datatype: Int32)
+Field(name: "b", nullable: false, datatype: Struct[
+  Field(name: "b1", nullable: true, datatype: Int32),
+  Field(name: "b2", nullable: false, datatype: Int32)
+])
+Field(name: "c"), nullable: true, datatype: Struct[
+  Field(name: "c1", nullable: false, datatype: Int32)
+])
+Field(name: "d"), nullable: true, datatype: Struct[
+  Field(name: "d1", nullable: false, datatype: Int32)
+  Field(name: "d2", nullable: true, datatype: Int32)
+])
+
+----------------------------------------
+
+TITLE: Fetching Data as Apache Arrow Table with turbodbc in Python
+DESCRIPTION: This code snippet demonstrates how to connect to a database using turbodbc, execute a SQL query, and fetch the results as an Apache Arrow table. It showcases the new fetchallarrow() method introduced in turbodbc 2.0.0.
+
+LANGUAGE: python
+CODE:
+>>> from turbodbc import connect
+>>> connection = connect(dsn="My columnar database")
+>>> cursor = connection.cursor()
+>>> cursor.execute("SELECT some_integers, some_strings FROM my_table")
+>>> cursor.fetchallarrow()
+pyarrow.Table
+some_integers: int64
+some_strings: string
+
+----------------------------------------
+
+TITLE: Defining Parquet Schema for Nested Struct Data
+DESCRIPTION: Parquet schema definition for the nested struct data structure, specifying message format with optional and required fields and nested groups.
+
+LANGUAGE: python
+CODE:
+message schema {
+  optional int32 a;
+  required group b {
+    optional int32 b1;
+    required int32 b2;
+  }
+  optional group c {
+    required int32 c1;
+  }
+  optional group d {
+    required int32 d1;
+    optional int32 d2;
+  }
+}
+
+----------------------------------------
+
+TITLE: Reading Arrow IPC Stream with nanoarrow in C
+DESCRIPTION: Demonstrates how to use the new IPC stream reader extension in nanoarrow to read an Arrow IPC stream from stdin. It initializes an input stream, creates an array stream reader, retrieves the schema, and iterates through record batches.
+
+LANGUAGE: C
+CODE:
+#include <stdio.h>
+#include <stdbool.h>
+
+#include "nanoarrow_ipc.h"
+
+int main(int argc, char* argv[]) {
+  FILE* file_ptr = freopen(NULL, "rb", stdin);
+
+  struct ArrowIpcInputStream input;
+  NANOARROW_RETURN_NOT_OK(ArrowIpcInputStreamInitFile(&input, file_ptr, false));
+
+  struct ArrowArrayStream stream;
+  NANOARROW_RETURN_NOT_OK(ArrowIpcArrayStreamReaderInit(&stream, &input, NULL));
+
+  struct ArrowSchema schema;
+  NANOARROW_RETURN_NOT_OK(stream.get_schema(&stream, &schema));
+
+  struct ArrowArray array;
+  while (true) {
+    NANOARROW_RETURN_NOT_OK(stream.get_next(&stream, &array));
+    if (array.release == NULL) {
+      break;
+    }
+  }
+
+  return 0;
+}
+
+----------------------------------------
+
+TITLE: Creating Schema objects in Python
+DESCRIPTION: These snippets show how to create Schema objects representing an int32 type and a struct type using nanoarrow in Python.
+
+LANGUAGE: python
+CODE:
+na.int32()
+
+LANGUAGE: python
+CODE:
+na.struct({"col1": na.int32()})
+
+----------------------------------------
+
+TITLE: Interoperability between nanoarrow and pyarrow
+DESCRIPTION: Examples demonstrating zero-copy interchangeability between nanoarrow and pyarrow objects.
+
+LANGUAGE: python
+CODE:
+import pyarrow as pa
+
+pa.field(na.int32())
+#> pyarrow.Field<: int32>
+
+na.Schema(pa.string())
+#> <Schema> string
+
+pa.array(na.Array([4, 5, 6], na.int32()))
+#> <pyarrow.lib.Int32Array object at 0x11b552500>
+#> [
+#>   4,
+#>   5,
+#>   6
+#> ]
+
+na.Array(pa.array([10, 11, 12]))
+#> nanoarrow.Array<int64>[3]
+#> 10
+#> 11
+#> 12
+
+----------------------------------------
+
+TITLE: Using Compute Functions in Ruby
+DESCRIPTION: Demonstrates how to use compute functions in Ruby with both raw Ruby objects and Arrow arrays/scalars.
+
+LANGUAGE: ruby
+CODE:
+add_function = Arrow::Function.find("add")
+# Not shortcut version
+augend = Arrow::Int8Array.new([1, 2, 3])
+addend = Arrow::Int8Scalar.new(5)
+args = [
+  Arrow::ArrayDatum.new(augend),
+  Arrow::ScalarDatum.new(addend),
+]
+add_function.execute(args).value.to_a # => [6, 7, 8]
+# Shortcut version
+add_function.execute([[1, 2, 3], 5]).value.to_a # => [6, 7, 8]
+
+----------------------------------------
+
+TITLE: Defining Protobuf Schema for Complex Data Model
+DESCRIPTION: This Protobuf schema defines a complex data model for metrics, including recursive structures for attributes and values.
+
+LANGUAGE: protobuf
+CODE:
+syntax = "proto3";
+
+message Metric {
+ message DataPoint {
+   repeated Attribute attributes = 1;
+   oneof value {
+     int64 int_value = 2;
+     double double_value = 3;
+   }
+ }
+
+ enum MetricType {
+   UNSPECIFIED = 0;
+   GAUGE = 1;
+   SUM = 2;
+ }
+
+ message Gauge {
+   DataPoint data_point = 1;
+ }
+
+ message Sum {
+   DataPoint data_point = 1;
+   bool is_monotonic = 2;
+ }
+
+ string name = 1;
+ int64 timestamp = 2;
+ string unit = 3;
+ MetricType type = 4;
+ oneof metric {
+   Gauge gauge = 5;
+   Sum sum = 6;
+ }
+}
+
+message Attribute {
+ string name = 1;
+ AnyValue value = 2;
+}
+
+// Recursive definition of AnyValue. AnyValue can be a primitive value, a list
+// of AnyValues, or a list of key-value pairs where the key is a string and
+// the value is an AnyValue.
+message AnyValue {
+ message ArrayValue {
+   repeated AnyValue values = 1;
+ }
+ message KeyValueList {
+   message KeyValue {
+     string key = 1;
+     AnyValue value = 2;
+   }
+   repeated KeyValue values = 1;
+ }
+
+ oneof value {
+   int64 int_value = 1;
+   double double_value = 2;
+   string string_value = 3;
+   ArrayValue list_value = 4;
+   KeyValueList kvlist_value = 5;
+ }
+}
+
+----------------------------------------
+
+TITLE: Using User-Defined Table Function for Parquet Metadata in DataFusion SQL
+DESCRIPTION: Illustrates the use of a user-defined table function 'parquet_metadata' to query Parquet file metadata. This example showcases DataFusion's new support for user-defined table functions.
+
+LANGUAGE: SQL
+CODE:
+SELECT 
+    path_in_schema, row_group_id, row_group_num_rows, stats_min, stats_max, total_compressed_size 
+FROM 
+    parquet_metadata('hits.parquet')
+WHERE path_in_schema = '"WatchID"' 
+LIMIT 3;
+
+----------------------------------------
+
+TITLE: Setting global Arrow dependency source in CMake
+DESCRIPTION: Example of setting the global dependency source for all Arrow dependencies in CMake. AUTO is the default, which tries system libraries first but falls back to bundled if not available.
+
+LANGUAGE: CMake
+CODE:
+set(ARROW_DEPENDENCY_SOURCE AUTO)
+
+----------------------------------------
+
+TITLE: Benchmarking Data Transformation with Arrow
+DESCRIPTION: Compares performance of transforming data using R functions in Spark with and without Arrow using microbenchmark package.
+
+LANGUAGE: R
+CODE:
+microbenchmark::microbenchmark(
+  setup = library(arrow),
+  arrow_on = {
+    sample_n(sparklyr_df, 10^5) %>% spark_apply(~ .x / 2) %>% count()
+  },
+  arrow_off = {
+    if ("arrow" %in% .packages()) detach("package:arrow")
+    sample_n(sparklyr_df, 10^5) %>% spark_apply(~ .x / 2) %>% count()
+  },
+  times = 10
+) %T>% print() %>% ggplot2::autoplot()
+
+----------------------------------------
+
+TITLE: Conan Package Configuration
+DESCRIPTION: Example Conan package configuration file for installing Arrow C++
+
+LANGUAGE: ini
+CODE:
+[requires]
+arrow/{{site.data.versions['current'].number}}
+
+----------------------------------------
+
+TITLE: Representing Python Dictionary Data in Arrow Map Format
+DESCRIPTION: Example showing how Python dictionary data is represented using Arrow's new Map type structure. Demonstrates the conversion of Python dictionaries to Arrow's Map<String, Int32> format with nested structures.
+
+LANGUAGE: python
+CODE:
+data = [{'a': 1, 'bb': 2, 'cc': 3}, {'dddd': 4}]
+
+LANGUAGE: text
+CODE:
+Map<String, Int32> = List<Struct<keys: String, values: Int32>>
+  is_valid: [true, true]
+  offsets: [0, 3, 4]
+  values: Struct<keys: String, values: Int32>
+    children:
+      - keys: String
+          is_valid: [true, true, true, true]
+          offsets: [0, 1, 3, 5, 9]
+          data: abbccdddd
+      - values: Int32
+          is_valid: [true, true, true, true]
+          data: [1, 2, 3, 4]
+
+----------------------------------------
+
+TITLE: ALTREP Performance Benchmark in R Arrow
+DESCRIPTION: Benchmarks performance difference between using ALTREP and standard conversion when moving data from Arrow to R data frames.
+
+LANGUAGE: R
+CODE:
+tbl <- arrow_table(data.frame(
+  x = rnorm(10000000),
+  y = sample(c(letters, NA), 10000000, replace = TRUE)
+))
+
+with_altrep <- function(data){
+  options(arrow.use_altrep = TRUE)
+  as.data.frame(data)
+}
+
+without_altrep <- function(data){
+  options(arrow.use_altrep = FALSE)
+  as.data.frame(data)
+}
+
+microbenchmark(
+  without_altrep(tbl),
+  with_altrep(tbl)
+)
+
+----------------------------------------
+
+TITLE: Copying Query Results to File in DataFusion SQL
+DESCRIPTION: Shows how to use the COPY command to write query results to a file in JSON format. This feature is similar to DuckDB's COPY functionality.
+
+LANGUAGE: SQL
+CODE:
+COPY (SELECT x + 1 FROM my_source_table) TO '/tmp/output.json';
+
+----------------------------------------
+
+TITLE: Implementing Dataset Scanning with Skyhook and Apache Arrow in C++
+DESCRIPTION: Demonstrates how to configure and use Skyhook to scan a dataset stored in Ceph, including setting up the connection context, creating a filesystem, defining partitioning, and applying filters. The code shows integration between Arrow Datasets API and Skyhook's storage layer computation capabilities.
+
+LANGUAGE: cpp
+CODE:
+#include <arrow/compute/api.h>
+#include <arrow/dataset/api.h>
+#include <arrow/filesystem/api.h>
+#include <arrow/table.h>
+#include <skyhook/client/file_skyhook.h>
+
+#include <cstdlib>
+#include <iostream>
+#include <memory>
+#include <string>
+
+namespace cp = arrow::compute;
+namespace ds = arrow::dataset;
+namespace fs = arrow::fs;
+
+// Demonstrate reading a dataset via Skyhook.
+arrow::Status ScanDataset() {
+  // Configure SkyhookFileFormat to connect to our Ceph cluster.
+  std::string ceph_config_path = "/etc/ceph/ceph.conf";
+  std::string ceph_data_pool = "cephfs_data";
+  std::string ceph_user_name = "client.admin";
+  std::string ceph_cluster_name = "ceph";
+  std::string ceph_cls_name = "skyhook";
+  std::shared_ptr<skyhook::RadosConnCtx> rados_ctx =
+      std::make_shared<skyhook::RadosConnCtx>(ceph_config_path, ceph_data_pool,
+                                              ceph_user_name, ceph_cluster_name,
+                                              ceph_cls_name);
+  ARROW_ASSIGN_OR_RAISE(auto format,
+                        skyhook::SkyhookFileFormat::Make(rados_ctx, "parquet"));
+
+  // Create the filesystem.
+  std::string root;
+  ARROW_ASSIGN_OR_RAISE(auto fs, fs::FileSystemFromUri("file:///mnt/cephfs/nyc", &root));
+
+  // Create our dataset.
+  fs::FileSelector selector;
+  selector.base_dir = root;
+  selector.recursive = true;
+
+  ds::FileSystemFactoryOptions options;
+  options.partitioning = std::make_shared<ds::HivePartitioning>(
+      arrow::schema({arrow::field("payment_type", arrow::int32()),
+                     arrow::field("VendorID", arrow::int32())}));
+  ARROW_ASSIGN_OR_RAISE(auto factory,
+                        ds::FileSystemDatasetFactory::Make(fs, std::move(selector),
+                                                           std::move(format), options));
+
+  ds::InspectOptions inspect_options;
+  ds::FinishOptions finish_options;
+  ARROW_ASSIGN_OR_RAISE(auto schema, factory->Inspect(inspect_options));
+  ARROW_ASSIGN_OR_RAISE(auto dataset, factory->Finish(finish_options));
+
+  // Scan the dataset.
+  auto filter = cp::greater(cp::field_ref("payment_type"), cp::literal(2));
+  ARROW_ASSIGN_OR_RAISE(auto scanner_builder, dataset->NewScan());
+  ARROW_RETURN_NOT_OK(scanner_builder->Filter(filter));
+  ARROW_RETURN_NOT_OK(scanner_builder->UseThreads(true));
+  ARROW_ASSIGN_OR_RAISE(auto scanner, scanner_builder->Finish());
+
+  ARROW_ASSIGN_OR_RAISE(auto table, scanner->ToTable());
+
+  std::cout << "Got " << table->num_rows() << " rows" << std::endl;
+  return arrow::Status::OK();
+}
+
+int main(int, char**) {
+  auto status = ScanDataset();
+  if (!status.ok()) {
+    std::cerr << status.message() << std::endl;
+    return EXIT_FAILURE;
+  }
+  return EXIT_SUCCESS;
+}
+
+----------------------------------------
+
+TITLE: Querying Nested Timestamp Data with SQL in DataFusion
+DESCRIPTION: Example of querying timestamp data with interval arithmetic in DataFusion SQL, demonstrating the ability to perform date/time calculations.
+
+LANGUAGE: sql
+CODE:
+SELECT now() + '1 month' FROM my_table;
+
+----------------------------------------
+
+TITLE: Initializing Spark Connection and Test Data
+DESCRIPTION: Sets up a local Spark connection with 6GB driver memory and creates a test dataframe with 10 million random numbers.
+
+LANGUAGE: R
+CODE:
+library(sparklyr)
+library(dplyr)
+
+sc <- spark_connect(master = "local", config = list("sparklyr.shell.driver-memory" = "6g"))
+data <- data.frame(y = runif(10^7, 0, 1))
+
+----------------------------------------
+
+TITLE: Querying Structured Data in DataFusion SQL
+DESCRIPTION: Examples of querying nested structured data from Parquet files, demonstrating DataFusion's ability to handle complex nested data structures including arrays and structs.
+
+LANGUAGE: sql
+CODE:
+SELECT delete FROM 'twitter-sample-head-100000.parquet' WHERE delete IS NOT NULL limit 10;
+
+LANGUAGE: sql
+CODE:
+SELECT
+  delete['status']['id']['$numberLong'] as delete_id,
+  delete['status']['user_id'] as delete_user_id
+FROM 'twitter-sample-head-100000.parquet' WHERE delete IS NOT NULL LIMIT 10;
+
+----------------------------------------
+
+TITLE: Generating Random Strings for Benchmarking
+DESCRIPTION: Function to generate a large number of random strings with a specified number of unique values for memory benchmarking.
+
+LANGUAGE: python
+CODE:
+from pandas.util.testing import rands
+def generate_strings(length, nunique, string_length=10):
+    unique_values = [rands(string_length) for i in range(nunique)]
+    values = unique_values * (length // nunique)
+    return values
+
+----------------------------------------
+
+TITLE: Listing Python Package Dependencies
+DESCRIPTION: Lists required Python packages that need to be installed. Contains pyyaml for YAML parsing and requests for making HTTP requests.
+
+LANGUAGE: plaintext
+CODE:
+pyyaml
+requests
+
+----------------------------------------
+
+TITLE: Installing nanoarrow Python package
+DESCRIPTION: Commands to install the nanoarrow Python package using pip or conda.
+
+LANGUAGE: shell
+CODE:
+pip install nanoarrow
+conda install nanoarrow -c conda-forge
+
+----------------------------------------
+
+TITLE: Running Site with Docker Compose
+DESCRIPTION: Alternative command to build and preview the site using Docker Compose, avoiding local Ruby and Node.js installation requirements.
+
+LANGUAGE: shell
+CODE:
+docker compose up
+
+----------------------------------------
+
+TITLE: Creating Empty Bytes and Unicode Objects in Python
+DESCRIPTION: Demonstrates creating empty bytes and unicode string objects in Python 3.7 to illustrate their memory overhead.
+
+LANGUAGE: python
+CODE:
+val = b''
+
+unicode_val = u''
+
+----------------------------------------
+
+TITLE: R StringView and Float16 Examples
+DESCRIPTION: Shows how to use string_view and float16 data types in R with nanoarrow
+
+LANGUAGE: r
+CODE:
+library(nanoarrow)
+
+as_nanoarrow_array(c("abc", "def", NA), schema = na_string_view()) |>
+  convert_array()
+#> [1] "abc" "def" NA
+as_nanoarrow_array(c(1, 2, 3), schema = na_half_float()) |>
+  convert_array()
+#> [1] 1 2 3
+
+----------------------------------------
+
+TITLE: Generating Bundle Files for nanoarrow
+DESCRIPTION: Shell command to generate bundled single-file amalgamation with various features enabled
+
+LANGUAGE: shell
+CODE:
+python ci/scripts/bundle.py \
+  --source-output-dir=dist \
+  --include-output-dir=dist \
+  --header-namespace= \
+  --with-device \
+  --with-ipc \
+  --with-testing \
+  --with-flatcc
+
+----------------------------------------
+
+TITLE: Visualizing Non-Nullable Primitive Column in Arrow
+DESCRIPTION: ASCII representation of how Arrow stores a non-nullable list of 32-bit signed integers in a PrimitiveArray.
+
+LANGUAGE: text
+CODE:
+┌─────┐
+│  1  │
+├─────┤
+│  2  │
+├─────┤
+│  3  │
+├─────┤
+│  4  │
+└─────┘
+Values
+
+----------------------------------------
+
+TITLE: Performance Metrics - Normalized-Only Data Processing
+DESCRIPTION: Terminal output showing performance metrics when processing only normalized (flat) data, achieving ~1.2M rows/second throughput
+
+LANGUAGE: plaintext
+CODE:
+num_cpu:                60
+runtime_os:             linux
+kafka_clients:          10
+kafka_queue_cap:        1228800
+processor_routines:     32
+arrow_queue_cap:        4
+duckdb_threshold_mb:    4200
+duckdb_connections:     24
+normalizer_fields:      10
+start_time:             2025-02-25T19:04:33Z
+end_time:               2025-02-25T19:09:36Z
+records:                231_852_772.00
+norm_records:           363_247_327.00
+data_transferred:       285.76 GB
+duration:               5m3.059s
+records_per_second:     0.00
+total_rows_per_second:  1_198_601.39
+transfer_rate:          965.54 MB/second
+duckdb_files:           5
+duckdb_files_MB:        20056
+file_avg_duration:      58.975s
+
+----------------------------------------
+
+TITLE: Defining Adaptive Arrow Schema in Go
+DESCRIPTION: Go code demonstrating the definition of an Arrow schema for OTLP Traces with annotations for dynamic adaptation. The schema includes optional fields and dictionary encoding specifications through metadata.
+
+LANGUAGE: go
+CODE:
+var (
+  TracesSchema = arrow.NewSchema([]arrow.Field{
+      {Name: constants.ID, Type: arrow.PrimitiveTypes.Uint16, Nullable: true},
+      {Name: constants.Resource, Type: arrow.StructOf([]arrow.Field{
+        {Name: constants.ID, Type: arrow.PrimitiveTypes.Uint16, Nullable: true},
+        {Name: constants.SchemaUrl,Type: arrow.BinaryTypes.String,Metadata: schema.Metadata(schema.Dictionary8), Nullable: true},
+        {Name: constants.DroppedAttributesCount,Type: arrow.PrimitiveTypes.Uint32,Nullable: true},
+      }...), Nullable: true},
+      // Additional fields omitted for brevity
+    }, nil)
+)
+
+----------------------------------------
+
+TITLE: Installing pyarrow with conda on Windows
+DESCRIPTION: Command to install the Arrow Python library (pyarrow) on Windows using conda-forge.
+
+LANGUAGE: shell
+CODE:
+conda install pyarrow -c conda-forge
+
+----------------------------------------
+
+TITLE: Installing pyarrow with conda on Windows
+DESCRIPTION: Command to install the Arrow Python library (pyarrow) on Windows using conda-forge.
+
+LANGUAGE: shell
+CODE:
+conda install pyarrow -c conda-forge
+
+----------------------------------------
+
+TITLE: Installing pyarrow with conda on Windows
+DESCRIPTION: Command to install the Arrow Python library (pyarrow) on Windows using conda-forge.
+
+LANGUAGE: shell
+CODE:
+conda install pyarrow -c conda-forge
+
+----------------------------------------
+
+TITLE: Visualizing Non-Nullable Primitive Column in Parquet
+DESCRIPTION: ASCII representation of how Parquet stores a non-nullable list of integers in encoded form within DataPages.
+
+LANGUAGE: text
+CODE:
+┌─────┐
+│  1  │
+├─────┤
+|  2  │
+├─────┤
+│  3  │
+├─────┤
+│  4  │
+└─────┘
+Values
+
+----------------------------------------
+
+TITLE: File Layout Configuration in Jekyll
+DESCRIPTION: Jekyll front matter configuration defining the blog post metadata including title, date, author and categories.
+
+LANGUAGE: yaml
+CODE:
+---
+layout: post
+title: "Apache Arrow 0.15.0 Release"
+date: "2019-10-06 00:00:00 -0600"
+author: pmc
+categories: [release]
+---
+
+----------------------------------------
+
+TITLE: Release Announcement Post Front Matter
+DESCRIPTION: Jekyll front matter metadata for the release announcement blog post, specifying title, date, author and categories.
+
+LANGUAGE: yaml
+CODE:
+---
+layout: post
+title: "Apache Arrow 0.17.0 Release"
+date: "2020-04-21 00:00:00 -0600"
+author: pmc
+categories: [release]
+---
+
+----------------------------------------
+
+TITLE: Adding nanoarrow as a CMake dependency
+DESCRIPTION: CMake configuration to add nanoarrow as a dependency using FetchContent.
+
+LANGUAGE: cmake
+CODE:
+include(FetchContent)
+fetchcontent_declare(nanoarrow
+                     GIT_REPOSITORY https://github.com/apache/arrow-nanoarrow.git
+                     GIT_TAG  apache-arrow-nanoarrow-0.5.0
+                     GIT_SHALLOW TRUE)
+fetchcontent_makeavailable(nanoarrow)
+
+add_executable(some_target ...)
+target_link_libraries(some_target nanoarrow::nanoarrow)
+
+----------------------------------------
+
+TITLE: Apache Arrow Release Page Front Matter
+DESCRIPTION: Jekyll front matter configuration for the Apache Arrow releases page, defining the layout, title and permalink.
+
+LANGUAGE: yaml
+CODE:
+---
+layout: default
+title: Releases
+permalink: /release/index.html
+---
+
+----------------------------------------
+
+TITLE: Demonstrating Sorting with Apache Arrow Rust
+DESCRIPTION: This code snippet demonstrates how to use the sorting functionality in Apache Arrow Rust. It creates an Int32Array, prints it, sorts it, and then prints the sorted array.
+
+LANGUAGE: rust
+CODE:
+extern crate arrow;
+
+use arrow::array::
+    Int32Array,
+    ArrayRef,
+};
+use std::sync::Arc;
+use arrow::compute::sort;
+
+fn main() {
+    
+    let array: ArrayRef = Arc::new(Int32Array::from(vec![5, 4, 23, 1, 20, 2]));
+    println!("{:?}", array);
+    let sorted_array = sort(&array, None).unwrap();
+    println!("{:?}", sorted_array);
+}
+
+----------------------------------------
+
+TITLE: AWS SDK Compatibility Issue Reference
+DESCRIPTION: GitHub issue link showing the AWS C++ SDK compatibility improvement.
+
+LANGUAGE: markdown
+CODE:
+[#45304](https://github.com/apache/arrow/issues/45304)
+
+----------------------------------------
+
+TITLE: Using nanoarrow C++ range/view helpers
+DESCRIPTION: Example of using nanoarrow C++ range/view helpers in a test scenario.
+
+LANGUAGE: cpp
+CODE:
+#include <gtest/gtest.h>
+#include <gmock/gmock-matchers.h>
+#include <nanoarrow/nanoarrow_gtest_util.hpp>
+#include <nanoarrow/nanoarrow.hpp>
+
+nanoarrow::UniqueArrayStream array_stream;
+// ... populate array_stream
+nanoarrow::ViewArrayStream array_stream_view(array_stream.get());
+
+for (ArrowArray& array : array_stream_view) {
+  EXPECT_THAT(nanoarrow::ViewArrayAs<int32_t>(&array), ElementsAre(1234));
+}
+
+EXPECT_EQ(array_stream_view.count(), 1);
+EXPECT_EQ(array_stream_view.code(), NANOARROW_OK);
+EXPECT_STREQ(array_stream_view.error()->message, "");
+
+----------------------------------------
+
+TITLE: Patch Committers Git Log Output
+DESCRIPTION: Git shortlog showing Apache committers who merged patches for release 19.0.1
+
+LANGUAGE: console
+CODE:
+$ git shortlog -sn --group=trailer:signed-off-by apache-arrow-19.0.0..apache-arrow-19.0.1
+     5	Raúl Cumplido
+     4	Antoine Pitrou
+     2	Bryce Mecum
+     2	Gang Wu
+     2	Sutou Kouhei
+     1	Joris Van den Bossche
+     1	Rossi Sun
+
+----------------------------------------
+
+TITLE: Listing Patch Committers for Apache Arrow 15.0.1
+DESCRIPTION: This console command uses git shortlog with custom options to display the Apache committers who merged contributed patches for the 15.0.1 release of Apache Arrow.
+
+LANGUAGE: console
+CODE:
+$ git shortlog -sn --group=trailer:signed-off-by apache-arrow-15.0.0..apache-arrow-15.0.1
+
+----------------------------------------
+
+TITLE: Adding nanoarrow as a Meson dependency
+DESCRIPTION: Meson configuration to add nanoarrow as a dependency.
+
+LANGUAGE: shell
+CODE:
+mkdir -p subprojects
+meson wrap install nanoarrow
+
+----------------------------------------
+
+TITLE: Listing Git Contributors for Apache Arrow 14.0.1 Release
+DESCRIPTION: This console command uses git shortlog to display the number of commits and names of contributors for the Apache Arrow 14.0.1 release, comparing it to the previous 14.0.0 release.
+
+LANGUAGE: console
+CODE:
+$ git shortlog -sn apache-arrow-14.0.0..apache-arrow-14.0.1
+     3	Raúl Cumplido
+     1	Alenka Frim
+     1	Antoine Pitrou
+
+----------------------------------------
+
+TITLE: Listing Git Contributors for Apache Arrow 14.0.1 Release
+DESCRIPTION: This console command uses git shortlog to display the number of commits and names of contributors for the Apache Arrow 14.0.1 release, comparing it to the previous 14.0.0 release.
+
+LANGUAGE: console
+CODE:
+$ git shortlog -sn apache-arrow-14.0.0..apache-arrow-14.0.1
+     3	Raúl Cumplido
+     1	Alenka Frim
+     1	Antoine Pitrou
+
+----------------------------------------
+
+TITLE: Defining RecordBatchReader Interface in C++
+DESCRIPTION: Abstract interface definition for reading record batches in Arrow streams, enabling support for different transport protocols beyond continuous byte streams.
+
+LANGUAGE: cpp
+CODE:
+class RecordBatchReader {
+ public:
+  virtual std::shared_ptr<Schema> schema() const = 0;
+  virtual Status GetNextRecordBatch(std::shared_ptr<RecordBatch>* batch) = 0;
+};
+
+----------------------------------------
+
+TITLE: Contributor Statistics Command Output
+DESCRIPTION: Git command output showing commit statistics per contributor for the release period between apache-arrow-12.0.0 and apache-arrow-12.0.1
+
+LANGUAGE: console
+CODE:
+$ git shortlog -sn apache-arrow-12.0.0..apache-arrow-12.0.1
+     5	Joris Van den Bossche
+     5	Raúl Cumplido
+     5	Weston Pace
+     4	Sutou Kouhei
+     3	Nic Crane
+     2	David Li
+     2	Matt Topol
+     2	mwish
+     1	Felipe Oliveira Carvalho
+     1	Jacob Wujciak-Jens
+     1	Matthew Roeschke
+     1	Yevgeny Pats
+
+----------------------------------------
+
+TITLE: Importing PyArrow in Cython
+DESCRIPTION: Example demonstrating how to import and use PyArrow within Cython code.
+
+LANGUAGE: cython
+CODE:
+cimport pyarrow
+pyarrow.import_pyarrow()
+
+----------------------------------------
+
+TITLE: Displaying Git Shortlog for Contributors
+DESCRIPTION: Shows a git shortlog command to list contributors and their commit counts for this release.
+
+LANGUAGE: console
+CODE:
+$ git shortlog -sn apache-arrow-10.0.0..apache-arrow-10.0.1
+    10	Sutou Kouhei
+     5	Raúl Cumplido
+     3	David Li
+     2	Alenka Frim
+     2	Matt Topol
+     2	Neal Richardson
+     2	Yibo Cai
+     1	Benson Muite
+     1	Bryce Mecum
+     1	Dewey Dunnington
+     1	Hadley Wickham
+     1	Laurent Quérel
+     1	Nic Crane
+     1	h-vetinari
+     1	rtpsw
+
+----------------------------------------
+
+TITLE: Git Contributor Statistics for Apache Arrow 1.0.1
+DESCRIPTION: Git shortlog showing number of commits per contributor between versions 1.0.0 and 1.0.1
+
+LANGUAGE: console
+CODE:
+$ git shortlog -sn apache-arrow-1.0.0..apache-arrow-1.0.1
+     9	Krisztián Szűcs
+     8	Neal Richardson
+     4	Benjamin Kietzman
+     3	Andy Grove
+     3	Antoine Pitrou
+     3	Uwe L. Korn
+     1	Jorge C. Leitao
+     1	Joris Van den Bossche
+     1	Mahmut Bulut
+     1	Matthias
+     1	Micah Kornfield
+     1	alamb
+     1	mubai
+     1	offthewall123
+     1	ptaylor
+
+----------------------------------------
+
+TITLE: Adding BigTable Dependency
+DESCRIPTION: Cargo dependency configuration for adding BigTable support to a Rust DataFusion project.
+
+LANGUAGE: toml
+CODE:
+datafusion-bigtable = "0.1.0"
+
+----------------------------------------
+
+TITLE: Git Patch Committer Statistics for Apache Arrow 1.0.1
+DESCRIPTION: Git shortlog showing number of merged patches per committer between versions 1.0.0 and 1.0.1
+
+LANGUAGE: console
+CODE:
+$ git shortlog -csn apache-arrow-1.0.0..apache-arrow-1.0.1
+    39	Krisztián Szűcs
+
+----------------------------------------
+
+TITLE: Using Python Extension C++ API
+DESCRIPTION: Example showing how to use the C++ API to create Python wrapper objects from C++ extension code, enabling interoperability between C++ and Python.
+
+LANGUAGE: cpp
+CODE:
+#include "arrow/python/pyarrow.h"
+
+if (!arrow::py::import_pyarrow()) {
+  // Error
+}
+
+std::shared_ptr<arrow::RecordBatch> cpp_batch = GetData(...);
+PyObject* py_batch = arrow::py::wrap_batch(cpp_batch);
+
+----------------------------------------
+
+TITLE: Contributor Git Shortlog for Apache Arrow 0.17.1
+DESCRIPTION: Git shortlog command output showing commit counts per contributor between versions 0.17.0 and 0.17.1, listing 11 distinct contributors and their commit counts.
+
+LANGUAGE: console
+CODE:
+$ git shortlog -sn apache-arrow-0.17.0..apache-arrow-0.17.1
+     9	Krisztián Szűcs
+     4	Sutou Kouhei
+     3	Neal Richardson
+     3	Wes McKinney
+     2	Antoine Pitrou
+     1	Eric Erhardt
+     1	Joris Van den Bossche
+     1	Micah Kornfield
+     1	Paul Taylor
+     1	Yibo Cai
+     1	Yuan Zhou
+
+----------------------------------------
+
+TITLE: Debian/Ubuntu Package Repository Configuration
+DESCRIPTION: Updated package repository configuration for Debian/Ubuntu systems to use the new Artifactory hosting instead of Bintray.
+
+LANGUAGE: shell
+CODE:
+# Old Bintray URL\nhttps://apache.bintray.com/arrow/...\n\n# New Artifactory URL\nhttps://apache.jfrog.io/artifactory/arrow/...
+
+----------------------------------------
+
+TITLE: Displaying Patch Committer Statistics for Apache Arrow 0.15.1
+DESCRIPTION: Git shortlog command output showing the number of patches merged by Apache committers between versions 0.15.0 and 0.15.1
+
+LANGUAGE: console
+CODE:
+$ git shortlog -csn apache-arrow-0.15.0..apache-arrow-0.15.1
+    41	Krisztián Szűcs
+
+----------------------------------------
+
+TITLE: Displaying Git Contributor Statistics for Apache Arrow 18.1.0
+DESCRIPTION: Git shortlog command showing the number of commits per contributor between versions 18.0.0 and 18.1.0.
+
+LANGUAGE: console
+CODE:
+$ git shortlog -sn apache-arrow-18.0.0..apache-arrow-18.1.0
+     7	Bryce Mecum
+     7	Sutou Kouhei
+     4	dependabot[bot]
+     2	Adam Reeve
+     2	Raúl Cumplido
+     1	0xderek
+     1	Anja Kefala
+     1	Jacob Wujciak-Jens
+
+----------------------------------------
+
+TITLE: Configuring Universal Access in robots.txt
+DESCRIPTION: This robots.txt configuration allows all user agents (bots) to access the entire website. It uses the wildcard (*) to match any user agent and the root slash (/) to indicate full site access.
+
+LANGUAGE: robots.txt
+CODE:
+User-Agent: *
+Allow: /
+
+----------------------------------------
+
+TITLE: Displaying Patch Committer Statistics for Apache Arrow 18.1.0
+DESCRIPTION: Git shortlog command showing the number of patches merged by Apache committers between versions 18.0.0 and 18.1.0.
+
+LANGUAGE: console
+CODE:
+$ git shortlog -sn --group=trailer:signed-off-by apache-arrow-18.0.0..apache-arrow-18.1.0
+     5	Sutou Kouhei
+     4	David Li
+     3	Bryce Mecum
+     3	Curt Hagenlocher
+     3	Jacob Wujciak-Jens
+     2	Raúl Cumplido
+     1	Felipe Oliveira Carvalho
+
+----------------------------------------
+
+TITLE: Installing PyArrow using pip or conda
+DESCRIPTION: Commands to install PyArrow, including bundled Apache Parquet support, using either pip or conda package managers. This is now supported across Linux, macOS, and Windows platforms.
+
+LANGUAGE: bash
+CODE:
+pip install pyarrow
+
+LANGUAGE: bash
+CODE:
+conda install pyarrow -c conda-forge
+
+----------------------------------------
+
+TITLE: Displaying Git commit statistics in Bash
+DESCRIPTION: Bash command to show the number of commits per contributor for this release using git shortlog.
+
+LANGUAGE: bash
+CODE:
+$ git shortlog -sn apache-arrow-14.0.2..apache-arrow-15.0.0
+
+----------------------------------------
+
+TITLE: Generating Production Site Build
+DESCRIPTION: Command to generate the production version of the website locally in the _site/ directory.
+
+LANGUAGE: shell
+CODE:
+JEKYLL_ENV=production bundle exec rake generate
+
+----------------------------------------
+
+TITLE: Git Contributors List Command
+DESCRIPTION: Shell command to display the list of contributors and number of commits between Arrow 10.0.0 and 11.0.0 releases
+
+LANGUAGE: console
+CODE:
+$ git shortlog -sn apache-arrow-10.0.0..apache-arrow-11.0.0
+
+----------------------------------------
+
+TITLE: Git Contributor Statistics
+DESCRIPTION: Git shortlog showing number of commits per contributor between versions 1.0.0 and 2.0.0
+
+LANGUAGE: console
+CODE:
+$ git shortlog -sn apache-arrow-1.0.0..apache-arrow-2.0.0
+    68	Jorge C. Leitao
+    48	Antoine Pitrou
+    40	Krisztián Szűcs
+    34	alamb
+    33	Neal Richardson
+    30	Andy Grove
+    25	Benjamin Kietzman
+    25	Joris Van den Bossche
+    19	Sutou Kouhei
+    13	Uwe L. Korn
+    12	Micah Kornfield
+    10	Frank Du
+    10	Jörn Horstmann
+     9	Neville Dipale
+     9	Romain Francois
+     9	arw2019
+     8	Yibo Cai
+     8	liyafan82
+     7	Sagnik Chakraborty
+     6	David Li
+     5	Kazuaki Ishizaki
+     5	Mahmut Bulut
+     4	Mingyu Zhong
+     4	fredgan
+     3	Bryan Cutler
+     3	wqc200
+     2	Daniel Russo
+     2	Diana Clarke
+     2	James Duong
+     2	Kenta Murata
+     2	Patrick Woody
+     2	Projjal Chanda
+     2	naman1996
+     2	ptaylor
+     2	tianchen
+     1	Adam Szmigin
+     1	Ali McMaster
+     1	Andrew Stevenson
+     1	Ben Kimock
+     1	Brian Dunlay
+     1	Christoph Schulze
+     1	Derek Marsh
+     1	Dominik Moritz
+     1	Eric Erhardt
+     1	Ezra
+     1	Fernando José Herrera Elizalde
+     1	FredGan
+     1	Hongze Zhang
+     1	Jim Klucar
+     1	Josiah
+     1	Kyle Strand
+     1	Laurent Goujon
+     1	Lawrence Chan
+     1	Mark Rushakoff
+     1	Matt Corley
+     1	Matthew Topol
+     1	Matthias
+     1	Morgan Cassels
+     1	Ofek
+     1	Patrick Pai
+     1	Paul
+     1	PoojaChandak
+     1	Prashanth Govindarajan
+     1	Pratik raj
+     1	Revital Sur
+     1	Ruan Pearce-Authers
+     1	Ryan Murray
+     1	Simon Bertron
+     1	Steve Suh
+     1	Tanguy Fautre
+     1	Tobias Mayer
+     1	Troels Nielsen
+     1	Vivian Kong
+     1	Wes McKinney
+     1	Xavier Lange
+     1	Yordan Pavlov
+     1	kanga333
+     1	karldw
+     1	mubai
+     1	offthewall123
+     1	zanmato1984
+
+----------------------------------------
+
+TITLE: Installing Arrow C++ Library on macOS
+DESCRIPTION: Shows how to install the Arrow C++ library on macOS using Homebrew and then install the R package from source.
+
+LANGUAGE: R
+CODE:
+install.packages("arrow", type = "source")
+
+----------------------------------------
+
+TITLE: Git Patch Committer Statistics
+DESCRIPTION: Git shortlog showing number of patches merged per committer between versions 1.0.0 and 2.0.0
+
+LANGUAGE: console
+CODE:
+$ git shortlog -csn apache-arrow-1.0.0..apache-arrow-2.0.0
+   127	Andy Grove
+    92	Antoine Pitrou
+    56	Krisztián Szűcs
+    51	Neal Richardson
+    44	Sutou Kouhei
+    18	Joris Van den Bossche
+    18	Micah Kornfield
+    17	Benjamin Kietzman
+    17	Wes McKinney
+    16	Neville Dipale
+    12	Jorge C. Leitao
+    10	Praveen
+     7	Paddy Horan
+     4	David Li
+     4	Eric Erhardt
+     4	Sebastien Binet
+     4	Uwe L. Korn
+     4	liyafan82
+     3	GitHub
+     1	Bryan Cutler
+     1	Chao Sun
+     1	tianchen
+
+----------------------------------------
+
+TITLE: Installing Turbodbc using pip or conda
+DESCRIPTION: Commands to install Turbodbc 2.0.0, which now includes Apache Arrow support for reading SQL result sets as Arrow record batches. Installation is possible using either pip or conda package managers.
+
+LANGUAGE: bash
+CODE:
+pip install turbodbc
+
+LANGUAGE: bash
+CODE:
+conda install turbodbc -c conda-forge
+
+----------------------------------------
+
+TITLE: Listing Git Contributors
+DESCRIPTION: Shows how to use git shortlog to list contributors between two versions
+
+LANGUAGE: shell
+CODE:
+$ git shortlog -sn apache-arrow-0.16.0..apache-arrow-0.17.0
+
+----------------------------------------
+
+TITLE: Apache License Comment Block
+DESCRIPTION: Standard Apache License 2.0 comment block included in the Jekyll template.
+
+LANGUAGE: html
+CODE:
+<!--
+{% comment %}
+Licensed to the Apache Software Foundation (ASF) under one or more
+contributor license agreements.  See the NOTICE file distributed with
+this work for additional information regarding copyright ownership.
+The ASF licenses this file to you under the Apache License, Version 2.0
+(the "License"); you may not use this file except in compliance with
+the License.  You may obtain a copy of the License at
+
+http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+{% endcomment %}
+-->
+
+----------------------------------------
+
+TITLE: Listing Git Contributors in Shell
+DESCRIPTION: Shell command to list Git contributors between two versions
+
+LANGUAGE: shell
+CODE:
+$ git shortlog -sn apache-arrow-0.10.0..apache-arrow-0.11.0
+
+----------------------------------------
+
+TITLE: Listing Git Patch Committers in Shell
+DESCRIPTION: Shell command to list Git patch committers between two versions
+
+LANGUAGE: shell
+CODE:
+$ git shortlog -csn apache-arrow-0.10.0..apache-arrow-0.11.0
+
+----------------------------------------
+
+TITLE: Defining Arrow Schema for Hierarchical Data Model in Go
+DESCRIPTION: This code snippet demonstrates how to define an Arrow schema in Go to represent a hierarchical data model for metrics, including nested structures, lists, and unions.
+
+LANGUAGE: go
+CODE:
+import "github.com/apache/arrow/go/v11/arrow"
+
+const (
+  GaugeMetricCode arrow.UnionTypeCode = 0
+  SumMetricCode   arrow.UnionTypeCode = 1
+)
+
+var (
+  // uint8Dictionary represent a Dictionary<Uint8, String>
+  uint8Dictionary = &arrow.DictionaryType{
+     IndexType: arrow.PrimitiveTypes.Uint8,
+     ValueType: arrow.BinaryTypes.String,
+  }
+  // uint16Dictionary represent a Dictionary<Uint16, String>
+  uint16Dictionary = &arrow.DictionaryType{
+     IndexType: arrow.PrimitiveTypes.Uint16,
+     ValueType: arrow.BinaryTypes.String,
+  }
+
+  Schema = arrow.NewSchema([]arrow.Field{
+     {Name: "resource_metrics", Type: arrow.ListOf(arrow.StructOf([]arrow.Field{
+        {Name: "scope", Type: arrow.StructOf([]arrow.Field{
+           // Name and Version are declared as dictionaries (Dictionary<Uint16, String>)).
+           {Name: "name", Type: uint16Dictionary},
+           {Name: "version", Type: uint16Dictionary},
+        }...))},
+        {Name: "metrics", Type: arrow.ListOf(arrow.StructOf([]arrow.Field{
+           {Name: "name", Type: uint16Dictionary},
+           {Name: "unit", Type: uint8Dictionary},
+           {Name: "timestamp", Type: arrow.TIMESTAMP},
+           {Name: "metric_type", Type: arrow.UINT8},
+           {Name: "data_point", Type: arrow.ListOf(arrow.StructOf([]arrow.Field{
+              {Name: "metric", Type: arrow.DenseUnionOf(
+                 []arrow.Field{
+                    {Name: "gauge", Type: arrow.StructOf([]arrow.Field{
+                       {Name: "data_point", Type: arrow.FLOAT64},
+                    }...))},
+                    {Name: "sum", Type: arrow.StructOf([]arrow.Field{
+                       {Name: "data_point", Type: arrow.FLOAT64},
+                       {Name: "is_monotonic", Type: arrow.BOOL},
+                    }...))},
+                 },
+                 []arrow.UnionTypeCode{GaugeMetricCode, SumMetricCode},
+              )},
+           }...)))},
+        }...)))},
+     }...)))},
+  }, nil)
+)
+
+----------------------------------------
+
+TITLE: Defining Arrow Schema for Hierarchical Data Model in Go
+DESCRIPTION: This code snippet demonstrates how to define an Arrow schema in Go to represent a hierarchical data model for metrics, including nested structures, lists, and unions.
+
+LANGUAGE: go
+CODE:
+import "github.com/apache/arrow/go/v11/arrow"
+
+const (
+  GaugeMetricCode arrow.UnionTypeCode = 0
+  SumMetricCode   arrow.UnionTypeCode = 1
+)
+
+var (
+  // uint8Dictionary represent a Dictionary<Uint8, String>
+  uint8Dictionary = &arrow.DictionaryType{
+     IndexType: arrow.PrimitiveTypes.Uint8,
+     ValueType: arrow.BinaryTypes.String,
+  }
+  // uint16Dictionary represent a Dictionary<Uint16, String>
+  uint16Dictionary = &arrow.DictionaryType{
+     IndexType: arrow.PrimitiveTypes.Uint16,
+     ValueType: arrow.BinaryTypes.String,
+  }
+
+  Schema = arrow.NewSchema([]arrow.Field{
+     {Name: "resource_metrics", Type: arrow.ListOf(arrow.StructOf([]arrow.Field{
+        {Name: "scope", Type: arrow.StructOf([]arrow.Field{
+           // Name and Version are declared as dictionaries (Dictionary<Uint16, String>)).
+           {Name: "name", Type: uint16Dictionary},
+           {Name: "version", Type: uint16Dictionary},
+        }...))},
+        {Name: "metrics", Type: arrow.ListOf(arrow.StructOf([]arrow.Field{
+           {Name: "name", Type: uint16Dictionary},
+           {Name: "unit", Type: uint8Dictionary},
+           {Name: "timestamp", Type: arrow.TIMESTAMP},
+           {Name: "metric_type", Type: arrow.UINT8},
+           {Name: "data_point", Type: arrow.ListOf(arrow.StructOf([]arrow.Field{
+              {Name: "metric", Type: arrow.DenseUnionOf(
+                 []arrow.Field{
+                    {Name: "gauge", Type: arrow.StructOf([]arrow.Field{
+                       {Name: "data_point", Type: arrow.FLOAT64},
+                    }...))},
+                    {Name: "sum", Type: arrow.StructOf([]arrow.Field{
+                       {Name: "data_point", Type: arrow.FLOAT64},
+                       {Name: "is_monotonic", Type: arrow.BOOL},
+                    }...))},
+                 },
+                 []arrow.UnionTypeCode{GaugeMetricCode, SumMetricCode},
+              )},
+           }...)))},
+        }...)))},
+     }...)))},
+  }, nil)
+)
+
+----------------------------------------
+
+TITLE: Listing Git Contributors
+DESCRIPTION: Shell command to list contributors between 0.9.0 and 0.10.0 releases
+
+LANGUAGE: shell
+CODE:
+$ git shortlog -sn apache-arrow-0.9.0..apache-arrow-0.10.0
+
+----------------------------------------
+
+TITLE: CUDA GPU Memory Management with Arrow C++
+DESCRIPTION: Shows how to use Arrow's CUDA extension library to manage GPU memory and transfer record batches between CPU and GPU memory. Includes initialization of CUDA context and serialization of record batch data.
+
+LANGUAGE: c++
+CODE:
+#include <arrow/api.h>
+#include <arrow/gpu/cuda_api.h>
+
+using namespace arrow;
+
+gpu::CudaDeviceManager* manager;
+std::shared_ptr<gpu::CudaContext> context;
+
+gpu::CudaDeviceManager::GetInstance(&manager)
+manager_->GetContext(kGpuNumber, &context);
+
+std::shared_ptr<RecordBatch> batch = GetCpuData();
+
+std::shared_ptr<gpu::CudaBuffer> device_serialized;
+gpu::SerializeRecordBatch(*batch, context_.get(), &device_serialized));
+
+LANGUAGE: c++
+CODE:
+std::shared_ptr<RecordBatch> device_batch;
+gpu::ReadRecordBatch(batch->schema(), device_serialized,
+                     default_memory_pool(), &device_batch));
+
+// Now run some CUDA kernels on device_batch
+
+----------------------------------------
+
+TITLE: Listing Patch Committers
+DESCRIPTION: Shell command to list committers who committed patches
+
+LANGUAGE: shell
+CODE:
+$ git shortlog -csn apache-arrow-0.9.0..apache-arrow-0.10.0
+
+----------------------------------------
+
+TITLE: Implementing AsyncFileReader Trait in Rust
+DESCRIPTION: Reference to the AsyncFileReader trait in the Rust Parquet crate, which allows efficient reading from storage media supporting range requests.
+
+LANGUAGE: Rust
+CODE:
+trait AsyncFileReader {
+    // Trait methods
+}
+
+----------------------------------------
+
+TITLE: Listing Patch Committers
+DESCRIPTION: Shell command to list Apache committers who contributed patches
+
+LANGUAGE: shell
+CODE:
+$ git shortlog -csn apache-arrow-0.7.0..apache-arrow-0.8.0
+
+----------------------------------------
+
+TITLE: Listing Git Contributors in Shell
+DESCRIPTION: Shell command to list Git contributors between versions 0.6.0 and 0.7.0 of Apache Arrow.
+
+LANGUAGE: shell
+CODE:
+$ git shortlog -sn apache-arrow-0.6.0..apache-arrow-0.7.0
+
+----------------------------------------
+
+TITLE: Displaying Git Contributor Summary in Markdown
+DESCRIPTION: Shows a shell command to generate a summary of git contributors between two versions, and displays the output in a markdown code block.
+
+LANGUAGE: markdown
+CODE:
+```shell
+$ git shortlog -sn apache-arrow-0.4.0..apache-arrow-0.4.1
+    16  Wes McKinney
+     5  Julien Le Dem
+     4  Kouhei Sutou
+     2  Jacob Scott
+     1  Brian Hulette
+     1  Jeff Knupp
+     1  Jeff Reback
+     1  Max Risuhin
+     1  Phillip Cloud
+     1  Tony Kelman
+     1  Uwe L. Korn
+     1  adeneche
+     1  kimanjun
+     1  rip.nsk
+```
+
+----------------------------------------
+
+TITLE: Creating an Integer Array in C using nanoarrow
+DESCRIPTION: This snippet demonstrates how to create a simple integer array using nanoarrow's C API. It initializes an array, appends integer values, and sets up the corresponding schema.
+
+LANGUAGE: c
+CODE:
+#include "nanoarrow.h"
+
+int make_simple_array(struct ArrowArray* array_out, struct ArrowSchema* schema_out) {
+  struct ArrowError error;
+  array_out->release = NULL;
+  schema_out->release = NULL;
+
+  NANOARROW_RETURN_NOT_OK(ArrowArrayInitFromType(array_out, NANOARROW_TYPE_INT32));
+
+  NANOARROW_RETURN_NOT_OK(ArrowArrayStartAppending(array_out));
+  NANOARROW_RETURN_NOT_OK(ArrowArrayAppendInt(array_out, 1));
+  NANOARROW_RETURN_NOT_OK(ArrowArrayAppendInt(array_out, 2));
+  NANOARROW_RETURN_NOT_OK(ArrowArrayAppendInt(array_out, 3));
+  NANOARROW_RETURN_NOT_OK(ArrowArrayFinishBuilding(array_out, &error));
+
+  NANOARROW_RETURN_NOT_OK(ArrowSchemaInitFromType(schema_out, NANOARROW_TYPE_INT32));
+
+  return NANOARROW_OK;
+}
+
+----------------------------------------
+
+TITLE: Displaying Contributors in Console
+DESCRIPTION: Displays a list of contributors and their commit counts for this release using a console command.
+
+LANGUAGE: bash
+CODE:
+console
+ 58 David Li
+ 56 Antoine Pitrou
+ 46 Neal Richardson
+ 42 Sutou Kouhei
+ 38 Jonathan Keane
+ 34 Krisztián Szűcs
+ 27 Matthew Topol
+ 26 Nic Crane
+ 23 Andrew Lamb
+ 22 Joris Van den Bossche
+ 21 Weston Pace
+ 16 Alessandro Molina
+ 15 Yibo Cai
+ 10 Eduardo Ponce
+ 9 Benson Muite
+ 9 Rok
+ 9 Micah Kornfield
+ 8 liyafan82
+ 8 michalursa
+ 8 Benjamin Kietzman
+ 8 Carlos O'Ryan
+ 8 Ben Chambers
+ 8 Navin
+ 7 Alexander
+ 7 Jiayu Liu
+ 6 Phillip Cloud
+ 5 Dominik Moritz
+ 5 Percy Camilo Triveño Aucahuasi
+ 5 Ian Cook
+ 5 karldw
+ 5 Wakahisa
+ 4 Ruihang Xia
+ 4 Nate Clark
+ 4 Bryan Cutler
+ 4 Dragos Moldovan-Grünfeld
+ 4 Romain Francois
+ 3 Daniël Heres
+ 3 Matthew Turner
+ 3 Sumit 
+ 3 Alenka Frim
+ 3 okadakk
+ 3 Laurent Goujon
+ 3 Keith Kraus
+ 3 Rommel Quintanilla
+ 3 Roee Shlomo
+ 2 Boaz
+ 2 Chojan Shang
+ 2 Ilya Biryukov
+ 2 Markus Westerlind
+ 2 Sergii Mikhtoniuk
+ 2 Wang Fenjin
+ 2 baishen
+ 2 Fernando Rodriguez
+ 2 João Pedro
+ 2 Junwang Zhao
+ 2 Takashi Hashida
+ 2 William Butler
+ 2 christian
+ 2 darion.yaphet
+ 2 frank400
+ 2 jreid
+ 2 rvernica
+ 2 Jorge C. Leitao
+ 1 Pachamaltese
+ 1 Itamar Turner-Trauring
+ 1 Projjal Chanda
+ 1 Qingping Hou
+ 1 Hongze Zhang
+ 1 Eric Erhardt
+ 1 ElenaHenderson
+ 1 Sasha Krassovsky
+ 1 Shoichi Kagawa
+ 1 Eduard Tudenhoefner
+ 1 Tahsin Hassan
+ 1 niranda perera
+ 1 Ted Dunning
+ 1 Tim Swast
+ 1 Wes McKinney
+ 1 Dongjoon Hyun
+ 1 Carol (Nichols || Goulding)
+ 1 Christian Williams
+ 1 Felix Yan 
+ 1 Andrey Klochkov
+ 1 William Hyun
+ 1 William Malpica
+ 1 Dmitry Kalinkin
+ 1 rodrigojdebem
+ 1 czxrrr
+ 1 wuzhuoming
+ 1 seidl
+ 1 jeremyd2019
+ 1 shanhuuang
+ 1 Dewey Dunnington
+ 1 kharoc
+ 1 lixiang.li
+ 1 Daniel Rodriguez
+ 1 Anthony Louis
+ 1 neil
+ 1 Matt Peterson
+ 1 Kevin Gurney
+ 1 Nathanaël Leaute
+ 1 Kazuaki Ishizaki
+ 1 Jiajun Yao
+ 1 James Bourbeau
+
+----------------------------------------
+
+TITLE: Displaying Git Shortlog of Contributors
+DESCRIPTION: Shows a Git command to list contributors and their commit counts for the release, excluding dependabot contributions. This provides a summary of individual contributions to the project for this release.
+
+LANGUAGE: bash
+CODE:
+$ git shortlog --perl-regexp --author='^((?!dependabot\[bot\]).*)$' -sn apache-arrow-adbc-16..apache-arrow-adbc-17
+
+----------------------------------------
+
+TITLE: Git Contributors List Command
+DESCRIPTION: Git command to generate a sorted list of contributors excluding dependabot, showing commit counts between ADBC versions 14 and 15.
+
+LANGUAGE: shell
+CODE:
+git shortlog --perl-regexp --author='^((?!dependabot\[bot\]).*)$' -sn apache-arrow-adbc-14..apache-arrow-adbc-15
+
+----------------------------------------
+
+TITLE: Displaying Git Commit Statistics for Contributors
+DESCRIPTION: This command uses git shortlog to display a summary of commits by author, excluding dependabot contributions, for the 0.1.0 release of Apache Arrow Flight SQL adapter for PostgreSQL.
+
+LANGUAGE: shell
+CODE:
+$ git shortlog --perl-regexp --author=^((?!dependabot\[bot\]).*)$ -sn dc7f34e2636732acd0d015a7cd8259334f1acb16...0.1.0
+    59	Sutou Kouhei
+
+----------------------------------------
+
+TITLE: Installing Jekyll Dependencies with Ruby
+DESCRIPTION: Commands to install Jekyll and its dependencies using Ruby's package manager. Requires a recent non-EOL version of Ruby.
+
+LANGUAGE: shell
+CODE:
+gem install bundler
+bundle install
+
+----------------------------------------
+
+TITLE: Git Contributor Statistics Command
+DESCRIPTION: Git shortlog command to display contributor statistics between Apache Arrow ADBC versions 0.3.0 and 0.4.0, excluding dependabot contributions.
+
+LANGUAGE: git
+CODE:
+git shortlog --perl-regexp --author='^((?!dependabot\[bot\]).*)$' -sn apache-arrow-adbc-0.3.0..apache-arrow-adbc-0.4.0
+
+----------------------------------------
+
+TITLE: Git Contributor Statistics for ADBC 0.2.0
+DESCRIPTION: Git shortlog command showing the number of contributions per author between ADBC 0.1.0 and 0.2.0 releases, excluding dependabot contributions.
+
+LANGUAGE: git
+CODE:
+$ git shortlog --perl-regexp --author='^((?!dependabot\[bot\]).*)$' -sn apache-arrow-adbc-0.1.0..apache-arrow-adbc-0.2.0
+    56	David Li
+     8	Sutou Kouhei
+     7	Matt Topol
+     4	Jacob Marble
+     2	Benson Muite
+     1	Dave Hirschfeld
+     1	Jianfeng Mao
+
+----------------------------------------
+
+TITLE: Git Contributors List Command
+DESCRIPTION: Git command that generates a shortlog of contributors and their commit counts, excluding dependabot contributions, between specific commit hashes.
+
+LANGUAGE: shell
+CODE:
+git shortlog --perl-regexp --author='^((?!dependabot\[bot\]).*)$' -sn fe96ea9186194af06f4a229b6e5a57815f05f6bd..apache-arrow-adbc-0.1.0
+
+----------------------------------------
+
+TITLE: Listing Contributor Statistics for Ballista 0.9.0 Release
+DESCRIPTION: This code snippet shows the output of a git command listing the number of commits per contributor for the Ballista 0.9.0 release. It provides insight into the level of community involvement in the project.
+
+LANGUAGE: plaintext
+CODE:
+    22  Andy Grove
+    12  yahoNanJing
+     6  Daniël Heres
+     4  Brent Gardner
+     4  dependabot[bot]
+     4  r.4ntix
+     3  Stefan Stanciulescu
+     3  mingmwang
+     2  Ken Suenobu
+     2  Yang Jiang
+     1  Metehan Yıldırım
+     1  Trent Feda
+     1  askoa
+     1  yangzhong
+
+----------------------------------------
+
+TITLE: Previewing Jekyll Site Locally
+DESCRIPTION: Command to build and serve the website locally for preview at http://localhost:4000/.
+
+LANGUAGE: shell
+CODE:
+bundle exec rake
+
+----------------------------------------
+
+TITLE: Displaying Contributor Statistics for DataFusion 8.0.0 Release
+DESCRIPTION: This code snippet shows how to use Git commands to generate statistics about the contributors to the DataFusion 8.0.0 release. It counts the number of commits and lists contributors sorted by the number of contributions.
+
+LANGUAGE: shell
+CODE:
+$ git log --pretty=oneline 7.0.0..8.0.0 datafusion datafusion-cli datafusion-examples ballista ballista-cli ballista-examples | wc -l
+279
+
+$ git shortlog -sn 7.0.0..8.0.0 datafusion datafusion-cli datafusion-examples ballista ballista-cli ballista-examples | wc -l
+49
+
+(feynman han, feynman.h, Feynman Han were assumed to be the same person)
+
+----------------------------------------
+
+TITLE: Generating Git Commit Statistics for Ballista 0.5.0
+DESCRIPTION: This Git command generates a short log of commit statistics, showing the number of commits per author for the Ballista project between versions 4.0.0 and 5.0.0. It focuses on specific directories within the project.
+
+LANGUAGE: git
+CODE:
+git shortlog -sn 4.0.0..5.0.0 ballista/rust/client ballista/rust/core ballista/rust/executor ballista/rust/scheduler
+
+----------------------------------------
+
+TITLE: Displaying Git Commit Statistics for Apache Arrow Rust 5.0.0
+DESCRIPTION: This code snippet shows the git command used to display the number of commits and contributors for the Apache Arrow Rust 5.0.0 release. It demonstrates how to use git log and shortlog commands to generate release statistics.
+
+LANGUAGE: bash
+CODE:
+(arrow_dev) alamb@MacBook-Pro:~/Software/arrow-rs$ git log --pretty=oneline 4.0.0..5.0.0 | wc -l
+     161
+(arrow_dev) alamb@MacBook-Pro:~/Software/arrow-rs$ git shortlog -sn 4.0.0..5.0.0 | wc -l
+      35 // but Jorge is double counted
+
+----------------------------------------
+
+TITLE: Displaying Git Contributor Statistics for nanoarrow 0.3.0
+DESCRIPTION: Git command to show the number of commits per contributor between the previous release and apache-arrow-nanoarrow-0.3.0, excluding GitHub Actions commits.
+
+LANGUAGE: console
+CODE:
+$ git shortlog -sn d4f038ce58655ba6e996cdae165f1b33c3919d51..apache-arrow-nanoarrow-0.3.0 | grep -v "GitHub Actions"
+    40  Dewey Dunnington
+     7  William Ayd
+     2  Bryce Mecum
+     1  Dane Pitkin
+
+----------------------------------------
+
+TITLE: Adding S3 ObjectStore Dependency
+DESCRIPTION: Cargo dependency configuration for adding S3 ObjectStore support to a Rust DataFusion project.
+
+LANGUAGE: toml
+CODE:
+datafusion-objectstore-s3 = "0.1.0"
+
+----------------------------------------
+
+TITLE: Git Contributor Statistics Command
+DESCRIPTION: Shell commands to display the number of commits and unique contributors between versions 13.0.0 and 16.0.0
+
+LANGUAGE: shell
+CODE:
+$ git log --pretty=oneline 13.0.0..16.0.0 . | wc -l
+     543
+
+$ git shortlog -sn 13.0.0..16.0.0 . | wc -l
+      73
+
+----------------------------------------
+
+TITLE: Git Contributor List
+DESCRIPTION: A formatted list of all contributors and their contribution counts between versions 13.0.0 and 16.0.0
+
+LANGUAGE: text
+CODE:
+   113	Andrew Lamb
+    58	jakevin
+    46	Raphael Taylor-Davies
+    30	Andy Grove
+    19	Batuhan Taskaya
+    19	Remzi Yang
+    17	ygf11
+    16	Burak
+    16	Jeffrey
+    16	Marco Neumann
+    14	Kun Liu
+    12	Yang Jiang
+    10	mingmwang
+
+----------------------------------------
+
+TITLE: Git Commit Count for DataFusion 5.0.0
+DESCRIPTION: Git command to count total number of commits between versions 4.0.0 and 5.0.0 across datafusion related repositories.
+
+LANGUAGE: shell
+CODE:
+$ git log --pretty=oneline 4.0.0..5.0.0 datafusion datafusion-cli datafusion-examples | wc -l
+
+----------------------------------------
+
+TITLE: Linking to Apache Arrow Blog Posts in HTML
+DESCRIPTION: This HTML snippet creates an ordered list of links to blog posts about Apache Arrow. It uses Jekyll-style linking to reference other posts within the same site.
+
+LANGUAGE: HTML
+CODE:
+<ol>
+<li><a href="{% link _posts/2025-01-10-arrow-result-transfer.md %}">How the Apache Arrow Format Accelerates Query Result Transfer</a></li>
+<li><a href="{% link _posts/2025-02-28-data-wants-to-be-free.md %}">Data Wants to Be Free: Fast Data Exchange with Apache Arrow</a></li>
+</ol>
+
+----------------------------------------
+
+TITLE: Defining Arrow Schema for Nested Data Structure in Python
+DESCRIPTION: Arrow schema definition for the complex nested data structure, including field names, nullability, and data types for lists and structs.
+
+LANGUAGE: python
+CODE:
+Field(name: "a", nullable: true, datatype: List(
+  Field(name: "element", nullable: true, datatype: Int32),
+)
+Field(name: "b"), nullable: false, datatype: List(
+  Field(name: "element", nullable: true, datatype: Struct[
+    Field(name: "b1", nullable: false, datatype: Int32),
+    Field(name: "b2", nullable: true, datatype: List(
+      Field(name: "element", nullable: false, datatype: Int32)
+    ))
+  ])
+))
+
+----------------------------------------
+
+TITLE: Git Contributors List Command for Arrow Go 18.2.0
+DESCRIPTION: Git command showing contributor statistics between versions 18.1.0 and 18.2.0 of Apache Arrow Go, displaying the number of commits per contributor.
+
+LANGUAGE: console
+CODE:
+$ git shortlog -sn v18.1.0..v18.2.0
+    13	Matt Topol
+     3	Saurabh Singh
+     2	Ruihao Chen
+     1	Chris Bandy
+     1	David Li
+     1	Simon Josefsson
+     1	Sutou Kouhei
+
+----------------------------------------
+
+TITLE: Visualizing Parquet Encoding for Nested Data Structure
+DESCRIPTION: ASCII representation of how Parquet encodes the complex nested data structure, showing definition levels, repetition levels, and data for different fields.
+
+LANGUAGE: text
+CODE:
+┌───────────────────────────────┐ ┌────────────────────────────────┐
+│ ┌─────┐    ┌─────┐    ┌─────┐ │ │  ┌─────┐    ┌─────┐    ┌─────┐ │
+│ │  3  │    │  0  │    │  1  │ │ │  │  2  │    │  0  │    │  1  │ │
+│ ├─────┤    ├─────┤    └─────┘ │ │  ├─────┤    ├─────┤    ├─────┤ │
+│ │  0  │    │  0  │            │ │  │  2  │    │  1  │    │  1  │ │
+│ ├─────┤    ├─────┤      Data  │ │  ├─────┤    ├─────┤    ├─────┤ │
+│ │  2  │    │  0  │            │ │  │  2  │    │  0  │    │  2  │ │
+│ ├─────┤    ├─────┤            │ │  ├─────┤    ├─────┤    └─────┘ │
+│ │  2  │    │  1  │            │ │  │  1  │    │  0  │            │
+│ └─────┘    └─────┘            │ │  └─────┘    └─────┘     Data   │
+│                               │ │                                │
+│Definition Repetition          │ │ Definition Repetition          │
+│  Levels     Levels            │ │   Levels     Levels            │
+│                               │ │                                │
+│ "a"                           │ │  "b.b1"                        │
+└───────────────────────────────┘ └────────────────────────────────┘
+
+┌───────────────────────────────┐
+│  ┌─────┐    ┌─────┐    ┌─────┐│
+│  │  2  │    │  0  │    │  3  ││
+│  ├─────┤    ├─────┤    ├─────┤│
+│  │  4  │    │  1  │    │  4  ││
+│  ├─────┤    ├─────┤    └─────┘│
+│  │  4  │    │  2  │           │
+│  ├─────┤    ├─────┤           │
+│  │  2  │    │  0  │           │
+│  ├─────┤    ├─────┤     Data  │
+│  │  1  │    │  0  │           │
+│  └─────┘    └─────┘           │
+│Definition  Repetition         │
+│  Levels      Levels           │
+│                               │
+│  "b.b2"                       │
+└───────────────────────────────┘
+
+----------------------------------------
+
+TITLE: Defining JSON-like List Data Structure in Python
+DESCRIPTION: Example of four JSON documents with list structures, demonstrating various scenarios including null lists, empty lists, and lists with null elements.
+
+LANGUAGE: python
+CODE:
+{
+  "a": [1],
+}
+
+{
+}
+
+{
+  "a": []
+}
+
+{
+  "a": [null, 2],
+}
+
+----------------------------------------
+
+TITLE: Defining Arrow Schema for List Data
+DESCRIPTION: Arrow schema definition for the list data structure, specifying a nullable list field containing nullable integer elements.
+
+LANGUAGE: python
+CODE:
+Field(name: "a", nullable: true, datatype: List(
+  Field(name: "element", nullable: true, datatype: Int32),
+)
+
+----------------------------------------
+
+TITLE: Demonstrating Record-Oriented Data Format in Python
+DESCRIPTION: Example of record-oriented data format using newline-delimited JSON (NDJSON) to store multiple records with varying columns.
+
+LANGUAGE: python
+CODE:
+{"Column1": 1, "Column2": 2}
+{"Column1": 3, "Column2": 4, "Column3": 5}
+{"Column1": 5, "Column2": 4, "Column3": 5}
+
+----------------------------------------
+
+TITLE: Contributor Git Log Output
+DESCRIPTION: Git shortlog showing commit counts and contributors for release 19.0.1
+
+LANGUAGE: console
+CODE:
+$ git shortlog -sn apache-arrow-19.0.0..apache-arrow-19.0.1
+    11	Bryce Mecum
+     4	Antoine Pitrou
+     4	Joris Van den Bossche
+     2	Gang Wu
+     2	Sutou Kouhei
+     1	David Li
+     1	Ian Cook
+     1	Matt Topol
+     1	Rossi Sun
+
+----------------------------------------
+
+TITLE: Visualizing Nullable Primitive Column in Arrow
+DESCRIPTION: ASCII representation of how Arrow stores a nullable column using a validity bitmask and a values buffer.
+
+LANGUAGE: text
+CODE:
+┌─────┐   ┌─────┐
+│  1  │   │  1  │
+├─────┤   ├─────┤
+│  0  │   │ ??  │
+├─────┤   ├─────┤
+│  1  │   │  3  │
+├─────┤   ├─────┤
+│  1  │   │  4  │
+├─────┤   ├─────┤
+│  0  │   │ ??  │
+└─────┘   └─────┘
+Validity   Values
+
+----------------------------------------
+
+TITLE: Retrieving Git Shortlog for Apache Arrow Release
+DESCRIPTION: A Git command to retrieve the shortlog of commits between two Apache Arrow versions, showing contributor statistics.
+
+LANGUAGE: shell
+CODE:
+$ git shortlog -sn apache-arrow-16.1.0..apache-arrow-17.0.0
+
+----------------------------------------
+
+TITLE: Listing Git Commit Statistics for Apache Arrow 16.1.0
+DESCRIPTION: This console command uses git shortlog to display the number of commits and contributors for the Apache Arrow 16.1.0 release.
+
+LANGUAGE: console
+CODE:
+$ git shortlog -sn apache-arrow-16.0.0..apache-arrow-16.1.0
+
+----------------------------------------
+
+TITLE: Visualizing Nullable Primitive Column in Parquet
+DESCRIPTION: ASCII representation of how Parquet stores a nullable column using definition levels and a values list.
+
+LANGUAGE: text
+CODE:
+┌─────┐    ┌─────┐
+│  1  │    │  1  │
+├─────┤    ├─────┤
+│  0  │    │  3  │
+├─────┤    ├─────┤
+│  1  │    │  4  │
+├─────┤    └─────┘
+│  1  │
+├─────┤
+│  0  │
+└─────┘
+Definition  Values
+ Levels
+
+----------------------------------------
+
+TITLE: Listing Git Commit Statistics for Apache Arrow 15.0.1
+DESCRIPTION: This console command uses git shortlog to display the number of commits per contributor for the 15.0.1 release of Apache Arrow.
+
+LANGUAGE: console
+CODE:
+$ git shortlog -sn apache-arrow-15.0.0..apache-arrow-15.0.1
+
+----------------------------------------
+
+TITLE: Displaying Patch Committer Statistics
+DESCRIPTION: Console command showing git shortlog output grouped by signed-off-by trailer to display patch committer statistics between Apache Arrow versions 14.0.1 and 14.0.2
+
+LANGUAGE: console
+CODE:
+$ git shortlog -sn --group=trailer:signed-off-by apache-arrow-14.0.1..apache-arrow-14.0.2
+    11	Jacob Wujciak-Jens
+     4	Sutou Kouhei
+     3	Antoine Pitrou
+     3	Dewey Dunnington
+     3	Joris Van den Bossche
+     2	Raúl Cumplido
+     1	Benjamin Kietzman
+     1	Nic Crane
+     1	mwish
+
+----------------------------------------
+
+TITLE: Building nanoarrow with CMake Features
+DESCRIPTION: CMake command to build nanoarrow with IPC and device support enabled
+
+LANGUAGE: shell
+CODE:
+cmake -S . -B build -DNANOARROW_IPC=ON -DNANOARROW_DEVICE=ON
+
+----------------------------------------
+
+TITLE: Displaying Git Contributor Statistics
+DESCRIPTION: Console commands showing git shortlog output to display contributor statistics for commits between Apache Arrow versions 14.0.1 and 14.0.2
+
+LANGUAGE: console
+CODE:
+$ git shortlog -sn apache-arrow-14.0.1..apache-arrow-14.0.2
+     6	Jacob Wujciak-Jens
+     5	Dewey Dunnington
+     5	Raúl Cumplido
+     5	Sutou Kouhei
+     2	Antoine Pitrou
+     2	Jonathan Keane
+     2	Joris Van den Bossche
+     2	mwish
+     1	Eero Lihavainen
+     1	Nic Crane
+     1	Peter Andreas Entschev
+
+----------------------------------------
+
+TITLE: Git Contributor Statistics Command
+DESCRIPTION: Console command to show git commit statistics between versions
+
+LANGUAGE: console
+CODE:
+$ git shortlog -sn apache-arrow-12.0.1..apache-arrow-13.0.0
+
+----------------------------------------
+
+TITLE: Python StringView and Float16 Examples
+DESCRIPTION: Demonstrates using string_view and float16 data types in Python with nanoarrow
+
+LANGUAGE: python
+CODE:
+import nanoarrow as na
+
+na.Array(["abc", "def", None], na.string_view())
+#> nanoarrow.Array<string_view>[3]
+#> 'abc'
+#> 'def'
+#> None
+na.Array([1, 2, 3], na.float16())
+#> nanoarrow.Array<half_float>[3]
+#> 1.0
+#> 2.0
+#> 3.0
+
+----------------------------------------
+
+TITLE: Git Shortlog for Patch Committers
+DESCRIPTION: Shows the number of patches merged by Apache committers
+
+LANGUAGE: console
+CODE:
+$ git shortlog -sn --group=trailer:signed-off-by apache-arrow-8.0.0..apache-arrow-9.0.0
+   126	Sutou Kouhei
+    75	Antoine Pitrou
+    67	David Li
+    40	Neal Richardson
+    34	Weston Pace
+    25	Matthew Topol
+    24	Krisztián Szűcs
+    19	Joris Van den Bossche
+    17	Nic Crane
+    17	Alessandro Molina
+
+----------------------------------------
+
+TITLE: Listing Patch Committers for Apache Arrow 7.0.0
+DESCRIPTION: Git shortlog showing counts of patches merged by Apache committers between versions 6.0.0 and 7.0.0
+
+LANGUAGE: console
+CODE:
+$ git shortlog -csn apache-arrow-6.0.0..apache-arrow-7.0.0
+   149	Antoine Pitrou
+    85	Krisztián Szűcs
+    73	Sutou Kouhei
+    68	Jonathan Keane
+    64	David Li
+
+----------------------------------------
+
+TITLE: Using nanoarrow low-level Python functions
+DESCRIPTION: Examples of using nanoarrow's c_schema, c_array, and c_array_stream functions in Python.
+
+LANGUAGE: python
+CODE:
+na.c_schema(pa.decimal128(10, 3))
+#> <nanoarrow.c_schema.CSchema decimal128(10, 3)>
+#> - format: 'd:10,3'
+#> - name: ''
+#> - flags: 2
+#> - metadata: NULL
+#> - dictionary: NULL
+#> - children[0]:
+
+na.c_array(["one", "two", "three", None], na.string())
+#> <nanoarrow.c_array.CArray string>
+#> - length: 4
+#> - offset: 0
+#> - null_count: 1
+#> - buffers: (4754305168, 4754307808, 4754310464)
+#> - dictionary: NULL
+#> - children[0]:
+
+----------------------------------------
+
+TITLE: Displaying Git Shortlog for Contributors in Bash
+DESCRIPTION: This bash command displays a short git log of contributors for the 6.0.1 release, showing the number of commits and contributor names.
+
+LANGUAGE: bash
+CODE:
+$ git shortlog -sn apache-arrow-6.0.0..apache-arrow-6.0.1
+
+----------------------------------------
+
+TITLE: Listing Git Commit Statistics for Apache Arrow 4.0.1 Release
+DESCRIPTION: This console command uses git shortlog to display statistics about commits and contributors for the Apache Arrow 4.0.1 release.
+
+LANGUAGE: console
+CODE:
+$ git shortlog -sn apache-arrow-4.0.0..apache-arrow-4.0.1
+
+----------------------------------------
+
+TITLE: Creating a nanoarrow_vctr in R
+DESCRIPTION: Example of creating a nanoarrow_vctr from an Arrow array in R.
+
+LANGUAGE: r
+CODE:
+library(nanoarrow)
+
+array <- as_nanoarrow_array(c("one", "two", "three"))
+convert_array(array, nanoarrow_vctr())
+#> <nanoarrow_vctr string[3]>
+#> [1] "one"   "two"   "three"
+
+----------------------------------------
+
+TITLE: Displaying Git Contribution Statistics for Apache Arrow 0.15.1
+DESCRIPTION: Git shortlog command output showing the number of commits per contributor between versions 0.15.0 and 0.15.1
+
+LANGUAGE: console
+CODE:
+$ git shortlog -sn apache-arrow-0.15.0..apache-arrow-0.15.1
+    10	Wes McKinney
+    10	Antoine Pitrou
+     7	Krisztián Szűcs
+     2	tianchen92
+     2	Joris Van den Bossche
+     2	Sutou Kouhei
+     2	Anthony Abate
+     1	Uwe L. Korn
+     1	Prudhvi Porandla
+     1	Yuqi Gu
+     1	ptaylor
+     1	Rick Cobb
+     1	tianchen
+
+----------------------------------------
+
+TITLE: Listing Patch Committers
+DESCRIPTION: Shows how to use Git to list Apache committers who merged patches between two versions
+
+LANGUAGE: shell
+CODE:
+$ git shortlog -csn apache-arrow-0.14.0..apache-arrow-0.15.0
+
+----------------------------------------
+
+TITLE: Displaying CSchema representation in Python
+DESCRIPTION: This snippet demonstrates how to use nanoarrow to print a human-readable representation of a decimal128 schema using the C Data interface.
+
+LANGUAGE: python
+CODE:
+import nanoarrow as na
+import pyarrow as pa
+na.c_schema(pa.decimal128(10, 3))
+
+----------------------------------------
+
+TITLE: Listing Git Commit Statistics
+DESCRIPTION: Shows how to use Git to list commit statistics for contributors between two versions
+
+LANGUAGE: shell
+CODE:
+$ git shortlog -sn apache-arrow-0.14.0..apache-arrow-0.15.0
+
+----------------------------------------
+
+TITLE: Patch Committer Statistics
+DESCRIPTION: Shows git shortlog statistics for committers who merged patches between versions 0.13.0 and 0.14.0.
+
+LANGUAGE: console
+CODE:
+$ git shortlog -csn apache-arrow-0.13.0..apache-arrow-0.14.0
+   213	Wes McKinney
+    67	Antoine Pitrou
+    40	Sutou Kouhei
+    36	Krisztián Szűcs
+    36	Sebastien Binet
+    34	Micah Kornfield
+    33	Kouhei Sutou
+
+----------------------------------------
+
+TITLE: Displaying CArray representation in Python
+DESCRIPTION: This code shows how to use nanoarrow to print a human-readable representation of a string array using the C Data interface.
+
+LANGUAGE: python
+CODE:
+na.c_array(pa.array(["one", "two", "three", None]))
+
+----------------------------------------
+
+TITLE: Git Patch Committers List Command
+DESCRIPTION: Git command to show number of patches merged by each committer between versions 0.12.0 and 0.13.0
+
+LANGUAGE: console
+CODE:
+$ git shortlog -csn apache-arrow-0.12.0..apache-arrow-0.13.0
+
+----------------------------------------
+
+TITLE: Git committer statistics in Shell
+DESCRIPTION: Shell command to show git shortlog statistics of committers who merged contributed patches between versions 0.11.0 and 0.12.0
+
+LANGUAGE: shell
+CODE:
+$ git shortlog -csn apache-arrow-0.11.0..apache-arrow-0.12.0
+
+----------------------------------------
+
+TITLE: Encoding Unsigned Integers in Arrow Rust Row Format
+DESCRIPTION: Demonstrates how unsigned integers are encoded in the Arrow Rust row format. The encoding uses a leading byte to indicate nullability, followed by the integer's bytes in big-endian order.
+
+LANGUAGE: text
+CODE:
+              ┌──┬──┬──┬──┐      ┌──┬──┬──┬──┬──┐
+   3          │03│00│00│00│      │01│00│00│00│03│
+              └──┴──┴──┴──┘      └──┴──┴──┴──┴──┘
+              ┌──┬──┬──┬──┐      ┌──┬──┬──┬──┬──┐
+  258         │02│01│00│00│      │01│00│00│01│02│
+              └──┴──┴──┴──┘      └──┴──┴──┴──┴──┘
+              ┌──┬──┬──┬──┐      ┌──┬──┬──┬──┬──┐
+ 23423        │7F│5B│00│00│      │01│00│00│5B│7F│
+              └──┴──┴──┴──┘      └──┴──┴──┴──┴──┘
+              ┌──┬──┬──┬──┐      ┌──┬──┬──┬──┬──┐
+ NULL         │??│??│??│??│      │00│00│00│00│00│
+              └──┴──┴──┴──┘      └──┴──┴──┴──┴──┘
+
+             32-bit (4 bytes)        Row Format
+ Value        Little Endian
+
+----------------------------------------
+
+TITLE: Listing Git Contributors
+DESCRIPTION: Shell command to list Git contributors between two versions
+
+LANGUAGE: shell
+CODE:
+$ git shortlog -sn apache-arrow-0.7.1..apache-arrow-0.8.0
+
+----------------------------------------
+
+TITLE: Git Contributors List for Apache Arrow 0.7.1
+DESCRIPTION: Shell command output showing the git shortlog of contributors between versions 0.7.0 and 0.7.1, displaying the number of commits per contributor.
+
+LANGUAGE: shell
+CODE:
+$ git shortlog -sn apache-arrow-0.7.0..apache-arrow-0.7.1
+    14  Wes McKinney
+     6  Kouhei Sutou
+     3  siddharth
+     2  Paul Taylor
+     2  Uwe L. Korn
+     1  Amir Malekpour
+     1  Bryan Cutler
+     1  Deepak Majeti
+     1  Kentaro Hayashi
+     1  Korn, Uwe
+     1  Li Jin
+     1  Rene Sugar
+     1  Tom Augspurger
+     1  Wataru Shimizu
+     1  m-nakamura145
+     1  rvernica
+
+----------------------------------------
+
+TITLE: Encoding Signed Integers in Arrow Rust Row Format
+DESCRIPTION: Shows how signed integers are encoded in the Arrow Rust row format. The encoding flips the top-most bit and treats the result as an unsigned integer to preserve order.
+
+LANGUAGE: text
+CODE:
+       ┌──┬──┬──┬──┐       ┌──┬──┬──┬──┐       ┌──┬──┬──┬──┬──┐
+    5  │05│00│00│00│       │05│00│00│80│       │01│80│00│00│05│
+       └──┴──┴──┴──┘       └──┴──┴──┴──┘       └──┴──┴──┴──┴──┘
+       ┌──┬──┬──┬──┐       ┌──┬──┬──┬──┐       ┌──┬──┬──┬──┬──┐
+   -5  │FB│FF│FF│FF│       │FB│FF│FF│7F│       │01│7F│FF│FF│FB│
+       └──┴──┴──┴──┘       └──┴──┴──┴──┘       └──┴──┴──┴──┴──┘
+
+ Value  32-bit (4 bytes)    High bit flipped      Row Format
+         Little Endian
+
+----------------------------------------
+
+TITLE: Listing Contributors using Git
+DESCRIPTION: This shell command uses git to list contributors and their commit counts between versions 0.5.0 and 0.6.0 of Apache Arrow.
+
+LANGUAGE: shell
+CODE:
+$ git shortlog -sn apache-arrow-0.5.0..apache-arrow-0.6.0
+
+----------------------------------------
+
+TITLE: Listing Contributors with Git Shortlog in Shell
+DESCRIPTION: This shell command uses git shortlog to list contributors and their commit counts between Apache Arrow versions 0.3.0 and 0.4.0.
+
+LANGUAGE: shell
+CODE:
+$ git shortlog -sn apache-arrow-0.3.0..apache-arrow-0.4.0
+
+----------------------------------------
+
+TITLE: Implementing lexicographical sorting with byte array comparisons in Python
+DESCRIPTION: Pseudocode for implementing lexicographical sorting using a byte array representation of rows, which allows for more efficient comparisons.
+
+LANGUAGE: python
+CODE:
+def lexsort_to_indices(columns):
+  rows = convert_to_rows(columns)
+  [0..columns.num_rows()].sort_by(lambda l, r: cmp(rows[l], rows[r]))
+
+----------------------------------------
+
+TITLE: Listing Git Contributors in Shell
+DESCRIPTION: Shell command to list contributors and their commit counts between two Arrow versions.
+
+LANGUAGE: shell
+CODE:
+$ git shortlog -sn apache-arrow-0.1.0..apache-arrow-0.2.0
+
+----------------------------------------
+
+TITLE: Git Contributor Summary
+DESCRIPTION: A git shortlog showing code contribution statistics between the initial commit and release 0.1.0
+
+LANGUAGE: shell
+CODE:
+$ git shortlog -sn d5aa7c46..apache-arrow-0.1.0
+    49  Wes McKinney
+    27  Uwe L. Korn
+    25  Julien Le Dem
+    13  Micah Kornfield
+    11  Steven Phillips
+     6  Jihoon Son
+     5  Laurent Goujon
+     5  adeneche
+     4  Dan Robinson
+     4  proflin
+     2  Jacques Nadeau
+     1  Christopher C. Aycock
+     1  Edmon Begoli
+     1  Kai Zheng
+     1  MechCoder
+     1  Minji Kim
+     1  Philipp Moritz
+     1  Smyatkin Maxim
+     1  fengguangyuan
+     1  hyukjinkwon
+     1  hzhang2
+     1  lfzCarlosC
+
+----------------------------------------
+
+TITLE: Ray API Serialization Example
+DESCRIPTION: Shows how to use Ray's API for object serialization, which internally uses Arrow for efficient data handling.
+
+LANGUAGE: python
+CODE:
+x = [(1, 2), 'hello', 3, 4, np.array([5.0, 6.0])]
+x_id = ray.put(x)
+deserialized_x = ray.get(x_id)
+
+----------------------------------------
+
+TITLE: Displaying Git Shortlog for Contributors in Bash
+DESCRIPTION: This bash command generates a shortlog of contributors to the Apache Arrow ADBC project between versions 15 and 16, excluding dependabot contributions. It lists the number of commits per author.
+
+LANGUAGE: bash
+CODE:
+$ git shortlog --perl-regexp --author='^((?!dependabot\[bot\]).*)$' -sn apache-arrow-adbc-15..apache-arrow-adbc-16
+
+----------------------------------------
+
+TITLE: Git Contributors List Command
+DESCRIPTION: Console command showing git shortlog output to list contributors and their commit counts between versions v18.0.0 and v18.1.0
+
+LANGUAGE: console
+CODE:
+$ git shortlog -sn v18.0.0..v18.1.0
+    24	Matt Topol
+     2	Sutou Kouhei
+     2	Todd Treece
+     1	Nick Ripley
+     1	Raúl Cumplido
+     1	Ruihao Chen
+
+----------------------------------------
+
+TITLE: Installing Required R Packages for Arrow and Sparklyr
+DESCRIPTION: Installation of development versions of Apache Arrow and Sparklyr packages from GitHub using devtools.
+
+LANGUAGE: R
+CODE:
+devtools::install_github("apache/arrow", subdir = "r", ref = "apache-arrow-0.12.0")
+devtools::install_github("rstudio/sparklyr", ref = "apache-arrow-0.12.0")
+
+----------------------------------------
+
+TITLE: Listing Git Contributors for Apache Arrow ADBC 13
+DESCRIPTION: This Git command lists the contributors to the Apache Arrow ADBC project between versions 12 and 13, excluding dependabot contributions. It shows the number of commits per contributor.
+
+LANGUAGE: shell
+CODE:
+$ git shortlog --perl-regexp --author='^((?!dependabot\[bot\]).*)$' -sn apache-arrow-adbc-12..apache-arrow-adbc-13
+
+----------------------------------------
+
+TITLE: Listing Contributors using Git Shortlog
+DESCRIPTION: This Git command lists the contributors to the project between versions 0.5.1 and 0.6.0, excluding dependabot contributions. It shows the number of commits per contributor.
+
+LANGUAGE: shell
+CODE:
+$ git shortlog --perl-regexp --author='^((?!dependabot\[bot\]).*)$' -sn apache-arrow-adbc-0.5.1..apache-arrow-adbc-0.6.0
+    30	David Li
+    15	William Ayd
+     9	Dewey Dunnington
+     5	Matt Topol
+     5	Solomon Choe
+     2	davidhcoe
+     1	Alexandre Crayssac
+     1	Curt Hagenlocher
+     1	Diego Fernández Giraldo
+
+----------------------------------------
+
+TITLE: Benchmarking Data Copy Operations with Arrow
+DESCRIPTION: Compares performance of copying data from R to Spark with and without Arrow using microbenchmark package.
+
+LANGUAGE: R
+CODE:
+microbenchmark::microbenchmark(
+  setup = library(arrow),
+  arrow_on = {
+    sparklyr_df <<- copy_to(sc, data, overwrite = T)
+    count(sparklyr_df) %>% collect()
+  },
+  arrow_off = {
+    if ("arrow" %in% .packages()) detach("package:arrow")
+    sparklyr_df <<- copy_to(sc, data, overwrite = T)
+    count(sparklyr_df) %>% collect()
+  },
+  times = 10
+) %T>% print() %>% ggplot2::autoplot()
+
+----------------------------------------
+
+TITLE: Listing Contributors with Git Shortlog Command
+DESCRIPTION: A Git command to list contributors and their commit counts between two specific versions of Apache Arrow ADBC, excluding dependabot commits.
+
+LANGUAGE: shell
+CODE:
+$ git shortlog --perl-regexp --author='^((?!dependabot\[bot\]).*)$' -sn apache-arrow-adbc-0.5.0..apache-arrow-adbc-0.5.1
+
+----------------------------------------
+
+TITLE: Listing Git Contributors for Apache Arrow Rust
+DESCRIPTION: This code snippet shows a Git command to list contributors and their commit counts for the Apache Arrow Rust project between versions 16.0.0 and 32.0.0. It demonstrates how to use Git's shortlog feature to generate a summary of contributions.
+
+LANGUAGE: shell
+CODE:
+git shortlog -sn 16.0.0..32.0.0
+
+----------------------------------------
+
+TITLE: Installing Apache Arrow R Package from CRAN
+DESCRIPTION: Demonstrates how to install the Apache Arrow R package from CRAN using the install.packages() function.
+
+LANGUAGE: R
+CODE:
+install.packages("arrow")
+
+----------------------------------------
+
+TITLE: Displaying Git Contribution Statistics
+DESCRIPTION: Console command using git shortlog to show contributor statistics between versions 9.0.0 and 16.0.0, listing the number of commits and contributor names.
+
+LANGUAGE: console
+CODE:
+git shortlog -sn 9.0.0..16.0.0
+
+----------------------------------------
+
+TITLE: Contributor Statistics Output
+DESCRIPTION: Git log output showing contributor statistics for the DataFusion 7.0.0 release, listing number of commits per contributor.
+
+LANGUAGE: text
+CODE:
+    44  Andrew Lamb
+    24  Kun Liu
+    23  Jiayu Liu
+    17  xudong.w
+    11  Yijie Shen
+     9  Matthew Turner
+     7  Liang-Chi Hsieh
+     5  Lin Ma
+     4  Stephen Carman
+     4  James Katz
+     4  Dmitry Patsura
+     4  QP Hou
+     3  dependabot[bot]
+     3  Remzi Yang
+     3  Yang
+     3  ic4y
+     3  Daniël Heres
+     2  Andy Grove
+     2  Raphael Taylor-Davies
+     2  Jason Tianyi Wang
+     2  Dan Harris
+     2  Sergey Melnychuk
+     1  Nitish Tiwari
+     1  Dom
+     1  Eduard Karacharov
+     1  Javier Goday
+     1  Boaz
+     1  Marko Mikulicic
+     1  Max Burke
+     1  Carol (Nichols || Goulding)
+     1  Phillip Cloud
+     1  Rich
+     1  Toby Hede
+     1  Will Jones
+     1  r.4ntix
+     1  rdettai
+
+----------------------------------------
+
+TITLE: Rendering PMC Members Table with Liquid Templates
+DESCRIPTION: HTML table template that uses Liquid templating to display PMC members, sorted alphabetically by name. Distinguishes between the PMC Chair (VP role) and regular PMC members.
+
+LANGUAGE: html
+CODE:
+<table class="table table-striped"><thead>
+<tr>
+<th>Name</th>
+<th>Affiliation</th>
+</tr>
+</thead><tbody>
+  {% assign sorted_committers = site.data.committers | sort: "name" %}
+  {% for person in sorted_committers %}
+    {% if person.role == "VP" %}
+  <tr>
+    <td><a href="https://people.apache.org/phonebook.html?uid={{ person.alias }}">{{ person.name }}</a> (Chair)</td>
+    <td>{{ person.affiliation }}</td>
+  </tr>
+    {% endif %}
+  {% endfor %}
+  {% for person in sorted_committers %}
+    {% if person.role == "PMC" %}
+  <tr>
+    <td><a href="https://people.apache.org/phonebook.html?uid={{ person.alias }}">{{ person.name }}</a></td>
+    <td>{{ person.affiliation }}</td>
+  </tr>
+    {% endif %}
+  {% endfor %}
+</tbody></table>
+
+----------------------------------------
+
+TITLE: Displaying Git Commit Statistics in Bash
+DESCRIPTION: This snippet shows bash commands to count the number of commits and list contributors for the DataFusion 6.0.0 release using git log and shortlog.
+
+LANGUAGE: bash
+CODE:
+git log --pretty=oneline 5.0.0..6.0.0 datafusion datafusion-cli datafusion-examples | wc -l
+     134
+
+git shortlog -sn 5.0.0..6.0.0 datafusion datafusion-cli datafusion-examples | wc -l
+      29
+
+      Carlos and xudong963 are same individual
+
+----------------------------------------
+
+TITLE: Rendering Committers Table with Liquid Templates
+DESCRIPTION: HTML table template that uses Liquid templating to display project committers, sorted alphabetically by name. Shows only members with Committer role.
+
+LANGUAGE: html
+CODE:
+<table class="table table-striped"><thead>
+<tr>
+<th>Name</th>
+<th>Affiliation</th>
+</tr>
+</thead><tbody>
+  {% assign sorted_committers = site.data.committers | sort: "name" %}
+  {% for person in sorted_committers %}
+    {% if person.role == "Committer" %}
+  <tr>
+    <td><a href="https://people.apache.org/phonebook.html?uid={{ person.alias }}">{{ person.name }}</a></td>
+    <td>{{ person.affiliation }}</td>
+  </tr>
+    {% endif %}
+  {% endfor %}
+</tbody></table>
+
+----------------------------------------
+
+TITLE: Issue Reference Link for GitHub
+DESCRIPTION: GitHib issue link demonstrating the Parquet file reading compatibility fix between Arrow C++ and Rust.
+
+LANGUAGE: markdown
+CODE:
+[(#45283)](https://github.com/apache/arrow/issues/45283)
+
+----------------------------------------
+
+TITLE: Segmentation Fault Fix Reference
+DESCRIPTION: GitHub issue link documenting the fix for segmentation faults during large join operations.
+
+LANGUAGE: markdown
+CODE:
+[#44513](https://github.com/apache/arrow/issues/44513)
+
+----------------------------------------
+
+TITLE: Git Contributors List Command
+DESCRIPTION: Console command to generate a list of contributors using git shortlog, excluding dependabot contributions, between version 8b7fde9 and v18.0.0.
+
+LANGUAGE: console
+CODE:
+$ git shortlog --perl-regexp --author='^((?!dependabot\[bot\]).*)$' -sn 8b7fde9..v18.0.0
+
+----------------------------------------
+
+TITLE: Accessing STRUCT Fields in DataFusion SQL
+DESCRIPTION: Shows how to access fields of a STRUCT type column using the square bracket notation in DataFusion SQL. This demonstrates the enhanced STRUCT support in version 34.0.0.
+
+LANGUAGE: SQL
+CODE:
+SELECT column1, column1['c0'] FROM  my_table;
+
+----------------------------------------
+
+TITLE: Listing DataFusion 6.0.0 Contributors in Markdown
+DESCRIPTION: This snippet presents a markdown-formatted list of contributors to the DataFusion 6.0.0 release, showing the number of commits per contributor.
+
+LANGUAGE: markdown
+CODE:
+    28  Andrew Lamb
+    26  Jiayu Liu
+    13  xudong963
+     9  rdettai
+     9  QP Hou
+     6  Matthew Turner
+     5  Daniël Heres
+     4  Guillaume Balaine
+     3  Francis Du
+     3  Marco Neumann
+     3  Jon Mease
+     3  Nga Tran
+     2  Yijie Shen
+     2  Ruihang Xia
+     2  Liang-Chi Hsieh
+     2  baishen
+     2  Andy Grove
+     2  Jason Tianyi Wang
+     1  Nan Zhu
+     1  Antoine Wendlinger
+     1  Krisztián Szűcs
+     1  Mike Seddon
+     1  Conner Murphy
+     1  Patrick More
+     1  Taehoon Moon
+     1  Tiphaine Ruy
+     1  adsharma
+     1  lichuan6
+
+----------------------------------------
+
+TITLE: Git Contributor Statistics for DataFusion 5.0.0
+DESCRIPTION: Git shortlog command showing commit statistics per contributor between versions 4.0.0 and 5.0.0 across datafusion, datafusion-cli, and datafusion-examples repositories.
+
+LANGUAGE: shell
+CODE:
+$ git shortlog -sn 4.0.0..5.0.0 datafusion datafusion-cli datafusion-examples
+
+----------------------------------------
+
+TITLE: Listing Contributors to Apache Arrow Rust 5.0.0
+DESCRIPTION: This code snippet displays the git shortlog command used to generate a list of contributors and their commit counts for the Apache Arrow Rust 5.0.0 release. It provides a summary of individual contributions to the project.
+
+LANGUAGE: bash
+CODE:
+    28  Jorge Leitao
+    27  Andrew Lamb
+    15  Jiayu Liu
+    12  Ritchie Vink
+    10  Wakahisa
+     8  Raphael Taylor-Davies
+     6  Daniël Heres
+     5  Andy Grove
+     5  Navin
+     5  Jörn Horstmann
+     4  Ádám Lippai
+     4  Dominik Moritz
+     4  Marco Neumann
+     3  Roee Shlomo
+     3  Michael Edwards
+     2  Steven
+     2  Krisztián Szűcs
+     2  Gary Pennington
+     1  Ben Chambers
+     1  Max Meldrum
+     1  Edd Robinson
+     1  Gang Liao
+     1  Chojan Shang
+     1  Boaz
+     1  Wes McKinney
+     1  Yordan Pavlov
+     1  baishen
+     1  hulunbier
+     1  kazuhiko kikuchi
+     1  Dmitry Patsura
+     1  Kornelijus Survila
+     1  Laurent Mazare
+     1  Manish Gill
+     1  Marc van Heerden
+
+----------------------------------------
+
+TITLE: Displaying Git Commit Log in Rust
+DESCRIPTION: Shows how to use Git command to display a short log of commits between versions 7.0.0 and 9.0.0 of the arrow-rs repository. This snippet demonstrates using console commands in Rust.
+
+LANGUAGE: console
+CODE:
+git shortlog -sn 7.0.0..9.0.0
+    22  Raphael Taylor-Davies
+    18  Andrew Lamb
+     6  Helgi Kristvin Sigurbjarnarson
+     6  Remzi Yang
+     5  Jörn Horstmann
+     4  Liang-Chi Hsieh
+     3  Jiayu Liu
+     2  dependabot[bot]
+     2  Yijie Shen
+     1  Matthew Turner
+     1  Kun Liu
+     1  Yang
+     1  Edd Robinson
+     1  Patrick More
+
+----------------------------------------
+
+TITLE: Git Contributor Statistics
+DESCRIPTION: Git shortlog output showing contributor statistics between versions 9.0.0 and 13.0.0, displaying the number of commits per contributor.
+
+LANGUAGE: text
+CODE:
+    87	Andy Grove
+    71	Andrew Lamb
+    29	Kun Liu
+    29	Kirk Mitchener
+    17	Wei-Ting Kuo
+    14	Yang Jiang
+    12	Raphael Taylor-Davies
+    11	Batuhan Taskaya
+    10	Brent Gardner
+    10	Remzi Yang
+    10	comphead
+    10	xudong.w
+
+----------------------------------------
+
+TITLE: Git Contributor Statistics Command
+DESCRIPTION: Git command to generate a list of contributors and their commit counts between ADBC versions 0.9.0 and 0.10.0, excluding dependabot commits.
+
+LANGUAGE: bash
+CODE:
+git shortlog --perl-regexp --author='^((?!dependabot\[bot\]).*)$' -sn apache-arrow-adbc-0.9.0..apache-arrow-adbc-0.10.0
+
+----------------------------------------
+
+TITLE: Displaying Git Shortlog for Contributors
+DESCRIPTION: This code snippet shows a Git command to generate a shortlog of contributors for the Apache Arrow ADBC project between versions 0.8.0 and 0.9.0, excluding dependabot contributions.
+
+LANGUAGE: shell
+CODE:
+$ git shortlog --perl-regexp --author='^((?!dependabot\[bot\]).*)$' -sn apache-arrow-adbc-0.8.0..apache-arrow-adbc-0.9.0
+
+----------------------------------------
+
+TITLE: Displaying Git Shortlog for Contributors in Markdown
+DESCRIPTION: This code snippet shows a Git command to generate a shortlog of contributors, excluding dependabot, for the Apache Arrow ADBC project between versions 0.4.0 and 0.5.0. It lists the number of commits and author names.
+
+LANGUAGE: markdown
+CODE:
+```
+$ git shortlog --perl-regexp --author='^((?!dependabot\[bot\]).*)$' -sn apache-arrow-adbc-0.4.0..apache-arrow-adbc-0.5.0
+    36	David Li
+    21	William Ayd
+     6	Dewey Dunnington
+     4	Matt Topol
+     3	Kirill Müller
+     2	Sutou Kouhei
+     2	vipere
+     1	Curt Hagenlocher
+     1	Diego Fernández Giraldo
+     1	Matthijs Brobbel
+     1	Will Jones
+     1	davidhcoe
+```
+
+----------------------------------------
+
+TITLE: Git Contributor Statistics Command
+DESCRIPTION: Git command to generate a shortlog of contributors between versions apache-arrow-adbc-0.2.0 and apache-arrow-adbc-0.3.0, excluding dependabot contributions.
+
+LANGUAGE: shell
+CODE:
+git shortlog --perl-regexp --author='^((?!dependabot\[bot\]).*)$' -sn apache-arrow-adbc-0.2.0..apache-arrow-adbc-0.3.0
+
+----------------------------------------
+
+TITLE: Displaying Contributors using Git Shortlog in Bash
+DESCRIPTION: This command uses git shortlog to list contributors to the ADBC project between versions 0.11.0 and 12, excluding dependabot contributions. It shows the number of commits and author names.
+
+LANGUAGE: bash
+CODE:
+$ git shortlog --perl-regexp --author='^((?!dependabot\[bot\]).*)$' -sn apache-arrow-adbc-0.11.0..apache-arrow-adbc-12
+
+----------------------------------------
+
+TITLE: Git Contributor Statistics Command
+DESCRIPTION: Git command to generate a sorted list of contributors and their commit counts between ADBC versions 0.10.0 and 0.11.0, excluding dependabot contributions
+
+LANGUAGE: bash
+CODE:
+git shortlog --perl-regexp --author='^((?!dependabot\[bot\]).*)$' -sn apache-arrow-adbc-0.10.0..apache-arrow-adbc-0.11.0
+
+----------------------------------------
+
+TITLE: Performance Metrics - Raw and Normalized Data Processing
+DESCRIPTION: Terminal output showing performance metrics for processing both raw data (14 fields with nested structures) and normalized data, achieving ~806k rows/second total throughput
+
+LANGUAGE: plaintext
+CODE:
+num_cpu:                60
+runtime_os:             linux
+kafka_clients:          5
+kafka_queue_cap:        983040
+processor_routines:     32
+arrow_queue_cap:        4
+duckdb_threshold_mb:    4200
+duckdb_connections:     24
+normalizer_fields:      10
+start_time:             2025-02-24T21:06:23Z
+end_time:               2025-02-24T21:11:23Z
+records:                123_686_901.00
+norm_records:           122_212_452.00
+data_transferred:       146.53 GB
+duration:               4m59.585s
+records_per_second:     398_271.90
+total_rows_per_second:  806_210.41
+transfer_rate:          500.86 MB/second
+duckdb_files:           9
+duckdb_files_MB:        38429
+file_avg_duration:      33.579s
+
+----------------------------------------
+
+TITLE: Patch Committer Statistics
+DESCRIPTION: Shows git shortlog output for patch committers between versions 18.1.0 and 19.0.0
+
+LANGUAGE: console
+CODE:
+$ git shortlog -sn --group=trailer:signed-off-by apache-arrow-18.1.0..apache-arrow-19.0.0
+   142	Sutou Kouhei
+    31	Antoine Pitrou
+    29	David Li
+    24	Raúl Cumplido
+    23	Curt Hagenlocher
+    14	Jacob Wujciak-Jens
+    11	mwish
+
+----------------------------------------
+
+TITLE: Contributor Statistics Command
+DESCRIPTION: Git command to show number of commits per contributor between version 17.0.0 and 18.0.0
+
+LANGUAGE: console
+CODE:
+$ git shortlog -sn apache-arrow-17.0.0..apache-arrow-18.0.0
+
+----------------------------------------
+
+TITLE: Patch Committer Statistics Command
+DESCRIPTION: Git command to show number of patches merged by Apache committers between version 17.0.0 and 18.0.0
+
+LANGUAGE: console
+CODE:
+$ git shortlog -sn --group=trailer:signed-off-by apache-arrow-17.0.0..apache-arrow-18.0.0
+
+----------------------------------------
+
+TITLE: Retrieving Patch Committers for Apache Arrow Release
+DESCRIPTION: A Git command to retrieve the list of Apache committers who merged contributed patches to the repository between two versions.
+
+LANGUAGE: shell
+CODE:
+$ git shortlog -sn --group=trailer:signed-off-by apache-arrow-16.1.0..apache-arrow-17.0.0
+
+----------------------------------------
+
+TITLE: Listing Patch Committers for Apache Arrow 16.1.0
+DESCRIPTION: This console command uses git shortlog to display the Apache committers who merged contributed patches for the 16.1.0 release.
+
+LANGUAGE: console
+CODE:
+$ git shortlog -sn --group=trailer:signed-off-by apache-arrow-16.0.0..apache-arrow-16.1.0
+
+----------------------------------------
+
+TITLE: Retrieving Git Commit History in Bash
+DESCRIPTION: A bash command to retrieve the git commit history between two versions, showing the number of commits per author.
+
+LANGUAGE: bash
+CODE:
+$ git shortlog -sn apache-arrow-15.0.2..apache-arrow-16.0.0
+
+----------------------------------------
+
+TITLE: Retrieving Patch Committers in Bash
+DESCRIPTION: A bash command to retrieve the list of Apache committers who merged contributed patches to the repository.
+
+LANGUAGE: bash
+CODE:
+$ git shortlog -sn --group=trailer:signed-off-by apache-arrow-15.0.2..apache-arrow-16.0.0
+
+----------------------------------------
+
+TITLE: Git Contributor Statistics Command for Apache Arrow 15.0.2
+DESCRIPTION: Git command showing commit statistics per contributor between versions 15.0.1 and 15.0.2
+
+LANGUAGE: console
+CODE:
+$ git shortlog -sn apache-arrow-15.0.1..apache-arrow-15.0.2
+
+----------------------------------------
+
+TITLE: Git Patch Committer Statistics Command for Apache Arrow 15.0.2
+DESCRIPTION: Git command showing statistics for Apache committers who merged patches between versions 15.0.1 and 15.0.2
+
+LANGUAGE: console
+CODE:
+$ git shortlog -sn --group=trailer:signed-off-by apache-arrow-15.0.1..apache-arrow-15.0.2
+
+----------------------------------------
+
+TITLE: Displaying Git patch committer statistics in Bash
+DESCRIPTION: Bash command to show the number of patches merged by each committer for this release using git shortlog.
+
+LANGUAGE: bash
+CODE:
+$ git shortlog -sn --group=trailer:signed-off-by apache-arrow-14.0.2..apache-arrow-15.0.0
+
+----------------------------------------
+
+TITLE: Listing Patch Committers for Apache Arrow 14.0.1 Release
+DESCRIPTION: This console command uses git shortlog to display the patch committers who merged contributed patches to the repository for the Apache Arrow 14.0.1 release, comparing it to the previous 14.0.0 release.
+
+LANGUAGE: console
+CODE:
+$ git shortlog -sn --group=trailer:signed-off-by apache-arrow-14.0.0..apache-arrow-14.0.1
+     1	Raúl Cumplido
+     1	Sutou Kouhei
+
+----------------------------------------
+
+TITLE: Displaying Git Commit Statistics
+DESCRIPTION: Shows how to use Git to display commit statistics for the release
+
+LANGUAGE: shell
+CODE:
+$ git shortlog -sn apache-arrow-13.0.0..apache-arrow-14.0.0
+
+----------------------------------------
+
+TITLE: Displaying Patch Committers
+DESCRIPTION: Shows how to use Git to display patch committers for the release
+
+LANGUAGE: shell
+CODE:
+$ git shortlog -sn --group=trailer:signed-off-by apache-arrow-13.0.0..apache-arrow-14.0.0
+
+----------------------------------------
+
+TITLE: Git Patch Committer Statistics Command
+DESCRIPTION: Console command to show patch committer statistics between versions
+
+LANGUAGE: console
+CODE:
+$ git shortlog -sn --group=trailer:signed-off-by apache-arrow-12.0.1..apache-arrow-13.0.0
+
+----------------------------------------
+
+TITLE: Patch Committer Statistics Command Output
+DESCRIPTION: Git command output showing merge statistics for Apache committers who merged contributed patches between apache-arrow-12.0.0 and apache-arrow-12.0.1
+
+LANGUAGE: console
+CODE:
+$ git shortlog -sn --group=trailer:signed-off-by apache-arrow-12.0.0..apache-arrow-12.0.1
+     6	Raúl Cumplido
+     5	Antoine Pitrou
+     5	Joris Van den Bossche
+     4	Weston Pace
+     3	Sutou Kouhei
+     2	Matt Topol
+     2	Nic Crane
+     1	Alenka Frim
+     1	David Li
+
+----------------------------------------
+
+TITLE: Git Contributor Statistics
+DESCRIPTION: Shows the number of commits per contributor using git shortlog command
+
+LANGUAGE: console
+CODE:
+$ git shortlog -sn apache-arrow-11.0.0..apache-arrow-12.0.0
+    62	Sutou Kouhei
+    44	Weston Pace
+    26	Gang Wu
+    26	Matt Topol
+    23	Nic Crane
+    23	mwish
+    22	Joris Van den Bossche
+    22	Raúl Cumplido
+    20	Alenka Frim
+    19	David Li
+    19	Felipe Oliveira Carvalho
+    15	Will Jones
+    11	Jin Shang
+    11	rtpsw
+
+----------------------------------------
+
+TITLE: Patch Committer Statistics
+DESCRIPTION: Shows Apache committers who merged contributed patches using git shortlog command with signed-off-by trailer
+
+LANGUAGE: console
+CODE:
+$ git shortlog -sn --group=trailer:signed-off-by apache-arrow-11.0.0..apache-arrow-12.0.0
+   123	Sutou Kouhei
+    77	Weston Pace
+    71	Matt Topol
+    50	Joris Van den Bossche
+    43	Will Jones
+    35	David Li
+    22	Jacob Wujciak-Jens
+    19	Nic Crane
+    17	Antoine Pitrou
+    17	Raúl Cumplido
+
+----------------------------------------
+
+TITLE: Git Committers List Command
+DESCRIPTION: Shell command to display Apache committers who merged patches between Arrow 10.0.0 and 11.0.0 releases
+
+LANGUAGE: console
+CODE:
+$ git shortlog -sn --group=trailer:signed-off-by apache-arrow-10.0.0..apache-arrow-11.0.0
+
+----------------------------------------
+
+TITLE: Displaying Git Shortlog for Patch Committers
+DESCRIPTION: Shows a git shortlog command to list Apache committers who merged contributed patches for this release.
+
+LANGUAGE: console
+CODE:
+$ git shortlog -sn --group=trailer:signed-off-by apache-arrow-10.0.0..apache-arrow-10.0.1
+    17	Sutou Kouhei
+     3	Matt Topol
+     2	Antoine Pitrou
+     2	David Li
+     2	Neal Richardson
+     2	Nic Crane
+     1	Dewey Dunnington
+     1	Weston Pace
+     1	Yibo Cai
+
+----------------------------------------
+
+TITLE: Displaying Git Commit Statistics
+DESCRIPTION: Shows how to use git shortlog to display commit statistics between two versions.
+
+LANGUAGE: bash
+CODE:
+$ git shortlog -sn apache-arrow-9.0.0..apache-arrow-10.0.0
+
+----------------------------------------
+
+TITLE: Git Shortlog for Contributors
+DESCRIPTION: Shows the number of commits per contributor between version 8.0.0 and 9.0.0
+
+LANGUAGE: console
+CODE:
+$ git shortlog -sn apache-arrow-8.0.0..apache-arrow-9.0.0
+    65	Sutou Kouhei
+    56	Raúl Cumplido
+    26	David Li
+    25	Jacob Wujciak-Jens
+    25	Neal Richardson
+    23	Will Jones
+    17	Alenka Frim
+    16	Dragoș Moldovan-Grünfeld
+    15	Antoine Pitrou
+    14	Weston Pace
+    14	Vibhatha Lakmal Abeykoon
+    12	Krisztián Szűcs
+    10	Rok Mihevc
+     9	Wes McKinney
+     9	Yibo Cai
+
+----------------------------------------
+
+TITLE: Listing Git Commit Statistics in Console
+DESCRIPTION: A console command to list the number of commits and contributors for this release using Git.
+
+LANGUAGE: shell
+CODE:
+$ git shortlog -sn apache-arrow-7.0.0..apache-arrow-8.0.0
+
+----------------------------------------
+
+TITLE: Listing Git Contributors for Apache Arrow 7.0.0
+DESCRIPTION: Git shortlog command output showing commit counts per contributor between versions 6.0.0 and 7.0.0
+
+LANGUAGE: console
+CODE:
+$ git shortlog -sn apache-arrow-6.0.0..apache-arrow-7.0.0
+    78	Antoine Pitrou
+    49	Sutou Kouhei
+    44	Krisztián Szűcs
+    39	David Li
+    35	Nic Crane
+    34	Alenka Frim
+    28	Carlos O'Ryan
+    27	Jonathan Keane
+
+----------------------------------------
+
+TITLE: Displaying Git Shortlog for Patch Committers in Bash
+DESCRIPTION: This bash command shows a short git log of Apache committers who merged contributed patches to the repository for the 6.0.1 release.
+
+LANGUAGE: bash
+CODE:
+$ git shortlog -csn apache-arrow-6.0.0..apache-arrow-6.0.1
+
+----------------------------------------
+
+TITLE: Displaying Contributor List for Apache Arrow 5.0.0
+DESCRIPTION: Console output showing the list of contributors and their number of commits for the Apache Arrow 5.0.0 release
+
+LANGUAGE: console
+CODE:
+77  David Li
+43  Krisztián Szűcs
+42  Antoine Pitrou
+35  Dominik Moritz
+33  Nic Crane
+27  Weston Pace
+27  Sutou Kouhei
+27  Andrew Lamb
+23  Jonathan Keane
+21  Joris Van den Bossche
+17  Jorge C. Leitao
+17  Ian Cook
+16  João Pedro
+15  Jiayu Liu
+14  Yibo Cai
+14  Alessandro Molina
+13  Jorge Leitao
+12  Ritchie Vink
+12  Benjamin Kietzman
+10  niranda perera
+10  Wakahisa
+10  Matthew Topol
+9  Anthony Louis
+8  Raphael Taylor-Davies
+8  Nate Clark
+7  Eduardo Ponce
+6  Daniël Heres
+5  Neal Richardson
+5  Navin
+5  Jörn Horstmann
+5  Andy Grove
+4  crystrix
+4  Uwe L. Korn
+4  Romain Francois
+4  Rok
+4  Marco Neumann
+4  Ádám Lippai
+3  liyafan82
+3  frank400
+3  Ying Zhou
+3  Roee Shlomo
+3  Michael Edwards
+3  Matthijs Brobbel
+3  Alenka Frim
+2  Zachary Blackwood
+2  Wes McKinney
+2  Steven
+2  P42
+2  Michal Nowakiewicz
+2  Kazuaki Ishizaki
+2  Karik Isichei
+2  Jeroen Ooms
+2  Gary Pennington
+2  Diana Clarke
+2  Bryan Cutler
+1  sjgupta2
+1  sgilmore
+1  ptaylor
+1  nullptr
+1  kazuhiko kikuchi
+1  hulunbier
+1  baishen
+1  Zimo Zhang
+1  Yordan Pavlov
+1  Will Jones
+1  Steven Burns
+1  Stephen
+1  Shuai Zhang
+1  Ray Bell
+1  Projjal Chanda
+1  Pachamaltese
+1  Nick Bruno
+1  Micah Kornfield
+1  Menno Siekerman
+1  Max Meldrum
+1  Mauricio Vargas
+1  Marc van Heerden
+1  Manish Gill
+1  Maarten A. Breddels
+1  Lorenz Walthert
+1  Linan Qiu
+1  Laurent Mazare
+1  Kornelijus Survila
+1  Kevin Gurney
+1  Joris Peeters
+1  Jinpeng Zhou
+1  Jiangtao Peng
+1  Hideaki Hayashi
+1  Giordon Stark
+1  Gang Liao
+1  GALI PREM SAGAR
+1  Edd Robinson
+1  Dorian Kind
+1  Dmitry Patsura
+1  Chojan Shang
+1  Boaz
+1  Ben Chambers
+1  Alex Baden
+1  Adam Johnson
+
+----------------------------------------
+
+TITLE: Listing Patch Committers for Apache Arrow 4.0.1 Release
+DESCRIPTION: This console command uses git shortlog to display statistics about patch committers who merged contributed patches to the repository for the Apache Arrow 4.0.1 release.
+
+LANGUAGE: console
+CODE:
+$ git shortlog -csn apache-arrow-4.0.0..apache-arrow-4.0.1
+
+----------------------------------------
+
+TITLE: Git Contributor Summary
+DESCRIPTION: Console output showing commit statistics by contributor for the 3.0.0 release
+
+LANGUAGE: console
+CODE:
+$ git shortlog -sn apache-arrow-2.0.0..apache-arrow-3.0.0
+    71	Jorge C. Leitao
+    64	Sutou Kouhei
+    48	Antoine Pitrou
+    48	Heres, Daniel
+    27	Andy Grove
+    27	Neville Dipale
+    24	Joris Van den Bossche
+    19	Neal Richardson
+    15	Benjamin Kietzman
+    14	Carol (Nichols || Goulding)
+    14	Uwe L. Korn
+    12	Jonathan Keane
+    12	Krisztián Szűcs
+
+----------------------------------------
+
+TITLE: Patch Committer Summary
+DESCRIPTION: Console output showing patch commit statistics by committer for the 3.0.0 release
+
+LANGUAGE: console
+CODE:
+$ git shortlog -csn apache-arrow-2.0.0..apache-arrow-3.0.0
+   100	Andrew Lamb
+    88	Antoine Pitrou
+    76	Sutou Kouhei
+    70	Jorge C. Leitao
+    69	Neville Dipale
+    54	Krisztián Szűcs
+    44	Neal Richardson
+    40	Andy Grove
+
+----------------------------------------
+
+TITLE: Listing Patch Committers
+DESCRIPTION: Shows how to use git shortlog to list committers who merged patches
+
+LANGUAGE: shell
+CODE:
+$ git shortlog -csn apache-arrow-0.16.0..apache-arrow-0.17.0
+
+----------------------------------------
+
+TITLE: Displaying Git Contributor Statistics for Apache Arrow 0.14.1
+DESCRIPTION: Git shortlog command output showing the number of commits per contributor between versions 0.14.0 and 0.14.1.
+
+LANGUAGE: console
+CODE:
+$ git shortlog -sn apache-arrow-0.14.0..apache-arrow-0.14.1
+    15	Sutou Kouhei
+    10	Krisztián Szűcs
+     5	Antoine Pitrou
+     5	Wes McKinney
+     2	David Li
+     2	Eric Erhardt
+     2	Joris Van den Bossche
+     2	Micah Kornfield
+     2	Yosuke Shiro
+     1	Hatem Helal
+     1	Marco Neumann
+     1	Marius Seritan
+     1	Neal Richardson
+     1	Philipp Moritz
+     1	TP Boudreau
+     1	Uwe L. Korn
+
+----------------------------------------
+
+TITLE: Displaying Patch Committer Statistics for Apache Arrow 0.14.1
+DESCRIPTION: Git shortlog command output showing the number of patches merged by Apache committers between versions 0.14.0 and 0.14.1.
+
+LANGUAGE: console
+CODE:
+$ git shortlog -csn apache-arrow-0.14.0..apache-arrow-0.14.1
+    43	Wes McKinney
+     9	Krisztián Szűcs
+
+----------------------------------------
+
+TITLE: Git Commit Statistics
+DESCRIPTION: Shows git shortlog statistics for contributors between versions 0.13.0 and 0.14.0, displaying number of commits per author.
+
+LANGUAGE: console
+CODE:
+$ git shortlog -sn apache-arrow-0.13.0..apache-arrow-0.14.0
+    67	Antoine Pitrou
+    62	Wes McKinney
+    37	Sebastien Binet
+    34	Sutou Kouhei
+    25	Kouhei Sutou
+    24	Neal Richardson
+    22	Romain Francois
+    21	Joris Van den Bossche
+    20	Benjamin Kietzman
+    19	Micah Kornfield
+
+----------------------------------------
+
+TITLE: Git Contributors List Command
+DESCRIPTION: Git command to show number of commits per contributor between versions 0.12.0 and 0.13.0
+
+LANGUAGE: console
+CODE:
+$ git shortlog -sn apache-arrow-0.12.0..apache-arrow-0.13.0
+
+----------------------------------------
+
+TITLE: Git contributor statistics in Shell
+DESCRIPTION: Shell command to show git shortlog statistics of contributors between versions 0.11.0 and 0.12.0, listing the number of commits per contributor
+
+LANGUAGE: shell
+CODE:
+$ git shortlog -sn apache-arrow-0.11.0..apache-arrow-0.12.0
+
+----------------------------------------
+
+TITLE: Viewing Git Contributors
+DESCRIPTION: Shell command to view the number of contributions per contributor between Arrow 0.8.0 and 0.9.0 releases
+
+LANGUAGE: shell
+CODE:
+$ git shortlog -sn apache-arrow-0.8.0..apache-arrow-0.9.0
+
+----------------------------------------
+
+TITLE: Viewing Patch Committers
+DESCRIPTION: Shell command to view the number of patches committed per committer between Arrow 0.8.0 and 0.9.0 releases
+
+LANGUAGE: shell
+CODE:
+$ git shortlog -csn apache-arrow-0.8.0..apache-arrow-0.9.0
+
+----------------------------------------
+
+TITLE: Listing Git Contributors for Apache Arrow 0.5.0
+DESCRIPTION: Shell command to list Git contributors between versions 0.4.1 and 0.5.0 of Apache Arrow, showing the number of commits per contributor.
+
+LANGUAGE: shell
+CODE:
+$ git shortlog -sn apache-arrow-0.4.1..apache-arrow-0.5.0

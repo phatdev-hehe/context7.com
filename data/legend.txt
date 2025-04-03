@@ -1,0 +1,4722 @@
+TITLE: Creating Global State with Legend State
+DESCRIPTION: Demonstrates how to create a global state object using observables in Legend State.
+
+LANGUAGE: javascript
+CODE:
+import { observable } from '@legendapp/state';
+
+export const state$ = observable({
+    UI: {
+        windowSize: undefined as { width: number, height: number },
+        activeTab: 'home' as 'home' | 'user' | 'profile',
+        ...
+    },
+    settings: {
+        theme: 'light' as 'light' | 'dark',
+        fontSize: 14,
+        ...
+    },
+    todos: []
+})
+
+----------------------------------------
+
+TITLE: Creating an Observable Store for a Todo App in TypeScript
+DESCRIPTION: This snippet demonstrates how to create an observable store for a Todo application using Legend-State. It includes the store interface, observable creation, computed properties, and an action function to add todos.
+
+LANGUAGE: typescript
+CODE:
+import { observable } from "@legendapp/state";
+
+// Type your Store interface
+interface Todo {
+  id: number;
+  text: string;
+  completed?: boolean;
+}
+
+interface Store {
+  todos: Todo[];
+  total: number;
+  numCompleted: number;
+  addTodo: () => void;
+}
+
+// Create a global observable for the Todos
+let nextId = 0;
+const store$ = observable<Store>({
+  todos: [],
+  // Computeds
+  total: (): number => {
+    return store$.todos.length;
+  },
+  numCompleted: (): number => {
+    return store$.todos.get().filter((todo) => todo.completed).length;
+  },
+  addTodo: () => {
+    const todo: Todo = {
+      id: nextId++,
+      text: "",
+    };
+    store$.todos.push(todo);
+  },
+});
+
+----------------------------------------
+
+TITLE: Implementing a Todo App with Legend-State in React/React Native
+DESCRIPTION: This snippet shows how to use Legend-State observables in a React/React Native application. It demonstrates the use of `use$`, `useObservable`, and reactive components to create a Todo app interface with dynamic updates and local state management.
+
+LANGUAGE: tsx
+CODE:
+import { observer, use$, useObservable } from "@legendapp/state/react"
+import { $TextInput } from "@legendapp/state/react-native"
+
+export function App() {
+    // Consume the computed observables from the global store$
+    const total = use$(store$.total)
+    const completed = use$(store$.numCompleted)
+    // Create a local observable
+    const theme$ = useObservable<'light' | 'dark'>('dark')
+    const theme = use$(theme$)
+
+    const onClickClear = () => store$.todos.set([])
+
+    return (
+        <Box theme={theme}>
+            <ThemeButton $value={theme$} />
+            <Text>Total: {total}</Text>
+            <Text>Completed: {completed}</Text>
+            <For each={store$.todos} item={TodoItem} />
+            <View className="flex justify-between">
+                <Button onClick={store$.addTodo}>Add</Button>
+                <Button onClick={onClickClear}>Clear</Button>
+            </View>
+        </Box>
+    )
+}
+
+// Receives item$ prop from the For component
+function TodoItem({ item$ }: { item$: Observable<Todo> }) {
+    const onKeyDown = (e) => {
+        // Call addTodo from the global store$
+        if (e.key === 'Enter') store$.addTodo()
+    }
+
+    // The child components are bound directly to the observable properties
+    // so this component never has to re-render.
+    return (
+        <View className="row">
+            <Checkbox $value={item$.completed} />
+            <$TextInput
+                $value={item$.text}
+                onKeyDown={onKeyDown}
+            />
+        </View>
+    );
+}
+
+----------------------------------------
+
+TITLE: Basic Observable Usage in React
+DESCRIPTION: Demonstrates creating and using an observable state object with theme settings in a React component. Shows basic get/set operations and component re-rendering.
+
+LANGUAGE: jsx
+CODE:
+const state$ = observable({
+    settings: { theme: 'dark' }
+})
+
+state$.settings.theme.set('light')
+
+const Component = () => {
+    const theme = use$(state$.settings.theme)
+
+    return <div>Theme: {theme}</div>
+}
+
+----------------------------------------
+
+TITLE: Advanced Observable Pattern with Computed Values
+DESCRIPTION: Shows more advanced usage of observables including computed values, observation contexts, and component integration with TypeScript support.
+
+LANGUAGE: jsx
+CODE:
+import { observable, observe } from "@legendapp/state"
+import { observer } from "@legendapp/state/react"
+
+// Observables can be primitives or deep objects
+const settings$ = observable({
+    theme: 'dark'
+    // Computed observables with just a function
+    isDark: () => settings$.theme.get() === 'dark'
+})
+
+// get returns the raw data
+settings$.theme.get() // 'dark'
+// set sets
+settings$.theme.set('light')
+
+// observing contexts re-run when tracked observables change
+observe(() => {
+  console.log(settings$.theme.get())
+})
+
+function Component() {
+    const theme = use$(state$.settings.theme)
+    // use$ tracks get() calls to automatically re-render on changes
+    const isDark = use$(() => state$.settings.theme.get() === 'dark')
+
+    return <div>Theme: {theme}</div>
+}
+
+----------------------------------------
+
+TITLE: Creating Observable Objects in JavaScript
+DESCRIPTION: This snippet demonstrates how to create observable objects using Legend-State. It shows creating a large observable object with computed functions and actions, as well as creating individual observable atoms.
+
+LANGUAGE: javascript
+CODE:
+import { observable } from "@legendapp/state"
+
+// Create observable objects as large and deep as you want. They can include computed functions
+// and action functions.
+const state$ = observable({
+    fname: 'Annyong',
+    lname: 'Bluth',
+    // Computeds
+    name: () => state$.fname.get() + ' ' + state$.lname.get(),
+    // Actions
+    setName: (name: string) => {
+        const [fname, lname] = name.split(' ');
+        state$.assign({ fname, lname })
+    }
+})
+
+// Or create small individual atoms if you prefer
+const fname$ = observable('Annyong')
+const lname$ = observable('Bluth')
+
+----------------------------------------
+
+TITLE: Two-way Computed Observable
+DESCRIPTION: Shows how to create a two-way computed observable that can both read and write to underlying observables.
+
+LANGUAGE: javascript
+CODE:
+const selected$ = observable([false, false, false]);
+const selectedAll$ = computed(
+  // selectedAll is true when every element is selected
+  () => selected$.every((val$) => val$.get()),
+
+  // setting selectedAll sets the value of every element
+  (value) => selected$.forEach((val$) => val$.set(value))
+);
+
+selectedAll$.set(true);
+// selected.get() === [true, true, true]
+
+----------------------------------------
+
+TITLE: Creating Large Global State Store in JavaScript
+DESCRIPTION: This snippet demonstrates how to create a single large observable store containing all app state in Legend-State. It includes UI state, settings, and a todos list.
+
+LANGUAGE: javascript
+CODE:
+const store$ = observable({
+    UI: {
+        windowSize: undefined as { width: number, height: number },
+        activeTab: 'home' as 'home' | 'user' | 'profile',
+        ...
+    },
+    settings: {
+        theme: 'light' as 'light' | 'dark',
+        fontSize: 14,
+        ...
+    },
+    todos: [] as TodoItem[]
+})
+
+----------------------------------------
+
+TITLE: Creating and Using Observables in JavaScript
+DESCRIPTION: Demonstrates how to create observables, get values, and set values using Legend State.
+
+LANGUAGE: javascript
+CODE:
+import { observable } from "@legendapp/state";
+
+const state$ = observable({ text: "hello", obj: { value: 10 } });
+
+const text = state$.text.get(); // 'hello'
+state$.obj.value.get() === 10; // true
+
+// Use the set function anywhere
+state$.text.set("hi");
+
+// Easily modify the previous value
+state$.text.set((text) => text + " there");
+
+----------------------------------------
+
+TITLE: Implementing Fine-Grained Reactivity in React with Legend-State
+DESCRIPTION: Demonstrates advanced patterns for fine-grained reactivity in React using Legend-State, including Reactive components and control-flow components like For, Show, and Switch for optimized rendering.
+
+LANGUAGE: jsx
+CODE:
+import { observable } from "@legendapp/state";
+import { Memo, For, Reactive, Show, Switch } from "@legendapp/state/react";
+
+const state$ = observable({ showModal: false, page: 0, users: [] });
+
+function MemoExample() {
+  // This component itself never re-renders
+
+  return (
+    <div>
+      // Reactive components have reactive props and children which re-render
+      themselves on changes
+      <Reactive.div
+        $className={state$.showModal.get() ? "bg-blue-500" : "bg-red-500"}
+      >
+        {() => `Showing page: ${state$.page.get()}`}
+      </Reactive.div>
+      // Show re-renders itself whenever showModal changes
+      <Show if={state$.showModal}>{() => <Modal />}</Show>
+      // Switch re-renders itself whenever page changes
+      <Switch value={state$.page}>
+        {{
+          0: <Page0 />,
+          1: <Page1 />,
+          2: <Page2 />,
+        }}
+      </Switch>
+      // For optimizes array updates to be much faster
+      <For each={state$.users} item={User} optimized />
+    </div>
+  );
+}
+
+function User({ item }) {
+  return <Memo>{item.name}</Memo>;
+}
+
+----------------------------------------
+
+TITLE: Tracking Examples in Legend-State
+DESCRIPTION: Illustrates various ways of tracking changes in observables, including get(), peek(), and shallow tracking.
+
+LANGUAGE: javascript
+CODE:
+const state$ = observable({
+  settings: {
+    theme: "dark",
+  },
+  chats: {
+    messages: [{ id: 0, text: "hi" }],
+  },
+});
+
+observe(() => {
+  const theme = state$.settings.theme.get();
+  // ✅ Tracking [state$.settings.theme] because of get()
+
+  const theme = state$.settings.theme.peek();
+  // ❌ Not tracking because of peek()
+
+  const theme = state$.settings.get(true);
+  // ✅ Tracking [state$.settings (shallow)] because of get(true)
+
+  const settings$ = state$.settings;
+  // ❌ Not tracking, just a reference to an observable
+
+  state$.chats.messages.map((m) => <Message key={m.peek().id} message={m} />);
+  // ✅ Tracking [state$.chats.messages (shallow)] because of map()
+
+  const keys = Object.keys(state$.settings);
+  // ✅ Tracking [state$.settings (shallow)] because of Object.keys
+});
+
+----------------------------------------
+
+TITLE: Context Integration with Legend State
+DESCRIPTION: Shows how to integrate Legend's observable state with React Context, providing efficient updates without unnecessary re-renders.
+
+LANGUAGE: tsx
+CODE:
+import { createContext, useContext } from "react"
+import { observer, useObservable } from "@legendapp/state/react"
+
+interface UserState {
+    profile: {
+        name: string;
+    };
+}
+
+const StateContext = createContext<Observable<UserState>>(undefined as any);
+
+function App() {
+  const state$ = useObservable({
+    profile: {
+      name: "",
+    },
+  })
+
+  return (
+    <StateContext.Provider value={state$}>
+      <div>
+        <Sidebar />
+        <Main />
+      </div>
+    </StateContext.Provider>
+  )
+}
+
+const Sidebar = function Sidebar() {
+  const state$ = useContext(StateContext)
+
+  return (
+    <div>
+      Name: <Memo>{state$.profile.name}</Memo>
+    </div>
+  )
+}
+
+----------------------------------------
+
+TITLE: Basic Observable Tracking Examples in JavaScript
+DESCRIPTION: Demonstrates different ways of tracking observable changes in Legend-State, including get(), map(), and object operations. Shows both tracking and non-tracking examples.
+
+LANGUAGE: javascript
+CODE:
+const state$ = observable({
+  settings: {
+    theme: "dark",
+  },
+  chats: {
+    messages: [{ id: 0, text: "hi" }],
+  },
+});
+
+observe(() => {
+  // Example 1:
+  const theme = state$.settings.theme.get();
+  // ✅ Tracking [state$.settings.theme] because of get()
+
+  // Example 2:
+  const settings = state$.settings;
+  // ❌ Not tracking because it's an object
+
+  const theme = settings.theme.get();
+  // ✅ Tracking [state$.settings.theme] because of get()
+
+  // Example 3:
+  const theme$ = state$.settings.theme;
+  // ❌ Not tracking with no get()
+
+  // Example 4:
+  state$.chats.messages.map((m) => <Message key={m.peek().id} message={m} />);
+  // ✅ Tracking [state$.chats.messages (shallow)] because of map()
+
+  // Example 5:
+  Object.keys(state$.settings);
+  // ✅ Tracking [state$.settings (shallow)]
+});
+
+----------------------------------------
+
+TITLE: Creating Linked Observables in JavaScript
+DESCRIPTION: This snippet shows how to create two-way linked observables using the linked function. It demonstrates creating a 'Select All' checkbox and a serialized/deserialized value.
+
+LANGUAGE: javascript
+CODE:
+import { linked, observable } from "@legendapp/state"
+
+const selected$ = observable([false, false, false])
+const selectedAll$ = observable(linked({
+  // selectedAll is true when every element is selected
+  get: () => selected$.every((val$) => val$.get()),
+
+  // setting selectedAll sets the value of every element
+  set: (value) => selected$.forEach((val$) => val$.set(value))
+}))
+
+selectedAll$.set(true)
+// selected.get() === [true, true, true]
+
+const str$ = observable('[1,2,3]')
+const arr$ = observable(linked({
+  get: () => JSON.parse(str$.get())
+  set: (value) => str$.set(JSON.stringify(value))
+}))
+
+----------------------------------------
+
+TITLE: Conditional Rendering with Show Component in Legend-State
+DESCRIPTION: Illustrates the use of the Show component for conditional rendering based on observable state. It includes examples of using the 'if' prop and optional 'else' prop for different rendering scenarios.
+
+LANGUAGE: jsx
+CODE:
+<Show
+  if={state.show}
+  else={() => <div>Nothing to see here</div>}
+  wrap={AnimatePresence}
+>
+  {() => <Modal />}
+</Show>
+
+LANGUAGE: jsx
+CODE:
+import { Show, useObservable } from "@legendapp/state/react";
+import { AnimatePresence } from "framer-motion";
+
+function ShowExampleWithSelector() {
+  const state$ = useObservable({ collection: [] });
+  return (
+    <Show
+      if={() => state$.collection.get().length > 0}
+      else={() => <div>Nothing to see here</div>}
+      wrap={AnimatePresence}
+    >
+      {() => <Modal />}
+    </Show>
+  );
+}
+
+----------------------------------------
+
+TITLE: Creating Multiple Individual Atoms in TypeScript
+DESCRIPTION: This example shows how to create multiple individual observable atoms in separate files for different parts of the application state, such as settings and UI state.
+
+LANGUAGE: typescript
+CODE:
+// settings.ts
+export const theme$ = observable('light')
+export const fontSize$ = observable(14)
+
+// UIState.ts
+export const uiState$ = observable({
+    windowSize: undefined as { width: number, height: number },
+    activeTab: 'home' as 'home' | 'user' | 'profile',
+})
+
+----------------------------------------
+
+TITLE: Using useSelector Hook with Legend-State
+DESCRIPTION: Shows how to use useSelector for computed values and React Suspense integration.
+
+LANGUAGE: jsx
+CODE:
+import { observable } from "@legendapp/state"
+import { useSelector } from "@legendapp/state/react"
+
+const state$ = observable({ selected: 1, theme })
+
+const Component = ({ id }) => {
+    // Only re-renders if the return value changes
+    const isSelected = useSelector(() => id === state$.selected.get())
+
+    // Get the raw value of an observable and listen to it
+    const theme = useSelector(state$.theme)
+
+    ...
+}
+
+LANGUAGE: jsx
+CODE:
+import { useObservable, useSelector } from "@legendapp/state/react";
+import { Suspense } from "react";
+
+function Test({ state$ }) {
+  const value = useSelector(state$, { suspense: true });
+  return <div>{value}</div>;
+}
+
+export default function App() {
+  const state$ = useObservable(
+    new Promise((resolve) => {
+      setTimeout(() => {
+        resolve("hello");
+      }, 1000);
+    })
+  );
+  return (
+    <div>
+      <div>Suspense test</div>
+      <Suspense fallback={<div>Loading...</div>}>
+        <Test state$={state$} />
+      </Suspense>
+    </div>
+  );
+}
+
+----------------------------------------
+
+TITLE: Creating Computed Observables in JavaScript
+DESCRIPTION: This snippet shows how to create and use computed observables. It demonstrates creating computed functions within observable objects and as standalone observables.
+
+LANGUAGE: javascript
+CODE:
+const state$ = observable({
+    fname: 'Annyong',
+    lname: 'Bluth',
+    // A child is computed
+    fullName: () => state$.fname.get() + ' ' + state$.lname.get()
+})
+// An observable with a function is a computed
+const name$ = observable(() => state$.fname.get() + ' ' + state$.lname.get())
+
+// Calling it like a function returns the value and computes when called.
+const fullName = state$.fullName()
+
+// Calling .get() activates it as a computed observable that recomputes itself on changes
+const reactiveFullName = state$.fullName.get()
+
+----------------------------------------
+
+TITLE: Using Reactive Components with Legend-State in React Web
+DESCRIPTION: Shows how to use Legend-State's reactive versions of DOM elements for React Web. It demonstrates reactive styling, children, and two-way binding with input elements.
+
+LANGUAGE: jsx
+CODE:
+import { $React } from "@legendapp/state/react-web"
+
+function Component() {
+    // This component renders only once
+    const state$ = useObservable({ name: '', age: 18 })
+
+    return (
+        <div>
+            {/* Reactive styling */}
+            <$React.div
+                $style={() => ({
+                    color: state$.age.get() > 5 ? 'green' : 'red'
+                })}
+                $className={() => state$.age.get() > 5 ? 'kid' : 'baby'}
+            />
+            {/* Reactive children */}
+            <$React.div>
+                {() => (
+                    <div>{state$.age.get() > 5 ? <Kid /> : <Baby />}</div>
+                )}
+            />
+            {/* Two-way bind to inputs */}
+            <$React.textarea $value={state$.name} />
+            <$React.select $value={state$.age}>...</$React.select>
+            <$React.input
+                $value={state$.name}
+                $className={() => !state$.name.get() && "border-red-500"}
+                $style={() => !state$.name.get() && { borderWidth: 1 }}
+            />
+        </div>
+    )
+}
+
+----------------------------------------
+
+TITLE: Observing Changes in Legend-State
+DESCRIPTION: Demonstrates how to use the observe function to track changes in observables and react to them.
+
+LANGUAGE: javascript
+CODE:
+observe(() => {
+    console.log(settings$.theme.get())
+})
+
+----------------------------------------
+
+TITLE: Creating Reactive Observer Components with Legend-State
+DESCRIPTION: Demonstrates how to create components that are both reactive and observers using the reactiveObserver function from Legend-State.
+
+LANGUAGE: js
+CODE:
+import { observable } from "@legendapp/state";
+import { reactiveObserver } from "@legendapp/state/react";
+
+const name$ = observable("Annyong");
+const isSignedIn$ = observable(false);
+
+const Component = reactiveObserver(function Component({ message }) {
+  const name = name$.get();
+
+  return (
+    <div>
+      {message} {name}
+    </div>
+  );
+});
+
+function App() {
+  return (
+    <Component $message={() => (isSignedIn$.get() ? "Hello" : "Goodbye")} />
+  );
+}
+
+----------------------------------------
+
+TITLE: Using Reactive Components with Legend-State in React Native
+DESCRIPTION: Demonstrates the use of Legend-State's reactive versions of React Native components. It shows examples of reactive styling, children, and two-way binding with input elements.
+
+LANGUAGE: jsx
+CODE:
+import { $View, $Text, $TextInput } from "@legendapp/state/react-native"
+
+function Component() {
+    // This component renders only once
+    const state$ = useObservable({ name: '', age: 18 })
+
+    return (
+        <div>
+            {/* Reactive styling */}
+            <$View
+                $style={() => ({
+                    color: state$.age.get() > 5 ? 'green' : 'red'
+                })}
+            />
+            {/* Reactive children */}
+            <$Text>
+                {() => state$.age.get() > 5 ? 'child' : 'baby'}
+            </$Text>
+            {/* Two-way bind to inputs */}
+            <$TextInput $value={state$.name} />
+        </div>
+    )
+}
+
+----------------------------------------
+
+TITLE: Managing Local State with useObservable in React Components
+DESCRIPTION: Illustrates how to create and use local observable state within React components using the useObservable hook, allowing for efficient state management and passing to child components.
+
+LANGUAGE: jsx
+CODE:
+import { observer, useObservable } from "@legendapp/state/react";
+
+function App() {
+  const store$ = useObservable({
+    profile: { name: "hi" },
+  });
+
+  // This component does not get() the store so only Profile will re-render on changes
+
+  return (
+    <div>
+      <Profile profile$={store$.profile} />
+    </div>
+  );
+}
+
+const Profile = observer(function Profile({ profile$ }) {
+  const name = profile$.name.get();
+
+  return <div>Name: {name}</div>;
+})
+
+----------------------------------------
+
+TITLE: Configuring IndexedDB Persistence in React
+DESCRIPTION: Configuration setup for using IndexedDB as a persistence layer in React applications.
+
+LANGUAGE: javascript
+CODE:
+import { configureObservablePersistence } from '@legendapp/state/persist'
+import { ObservablePersistIndexedDB } from '@legendapp/state/persist-plugins/indexeddb'
+
+// Global configuration
+configureObservablePersistence({
+    pluginLocal: ObservablePersistIndexedDB
+})
+
+----------------------------------------
+
+TITLE: Persisting Data Locally using syncObservable in React Native
+DESCRIPTION: Demonstrates how to use syncObservable to persist data locally in a React Native app using the MMKV plugin.
+
+LANGUAGE: typescript
+CODE:
+import { observable } from "@legendapp/state"
+import { syncObservable } from "@legendapp/state/sync"
+import { ObservablePersistMMKV } from "@legendapp/state/persist-plugins/mmkv"
+
+// Create an observable
+const store$ = observable({
+  todos: [],
+})
+
+// Persist the observable to the named key of the global persist plugin
+syncObservable(store$, {
+    persist: {
+        name: 'persistKey',
+        plugin: ObservablePersistMMKV
+    }
+})
+
+// Any changes made after syncObservable will be persisted
+store$.todos.push({ id: 0 })
+
+----------------------------------------
+
+TITLE: Configuring syncedFetch with Legend State
+DESCRIPTION: Demonstrates how to configure and use the syncedFetch plugin with Legend's observable state. Shows setup of GET/POST endpoints and response handling with the onSaved callback.
+
+LANGUAGE: typescript
+CODE:
+import { syncedFetch } from '@legendapp/state/sync-plugins/fetch';
+import { observable } from '@legendapp/state';
+
+const state$ = observable(syncedFetch({
+    get: 'https://url.to.get',
+    set: 'https://url.to.set',
+    onSaved: (value) => {
+        return {
+            updatedAt: value.updatedAt
+        }
+    }
+}))
+
+----------------------------------------
+
+TITLE: Implementing Undo/Redo Functionality
+DESCRIPTION: Demonstrates implementing undo/redo functionality with observables, including history tracking and UI integration.
+
+LANGUAGE: javascript
+CODE:
+import { observable } from "@legendapp/state";
+import { undoRedo } from "@legendapp/state/helpers/undoRedo";
+
+const state$ = observable({ todos: ["Get milk"] });
+
+const { undo, redo, getHistory } = undoRedo(state$.todos, { limit: 100 });
+
+state$.todos.push("Pick up bread");
+// todos is now ["Get milk", "Pick up bread"]
+
+undo();
+// todos is now back to ["Get milk"]
+
+redo();
+// todos is restored to ["Get milk", "Pick up bread"]
+
+getHistory(); // returns an array of all the different states it contains
+
+state$.todos.set(getHistory()[0]); // reset to the original state in history
+
+undo(); // now back to where it was just prior to resetting
+
+LANGUAGE: jsx
+CODE:
+import { observable } from "@legendapp/state";
+import { observer } from "@legendapp/state/react";
+import { undoRedo } from "@legendapp/state/helpers/undoRedo";
+
+const state$ = observable({ todos: ["Get milk"] });
+
+const { undo, redo, undos$, redos$ } = undoRedo(state$.todos, { limit: 100 });
+
+export function UndoUI() {
+  const undos = use$(undos$);
+  const redos = use$(redos$);
+
+  return (
+    <div>
+      {undos > 0 ? (
+        <button onClick={undo}>Undo</button>
+      ) : (
+        <button disabled={true}>Undo</button>
+      )}
+      {redos > 0 ? (
+        <button onClick={undo}>Redo</button>
+      ) : (
+        <button disabled={true}>Redo</button>
+      )}
+    </div>
+  );
+}
+
+----------------------------------------
+
+TITLE: Batching State Updates in Legend-State
+DESCRIPTION: Demonstrates how to use batching to optimize multiple state updates, reducing unnecessary re-renders in React components.
+
+LANGUAGE: javascript
+CODE:
+const state$ = observable({ items: [] });
+
+function addItems() {
+  for (let i = 0; i < 1000; i++) {
+    state$.items.push({ text: `Item ${i}` });
+  }
+}
+
+// ❌ This can render 1000 times while pushing to the array
+addItems();
+
+// ✅ Batching delays until complete and renders once
+batch(addItems);
+
+----------------------------------------
+
+TITLE: Using the For Component in Legend-State React
+DESCRIPTION: Shows how to use the For component to optimize rendering of arrays of observable objects in React applications.
+
+LANGUAGE: jsx
+CODE:
+import { observable } from "@legendapp/state"
+import { For } from "@legendapp/state/react"
+
+const state$ = observable({ arr: [{ id: 1, text: 'hi' }]})
+
+function Row({ item }) {
+    return <div>{item.text}</div>
+}
+function List() {
+    // 1. Use the For component with an item prop
+    return <For each={state$.arr} item={Row} />
+
+    // 2. Use the For component with a render function as the child
+    return (
+        <For each={list}>
+            {item => (
+                <div>
+                    {item.text}
+                </div>
+            )}
+        </div>
+    )
+}
+
+----------------------------------------
+
+TITLE: Using For Component in React
+DESCRIPTION: Demonstrates the usage of the For component for optimized rendering of arrays in React with Legend-State.
+
+LANGUAGE: jsx
+CODE:
+import { observable } from "@legendapp/state"
+import { For, observer } from "@legendapp/state/react"
+
+const state$ = observable({ arr: [{ id: 1, text: 'hi' }]})
+
+const Row = observer(function Row({ item$ }) {
+    const text = item$.text.get()
+    return <div>{text}</div>
+})
+function List() {
+    // 1. Use the For component with an item prop
+    return <For each={state$.arr} item={Row} />
+
+    // 2. Use the For component with a render function as the child
+    return (
+        <For each={list} optimized>
+            {item$ => (
+                <div>
+                    {item$.text.get()}
+                </div>
+            )}
+        </div>
+    )
+}
+
+----------------------------------------
+
+TITLE: Debugging Observable Changes with onChange
+DESCRIPTION: Example of using onChange listener to debug frequent observable changes by adding breakpoints and trace logging.
+
+LANGUAGE: js
+CODE:
+// Why is count rendering so often?
+state.count.onChange(({ value }) => {
+  console.log("Count changed", value);
+  console.trace();
+  debugger;
+});
+
+----------------------------------------
+
+TITLE: Observer Component Pattern in Legend
+DESCRIPTION: Implementation of the observer pattern for optimized component rendering, using a single hook to track multiple observables efficiently.
+
+LANGUAGE: jsx
+CODE:
+import { observable } from "@legendapp/state"
+import { observer, use$ } from "@legendapp/state/react"
+
+const state$ = observable({ count: 0 })
+
+const Component = observer(function Component() {
+  // Accessing state automatically makes this component track changes to re-render
+  const count = use$(state$.count)
+
+  // Re-renders whenever count changes
+  return <div>{count}</div>
+})
+
+----------------------------------------
+
+TITLE: Creating Observable Hook with createObservableHook in JavaScript
+DESCRIPTION: Demonstrates how to use createObservableHook to convert an existing hook into an observable hook.
+
+LANGUAGE: javascript
+CODE:
+import { createObservableHook } from "@legendapp/state/react-hooks/createObservableHook"
+
+const useMyHookObservable = createObservableHook(useMyHook)
+
+function Component() {
+    const value = useMyHookObservable()
+    ...
+}
+
+----------------------------------------
+
+TITLE: Enabling React Tracking Warnings in Legend-State
+DESCRIPTION: This snippet demonstrates how to enable React tracking warnings in Legend-State. It helps identify cases where get() is called within a React component without being wrapped in use$, which could break reactivity.
+
+LANGUAGE: javascript
+CODE:
+import { enableReactTracking } from "@legendapp/state/config/enableReactTracking"
+enableReactTracking({
+    warnMissingUse: true,
+})
+
+----------------------------------------
+
+TITLE: Batching Operations in Legend-State
+DESCRIPTION: Demonstrates how to use batching to optimize multiple observable changes and prevent excessive renders or intermediary states.
+
+LANGUAGE: javascript
+CODE:
+import { batch, beginBatch, endBatch } from "@legendapp/state";
+
+// Wrap in begin and end
+beginBatch();
+doManyChanges();
+endBatch();
+
+// Or batch with a callback
+batch(() => {
+  doManyChanges();
+});
+
+----------------------------------------
+
+TITLE: Creating Animated Bottom Sheet with useMeasure in React
+DESCRIPTION: Shows an advanced example of using useMeasure with framer-motion to create an animated bottom sheet component.
+
+LANGUAGE: jsx
+CODE:
+import { reactive } from "@legendapp/state/react";
+import { useMeasure } from "@legendapp/state/react-hooks/useMeasure";
+import { motion } from "framer-motion";
+import { useRef } from "react";
+
+const MotionDiv$ = reactive(motion.div);
+
+function BottomSheet({ children }) {
+  const refInner = useRef();
+  const { width, height } = useMeasure(refInner);
+
+  return (
+    <MotionDiv$
+      style={{ position: "fixed", bottom: 0, left: 0, right: 0 }}
+      $animate={() => ({ y: -height.get() })}
+    >
+      <div ref={refInner}>{children}</div>
+    </MotionDiv$
+  );
+}
+
+----------------------------------------
+
+TITLE: Configuring Legend State for React
+DESCRIPTION: Shows how to enable automatic tracking of observables in React components.
+
+LANGUAGE: jsx
+CODE:
+import { enableReactTracking } from "@legendapp/state/config/enableReactTracking";
+// This makes React components automatically track get() calls to re-render
+enableReactTracking({ auto: true });
+
+----------------------------------------
+
+TITLE: Merging Objects into Observables
+DESCRIPTION: Demonstrates merging a deep object into an existing observable while maintaining listeners and firing change events appropriately.
+
+LANGUAGE: javascript
+CODE:
+import { observable } from "@legendapp/state";
+import { mergeIntoObservable } from "@legendapp/state";
+
+const state$ = observable({ store: { text: "hello", other: "hello there" } });
+
+state$.store.text.onChange(({ value }) =>
+  console.log(`text changed to "${value}"`)
+);
+
+const newValue = { store: { text: "hi", other: "hi there" } };
+mergeIntoObservable(state$, newValue);
+
+// text changed to "hi"
+
+state$.store === newValue.store; // ✅ true
+
+----------------------------------------
+
+TITLE: Using pageHashParams Observable in JavaScript
+DESCRIPTION: Shows how to use the pageHashParams observable to interact with specific parameters in the page's hash.
+
+LANGUAGE: javascript
+CODE:
+import { pageHashParams, configurePageHash } from '@legendapp/state/helpers/pageHashParams'
+
+observe(() => {
+    console.log('userid param changed to': pageHashParams.userid.get())
+})
+
+pageHashParams.userid.set('newuser')
+// location.hash == "#userid=newuser"
+
+----------------------------------------
+
+TITLE: Implementing Real-time Subscriptions in Legend-State
+DESCRIPTION: Example of setting up real-time subscriptions for data updates with refresh and update capabilities.
+
+LANGUAGE: typescript
+CODE:
+const profile$ = observable(syncedCrud({
+    // ...
+    list: () => {/* ... */},
+    subscribe: ({ refresh, update }) => {
+        const unsubscribe = pusher.subscribe({ /*...*/ }, (data) => {
+            // Either update with the received data
+            update(data)
+            // Or trigger a refresh of the get function
+            refresh()
+        })
+        // return unsubscribe function
+        return unsubscribe
+    }
+}))
+
+----------------------------------------
+
+TITLE: Configuring Persistence for Legend State
+DESCRIPTION: Demonstrates how to set up persistence for observables using local storage or react-native-mmkv.
+
+LANGUAGE: javascript
+CODE:
+// Global configuration
+configureObservablePersistence({
+    // Use Local Storage on web
+    pluginLocal: ObservablePersistLocalStorage
+    // Use react-native-mmkv in React Native
+    pluginLocal: ObservablePersistMMKV
+})
+
+const state$ = observable({ store: { bigObject: { ... } } })
+
+// Persist this observable
+persistObservable(state$, {
+    local: 'store' // Unique name
+})
+
+----------------------------------------
+
+TITLE: Using when Function in Legend-State
+DESCRIPTION: Shows how to use the when function to execute code when a condition becomes true.
+
+LANGUAGE: javascript
+CODE:
+import { when } from "@legendapp/state";
+
+const state$ = observable({ ok: false });
+
+// Option 1: Promise
+await when(state$.ok);
+
+// Option 2: callback
+when(
+  () => state$.ok.get(),
+  () => console.log("Don't worry, it's ok")
+);
+
+----------------------------------------
+
+TITLE: Creating Multiple Reactive Components with Legend-State
+DESCRIPTION: Shows how to create multiple reactive components at once using the reactiveComponents function from Legend-State.
+
+LANGUAGE: js
+CODE:
+import { reactiveComponents } from "@legendapp/state/react";
+import { motion } from "framer-motion";
+
+const ReactiveMotion = reactiveComponents(motion);
+
+function Component() {
+  // This component renders only once
+  const width$ = useObservable(100);
+
+  return (
+    <ReactiveMotion.div
+      $animate={() => ({
+        x: width$.get(),
+      })}
+    >
+      ...
+    </ReactiveMotion.div>
+  );
+}
+
+----------------------------------------
+
+TITLE: Implementing TanStack Query Outside React
+DESCRIPTION: Shows how to use syncedQuery outside of React components using @tanstack/query-core. This implementation requires a queryClient instance and can be used in any JavaScript/TypeScript context.
+
+LANGUAGE: tsx
+CODE:
+import { syncedQuery } from '@legendapp/state/sync-plugins/tanstack-query';
+import { QueryClient } from '@tanstack/react-query';
+
+const queryClient = new QueryClient()
+
+const state$ = observable(syncedQuery({
+    queryClient,
+    query: {
+        queryKey: ['user'],
+        queryFn: async () => {
+            return fetch('https://reqres.in/api/users/1').then((v) => v.json())
+        },
+    },
+    mutation: {
+        mutationFn: async (variables) => {
+            return fetch(
+                'https://reqres.in/api/users/1',
+                { body: JSON.stringify(variables), method: 'POST' }
+            )
+        },
+    },
+}))
+
+observe(() => {
+    // get() the value to start syncing, and it will be reactive to updates coming in
+    console.log(state$.get())
+})
+
+----------------------------------------
+
+TITLE: Using useMeasure Hook in React
+DESCRIPTION: Demonstrates how to use the useMeasure hook to get the dimensions of a DOM element.
+
+LANGUAGE: jsx
+CODE:
+import { useMeasure } from "@legendapp/state/react-hooks/useMeasure";
+import { useRef } from "react";
+
+function Component() {
+  const ref = useRef();
+  const { width, height } = useMeasure(ref);
+
+  return (
+    <div ref={ref}>
+      Width: {width}, Height: {height}
+    </div>
+  );
+}
+
+----------------------------------------
+
+TITLE: Creating a Large Global State Store in JavaScript
+DESCRIPTION: This snippet demonstrates how to create a single large observable state object that contains all the app state, including UI elements, settings, and data.
+
+LANGUAGE: javascript
+CODE:
+const store$ = observable({
+    UI: {
+        windowSize: undefined as { width: number, height: number },
+        activeTab: 'home' as 'home' | 'user' | 'profile',
+        ...
+    },
+    settings: {
+        theme: 'light' as 'light' | 'dark',
+        fontSize: 14,
+        ...
+    },
+    todos: [] as TodoItem[]
+})
+
+----------------------------------------
+
+TITLE: Spring Transition Animation
+DESCRIPTION: Shows how to configure spring-based transitions with damping and stiffness parameters.
+
+LANGUAGE: jsx
+CODE:
+<Motion.View
+  animate={{
+    x: value * 100,
+  }}
+  transition={{
+    type: "spring",
+    damping: 20,
+    stiffness: 400,
+  }}
+/>
+
+----------------------------------------
+
+TITLE: Importing Starlight Card Components in JSX
+DESCRIPTION: Import statement for Card and CardGrid components from the Starlight component library for documentation layout.
+
+LANGUAGE: jsx
+CODE:
+import { Card, CardGrid } from "@astrojs/starlight/components";
+
+----------------------------------------
+
+TITLE: Using Plain Observable Hint for Performance
+DESCRIPTION: Shows how to mark an object as plain to optimize performance by skipping recursive checks for functions or observables. Should only be used with objects known to be plain.
+
+LANGUAGE: javascript
+CODE:
+import { observable, ObservableHint } from '@legendapp/state'
+
+const bigObject = {}
+
+const state$ = observable({ text: 'hi', child: ObservableHint.plain(bigObject) })
+
+----------------------------------------
+
+TITLE: When and WhenReady Observable Patterns
+DESCRIPTION: Shows usage of when() and whenReady() utilities for one-time reactions to observable changes and non-empty states.
+
+LANGUAGE: javascript
+CODE:
+import { when, whenReady } from "@legendapp/state";
+
+const state$ = observable({ ok: false, arr: [] });
+
+// Option 1: Promise
+await when(state$.ok);
+
+// Option 2: callback
+const dispose = when(
+  () => state$.ok.get(),
+  () => console.log("Don't worry, it's ok")
+);
+
+whenReady(state$.arr, () => console.log("Array has some values"));
+state$.arr.push("hello");
+
+----------------------------------------
+
+TITLE: Setting up Persistence for Legend-State in TypeScript
+DESCRIPTION: This snippet demonstrates how to set up persistence for a Legend-State observable using the MMKV plugin. It shows the global configuration for sync and persistence, and how to sync an observable with storage.
+
+LANGUAGE: typescript
+CODE:
+import { observable } from "@legendapp/state"
+import { syncObservable } from '@legendapp/state/sync'
+import { ObservablePersistMMKV } from "@legendapp/state/persist-plugins/mmkv"
+
+const store$ = observable<Store>({
+    todos: {},
+})
+
+// Persist the observable to the named key of the global persist plugin
+syncObservable(store$, {
+    persist: {
+        name: 'gettingStarted',
+        plugin: ObservablePersistMMKV
+    }
+})
+
+----------------------------------------
+
+TITLE: Using Observables in React Components with Legend-State
+DESCRIPTION: This snippet illustrates how to use the useObservable hook from Legend-State to create observable state within React components and pass it down to child components through props.
+
+LANGUAGE: javascript
+CODE:
+function App() {
+  const store$ = useObservable({
+    profile: { name: "hi" },
+  });
+
+  return (
+    <div>
+      <Profile profile={store$.profile} />
+    </div>
+  );
+}
+
+function Profile({ profile }) {
+  return <div>{profile.name}</div>;
+}
+
+----------------------------------------
+
+TITLE: Using Observables in React Components with Legend-State
+DESCRIPTION: This snippet illustrates how to use the useObservable hook from Legend-State to create observable state within React components and pass it down to child components through props.
+
+LANGUAGE: javascript
+CODE:
+function App() {
+  const store$ = useObservable({
+    profile: { name: "hi" },
+  });
+
+  return (
+    <div>
+      <Profile profile={store$.profile} />
+    </div>
+  );
+}
+
+function Profile({ profile }) {
+  return <div>{profile.name}</div>;
+}
+
+----------------------------------------
+
+TITLE: Initializing CRUD Get Operations with Legend-State
+DESCRIPTION: Example of setting up a CRUD get operation with syncedCrud plugin. Shows how to handle basic profile operations including get, create, update, and delete.
+
+LANGUAGE: typescript
+CODE:
+import { syncedCrud } from '@legendapp/state/sync-plugins/crud'
+
+const profile$ = observable(syncedCrud({
+    get: getProfile,
+    create: createProfile,
+    update: updateProfile,
+    delete: deleteProfile,
+}))
+// profile$.get() is a Profile
+
+----------------------------------------
+
+TITLE: Configuring Persistence and Sync in JavaScript
+DESCRIPTION: This example demonstrates how to set up an observable with initial data, get and set methods for syncing with a backend, and persistence configuration using Legend-State.
+
+LANGUAGE: js
+CODE:
+import { ObservablePersistLocalStorage } from '@legendapp/state/persist-plugins/local-storage'
+import { synced } from '@legendapp/state/sync'
+import { observable } from '@legendapp/state'
+
+const state$ = observable({
+    initial: {
+        { bigObject: { ... } }
+    },
+    get: () => fetch('url').then(res => res.json()),
+    set: ({ value }) =>
+        fetch('https://url.to.set', { method: 'POST', data: JSON.stringify(value) }),
+    persist: {
+        name: 'test'
+    }
+})
+
+----------------------------------------
+
+TITLE: Animating React Native Components with Tailwind CSS Classes in Legend-Motion
+DESCRIPTION: This example demonstrates how to use Tailwind CSS classes with Legend-Motion components for styling and animation in React Native. It shows two Motion.View components with different animations and Tailwind classes.
+
+LANGUAGE: jsx
+CODE:
+<Motion.View
+  className="items-center justify-center p-4"
+  animate={{ x: value * 50 }}
+>
+  <Motion.Text className="font-bold text-white">RN View</Motion.Text>
+</Motion.View>
+<Motion.View
+  className="items-center justify-center p-4 mt-8"
+  whileHover={{ scale: 1.1 }}
+  whileTap={{ x: 30 }}
+>
+  <Motion.Text className="font-bold text-white">Press me</Motion.Text>
+</Motion.View>
+
+----------------------------------------
+
+TITLE: Using Optimized For Component in Legend-State React
+DESCRIPTION: Shows how to use the optimized prop of the For component for even better performance in certain scenarios.
+
+LANGUAGE: jsx
+CODE:
+import { For } from "@legendapp/state/react"
+
+...
+
+function List() {
+    // Use the optimized prop
+    return <For each={list} item={Row} optimized />
+}
+
+----------------------------------------
+
+TITLE: Complex Observable with Computed Values
+DESCRIPTION: Shows how to create an observable with functions and computed values, including state management and automatic updates.
+
+LANGUAGE: javascript
+CODE:
+import { computed, observable } from "@legendapp/state";
+
+const state$ = observable({
+  fname: "hello",
+  lname: "there",
+  setName: (name: string) => {
+    // Create Actions by just adding a function
+    const [fname, lname] = name.split(name);
+    state$.assign({
+      fname,
+      lname,
+    });
+  },
+  fullname: computed((): Observable<string> => {
+    // Set up computed observables within your state object
+    // or if you prefer them elsewhere that's cool too 🤟
+    return `${state$.fname.get()} ${state$.lname.get()}`;
+  }),
+});
+
+console.log(state$.fullname.get());
+// hello there
+
+----------------------------------------
+
+TITLE: Complex Observable with Computed Values
+DESCRIPTION: Shows how to create an observable with functions and computed values, including state management and automatic updates.
+
+LANGUAGE: javascript
+CODE:
+import { computed, observable } from "@legendapp/state";
+
+const state$ = observable({
+  fname: "hello",
+  lname: "there",
+  setName: (name: string) => {
+    // Create Actions by just adding a function
+    const [fname, lname] = name.split(name);
+    state$.assign({
+      fname,
+      lname,
+    });
+  },
+  fullname: computed((): Observable<string> => {
+    // Set up computed observables within your state object
+    // or if you prefer them elsewhere that's cool too 🤟
+    return `${state$.fname.get()} ${state$.lname.get()}`;
+  }),
+});
+
+console.log(state$.fullname.get());
+// hello there
+
+----------------------------------------
+
+TITLE: Creating Synced Keel Observable in TypeScript
+DESCRIPTION: Demonstration of creating a fully typed observable using syncedKeel with Keel client functions.
+
+LANGUAGE: typescript
+CODE:
+import { observable } from '@legendapp/state'
+import { syncedKeel } from '@legendapp/state/sync-plugins/keel'
+const { mutations, queries } = client.api
+
+const profile$ = observable(syncedKeel({
+    get: queries.getProfile,
+    create: mutations.createProfile,
+    update: mutations.updateProfile,
+    delete: mutations.deleteProfile,
+}))
+
+----------------------------------------
+
+TITLE: Batching Operations in Legend-State
+DESCRIPTION: Demonstrates how to use batching to optimize performance when making multiple changes to observables.
+
+LANGUAGE: javascript
+CODE:
+import { batch, beginBatch, endBatch } from "@legendapp/state";
+
+// Wrap in begin and end
+beginBatch();
+doManyChanges();
+endBatch();
+
+// Or batch with a callback
+batch(() => {
+  doManyChanges();
+});
+
+----------------------------------------
+
+TITLE: Using Switch Component in React
+DESCRIPTION: Shows how to use the Switch component for conditional rendering based on a value in React with Legend-State.
+
+LANGUAGE: jsx
+CODE:
+<Switch value={state.index}>
+  {{
+    0: () => <div>Tab 1</div>,
+    1: () => <div>Tab 2</div>,
+    default: () => <div>Error</div>,
+  }}
+</Switch>
+
+----------------------------------------
+
+TITLE: Using useIsMounted Hook in React
+DESCRIPTION: Shows how to use the useIsMounted hook to check if a component is mounted before executing delayed operations.
+
+LANGUAGE: jsx
+CODE:
+import { useIsMounted } from "@legendapp/state/react/useIsMounted";
+
+function Component() {
+  const isMounted = useIsMounted();
+
+  const onClick = () => {
+    setTimeout(() => {
+      if (isMounted.get()) {
+        console.log("Debounced click");
+      }
+    }, 100);
+  };
+
+  return <button onClick={onClick}>Click me</button>;
+}
+
+----------------------------------------
+
+TITLE: Database Schema Setup for Timestamps and Soft Deletes
+DESCRIPTION: SQL script to add created_at, updated_at timestamps and soft delete functionality to a Supabase table. Includes trigger creation for automatic timestamp management.
+
+LANGUAGE: sql
+CODE:
+-- Add new columns to table named `created_at` and `updated_at`
+ALTER TABLE YOUR_TABLE_NAME
+ADD COLUMN created_at timestamptz default now(),
+ADD COLUMN updated_at timestamptz default now(),
+-- Add column for soft deletes, remove this if you don't need that
+ADD COLUMN deleted boolean default false;
+
+-- This will set the `created_at` column on create and `updated_at` column on every update
+CREATE OR REPLACE FUNCTION handle_times()
+    RETURNS trigger AS
+    $$
+    BEGIN
+    IF (TG_OP = 'INSERT') THEN
+        NEW.created_at := now();
+        NEW.updated_at := now();
+    ELSEIF (TG_OP = 'UPDATE') THEN
+        NEW.created_at = OLD.created_at;
+        NEW.updated_at = now();
+    END IF;
+    RETURN NEW;
+    END;
+    $$ language plpgsql;
+
+CREATE TRIGGER handle_times
+    BEFORE INSERT OR UPDATE ON YOUR_TABLE_NAME
+    FOR EACH ROW
+EXECUTE PROCEDURE handle_times();
+
+----------------------------------------
+
+TITLE: Creating Multiple Reactive Components with Legend-State
+DESCRIPTION: Shows how to use 'reactiveComponents' to create multiple reactive components at once. This is useful for wrapping UI libraries or creating internal libraries of reactive components.
+
+LANGUAGE: js
+CODE:
+import { reactiveComponents } from "@legendapp/state/react";
+import { motion } from "framer-motion";
+
+const $Motion = reactiveComponents(motion);
+
+function Component() {
+  // This component renders only once
+  const width$ = useObservable(100);
+
+  return (
+    <$Motion.div
+      $animate={() => ({
+        x: width$.get(),
+      })}
+    >
+      ...
+    </$Motion.div>
+  );
+}
+
+----------------------------------------
+
+TITLE: Using useTraceUpdates for Render Tracking in React
+DESCRIPTION: Shows how to use the useTraceUpdates hook to log information about observable changes that cause component renders. This helps track down why components are rendering too often.
+
+LANGUAGE: jsx
+CODE:
+import { useTraceUpdates } from "@legendapp/state/trace";
+
+const Component = observer(function Component(props) {
+  // Call useTraceUpdates anywhere inside the component
+  useTraceUpdates();
+
+  return <div>{state.count.get()}</div>;
+
+  /* This logs:
+
+    [legend-state] Rendering because "count" changed:
+    from: 0
+    to: 1
+
+    */
+});
+
+----------------------------------------
+
+TITLE: Implementing CRUD List Operations with Legend-State
+DESCRIPTION: Demonstrates setting up CRUD list operations that handle multiple records with id-based keys.
+
+LANGUAGE: typescript
+CODE:
+const profiles$ = observable(syncedCrud({
+    list: listProfiles,
+    create: createProfile,
+    update: updateProfile,
+    delete: deleteProfile,
+}))
+// profile$.get() is a Record<string, Profile>
+
+----------------------------------------
+
+TITLE: Shallow Observable Tracking in React
+DESCRIPTION: Shows how to use shallow tracking with get(true) for optimizing performance when only needing to track top-level changes in arrays or objects.
+
+LANGUAGE: jsx
+CODE:
+const state$ = observable({ messages: [] });
+
+observe(() => {
+  // Only need this to update when messages added/removed
+  const messages = state$.messages.get(true);
+
+  console.log("Latest message", messages[0]);
+});
+
+----------------------------------------
+
+TITLE: Rendering Observables with Memo Component in React
+DESCRIPTION: Demonstrates how to use the Memo component from Legend-State to create self-updating elements without re-rendering the parent component. It shows examples with both direct observable rendering and selector functions.
+
+LANGUAGE: jsx
+CODE:
+import { Memo } from "@legendapp/state/react";
+
+const count$ = observable(0);
+
+// These components never re-render.
+// The Memo element re-renders itself when its value changes.
+function WithObservable() {
+  return (
+    <div>
+      Count:
+      <Memo>{count$}</Memo>
+    </div>
+  );
+}
+function WithSelector() {
+  return (
+    <div>
+      <Memo>{() => <div>Count: {count$.get()}</div>}</Memo>
+    </div>
+  );
+}
+
+----------------------------------------
+
+TITLE: Rendering Observables with Memo Component in React
+DESCRIPTION: Demonstrates how to use the Memo component from Legend-State to create self-updating elements without re-rendering the parent component. It shows examples with both direct observable rendering and selector functions.
+
+LANGUAGE: jsx
+CODE:
+import { Memo } from "@legendapp/state/react";
+
+const count$ = observable(0);
+
+// These components never re-render.
+// The Memo element re-renders itself when its value changes.
+function WithObservable() {
+  return (
+    <div>
+      Count:
+      <Memo>{count$}</Memo>
+    </div>
+  );
+}
+function WithSelector() {
+  return (
+    <div>
+      <Memo>{() => <div>Count: {count$.get()}</div>}</Memo>
+    </div>
+  );
+}
+
+----------------------------------------
+
+TITLE: Configuring Persistence for Legend State Observables
+DESCRIPTION: This snippet shows how to set up persistence for a Legend State observable using local storage and Firebase. It demonstrates configuring both local and remote persistence plugins.
+
+LANGUAGE: js
+CODE:
+import { ObservablePersistLocalStorage } from '@legendapp/state/persist-plugins/local-storage'
+import { ObservablePersistFirebase } from "@legendapp/state/persist-plugins/firebase"
+import { persistObservable } from '@legendapp/state/persist'
+import { observable } from '@legendapp/state'
+
+const state$ = observable({ store: { bigObject: { ... } } })
+
+// Persist this observable
+persistObservable(state$, {
+    pluginLocal: ObservablePersistLocalStorage,
+    local: 'store',
+    pluginRemote: ObservablePersistFirebase,
+    remote: {
+        firebase: {
+            refPath: (uid) => `/users/${uid}/`,
+            requireAuth: true,
+        },
+    }
+})
+
+----------------------------------------
+
+TITLE: Mount Animation
+DESCRIPTION: Shows how to animate a component on initial mount using the initial prop.
+
+LANGUAGE: jsx
+CODE:
+<Motion.View initial={{ x: 0 }} animate={{ x: 100 }} />
+
+----------------------------------------
+
+TITLE: Using observe Function in Legend-State
+DESCRIPTION: Demonstrates the use of the observe function for tracking changes and performing cleanup actions.
+
+LANGUAGE: javascript
+CODE:
+import { observe, observable } from "@legendapp/state";
+const state$ = observable({ isOnline: false, toasts: [] });
+
+const dispose = observe((e) => {
+  // This observe will automatically track state.isOnline for changes
+  if (!state$.isOnline.get()) {
+    // Show an "Offline" toast when offline
+    const toast = { id: "offline", text: "Offline", color: "red" };
+    state$.toasts.push(toast);
+
+    // Remove the toast when the observe is re-run, which will be when isOnline becomes true
+    e.onCleanup = () => state$.toasts.splice(state$.toasts.indexOf(toast), 1);
+  }
+});
+
+// Cancel the observe
+dispose();
+
+----------------------------------------
+
+TITLE: Using observe Function in Legend-State
+DESCRIPTION: Demonstrates the use of the observe function for tracking changes and performing cleanup actions.
+
+LANGUAGE: javascript
+CODE:
+import { observe, observable } from "@legendapp/state";
+const state$ = observable({ isOnline: false, toasts: [] });
+
+const dispose = observe((e) => {
+  // This observe will automatically track state.isOnline for changes
+  if (!state$.isOnline.get()) {
+    // Show an "Offline" toast when offline
+    const toast = { id: "offline", text: "Offline", color: "red" };
+    state$.toasts.push(toast);
+
+    // Remove the toast when the observe is re-run, which will be when isOnline becomes true
+    e.onCleanup = () => state$.toasts.splice(state$.toasts.indexOf(toast), 1);
+  }
+});
+
+// Cancel the observe
+dispose();
+
+----------------------------------------
+
+TITLE: Using Selectors in Legend State
+DESCRIPTION: Demonstrates how to use selectors with observables for tracking changes and reactive computations.
+
+LANGUAGE: javascript
+CODE:
+const isSignedIn$ = observable(false);
+const isOnline$ = observable(false);
+
+// A selector can be just an observable, which will be tracked for changes
+await when(isSignedIn$);
+
+// Or selector can be a function which tracks all get() callschanges
+await when(() => isSignedIn$.get() && isOnline$.get());
+
+----------------------------------------
+
+TITLE: Migrating from useSelector to use$ in React
+DESCRIPTION: Changes the usage of useSelector to the new use$ hook for accessing observable values in React components.
+
+LANGUAGE: jsx
+CODE:
+// 🔴 From
+const value = useSelector(state$.value)
+// ✅ To
+const value = use$(state$.value)
+
+----------------------------------------
+
+TITLE: Tracking Observable History Changes
+DESCRIPTION: Shows how to track historical changes in an observable with timestamps, useful for version control or audit trails.
+
+LANGUAGE: javascript
+CODE:
+import { observable } from '@legendapp/state'
+import { trackHistory } from '@legendapp/state/helpers/trackHistory'
+
+const state$ = observable({ profile: { name: 'Hello' }})
+
+// Track all changes to state
+const history = trackHistory(state$)
+
+// Change something in state
+state$.profile.name.set('Annyong')
+
+// History shows the previous value when it changed:
+{
+    1666593133018: {
+        profile: {
+            name: 'Hello'
+        }
+    }
+}
+
+----------------------------------------
+
+TITLE: Using currentTime Observable in JavaScript
+DESCRIPTION: Shows how to use the currentTime observable to log the current time every minute.
+
+LANGUAGE: javascript
+CODE:
+import { currentTime } from "@legendapp/state/helpers/time"
+
+observe(() => {
+    console.log('The time is is': currentTime.get())
+})
+
+----------------------------------------
+
+TITLE: Configuring Observable Object with Opaque Hint
+DESCRIPTION: Demonstrates how to mark an object as opaque in an observable to treat it as a primitive, preventing deep observation of its properties. Useful for DOM elements or React components.
+
+LANGUAGE: javascript
+CODE:
+import { observable, ObservableHint } from '@legendapp/state'
+
+const state$ = observable({ text: 'hi', body: ObservableHint.opaque(document.body) })
+
+----------------------------------------
+
+TITLE: Configuring Local Storage Persistence in React
+DESCRIPTION: Configuration setup for using localStorage as a persistence layer in React applications with Legend-State.
+
+LANGUAGE: javascript
+CODE:
+import { configureObservablePersistence } from '@legendapp/state/persist'
+import { ObservablePersistLocalStorage } from '@legendapp/state/persist-plugins/local-storage'
+
+// Global configuration
+configureObservablePersistence({
+    pluginLocal: ObservablePersistLocalStorage
+})
+
+----------------------------------------
+
+TITLE: Conditional Rendering with Switch Component in Legend-State
+DESCRIPTION: Shows how to use the Switch component for rendering different components based on a value prop. It allows for multiple cases and a default case for unmatched values.
+
+LANGUAGE: jsx
+CODE:
+<Switch value={state.index}>
+  {{
+    0: () => <div>Tab 1</div>,
+    1: () => <div>Tab 2</div>,
+    default: () => <div>Error</div>,
+  }}
+</Switch>
+
+----------------------------------------
+
+TITLE: Initializing Motion.View Component in React Native
+DESCRIPTION: Demonstrates how to use the Motion.View component with various animation properties including initial state, animate, hover and tap effects, and transition type.
+
+LANGUAGE: jsx
+CODE:
+<Motion.View
+  initial={{ y: -50 }}
+  animate={{ x: value * 100, y: 0 }}
+  whileHover={{ scale: 1.2 }}
+  whileTap={{ y: 20 }}
+  transition={{ type: "spring" }}
+/>
+
+----------------------------------------
+
+TITLE: Using the For Component in Legend-State React
+DESCRIPTION: Illustrates two ways to use the For component from Legend-State for optimized rendering of arrays in React applications.
+
+LANGUAGE: jsx
+CODE:
+import { observable } from "@legendapp/state"
+import { For } from "@legendapp/state/react"
+
+const state$ = observable({ arr: [{ id: 1, text: 'hi' }]})
+
+function Row({ item }) {
+    return <div>{item.text}</div>
+}
+function List() {
+    // 1. Use the For component with an item prop
+    return <For each={state$.arr} item={Row} />
+
+    // 2. Use the For component with a render function as the child
+    return (
+        <For each={list}>
+            {item => (
+                <div>
+                    {item.text}
+                </div>
+            )}
+        </For>
+    )
+}
+
+----------------------------------------
+
+TITLE: Full Example of Keel Integration with Legend-State
+DESCRIPTION: Comprehensive example showcasing Keel integration, including authentication, observable setup, and CRUD operations.
+
+LANGUAGE: typescript
+CODE:
+import { observable } from '@legendapp/state'
+import { ObservablePersistLocalStorage } from '@legendapp/state/persist-plugins/local-storage'
+import { configureSynced } from '@legendapp/state/sync/'
+import { generateKeelId, syncedKeel } from '@legendapp/state/sync-plugins/keel'
+import { APIClient } from './keelClient'
+
+const client = new APIClient({
+  baseUrl: process.env.API_BASE_URL
+})
+
+const isAuthed$ = observable(false);
+
+// Set defaults
+const sync = configureSynced(syncedKeel, {
+    client,
+    persist: {
+        plugin: ObservablePersistLocalStorage,
+        retrySync: true
+    },
+    debounceSet: 500,
+    retry: {
+        infinite: true,
+    },
+    changesSince: 'last-sync',
+    waitFor: isAuthed$
+})
+
+// enable sync after authentication succeeds
+async function doAuth() {
+    // authenticate the client
+    await keel.auth.authenticateWithPassword(email, pass)
+
+    // check that the client is authenticated
+    const isAuthenticated = await keel.auth.isAuthenticated()
+
+    // Set isAuthed$ to start syncing
+    isAuthed$.set(true)
+}
+
+// Set up your observables with Keel queries
+const { mutations, queries } = client.api
+
+// create an observable with the action functions
+const messages$ = observable(sync({
+    list: queries.getMessages,
+    create: mutations.createMessage,
+    update: mutations.updateMessage,
+    delete: mutations.deleteMessage,
+    persist: { name: 'messages' },
+}))
+
+// get() activates and starts syncing
+const messages = messages$.get()
+
+function addMessage(text: string) {
+    const id = generateKeelId()
+    // Add keyed by id to the messages$ observable to trigger the create action
+    messages$[id].set({
+        id,
+        text,
+        createdAt: undefined,
+        updatedAt: undefined
+    })
+}
+
+function updateMessage(id: string, text: string) {
+    // Just set valudes in the observable to trigger the update action
+    messages$[id].text.set(text)
+}
+
+----------------------------------------
+
+TITLE: Importing and Using Starlight Components in JSX
+DESCRIPTION: This snippet demonstrates how to import and use Card and CardGrid components from the Starlight UI library in a JSX context. It's used to create a feature highlight section for Legend State.
+
+LANGUAGE: jsx
+CODE:
+import { Card, CardGrid } from "@astrojs/starlight/components";
+
+<CardGrid stagger>
+  <Card title="Easy to Use" icon="pencil">
+    You can start sprinkling legend state without worrying about how to setup
+  </Card>
+  <Card title="Built for the New Era" icon="add-document">
+    Legend State brings back reactivity from knockout with a cool API for React
+  </Card>
+  <Card title="Blazingly Fast" icon="setting">
+    Check the [Krausest benchmarks](./intro/fast)
+  </Card>
+  <Card title="Read the docs" icon="open-book">
+    Learn more in [the Legend Docs](./intro/introduction).
+  </Card>
+</CardGrid>
+
+----------------------------------------
+
+TITLE: Using Observables in React Components with Legend-State
+DESCRIPTION: This snippet illustrates how to use the useObservable hook to create state objects within React components and pass them down to children through props or Context.
+
+LANGUAGE: javascript
+CODE:
+function App() {
+  const store$ = useObservable({
+    profile: { name: "hi" },
+  });
+
+  return (
+    <div>
+      <Profile profile={store$.profile} />
+    </div>
+  );
+}
+
+function Profile({ profile }) {
+  return <div>{profile.name}</div>;
+}
+
+----------------------------------------
+
+TITLE: Configuring Persistence in Legend-State
+DESCRIPTION: Shows how to set up state persistence using Legend-State's plugins for both local storage and Firebase remote sync.
+
+LANGUAGE: js
+CODE:
+import { ObservablePersistLocalStorage } from '@legendapp/state/persist-plugins/local-storage'
+import { ObservablePersistFirebase } from "@legendapp/state/persist-plugins/firebase"
+import { persistObservable } from '@legendapp/state/persist'
+import { observable } from '@legendapp/state'
+
+const state$ = observable({ store: { bigObject: { ... } } })
+
+// Persist this observable
+persistObservable(state$, {
+    pluginLocal: ObservablePersistLocalStorage,
+    local: 'store',
+    pluginRemote: ObservablePersistFirebase,
+    remote: {
+        firebase: {
+            refPath: (uid) => `/users/${uid}/`,
+            requireAuth: true,
+        },
+    }
+})
+
+----------------------------------------
+
+TITLE: Enabling Peek and Assign in Legend-State
+DESCRIPTION: This snippet shows how to enable and use the _PeekAssign feature, which allows accessing and modifying observable values without tracking or notifying listeners using the _ shorthand.
+
+LANGUAGE: javascript
+CODE:
+import { enable_PeekAssign } from "@legendapp/state/config/enable_PeekAssign";
+enable_PeekAssign();
+
+LANGUAGE: javascript
+CODE:
+import { observable } from "@legendapp/state"
+
+const state$ = observable({ test: "hi", num: 0 })
+
+// _ is a shorthand for peek()
+const testValue = state$.test._
+
+// Assign to _ to modify the underlying object without notifying listeners
+state$.test._ = "hello"
+
+// Assign objects too
+state$._ = { test: "hello" }
+
+----------------------------------------
+
+TITLE: Creating Reactive Components with Legend-State in React
+DESCRIPTION: Shows how to create reactive versions of custom or external components using the 'reactive' function. This allows components to accept reactive props while maintaining normal prop behavior.
+
+LANGUAGE: js
+CODE:
+import { observable } from "@legendapp/state";
+import { reactive } from "@legendapp/state/react";
+
+const isSignedIn$ = observable(false);
+
+const Component = reactive(function Component({ message }) {
+  return <div>{message}</div>;
+});
+
+function App() {
+  return (
+    <Component $message={() => isSignedIn$.get() ? "Hello" : "Goodbye"} />
+  );
+}
+
+----------------------------------------
+
+TITLE: Creating Reactive Components with Legend-State in React
+DESCRIPTION: Shows how to create reactive versions of custom or external components using the 'reactive' function. This allows components to accept reactive props while maintaining normal prop behavior.
+
+LANGUAGE: js
+CODE:
+import { observable } from "@legendapp/state";
+import { reactive } from "@legendapp/state/react";
+
+const isSignedIn$ = observable(false);
+
+const Component = reactive(function Component({ message }) {
+  return <div>{message}</div>;
+});
+
+function App() {
+  return (
+    <Component $message={() => isSignedIn$.get() ? "Hello" : "Goodbye"} />
+  );
+}
+
+----------------------------------------
+
+TITLE: Using Memo Component for Independent Child Rendering in React
+DESCRIPTION: Demonstrates the use of the Memo component from Legend-State to create child components that render independently of their parent. This is useful for optimizing performance when children are truly independent.
+
+LANGUAGE: jsx
+CODE:
+function Component() {
+  return (
+    <Memo>
+      {() =>
+        state.messages.map((message) => (
+          <div key={message.id}>
+            {message.text} {localVar}
+          </div>
+        ))
+      }
+    </Memo>
+  );
+}
+
+----------------------------------------
+
+TITLE: Creating and Using Observables in Legend State with React
+DESCRIPTION: This snippet demonstrates how to create an observable object, get and set values, observe changes, and use observables in React components with automatic tracking.
+
+LANGUAGE: jsx
+CODE:
+// Create an observable object
+const state$ = observable({ settings: { theme: "dark" } });
+
+// Just get and set
+const theme = state$.settings.theme.get();
+state$.settings.theme.set("light");
+
+// observe re-runs when accessed observables change
+observe(() => {
+  console.log(state$.settings.theme.get());
+});
+
+// Enable React components to automatically track observables
+enableReactTracking({ auto: true });
+
+const Component = function Component() {
+  // get() makes this component re-render whenever theme changes
+  const theme = state$.settings.theme.get();
+
+  return <div>Theme: {theme}</div>;
+};
+
+----------------------------------------
+
+TITLE: Enabling Direct Value Access in Legend-State
+DESCRIPTION: This snippet demonstrates how to enable and use the $GetSet feature, which allows direct access and modification of observable values using the $ shorthand.
+
+LANGUAGE: javascript
+CODE:
+import { enable$GetSet } from "@legendapp/state/config/enable$GetSet";
+enable$GetSet();
+
+LANGUAGE: javascript
+CODE:
+import { observable } from "@legendapp/state"
+
+const state$ = observable({ test: "hi", num: 0 })
+
+// $ is a shorthand for get()
+const testValue = state$.test.$
+
+// Assign to $ as a shorthand for set()
+state$.test.$ = "hello"
+
+// Assign objects too just like you can with set()
+state$.$ = { test: "hello" }
+
+// Incrementing works as you'd expect
+state$.num.$++
+
+----------------------------------------
+
+TITLE: Basic Observable Operations in Legend-State
+DESCRIPTION: Demonstrates basic usage of Legend-State observables including creation, getting values, setting values, and observation of changes.
+
+LANGUAGE: jsx
+CODE:
+const state$ = observable({ value: 1 });
+state$.value.get();
+state$.value.set(2);
+
+// Tracks automatically and runs on every change
+observe(() => {
+  console.log(state$.value.get());
+});
+
+----------------------------------------
+
+TITLE: Basic Observable Operations in Legend-State
+DESCRIPTION: Demonstrates basic usage of Legend-State observables including creation, getting values, setting values, and observation of changes.
+
+LANGUAGE: jsx
+CODE:
+const state$ = observable({ value: 1 });
+state$.value.get();
+state$.value.set(2);
+
+// Tracks automatically and runs on every change
+observe(() => {
+  console.log(state$.value.get());
+});
+
+----------------------------------------
+
+TITLE: Using Observer Component with Legend-State in React
+DESCRIPTION: Demonstrates how to use the observer HOC to create reactive components that automatically track observable state changes.
+
+LANGUAGE: jsx
+CODE:
+import { observable } from "@legendapp/state"
+import { observer } from "@legendapp/state/react"
+
+const state$ = observable({ count: 0 })
+
+const Component = observer(function Component() {
+  // Accessing state automatically makes this component track changes to re-render
+  const count = state$.count.get()
+
+  // Re-renders whenever count changes
+  return <div>{count}</div>
+});
+
+----------------------------------------
+
+TITLE: Using Observer Component with Legend-State in React
+DESCRIPTION: Demonstrates how to use the observer HOC to create reactive components that automatically track observable state changes.
+
+LANGUAGE: jsx
+CODE:
+import { observable } from "@legendapp/state"
+import { observer } from "@legendapp/state/react"
+
+const state$ = observable({ count: 0 })
+
+const Component = observer(function Component() {
+  // Accessing state automatically makes this component track changes to re-render
+  const count = state$.count.get()
+
+  // Re-renders whenever count changes
+  return <div>{count}</div>
+});
+
+----------------------------------------
+
+TITLE: Adding New Element to Keel Table with Local ID
+DESCRIPTION: Example of adding a new element to a Keel observable with a locally generated ID before remote creation.
+
+LANGUAGE: typescript
+CODE:
+import { Message } from './keelClient'
+import { observable } from '@legendapp/state'
+import { generateKeelId, syncedKeel } from '@legendapp/state/sync-plugins/keel'
+
+
+const profile$ = observable(syncedKeel({
+    get: queries.getProfile,
+    create: mutations.createProfile,
+    update: mutations.updateProfile,
+    delete: mutations.deleteProfile,
+}))
+
+function addMessage(text: string) {
+    const id = generateKeelId()
+    // Add keyed by id to the messages$ observable
+    messages$[id].set({
+        id,
+        text,
+        createdAt: undefined,
+        updatedAt: undefined
+    })
+}
+addMessage('test')
+
+----------------------------------------
+
+TITLE: Enabling Item Recycling in Legend List
+DESCRIPTION: Demonstrates how to enable item recycling for performance optimization in Legend List.
+
+LANGUAGE: typescript
+CODE:
+recycleItems?: boolean
+
+----------------------------------------
+
+TITLE: Using Computed Component in React
+DESCRIPTION: Shows how to use the Computed component to extract children and optimize rendering in React.
+
+LANGUAGE: jsx
+CODE:
+function Component() {
+  return (
+    <Computed>
+      {() =>
+        state$.messages.map((message) => (
+          <div key={message.id}>
+            {message.text} {localVar}
+          </div>
+        ))
+      }
+    </Computed>
+  );
+}
+
+----------------------------------------
+
+TITLE: Configuring Chat Interface in Legend List
+DESCRIPTION: Shows how to set up Legend List for a chat interface with items aligned at the bottom and scroll maintained at the end.
+
+LANGUAGE: tsx
+CODE:
+  <LegendList
+    data={items}
+    renderItem={({ item }) => <Text>{item.title}</Text>}
+    estimatedItemSize={320}
+    alignItemsAtEnd
+    maintainScrollAtEnd
+    maintainScrollAtEndThreshold={0.1}
+  />
+
+----------------------------------------
+
+TITLE: Enabling Deprecated React Tracking Features in Legend-State
+DESCRIPTION: This snippet shows how to enable deprecated React tracking features in Legend-State, including warnings for unobserved get() calls and auto-tracking of observables in React components.
+
+LANGUAGE: javascript
+CODE:
+import { enableReactTracking } from "@legendapp/state/config/enableReactTracking"
+enableReactTracking({
+    warnUnobserved: true,
+})
+
+LANGUAGE: javascript
+CODE:
+import { enableReactTracking } from "@legendapp/state/config/enableReactTracking"
+enableReactTracking({
+    auto: true,
+})
+
+LANGUAGE: javascript
+CODE:
+import { observable } from "@legendapp/state"
+const state$ = observable({ test: "hi" })
+
+function Component() {
+  // This makes this component responsive to test changing
+  const test = state$.test.get()
+
+  return <div>{test}</div>
+}
+
+----------------------------------------
+
+TITLE: Creating Reactive Components with Legend-State
+DESCRIPTION: Shows how to create custom reactive components using the reactive function from Legend-State.
+
+LANGUAGE: js
+CODE:
+import { observable } from "@legendapp/state";
+import { reactive } from "@legendapp/state/react";
+
+const isSignedIn$ = observable(false);
+
+const Component = reactive(function Component({ message }) {
+  return <div>{message}</div>;
+});
+
+function App() {
+  return (
+    <Component $message={() => isSignedIn$.get() ? "Hello" : "Goodbye"} />
+  );
+}
+
+----------------------------------------
+
+TITLE: Creating Reactive Components with Legend-State
+DESCRIPTION: Shows how to create custom reactive components using the reactive function from Legend-State.
+
+LANGUAGE: js
+CODE:
+import { observable } from "@legendapp/state";
+import { reactive } from "@legendapp/state/react";
+
+const isSignedIn$ = observable(false);
+
+const Component = reactive(function Component({ message }) {
+  return <div>{message}</div>;
+});
+
+function App() {
+  return (
+    <Component $message={() => isSignedIn$.get() ? "Hello" : "Goodbye"} />
+  );
+}
+
+----------------------------------------
+
+TITLE: Basic Observable Persistence Implementation
+DESCRIPTION: Example of persisting an observable object with a unique store name.
+
+LANGUAGE: javascript
+CODE:
+import { persistObservable } from '@legendapp/state/persist'
+
+const store$ = observable({ store: { bigObject: { ... } } })
+
+// Persist this observable
+persistObservable(store$, {
+    local: 'store' // Unique name
+})
+
+----------------------------------------
+
+TITLE: Animating SVG Rectangle Properties in React Native
+DESCRIPTION: This snippet demonstrates how to animate various properties of an SVG rectangle using MotionSvg components. It shows how to animate fill color, position, and size with different transition types for each property.
+
+LANGUAGE: jsx
+CODE:
+<MotionSvg.Svg height="200" width="200">
+  <MotionSvg.Rect
+    stroke="#555"
+    strokeWidth="1"
+    animateProps={{
+      fill: value ? "#F81FEC" : "#59B0F8",
+      x: value ? "60" : "0",
+      y: value ? "40" : "10",
+      width: value ? "140" : "50",
+      height: value ? "140" : "50",
+    }}
+    transition={{
+      default: {
+        type: "spring",
+        damping: 20,
+        stiffness: 300,
+      },
+      fill: {
+        type: "tween",
+        duration: 800,
+      },
+    }}
+  />
+</MotionSvg.Svg>
+
+----------------------------------------
+
+TITLE: Implementing pageHash Observable for URL Hash Management
+DESCRIPTION: Demonstrates how to use pageHash observable to track and update the URL hash, with configuration options for state management.
+
+LANGUAGE: javascript
+CODE:
+import { pageHash, configurePageHash } from '@legendapp/state/helpers/pageHash'
+
+configurePageHash({ setter: 'pushState' })
+
+observe(() => {
+    console.log('hash changed to': pageHash.get())
+})
+
+pageHash.set('value=test')
+// location.hash == "#value=test"
+
+----------------------------------------
+
+TITLE: Using use$ Hook for State Reading in React
+DESCRIPTION: Demonstrates how to use the use$ hook to compute values and listen to observables, with automatic re-rendering on changes. Shows both direct observable usage and computation function approaches.
+
+LANGUAGE: jsx
+CODE:
+import { observable } from "@legendapp/state"
+import { use$ } from "@legendapp/state/react"
+
+const state$ = observable({ selected: 1, theme })
+
+const Component = ({ id }) => {
+    // Only re-renders if the return value changes
+    const isSelected = use$(() => id === state$.selected.get())
+
+    // Get the raw value of an observable and re-render when it changes
+    const theme = use$(state$.theme)
+
+    ...
+}
+
+----------------------------------------
+
+TITLE: Using use$ Hook for State Reading in React
+DESCRIPTION: Demonstrates how to use the use$ hook to compute values and listen to observables, with automatic re-rendering on changes. Shows both direct observable usage and computation function approaches.
+
+LANGUAGE: jsx
+CODE:
+import { observable } from "@legendapp/state"
+import { use$ } from "@legendapp/state/react"
+
+const state$ = observable({ selected: 1, theme })
+
+const Component = ({ id }) => {
+    // Only re-renders if the return value changes
+    const isSelected = use$(() => id === state$.selected.get())
+
+    // Get the raw value of an observable and re-render when it changes
+    const theme = use$(state$.theme)
+
+    ...
+}
+
+----------------------------------------
+
+TITLE: Configuring Soft Delete Operations in Legend-State
+DESCRIPTION: Demonstrates how to implement soft delete functionality using a deleted field flag.
+
+LANGUAGE: typescript
+CODE:
+const profile$ = observable(syncedCrud({
+    // ...
+    update: () => {/* ... */},
+    fieldDeleted: 'deleted'
+}))
+
+----------------------------------------
+
+TITLE: Using onChange Function in Legend-State
+DESCRIPTION: Shows how to use the onChange function to listen for changes in observables.
+
+LANGUAGE: javascript
+CODE:
+const state$ = observable({ text: "hi" });
+
+state$.text.onChange(({ value }) => console.log("text changed to", value));
+state$.onChange(({ value }) => console.log("state changed to", value));
+
+state$.text.set("hello");
+
+// Log: text changed to "hello"
+// Log: state changed to { text: "hello" }
+
+----------------------------------------
+
+TITLE: Configuring Next.js for Legend-Motion Integration
+DESCRIPTION: This code snippet demonstrates how to configure next.config.js to integrate Legend-Motion, including setup for Linear Gradient and SVG features. It uses next-transpile-modules to transpile necessary dependencies and adjusts webpack configuration for proper resolution of react-native-web components.
+
+LANGUAGE: javascript
+CODE:
+const withTM = require("next-transpile-modules")([
+  "@legendapp/motion",
+  // Only required for MotionLinearGradient:
+  "react-native-linear-gradient",
+  // Only required for MotionSvg:
+  "react-native-svg",
+]);
+
+module.exports = withTM({
+  webpack(cfg) {
+    cfg.resolve.alias = {
+      ...(cfg.resolve.alias || {}),
+      "react-native$": "react-native-web",
+      // Only required for MotionLinearGradient:
+      "react-native-linear-gradient": "react-native-web-linear-gradient",
+    };
+    // Only required for MotionSvg:
+    cfg.resolve.extensions = [
+      ".web.js",
+      ".web.jsx",
+      ".web.ts",
+      ".web.tsx",
+      ...cfg.resolve.extensions,
+    ];
+
+    return cfg;
+  },
+});
+
+----------------------------------------
+
+TITLE: Native Animation Properties List - React Native
+DESCRIPTION: List of properties that can only be animated using native driver in React Native. These properties cannot be mixed with non-native animation properties.
+
+LANGUAGE: javascript
+CODE:
+[
+  "opacity",
+  "x",
+  "y",
+  "scale",
+  "scaleX",
+  "scaleY",
+  "skewX",
+  "skewY",
+  "perspective",
+  "rotate",
+  "rotateY",
+  "rotateZ",
+  "matrix"
+]
+
+----------------------------------------
+
+TITLE: Implementing Hover Detection with useHover Hook
+DESCRIPTION: Shows how to use the useHover hook to detect element hover states and implement conditional rendering with Show component.
+
+LANGUAGE: jsx
+CODE:
+import { Show } from "@legendapp/state/react";
+import { useHover } from "@legendapp/state/react-hooks/useHover";
+import { useRef } from "react";
+
+function ButtonWithTooltip() {
+  const refButton = useRef();
+  const isHovered = useHover(refButton);
+
+  return (
+    <div>
+      <button ref={refButton}>Click me</button>
+      <Show if={isHovered}>
+        {() => <Tooltip text="Tooltip!" target={refButton} />}
+      </Show>
+    </div>
+  );
+}
+
+----------------------------------------
+
+TITLE: Using currentDate Observable in JavaScript
+DESCRIPTION: Demonstrates how to use the currentDate observable to log the current date at midnight.
+
+LANGUAGE: javascript
+CODE:
+import { currentDate } from "@legendapp/state/helpers/time"
+
+observe(() => {
+    console.log('Today is': currentDate.get())
+})
+
+----------------------------------------
+
+TITLE: Using useHover Hook in React
+DESCRIPTION: Demonstrates how to use the useHover hook to create a button with a conditional tooltip based on hover state.
+
+LANGUAGE: jsx
+CODE:
+import { Show } from "@legendapp/state/react";
+import { useHover } from "@legendapp/state/react-hooks/useHover";
+import { useRef } from "react";
+
+function ButtonWithTooltip() {
+  const refButton = useRef();
+  const isHovered = useHover(refButton);
+
+  return (
+    <div>
+      <button ref={refButton}>Click me</button>
+      <Show if={isHovered}>
+        {() => <Tooltip text="Tooltip!" target={refButton} />}
+      </Show>
+    </div>
+  );
+}
+
+----------------------------------------
+
+TITLE: Using 'get' and 'list' Actions with Keel Plugin
+DESCRIPTION: Demonstrating the usage of 'get' and 'list' actions with the Keel plugin, showcasing different behaviors and data structures.
+
+LANGUAGE: typescript
+CODE:
+const { mutations, queries } = client.api
+
+const profile$ = observable(syncedKeel({
+    get: queries.getProfile,
+    create: mutations.createProfile,
+    update: mutations.updateProfile,
+    delete: mutations.deleteProfile,
+}))
+// profile$.get() is a Profile
+
+const profiles$ = observable(syncedKeel({
+    list: queries.listProfiles,
+    create: mutations.createProfile,
+    update: mutations.updateProfile,
+    delete: mutations.deleteProfile,
+}))
+// profile$.get() is a Record<string, Profile>
+
+----------------------------------------
+
+TITLE: Using useVerifyOneRender for Single Render Verification in React
+DESCRIPTION: Shows how to use the useVerifyOneRender hook to ensure React components render only once. This is useful for optimizing component performance and detecting unnecessary re-renders.
+
+LANGUAGE: jsx
+CODE:
+import { useVerifyOneRender } from "@legendapp/state/trace";
+
+const Component = observer(function Component(props) {
+  // Call useVerifyOneRender anywhere inside the component
+  useVerifyOneRender();
+
+  // This will log an error after one render when count is updated
+  return <div>{state.count.get()}</div>;
+});
+const Component = observer(function Component(props) {
+  // Call useVerifyOneRender anywhere inside the component
+  useVerifyOneRender();
+
+  // This will not log because `get(false)` does not track observable
+  // does not re-render this component
+  return <div>{state.count.get(false)}</div>;
+});
+
+----------------------------------------
+
+TITLE: Configuring Global Keel Plugin Settings
+DESCRIPTION: Setting up global configuration for the Keel plugin, including client setup and authentication handling.
+
+LANGUAGE: typescript
+CODE:
+import { observable } from '@legendapp/state'
+import { syncedKeel } from '@legendapp/state/sync-plugins/keel'
+import { configureSynced } from '@legendapp/state/sync/'
+import { APIClient } from './keelClient'
+
+const client = new APIClient({
+  baseUrl: process.env.API_BASE_URL,
+})
+
+const isAuthed$ = observable(false);
+
+// Set defaults
+const sync = configureSynced(syncedKeel, {
+    client,
+    persist: {
+        plugin: ObservablePersistLocalStorage,
+    },
+    waitFor: isAuthed$
+})
+
+// enable sync after authentication succeeds
+async function doAuth() {
+    // authenticate the client
+    await keel.auth.authenticateWithPassword(email, pass)
+
+    // check that the client is authenticated
+    const isAuthenticated = await keel.auth.isAuthenticated()
+
+    // Set isAuthed$ to start syncing
+    isAuthed$.set(true)
+}
+
+----------------------------------------
+
+TITLE: Using useTraceListeners Hook in React
+DESCRIPTION: Demonstrates how to use useTraceListeners hook to log tracked observables in a React component. This helps in identifying and reducing the number of observable listeners.
+
+LANGUAGE: jsx
+CODE:
+import { useTraceListeners } from "@legendapp/state/trace";
+
+const Component = observer(function Component(props) {
+  // Call useTraceListeners anywhere inside the component
+  useTraceListeners();
+
+  const count = use$(state.count)
+
+  return <div>{count}</div>;
+
+  /* This logs:
+
+    [legend-state] tracking 1 observable:
+    1: count
+
+    */
+});
+
+----------------------------------------
+
+TITLE: Using useTraceListeners Hook in React
+DESCRIPTION: Demonstrates how to use useTraceListeners hook to log tracked observables in a React component. This helps in identifying and reducing the number of observable listeners.
+
+LANGUAGE: jsx
+CODE:
+import { useTraceListeners } from "@legendapp/state/trace";
+
+const Component = observer(function Component(props) {
+  // Call useTraceListeners anywhere inside the component
+  useTraceListeners();
+
+  const count = use$(state.count)
+
+  return <div>{count}</div>;
+
+  /* This logs:
+
+    [legend-state] tracking 1 observable:
+    1: count
+
+    */
+});
+
+----------------------------------------
+
+TITLE: Using 'where' Parameter with Keel Plugin
+DESCRIPTION: Example of using the 'where' parameter to filter results in a Keel list query, demonstrating a lookup table by room.
+
+LANGUAGE: typescript
+CODE:
+const { mutations, queries } = client.api
+
+const messages$ = observable({
+    room: (roomId: string) =>
+        syncedKeel({
+            list: queries.listMessages,
+            where: { roomId }
+        })
+})
+// profile$.get() is a Record<string, Profile>
+
+----------------------------------------
+
+TITLE: Customizing Keel Actions in Legend-State
+DESCRIPTION: Example of customizing Keel actions when integrating with Legend-State, allowing for additional query or creation options.
+
+LANGUAGE: typescript
+CODE:
+import { mutations, queries, CreateProfileInput } from './keelClient'
+
+const profiles$ = observable({
+    user: (userId: string) =>
+        syncedKeel({
+            get: () => queries.getProfile({ userId }),
+            create: (data: CreateProfileInput) =>
+                mutations.createProfile({ user: { id: staffId }, ...data }),
+            update: mutations.updateProfile,
+            delete: mutations.deleteProfile,
+        })
+})
+
+----------------------------------------
+
+TITLE: Demonstrating Observable Usage in JavaScript
+DESCRIPTION: This snippet shows how to create an observable, get and set its value, and observe changes using Legend-State.
+
+LANGUAGE: jsx
+CODE:
+const state$ = observable({ value: 1 });
+state$.value.get();
+state$.value.set(2);
+
+// Tracks automatically and runs on every change
+observe(() => {
+  console.log(state$.value.get());
+});
+
+----------------------------------------
+
+TITLE: Demonstrating Observable Usage in JavaScript
+DESCRIPTION: This snippet shows how to create an observable, get and set its value, and observe changes using Legend-State.
+
+LANGUAGE: jsx
+CODE:
+const state$ = observable({ value: 1 });
+state$.value.get();
+state$.value.set(2);
+
+// Tracks automatically and runs on every change
+observe(() => {
+  console.log(state$.value.get());
+});
+
+----------------------------------------
+
+TITLE: Importing React Components in Astro
+DESCRIPTION: This code snippet imports various React components to be used in the examples. It demonstrates how to import Astro components that likely wrap React components for use in an Astro page.
+
+LANGUAGE: JavaScript
+CODE:
+import Persistence from "../../../Components/React/Persistence.astro";
+import AutoSavingFormExample from "../../../Components/React/AutoSavingFormExample.astro";
+import FormValidationExample from "../../../Components/React/FormValidationExample.astro";
+import MessageListExample from "../../../Components/React/MessageListExample.astro";
+import AnimatedSwitchExample from "../../../Components/React/AnimatedSwitchExample.astro";
+import ModalExample from "../../../Components/React/ModalExample.astro";
+import RouterExample from "../../../Components/React/RouterExample.astro";
+
+----------------------------------------
+
+TITLE: Using useObserve Hook with Legend-State
+DESCRIPTION: Demonstrates how to use useObserve for reactive side effects when observables change.
+
+LANGUAGE: jsx
+CODE:
+import { event } from "@legendapp/state";
+import { useObserve, useObservable, Reactive } from "@legendapp/state/react";
+
+const eventUpdateTitle = event();
+
+function ProfilePage() {
+  const profile$ = useObservable({ name: "" });
+
+  // This runs whenever profile changes
+  useObserve(() => {
+    document.title = `${profile$.name.get()} - Profile`;
+  });
+
+  // Observe a single observable with a callback when it changes
+  useObserve(profile$.name, ({ value }) => {
+    document.title = `${value} - Profile`;
+  });
+
+  // Observe an event with a callback when it changes
+  useObserve(eventUpdateTitle, () => {
+    document.title = `${profile$.name.get()} - Profile`;
+  });
+
+  return (
+    <div>
+      <span>Name:</span>
+      <Reactive.input $value={profile$.name} />
+    </div>
+  );
+}
+
+----------------------------------------
+
+TITLE: Using useObserve Hook with Legend-State
+DESCRIPTION: Demonstrates how to use useObserve for reactive side effects when observables change.
+
+LANGUAGE: jsx
+CODE:
+import { event } from "@legendapp/state";
+import { useObserve, useObservable, Reactive } from "@legendapp/state/react";
+
+const eventUpdateTitle = event();
+
+function ProfilePage() {
+  const profile$ = useObservable({ name: "" });
+
+  // This runs whenever profile changes
+  useObserve(() => {
+    document.title = `${profile$.name.get()} - Profile`;
+  });
+
+  // Observe a single observable with a callback when it changes
+  useObserve(profile$.name, ({ value }) => {
+    document.title = `${value} - Profile`;
+  });
+
+  // Observe an event with a callback when it changes
+  useObserve(eventUpdateTitle, () => {
+    document.title = `${profile$.name.get()} - Profile`;
+  });
+
+  return (
+    <div>
+      <span>Name:</span>
+      <Reactive.input $value={profile$.name} />
+    </div>
+  );
+}
+
+----------------------------------------
+
+TITLE: Configuring Draw Distance in Legend List
+DESCRIPTION: Shows how to set the draw distance for rendering items outside the viewport in Legend List.
+
+LANGUAGE: typescript
+CODE:
+drawDistance?: number
+
+----------------------------------------
+
+TITLE: Enabling Direct Peek in Legend-State
+DESCRIPTION: Enables direct access to observable values without tracking or notifying listeners using the _ shorthand syntax.
+
+LANGUAGE: javascript
+CODE:
+import { enableDirectPeek } from "@legendapp/state/config/enableDirectPeek"
+enableDirectPeek()
+
+import { observable } from "@legendapp/state"
+
+const state$ = observable({ test: "hi", num: 0 })
+
+// _ is a shorthand for peek()
+const testValue = state$.test._
+
+// Assign to _ to modify the underlying object without notifying listeners
+state$.test._ = "hello"
+
+// Assign objects too
+state$._ = { test: "hello" }
+
+----------------------------------------
+
+TITLE: Configuring Local-First Robust Real-Time Sync
+DESCRIPTION: Demonstrates how to set up a robust offline-first sync engine using the CRUD plugin with various options for persistence, retrying, and real-time updates.
+
+LANGUAGE: typescript
+CODE:
+import { observable } from '@legendapp/state'
+import { syncedCrud } from '@legendapp/state/sync-plugins/crud'
+import { ObservablePersistLocalStorage } from '@legendapp/state/persist-plugins/local-storage'
+
+const profile$ = observable(syncedCrud({
+    list: () => {/*...*/},
+    create: () => {/*...*/},
+    update: () => {/*...*/},
+    // Enable realtime. Some plugins have this built in so it's not required.
+    subscribe: ({ refresh, update }) => {
+        return realtime.subscribe({ /*...*/ }, () => {
+            // Trigger a refresh of the list function
+            refresh()
+        })
+    },
+    // Local first configuration
+    persist: {
+        plugin: ObservablePersistLocalStorage, // Set the persistence plugin
+        name: 'profile', // Set the name of this object in persistence
+        retrySync: true, // Persist pending changes to retry
+    },
+    retry: {
+        infinite: true, // Keep retrying until it saves
+    },
+    changesSince: 'last-sync', // Sync only diffs
+    fieldUpdatedAt: 'updatedAt' // Required for syncing only diffs
+}))
+
+----------------------------------------
+
+TITLE: Configuring Local-First Robust Real-Time Sync
+DESCRIPTION: Demonstrates how to set up a robust offline-first sync engine using the CRUD plugin with various options for persistence, retrying, and real-time updates.
+
+LANGUAGE: typescript
+CODE:
+import { observable } from '@legendapp/state'
+import { syncedCrud } from '@legendapp/state/sync-plugins/crud'
+import { ObservablePersistLocalStorage } from '@legendapp/state/persist-plugins/local-storage'
+
+const profile$ = observable(syncedCrud({
+    list: () => {/*...*/},
+    create: () => {/*...*/},
+    update: () => {/*...*/},
+    // Enable realtime. Some plugins have this built in so it's not required.
+    subscribe: ({ refresh, update }) => {
+        return realtime.subscribe({ /*...*/ }, () => {
+            // Trigger a refresh of the list function
+            refresh()
+        })
+    },
+    // Local first configuration
+    persist: {
+        plugin: ObservablePersistLocalStorage, // Set the persistence plugin
+        name: 'profile', // Set the name of this object in persistence
+        retrySync: true, // Persist pending changes to retry
+    },
+    retry: {
+        infinite: true, // Keep retrying until it saves
+    },
+    changesSince: 'last-sync', // Sync only diffs
+    fieldUpdatedAt: 'updatedAt' // Required for syncing only diffs
+}))
+
+----------------------------------------
+
+TITLE: Importing Legend-Motion in React Native
+DESCRIPTION: Basic import statement for the Motion component from Legend-Motion library.
+
+LANGUAGE: js
+CODE:
+import {Motion} from "@legendapp/motion"
+
+----------------------------------------
+
+TITLE: Animated Bottom Sheet Implementation with useMeasure
+DESCRIPTION: Advanced example showing how to create an animated bottom sheet using useMeasure hook with Framer Motion integration.
+
+LANGUAGE: jsx
+CODE:
+import { reactive } from "@legendapp/state/react";
+import { useMeasure } from "@legendapp/state/react-hooks/useMeasure";
+import { motion } from "framer-motion";
+import { useRef } from "react";
+
+const MotionDiv$ = reactive(motion.div);
+
+function BottomSheet({ children }) {
+  const refInner = useRef();
+  const { width, height } = useMeasure(refInner);
+
+  return (
+    <MotionDiv$
+      style={{ position: "fixed", bottom: 0, left: 0, right: 0 }}
+      $animate={() => ({ y: -height.get() })}
+    >
+      <div ref={refInner}>{children}</div>
+    </MotionDiv$>
+  );
+}
+
+----------------------------------------
+
+TITLE: Event Observable Implementation
+DESCRIPTION: Demonstrates how to create and use event observables for handling simple events without values.
+
+LANGUAGE: javascript
+CODE:
+import { event } from "@legendapp/state"
+
+const onClosed = event()
+
+// Simply pass a callback to the `on` function
+onClosed.on(() => { ... })
+
+// Or use it with 'onChange' like other observables
+onClosed.onChange(() => { ... })
+
+// Dispatch the event to call listeners
+onClosed.fire()
+
+----------------------------------------
+
+TITLE: Configuring Legend-Motion with NativeWind for Tailwind CSS Support
+DESCRIPTION: This code snippet shows how to configure Legend-Motion to work with NativeWind for Tailwind CSS support. It imports the necessary dependencies and uses the configureMotion function to set up the integration.
+
+LANGUAGE: js
+CODE:
+import { styled } from "nativewind";
+import { configureMotion } from "@legendapp/motion";
+
+configureMotion({ styled });
+
+----------------------------------------
+
+TITLE: Full Supabase and Legend-State Integration Setup
+DESCRIPTION: Complete example showing how to set up Supabase with Legend-State, including client configuration, message handling, and real-time updates. Demonstrates basic CRUD operations with typed observables.
+
+LANGUAGE: typescript
+CODE:
+import { createClient } from '@supabase/supabase-js'
+import { Database } from './database.types'
+import { observable } from '@legendapp/state'
+import { configureSyncedSupabase, syncedSupabase } from '@legendapp/state/sync-plugins/supabase'
+import { v4 as uuidv4 } from "uuid"
+
+const supabase = createClient<Database>(process.env.SUPABASE_URL, process.env.SUPABASE_ANON_KEY)
+
+// provide a function to generate ids locally
+const generateId = () => uuidv4()
+configureSyncedSupabase({
+    generateId
+})
+const uid = ''
+
+const messages$ = observable(syncedSupabase({
+    supabase,
+    collection: 'messages',
+    // Optional:
+    // Select only id and text fields
+    select: (from) => from.select('id,text'),
+    // Filter by the current user
+    filter: (select) => select.eq('user_id', uid),
+    // Don't allow delete
+    actions: ['read', 'create', 'update'],
+    // Realtime filter by user_id
+    realtime: { filter: `user_id=eq.${uid}` },
+    // Persist data and pending changes locally
+    persist: { name: 'messages', retrySync: true },
+    // Sync only diffs
+    changesSince: 'last-sync'
+}))
+
+// get() activates and starts syncing
+const messages = messages$.get()
+
+function addMessage(text: string) {
+    const id = generateId()
+    // Add keyed by id to the messages$ observable to trigger a create in Supabase
+    messages$[id].set({
+        id,
+        text,
+        created_at: null,
+        updated_at: null
+    })
+}
+
+function updateMessage(id: string, text: string) {
+    // Just set values in the observable to trigger an update to Supabase
+    messages$[id].text.set(text)
+}
+
+----------------------------------------
+
+TITLE: Observable Change Handling with onChange
+DESCRIPTION: Demonstrates using onChange() for listening to observable changes with various options including previous value tracking and change batching.
+
+LANGUAGE: javascript
+CODE:
+const state$ = observable({ text: 'hello' })
+
+const onChange = () => { ... }
+
+const dispose = state$.text.onChange(onChange)
+
+// Cancel listening manually
+dispose()
+
+----------------------------------------
+
+TITLE: Enabling Direct Access in Legend-State
+DESCRIPTION: Enables direct access to observable values using the $ shorthand syntax for get() and set() operations.
+
+LANGUAGE: javascript
+CODE:
+import { enableDirectAccess } from "@legendapp/state/config/enableDirectAccess"
+enableDirectAccess()
+
+import { observable } from "@legendapp/state"
+
+const state$ = observable({ test: "hi", num: 0 })
+
+// $ is a shorthand for get()
+const testValue = state$.test.$
+
+// Assign to $ as a shorthand for set()
+state$.test.$ = "hello"
+
+// Assign objects too just like you can with set()
+state$.$ = { test: "hello" }
+
+// Incrementing works as you'd expect
+state$.num.$++
+
+----------------------------------------
+
+TITLE: Enabling Reactive Components in React
+DESCRIPTION: Shows how to enable reactive versions of platform components in React and React Native using Legend-State configuration functions.
+
+LANGUAGE: js
+CODE:
+// React
+import { enableReactComponents } from "@legendapp/state/config/enableReactComponents";
+enableReactComponents();
+
+// React Native
+import { enableReactNativeComponents } from "@legendapp/state/config/enableReactNativeComponents";
+enableReactNativeComponents();
+
+----------------------------------------
+
+TITLE: Text Animation
+DESCRIPTION: Shows text animations including color and font size transitions.
+
+LANGUAGE: jsx
+CODE:
+<Motion.Text
+  animate={{
+    color: value ? "#F81FEC" : "#59B0F8",
+    fontSize: value ? 48 : 24,
+  }}
+>
+  Text
+</Motion.Text>
+
+----------------------------------------
+
+TITLE: Using useIsMounted Hook for Mount State Detection
+DESCRIPTION: Demonstrates the useIsMounted hook to track component mount state for managing async operations.
+
+LANGUAGE: jsx
+CODE:
+import { useIsMounted } from "@legendapp/state/react/useIsMounted";
+
+function Component() {
+  const isMounted = useIsMounted();
+
+  const onClick = () => {
+    setTimeout(() => {
+      if (isMounted.get()) {
+        console.log("Debounced click");
+      }
+    }, 100);
+  };
+
+  return <button onClick={onClick}>Click me</button>;
+}
+
+----------------------------------------
+
+TITLE: Using useVerifyNotTracking for Unintended Tracking Detection in React
+DESCRIPTION: Demonstrates the use of useVerifyNotTracking hook to detect unintended tracking of observables in React components. This is useful for ensuring fine-grained reactivity and preventing parent components from tracking observables.
+
+LANGUAGE: jsx
+CODE:
+import { useVerifyNotTracking } from "@legendapp/state/trace";
+
+const Component = observer(function Component(props) {
+  // Call useVerifyNotTracking anywhere inside the component
+  useVerifyNotTracking();
+
+  // This will log an error because get() makes it track
+  return <div>{state.count.get()}</div>;
+});
+const FineComponent = observer(function FineComponent(props) {
+  // Call useVerifyNotTracking anywhere inside the component
+  useVerifyNotTracking();
+
+  // This will not log because rendering the observable directly
+  // does not re-render this component
+  return <div>{state.count}</div>;
+});
+
+----------------------------------------
+
+TITLE: Using useVerifyOneRender Hook in React
+DESCRIPTION: Shows how to use useVerifyOneRender hook to ensure components render only once. Useful for optimizing component render performance.
+
+LANGUAGE: jsx
+CODE:
+import { useVerifyOneRender } from "@legendapp/state/trace";
+
+const Component = observer(function Component(props) {
+  // Call useVerifyOneRender anywhere inside the component
+  useVerifyOneRender();
+
+  const count = use$(state$.count)
+
+  // This will log an error after one render when count is updated
+  return <div>{count}</div>;
+});
+const Component = observer(function Component(props) {
+  // Call useVerifyOneRender anywhere inside the component
+  useVerifyOneRender();
+
+  const count = state$.count.peek()
+
+
+  // This will not log because `get(false)` does not track observable
+  // does not re-render this component
+  return <div>{state.count.peek()}</div>;
+});
+
+----------------------------------------
+
+TITLE: Importing MotionLinearGradient for Expo
+DESCRIPTION: This snippet demonstrates how to import the MotionLinearGradient component for use in Expo projects after installing the expo-linear-gradient package.
+
+LANGUAGE: javascript
+CODE:
+import { MotionLinearGradient } from "@legendapp/motion/linear-gradient-expo";
+
+----------------------------------------
+
+TITLE: Configuring and Using pageHash Observable in JavaScript
+DESCRIPTION: Demonstrates how to configure and use the pageHash observable to interact with the page's hash.
+
+LANGUAGE: javascript
+CODE:
+import { pageHash, configurePageHash } from '@legendapp/state/helpers/pageHash'
+
+configurePageHash({ setter: 'pushState' })
+
+observe(() => {
+    console.log('hash changed to': pageHash.get())
+})
+
+pageHash.set('value=test')
+// location.hash == "#value=test"
+
+----------------------------------------
+
+TITLE: Implementing Sync Diffs with Keel and Legend-State
+DESCRIPTION: Demonstration of using the 'changesSince' option to sync only diffs, reducing bandwidth usage when persisting list results.
+
+LANGUAGE: typescript
+CODE:
+// Sync diffs of a list
+syncedKeel({
+    list: queries.listMessages,
+    changesSince: 'last-sync',
+    persist: {
+        name: 'messages'
+    }
+})
+// Sync diffs of a single value
+syncedKeel({
+    list: queries.listUserById,
+    where: { id: myId },
+    as: 'value',
+    changesSince: 'last-sync',
+    persist: {
+        name: 'me'
+    }
+})
+
+----------------------------------------
+
+TITLE: Migrating from computed to observable for computed values
+DESCRIPTION: Shows how to update the usage of computed to use observable for creating computed values.
+
+LANGUAGE: js
+CODE:
+// Change
+const compValue$ = computed(() => /* ... */)
+// to
+const compValue$ = observable(() => /* ... */)
+
+// Change
+const state$ = observable(() => ({
+    value: 1,
+    comp: computed(() => state$.value.get())
+}))
+// to
+const state$ = observable(() => ({
+    value: 1,
+    comp: () => state$.value.get()
+}))
+
+----------------------------------------
+
+TITLE: Simple Animation with Legend-Motion
+DESCRIPTION: Demonstrates basic animation using the animate prop to control x-position.
+
+LANGUAGE: jsx
+CODE:
+<Motion.View
+  animate={{
+    x: value * 100,
+  }}
+/>
+
+----------------------------------------
+
+TITLE: Merging Objects into Legend Observables
+DESCRIPTION: Shows how to merge deep objects into an observable while maintaining existing observables and listeners, using mergeIntoObservable. This function triggers change listeners appropriately during the merge.
+
+LANGUAGE: javascript
+CODE:
+import { observable } from "@legendapp/state";
+import { mergeIntoObservable } from "@legendapp/state";
+
+const state$ = observable({ store: { text: "hello", other: "hello there" } });
+
+state$.store.text.onChange(({ value }) =>
+  console.log(`text changed to "${value}"`)
+);
+
+const newValue = { store: { text: "hi", other: "hi there" } };
+mergeIntoObservable(state$, newValue);
+
+// text changed to "hi"
+
+state$.store === newValue.store; // ✅ true
+
+----------------------------------------
+
+TITLE: Installing TypeScript Type Definitions for React and React Native
+DESCRIPTION: This code snippet shows how to install TypeScript type definitions for React and React Native using a custom Astro component. These type definitions are necessary for proper TypeScript functionality in Legend-Motion.
+
+LANGUAGE: astro
+CODE:
+<Install name="@types/react @types/react-native" />
+
+----------------------------------------
+
+TITLE: Batching Array Operations in Legend-State
+DESCRIPTION: Illustrates how to use batching to prevent excessive renders when performing multiple array operations.
+
+LANGUAGE: javascript
+CODE:
+const state$ = observable({ items: [] });
+
+function addItems() {
+  for (let i = 0; i < 1000; i++) {
+    state$.items.push({ text: `Item ${i}` });
+  }
+}
+
+// ❌ This can render 1000 times while pushing to the array
+addItems();
+
+// ✅ Batching delays until complete and renders once
+batch(addItems);
+
+----------------------------------------
+
+TITLE: Adding Custom Observable Change Listener in JavaScript
+DESCRIPTION: Demonstrates how to add a custom listener to an observable to watch for changes and debug rendering issues. This technique can be used to set breakpoints or log detailed information about observable changes.
+
+LANGUAGE: js
+CODE:
+// Why is count rendering so often?
+state.count.onChange(({ value }) => {
+  console.log("Count changed", value);
+  console.trace();
+  debugger;
+});
+
+----------------------------------------
+
+TITLE: Installing Legend-State Package
+DESCRIPTION: Instructions for installing the @legendapp/state package using a package manager.
+
+LANGUAGE: shell
+CODE:
+<Install name="@legendapp/state" />
+
+----------------------------------------
+
+TITLE: Configuring Custom Key Extractor for Arrays in Legend-State
+DESCRIPTION: Demonstrates how to set up a custom key extractor function for arrays of objects in Legend-State when the default 'id' or 'key' fields are not available.
+
+LANGUAGE: javascript
+CODE:
+const data$ = observable({
+  arr: [],
+  arr_keyExtractor: (item) => item.idObject._id,
+});
+
+----------------------------------------
+
+TITLE: Importing Motion from Legend-Motion in JavaScript
+DESCRIPTION: Shows how to import the Motion component from the @legendapp/motion package in a JavaScript file.
+
+LANGUAGE: js
+CODE:
+import {Motion} from "@legendapp/motion"
+
+----------------------------------------
+
+TITLE: Configuring Item Size Estimation in Legend List
+DESCRIPTION: Shows the props available for estimating item sizes and handling size changes in Legend List.
+
+LANGUAGE: typescript
+CODE:
+estimatedItemSize?: number;
+getEstimatedItemSize?: (index: number, item: T) => number;
+onItemSizeChanged?: (info: {
+        size: number;
+        previous: number;
+        index: number;
+        itemKey: string;
+        itemData: ItemT;
+    }) => void;
+
+----------------------------------------
+
+TITLE: Switching from FlatList to Legend List in React Native
+DESCRIPTION: Demonstrates how to replace FlatList with Legend List, adding the required estimatedItemSize prop for optimal performance.
+
+LANGUAGE: diff
+CODE:
+return (
+-  <FlatList
++  <LegendList
+      data={items}
+      renderItem={({ item }) => <Text>{item.title}</Text>}
++      estimatedItemSize={320}
+  />
+)
+
+----------------------------------------
+
+TITLE: Using set() Method with Observables in JavaScript
+DESCRIPTION: This snippet demonstrates how to use the set() method to modify observables. It shows setting values directly, using a function to set relative to the previous value, and setting values in undefined object paths.
+
+LANGUAGE: javascript
+CODE:
+const state$ = observable({ text: "hi" })
+
+// Set directly
+state$.text.set("hello there")
+
+// Set with a function relative to previous value
+state$.text.set((prev) => prev + " there")
+
+// Set will automatically fill out objects that were undefined
+state$.otherKey.otherProp.set("hi")
+
+----------------------------------------
+
+TITLE: Using Selectors in Legend-State
+DESCRIPTION: Shows how to use selectors with the when function to track changes in multiple observables.
+
+LANGUAGE: javascript
+CODE:
+const isSignedIn$ = observable(false);
+const isOnline$ = observable(false);
+
+// A selector can be just an observable, which will be tracked for changes
+await when(isSignedIn$);
+
+// Or selector can be a function which tracks all get() calls for changes
+await when(() => isSignedIn$.get() && isOnline$.get());
+
+----------------------------------------
+
+TITLE: Color Interpolation
+DESCRIPTION: Demonstrates automatic color interpolation animation.
+
+LANGUAGE: jsx
+CODE:
+<Motion.View
+  animate={{
+    backgroundColor: value ? "#F81FEC" : "#59B0F8",
+  }}
+/>
+
+----------------------------------------
+
+TITLE: Using Show Component in React
+DESCRIPTION: Explains how to use the Show component for conditional rendering in React with Legend-State.
+
+LANGUAGE: jsx
+CODE:
+<Show
+  if={state.show}
+  else={() => <div>Nothing to see here</div>}
+  wrap={AnimatePresence}
+>
+  {() => <Modal />}
+</Show>
+
+LANGUAGE: jsx
+CODE:
+import { Show, useObservable } from "@legendapp/state/react";
+import { AnimatePresence } from "framer-motion";
+
+function ShowExampleWithSelector() {
+  const state$ = useObservable({ collection: [] });
+  return (
+    <Show
+      if={() => state$.collection.get().length > 0}
+      else={() => <div>Nothing to see here</div>}
+      wrap={AnimatePresence}
+    >
+      {() => <Modal />}
+    </Show>
+  );
+}
+
+----------------------------------------
+
+TITLE: Using useTraceListeners for Observable Tracking in React
+DESCRIPTION: Demonstrates how to use the useTraceListeners hook to log all observables being tracked in a React component. This function helps identify and potentially reduce the number of listeners.
+
+LANGUAGE: jsx
+CODE:
+import { useTraceListeners } from "@legendapp/state/trace";
+
+const Component = observer(function Component(props) {
+  // Call useTraceListeners anywhere inside the component
+  useTraceListeners();
+
+  return <div>{state.count.get()}</div>;
+
+  /* This logs:
+
+    [legend-state] tracking 1 observable:
+    1: count
+
+    */
+});
+
+----------------------------------------
+
+TITLE: Syncing with a Server using syncedFetch
+DESCRIPTION: Shows how to use syncedFetch to synchronize data with a remote server, demonstrating both fetching and updating data.
+
+LANGUAGE: typescript
+CODE:
+import { observable, observe } from "@legendapp/state"
+import { syncedFetch } from "@legendapp/state/sync-plugins/fetch"
+
+// Create an observable with "users" synced
+const store$ = observable({
+    users: syncedFetch({
+        initial: [],
+        // When the fetch resolves it will update the observable
+        get: 'https://reqres.in/api/users',
+        // When the observable is changed it will send the changes back to the server.
+        set: 'https://reqres.in/api/users'
+    })
+})
+
+observe(() => {
+    // The first get() activates the synced get function to fetch the data
+    // observe is re-run when the data comes in
+    const users = store$.users.get()
+    if (users) {
+        processUsers(users)
+    }
+})
+
+// Any changes will be saved
+store$.users.push({ id: 0, name: 'name' })
+
+----------------------------------------
+
+TITLE: Using opaqueObject for Primitive Treatment in Legend
+DESCRIPTION: Demonstrates how to mark objects as opaque in an observable so they're treated as primitives, useful for storing DOM or React elements without tracking internal properties.
+
+LANGUAGE: javascript
+CODE:
+import { observable. opaqueObject } from '@legendapp/state'
+
+const state$ = observable({ text: 'hi', body: opaqueObject(document.body) })
+
+----------------------------------------
+
+TITLE: Deprecated: Direct Render Configuration in Legend-State
+DESCRIPTION: Demonstrates deprecated direct rendering of observables in React components. Now replaced by Memo component.
+
+LANGUAGE: jsx
+CODE:
+import { observable } from '@legendapp/state';
+import { enableReactDirectRender } from '@legendapp/state/config/enableReactDirectRender';
+enableReactDirectRender()
+
+const state$ = observable({ test: 'hi' })
+
+function Component() {
+    // The observable can now be rendered directly to create a self-reactive elemtn
+    return <div>{state$.test}</div>
+}
+
+----------------------------------------
+
+TITLE: Sync Configuration with Keel Integration
+DESCRIPTION: Demonstrates setting up synced state with Keel backend integration, including persistence, retry logic, and change tracking.
+
+LANGUAGE: js
+CODE:
+const state$ = observable(
+    users: syncedKeel({
+        list: queries.getUsers,
+        create: mutations.createUsers,
+        update: mutations.updateUsers,
+        delete: mutations.deleteUsers,
+        persist: { name: 'users', retrySync: true },
+        debounceSet: 500,
+        retry: {
+            infinite: true,
+        },
+        changesSince: 'last-sync',
+    }),
+    // direct link to my user within the users observable
+    me: () => state$.users['myuid']
+)
+
+observe(() => {
+    // get() activates through to state$.users and starts syncing.
+    // it updates itself and re-runs observers when name changes
+    const name = me$.name.get()
+})
+
+// Setting a value goes through to state$.users and saves update to server
+me$.name.set('Annyong')
+
+----------------------------------------
+
+TITLE: Setting Up Delete Operation in Legend-State
+DESCRIPTION: Shows how to implement delete operations with error handling and server response processing.
+
+LANGUAGE: typescript
+CODE:
+const profile$ = observable(syncedCrud({
+    // ...
+    delete: ({ id }, options) => {
+        const { data, error } = await serverDeleteProfile(id);
+        if (error) {
+            // Handle error, throw an Error to trigger a retry
+        } else if (data) {
+            return data;
+        }
+    }
+}))
+
+----------------------------------------
+
+TITLE: Optimized Array Rendering with For Component in Legend-State
+DESCRIPTION: Demonstrates the use of the For component for optimized rendering of arrays of observable objects. It includes examples of different usage patterns and props for customization.
+
+LANGUAGE: jsx
+CODE:
+import { observable } from "@legendapp/state"
+import { For, use$ } from "@legendapp/state/react"
+
+const state$ = observable({ arr: [{ id: 1, text: 'hi' }]})
+
+const Row = function Row({ item$ }) {
+    const text = use$(item$.text)
+    return <div>{text}</div>
+}
+function List() {
+    // 1. Use the For component with an item prop
+    return <For each={state$.arr} item={Row} />
+
+    // 2. Use the For component with a render function as the child
+    return (
+        <For each={list} optimized>
+            {item$ => (
+                <div>
+                    {item$.text.get()}
+                </div>
+            )}
+        </div>
+    )
+}
+
+----------------------------------------
+
+TITLE: Implementing Update Operation Handler in Legend-State
+DESCRIPTION: Example of implementing an update operation with partial updates and error handling.
+
+LANGUAGE: typescript
+CODE:
+const profile$ = observable(syncedCrud({
+    // ...
+    update: (value, options) => {
+        const { data, error } = await serverUpdateProfile(value);
+        if (error) {
+            // Handle error, throw an Error to trigger a retry
+        } else if (data) {
+            return data;
+        }
+    },
+    fieldCreatedAt: 'updated_at',
+    updatePartial: true // Update with only changed fields
+}))
+
+----------------------------------------
+
+TITLE: Using currentDate Observable in Legend-State
+DESCRIPTION: Demonstrates how to use the currentDate observable that automatically updates at midnight to track the current date without time.
+
+LANGUAGE: javascript
+CODE:
+import { currentDate } from "@legendapp/state/helpers/time"
+
+observe(() => {
+    console.log('Today is': currentDate.get())
+})
+
+----------------------------------------
+
+TITLE: Using MotionLinearGradient Component
+DESCRIPTION: This example demonstrates how to use the MotionLinearGradient component with animated props for colors, start, and end points. The gradient colors and direction change based on the 'value' variable.
+
+LANGUAGE: jsx
+CODE:
+<MotionLinearGradient
+  animateProps={{
+    colors: [value ? "#F81FEC" : "blue", value ? "#59B0F8" : "yellow"],
+    start: { x: 0, y: 0 },
+    end: { x: value ? 1 : 0, y: 1 },
+  }}
+/>
+
+----------------------------------------
+
+TITLE: Optimizing Array Iteration in Legend-State
+DESCRIPTION: Demonstrates how to optimize performance when iterating through large arrays of observable objects by accessing raw data.
+
+LANGUAGE: javascript
+CODE:
+const state$ = observable({ items: [{ data: { value: 10 }}, ...] })
+
+let sum = 0
+
+// 🔥 This will create proxies for each element's data and value
+state$.items.forEach(item => sum += item.data.value.get())
+
+// 💨 This will not do anything special
+state$.items.get().forEach(item => sum += item.data.value)
+
+----------------------------------------
+
+TITLE: IndexedDB Advanced Configuration
+DESCRIPTION: Detailed configuration for IndexedDB persistence including database setup and multiple persistence modes.
+
+LANGUAGE: javascript
+CODE:
+import { persistObservable } from "@legendapp/state/persist"
+import { ObservablePersistIndexedDB } from "@legendapp/state/persist-plugins/indexeddb"
+
+configureObservablePersistence({
+  pluginLocal: ObservablePersistIndexedDB,
+  local: {
+    indexedDB: {
+      databaseName: "Legend",
+      version: 1,
+      tableNames: ["documents", "store"],
+    },
+  },
+})
+
+// Mode 1: Persist a dictionary
+const state$ = observable({
+  obj1: { id: "obj1", text: "..." },
+  obj2: { id: "obj2", text: "..." },
+})
+
+persistObservable(state$, {
+  local: "documents", // IndexedDB table name
+})
+
+// Mode 2: Persist an object with itemId
+const settings$ = observable({ theme: "light" })
+
+persistObservable(settings$, {
+  local: {
+    name: "store", // IndexedDB table name
+    indexedDB: {
+      itemID: "settings",
+    },
+  },
+})
+
+----------------------------------------
+
+TITLE: Creating Async Observables in JavaScript
+DESCRIPTION: This snippet demonstrates how to create and use asynchronous observables. It shows creating an observable with a Promise and handling its resolved state.
+
+LANGUAGE: javascript
+CODE:
+const serverState$ = observable(() => fetch('url').then(res => res.json()))
+
+observe(() => {
+    // Getting the value activates the observable to fetch, and it
+    // updates its value when it resolves.
+    const data = serverState$.get()
+    if (data) {
+        ...
+    }
+})
+
+// Await the promise to resolve and then get the data from it
+const data = await when(serverState$)
+console.log(data)
+
+----------------------------------------
+
+TITLE: Observable Get Usage Example
+DESCRIPTION: Demonstrates the use of get() method and comparison between raw values and observable proxies.
+
+LANGUAGE: javascript
+CODE:
+const profile = { name: "Test user" };
+const state$ = observable({ profile: profile, test: 0 });
+
+// The raw value is unchanged
+state$.profile.get(); // { name: 'Test user' }
+state$.profile === profile; // ❌ false. The observable is not strictly equal to profile.
+state$.profile.get() === profile; // ✅ true. The raw data is exactly what was set.
+
+----------------------------------------
+
+TITLE: Configuring Create Operation Handler in Legend-State
+DESCRIPTION: Shows how to implement a create operation handler with error handling and server response processing.
+
+LANGUAGE: typescript
+CODE:
+const profile$ = observable(syncedCrud({
+    // ...
+    create: (value, options) => {
+        const { data, error } = await serverCreateProfile(value);
+        if (error) {
+            // Handle error, throw an Error to trigger a retry
+        } else if (data) {
+            return data;
+        }
+    },
+    fieldCreatedAt: 'created_at'
+}))
+
+----------------------------------------
+
+TITLE: Observing Changes in Legend State
+DESCRIPTION: Shows how to subscribe to changes in observables and use observing contexts for reactivity.
+
+LANGUAGE: javascript
+CODE:
+const state$ = observable({
+  settings: { theme: "light" },
+  array: [{ text: "hi" }],
+});
+
+// Listen to observable directly
+state$.settings.theme.onChange(({ value }) => console.log("Theme is", value));
+
+// This will re-run whenever accessed observables change
+observe(() => {
+  console.log("Theme is", state$.settings.theme.get());
+});
+
+// when waits for a value to become truthy.
+await when(() => state$.settings.theme.get() === "dark");
+
+// an observable can be computed based on other observables
+const isDark$ = observable(() => state$.settings.theme.get() === "dark");
+
+----------------------------------------
+
+TITLE: Using useSelector Hook for Complex Observable Computations in React
+DESCRIPTION: Demonstrates the use of useSelector hook for more complex cases to compute values based on observables and trigger re-renders only when the computed value changes.
+
+LANGUAGE: jsx
+CODE:
+import { observable } from "@legendapp/state";
+
+const state$ = observable({ fname: "hello", lname: "there" });
+
+function Component() {
+  // Re-render when fname changes
+  const fname = useSelector(state$.fname);
+  // Re-render when the computed value of fullname changes
+  const fullname = useSelector(
+    () => `${state$.fname.get()} ${state$.lname.get()}`
+  );
+
+  return (
+    <div>
+      {fname} {fullname}
+    </div>
+  );
+}
+
+----------------------------------------
+
+TITLE: Using keyExtractor in Legend List
+DESCRIPTION: Demonstrates the keyExtractor prop for optimizing item layout caching in Legend List.
+
+LANGUAGE: typescript
+CODE:
+keyExtractor?: (item: T, index: number) => string;
+
+----------------------------------------
+
+TITLE: Using Recycling Hooks in Legend List
+DESCRIPTION: Shows how to use recycling hooks to manage state and side effects when recycling items in Legend List.
+
+LANGUAGE: typescript
+CODE:
+useRecyclingEffect: (effect: (info: LegendListRecyclingState) => void | (() => void)) => void;
+useRecyclingState: <T>(updateState: ((info: LegendListRecyclingState) => T) | T) => [T, Dispatch<T>];
+
+----------------------------------------
+
+TITLE: Configuring Starlight Landing Page Frontmatter in Markdown
+DESCRIPTION: Defines the page title, description, template, and hero section properties for the Starlight documentation landing page. It sets up the page layout and main visual elements.
+
+LANGUAGE: markdown
+CODE:
+---
+title: Welcome to Starlight
+description: Get started building your docs site with Starlight.
+template: splash
+hero:
+  tagline: Congrats on setting up a new Starlight project!
+  image:
+    file: ../../assets/houston.webp
+  actions:
+    - text: Example Guide
+      link: /guides/example/
+      icon: right-arrow
+      variant: primary
+    - text: Read the Starlight docs
+      link: https://starlight.astro.build
+      icon: external
+---
+
+----------------------------------------
+
+TITLE: Basic Observable Creation and Usage
+DESCRIPTION: Demonstrates how to create and interact with a basic observable using get() and set() methods.
+
+LANGUAGE: javascript
+CODE:
+import { observable } from "@legendapp/state";
+
+const state$ = observable({ text: "hello" });
+
+console.log(state$.get());
+// { text: 'hello' }
+
+----------------------------------------
+
+TITLE: Updating proxy usage in observables
+DESCRIPTION: Demonstrates the new way of using proxy-like functionality within observables.
+
+LANGUAGE: js
+CODE:
+// Change
+const state$ = observable({
+    items: { test1: { text: 'hi' }, test2: { text: 'hello' } },
+    itemText: proxy((key) => {
+        return state$.items[key]['text'];
+    })
+})
+// To
+const state$ = observable({
+    items: { test1: { text: 'hi' }, test2: { text: 'hello' } },
+    texts: (key: string) => {
+        return state$.items[key]['text']
+    }
+})
+
+----------------------------------------
+
+TITLE: Configuring Babel Plugin for Legend-State
+DESCRIPTION: Explains how to configure the Babel plugin for Legend-State to simplify the syntax of Computed, Memo, and Show components.
+
+LANGUAGE: js
+CODE:
+module.exports = {
+  plugins: ["@legendapp/state/babel"],
+};
+
+----------------------------------------
+
+TITLE: Using Reactive Components in React
+DESCRIPTION: Demonstrates the usage of reactive components with two-way binding and reactive styling in a React component.
+
+LANGUAGE: jsx
+CODE:
+import { Reactive } from "@legendapp/state/react"
+
+function Component() {
+    // This component renders only once
+    const state$ = useObservable({ name: '', age: 18 })
+
+    return (
+        <div>
+            // Reactive styling
+            <Reactive.div
+                $style={() => ({
+                    color: state$.age.get() > 5 ? 'green' : 'red'
+                })}
+                $className={() => state$.age.get() > 5 ? 'kid' : 'baby'}
+            />
+            // Reactive children
+            <Reactive.div>
+                {() => (
+                    <div>{state$.age.get() > 5 ? <Kid /> : <Baby />}</div>
+                )}
+            </Reactive.div>
+            // Two-way bind to inputs
+            <Reactive.textarea $value={state$.name} />
+            <Reactive.select $value={state$.age}>...</Reactive.select>
+            <Reactive.input
+                $value={state$.name}
+                $className={() => !state$.name.get() && "border-red-500"}
+                $style={() => !state$.name.get() && { borderWidth: 1 }}
+            />
+        </div>
+    )
+}
+
+----------------------------------------
+
+TITLE: Using Motion Components for View, SVG, and LinearGradient in React Native
+DESCRIPTION: Demonstrates the usage of Motion.View, MotionSvg.Svg, MotionSvg.Polygon, and MotionLinearGradient components with animated properties based on a 'value' variable.
+
+LANGUAGE: jsx
+CODE:
+<Motion.View
+    animate={{
+        x: value * 100,
+        opacity: value ? 1 : 0.2,
+        scale: value ? 1 : 0.5
+    }}
+/>
+<MotionSvg.Svg>
+    <MotionSvg.Polygon
+        animateProps={{ points: value === 1 ?
+            "120,10 190,160 70,190 23,184" :
+            "100,50 140,160 50,130 23,84"
+        }}
+    />
+</MotionSvg.Svg>
+<MotionLinearGradient
+    animateProps={{
+        colors: value ?
+            ["#F81FEC", "#59B0F8"] :
+            ["blue", "yellow"]
+    }}
+/>
+
+----------------------------------------
+
+TITLE: Migrating to $React namespace for web components
+DESCRIPTION: Shows how to use the new $React namespace for reactive DOM components in web applications.
+
+LANGUAGE: tsx
+CODE:
+import { $React } from "@legendapp/state/react-web"
+
+function Component() {
+    return (
+        <$React.div
+            $className={() => state$.age.get() > 5 ? 'kid' : 'baby'}
+        />
+    )
+}
+
+----------------------------------------
+
+TITLE: Element Size Measurement with useMeasure Hook
+DESCRIPTION: Shows how to use useMeasure hook to track element dimensions and updates.
+
+LANGUAGE: jsx
+CODE:
+import { useMeasure } from "@legendapp/state/react-hooks/useMeasure";
+import { useRef } from "react";
+
+function Component() {
+  const ref = useRef();
+  const { width, height } = useMeasure(ref);
+
+  return (
+    <div ref={ref}>
+      Width: {width}, Height: {height}
+    </div>
+  );
+}
+
+----------------------------------------
+
+TITLE: Observable Change Observation with Cleanup
+DESCRIPTION: Demonstrates using observe() with cleanup effects for managing side effects when observables change, including toast notifications example.
+
+LANGUAGE: javascript
+CODE:
+import { observe, observable } from "@legendapp/state";
+const state$ = observable({ isOnline: false, toasts: [] });
+
+const dispose = observe((e) => {
+  if (!state$.isOnline.get()) {
+    const toast = { id: "offline", text: "Offline", color: "red" };
+    state$.toasts.push(toast);
+
+    e.onCleanup = () => state$.toasts.splice(state$.toasts.indexOf(toast), 1);
+  }
+});
+
+// Cancel the observe
+dispose();
+
+----------------------------------------
+
+TITLE: Optimizing Array Mapping in Legend-State React
+DESCRIPTION: Demonstrates best practices for mapping over observable arrays in React components to prevent unnecessary re-renders.
+
+LANGUAGE: jsx
+CODE:
+import { observable } from "@legendapp/state";
+import { For } from "@legendapp/state/react";
+
+const state$ = observable({ arr: [{ id: 1, text: "hi" }] });
+
+function Row({ item }) {
+  return <div>{item.text}</div>;
+}
+function List() {
+  // Be sure to use peek() to make sure you don't track any observable fields here
+  return state$.arr.map((item) => <Row key={item.peek().id} item={item} />);
+}
+
+----------------------------------------
+
+TITLE: Importing React Components for Examples
+DESCRIPTION: This code snippet imports various React components used throughout the examples page. These components demonstrate different functionalities and are likely defined in separate files.
+
+LANGUAGE: JavaScript
+CODE:
+import Persistence from "../../../Components/React/Persistence.astro";
+import AutoSavingFormExample from "../../../Components/React/AutoSavingFormExample.astro";
+import FormValidationExample from "../../../Components/React/FormValidationExample.astro";
+import MessageListExample from "../../../Components/React/MessageListExample.astro";
+import AnimatedSwitchExample from "../../../Components/React/AnimatedSwitchExample.astro";
+import ModalExample from "../../../Components/React/ModalExample.astro";
+import RouterExample from "../../../Components/React/RouterExample.astro";
+
+----------------------------------------
+
+TITLE: Updating observer usage with use$ in React
+DESCRIPTION: Demonstrates how to update components using observer to incorporate the new use$ hook for accessing observable values.
+
+LANGUAGE: jsx
+CODE:
+const state$ = observable({ value: 10 })
+
+// observer is now just an optional performance optimization
+const Component = observer(() => {
+    // ✅ The new way
+    const value = use$(state$.value)
+
+    // 🔴 The old way
+    const value = state$.value.get()
+})
+
+----------------------------------------
+
+TITLE: Using $TextInput for React Native
+DESCRIPTION: Demonstrates the usage of $TextInput for reactive components in React Native applications.
+
+LANGUAGE: tsx
+CODE:
+import { $TextInput } from "@legendapp/state/react-native"
+
+function Component() {
+    return (
+        <$TextInput
+            $value={state$.name}
+        />
+    )
+}
+
+----------------------------------------
+
+TITLE: Implementing TanStack Query with React Hook
+DESCRIPTION: Demonstrates using the useObservableSyncedQuery hook within React components to integrate TanStack Query. The hook manages query state and mutations while updating an observable instead of triggering re-renders.
+
+LANGUAGE: tsx
+CODE:
+import { useObservableSyncedQuery } from '@legendapp/state/sync-plugins/tanstack-react-query';
+import { useQueryClient } from '@tanstack/react-query';
+import { use$ } from '@legendapp/state/react';
+
+function Component() {
+    const state$ = useObservableSyncedQuery({
+        query: {
+            queryKey: ['user'],
+            queryFn: async () => {
+                return fetch('https://reqres.in/api/users/1').then((v) => v.json())
+            },
+        },
+        mutation: {
+            mutationFn: async (variables) => {
+                return fetch(
+                    'https://reqres.in/api/users/1',
+                    { body: JSON.stringify(variables), method: 'POST' }
+                )
+            },
+        },
+    })
+
+    // get it with use$ to start the sync
+    const state = use$(state$)
+
+    // Or bind an input directly to a property, which will also start the sync
+    return (
+        <div>
+            <$React.input $value={state$.first_name} />
+        </div>
+    )
+}
+
+----------------------------------------
+
+TITLE: Implementing Exit Animations with AnimatePresence in React Native
+DESCRIPTION: Demonstrates how to use AnimatePresence to animate a component's unmounting process. The example shows a view that animates its opacity and position on mount, during presence, and before unmount using spring and timing animations.
+
+LANGUAGE: jsx
+CODE:
+<AnimatePresence>
+  {value ? (
+    <MotionStyled.View
+      key="A"
+      initial={{ opacity: 0.1, x: 0 }}
+      animate={{ opacity: 1, x: 100 }}
+      exit={{ opacity: 0.2, x: 0 }}
+      transition={{
+        default: {
+          type: "spring",
+        },
+        opacity: {
+          type: "timing",
+        },
+      }}
+    />
+  ) : null}
+</AnimatePresence>
+
+----------------------------------------
+
+TITLE: Using Optimized For Component in Legend-State React
+DESCRIPTION: Demonstrates the usage of the optimized prop in the For component for highly efficient rendering of arrays in Legend-State React applications.
+
+LANGUAGE: jsx
+CODE:
+import { For } from "@legendapp/state/react"
+
+...
+
+function List() {
+    // Use the optimized prop
+    return <For each={list} item={Row} optimized />
+}
+
+----------------------------------------
+
+TITLE: Using whenReady Function in Legend-State
+DESCRIPTION: Demonstrates the use of whenReady function to wait for arrays or objects to be non-empty.
+
+LANGUAGE: javascript
+CODE:
+import { whenReady } from "@legendapp/state";
+
+const state$ = observable({ arr: [] });
+
+whenReady(state$.arr, () => console.log("Array has some values"));
+// Not ready yet
+
+state$.arr.push("hello");
+
+// "Array has some values"
+
+----------------------------------------
+
+TITLE: Using Memo Component in React
+DESCRIPTION: Demonstrates the usage of the Memo component for creating independent, memoized children in React.
+
+LANGUAGE: jsx
+CODE:
+function Component() {
+  return (
+    <Memo>
+      {() =>
+        state.messages.map((message) => (
+          <div key={message.id}>
+            {message.text} {localVar}
+          </div>
+        ))
+      }
+    </Memo>
+  );
+}
+
+----------------------------------------
+
+TITLE: Enabling React Tracking in Legend-State
+DESCRIPTION: Configures automatic tracking of observables in React components, allowing components to re-render when observed values change.
+
+LANGUAGE: javascript
+CODE:
+import { enableReactTracking } from "@legendapp/state/config/enableReactTracking"
+enableReactTracking({
+    auto: true,
+})
+
+LANGUAGE: jsx
+CODE:
+import { observable } from "@legendapp/state"
+const state$ = observable({ test: "hi" })
+
+function Component() {
+  // This makes this component responsive to test changing
+  const test = state$.test.get()
+
+  return <div>{test}</div>
+}
+
+----------------------------------------
+
+TITLE: Configuring AsyncStorage Persistence in React Native
+DESCRIPTION: Configuration setup for using AsyncStorage in React Native applications with custom AsyncStorage implementation.
+
+LANGUAGE: javascript
+CODE:
+import { configureObservablePersistence } from '@legendapp/state/persist'
+import { ObservablePersistAsyncStorage } from '@legendapp/state/persist-plugins/async-storage'
+
+// Global configuration
+configureObservablePersistence({
+    // Use AsyncStorage in React Native
+    pluginLocal: ObservablePersistAsyncStorage,
+    localOptions: {
+        asyncStorage: {
+            // The AsyncStorage plugin needs to be given the implementation of AsyncStorage
+            AsyncStorage
+        }
+    }
+})
+
+----------------------------------------
+
+TITLE: Configuring MMKV Persistence in React Native
+DESCRIPTION: Configuration setup for using MMKV storage in React Native applications.
+
+LANGUAGE: javascript
+CODE:
+import { configureObservablePersistence } from '@legendapp/state/persist'
+import { ObservablePersistMMKV } from '@legendapp/state/persist-plugins/mmkv'
+
+// Global configuration
+configureObservablePersistence({
+    // Use react-native-mmkv in React Native
+    pluginLocal: ObservablePersistMMKV
+})
+
+----------------------------------------
+
+TITLE: Defining Keel Model for Profile
+DESCRIPTION: Example of a Keel model definition for a Profile, including fields and actions for CRUD operations.
+
+LANGUAGE: keel
+CODE:
+model Profile {
+    fields {
+        name Text
+    }
+
+    actions {
+        get getProfile()
+        create createProfile() with (name)
+        update updateProfile(id) with (name)
+        delete deleteProfile(id)
+    }
+}
+
+----------------------------------------
+
+TITLE: Migrating Promise Behavior in React Components
+DESCRIPTION: Example showing how to update Promise error handling in Legend State from checking direct error property to using state.error
+
+LANGUAGE: jsx
+CODE:
+// Remove these:
+enableLegendStateReact();
+enableLegendStateReact();
+
+function Component() {
+  const text$ = useObservable("test");
+  return (
+    <>
+      Change this: {text$}
+      To this: <Memo>{text$}</Memo>
+    </>
+  );
+}
+
+----------------------------------------
+
+TITLE: Multi-Property Transitions
+DESCRIPTION: Demonstrates complex animations with different transition settings for multiple properties.
+
+LANGUAGE: jsx
+CODE:
+<Motion.View
+  animate={{
+    x: value * 100,
+    opacity: value ? 1 : 0.2,
+    scale: value ? 1 : 0.5,
+  }}
+  transition={{
+    default: {
+      type: "spring",
+      damping: 20,
+      stiffness: 300,
+    },
+    x: {
+      type: "spring",
+      damping: 20,
+      stiffness: 1000,
+    },
+    opacity: {
+      type: "tween",
+      duration: 1000,
+    },
+  }}
+/>
+
+----------------------------------------
+
+TITLE: Optimized Array Mapping in Legend-State React
+DESCRIPTION: Shows how to properly map over an observable array in Legend-State React, avoiding unnecessary re-renders and using peek() for optimal performance.
+
+LANGUAGE: jsx
+CODE:
+import { observable } from "@legendapp/state";
+import { For } from "@legendapp/state/react";
+
+const state$ = observable({ arr: [{ id: 1, text: "hi" }] });
+
+function Row({ item }) {
+  return <div>{item.text}</div>;
+}
+function List() {
+  // Be sure to use peek() to make sure you don't track any observable fields here
+  return state$.arr.map((item) => <Row key={item.peek().id} item={item} />);
+}

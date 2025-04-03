@@ -1,0 +1,2566 @@
+TITLE: Installing and Running Puter Locally with npm
+DESCRIPTION: Instructions for cloning the Puter repository, installing dependencies, and starting the application locally using npm. This snippet is for local development purposes.
+
+LANGUAGE: bash
+CODE:
+git clone https://github.com/HeyPuter/puter
+cd puter
+npm install
+npm start
+
+----------------------------------------
+
+TITLE: Integrating Puter.js SDK with GPT-3.5 Turbo Chat
+DESCRIPTION: Example showing how to integrate the Puter.js SDK into an HTML page and use its AI chat functionality with GPT-3.5 Turbo. The code demonstrates loading the SDK, displaying a loading message, and making an AI chat request.
+
+LANGUAGE: html
+CODE:
+<html>
+<body>
+    <script src="http://puter.localhost:4100/sdk/puter.dev.js"></script>
+    <script>
+        // Loading ...
+        puter.print(`Loading...`);
+
+        // Chat with GPT-3.5 Turbo
+        puter.ai.chat(`What color was Napoleon's white horse?`).then((response) => {
+            puter.print(response);
+        });
+    </script>
+</body>
+</html>
+
+----------------------------------------
+
+TITLE: Local Development Setup for Puter
+DESCRIPTION: Commands to clone the Puter repository and start the local development server. This will launch Puter at http://puter.localhost:4100 or the next available port.
+
+LANGUAGE: bash
+CODE:
+git clone https://github.com/HeyPuter/puter
+cd puter
+npm install
+npm start
+
+----------------------------------------
+
+TITLE: OpenAI Chat Completion Implementation
+DESCRIPTION: Method to handle chat completion requests using OpenAI's API. Supports streaming, moderation, and model selection with comprehensive error handling and usage tracking.
+
+LANGUAGE: javascript
+CODE:
+complete(messages, options) {
+  // messages: Array of message objects or strings representing the conversation
+  // options: Configuration options
+  // options.stream: Whether to stream the response
+  // options.moderation: Whether to perform content moderation
+  // options.model: The model to use for completion
+}
+
+----------------------------------------
+
+TITLE: Running Puter Instance with run-selfhosted.js
+DESCRIPTION: This script is used to run a local instance of Puter. It checks the Node.js version and provides error explanations. It boots Puter with essential modules and local file storage capabilities.
+
+LANGUAGE: javascript
+CODE:
+// run-selfhosted.js
+// (No actual code provided in the input text)
+
+----------------------------------------
+
+TITLE: Implementing Custom Puter Service
+DESCRIPTION: Template for creating a custom Puter service that extends BaseService, showing initialization, module dependencies, and event handling for the boot sequence.
+
+LANGUAGE: javascript
+CODE:
+class MyService extends BaseService {
+    static MODULES = {
+        // Use node's `require` function to populate this object;
+        // this makes these available to `this.require` and offers
+        // dependency-injection for unit testing.
+        ['some-module']: require('some-module')
+    }
+
+    // Do not override the constructor of BaseService - use this instead!
+    async _construct () {
+        this.my_list = [];
+    }
+
+    // This method is called after _construct has been called on all
+    // other services.
+    async _init () {
+        const services = this.services;
+
+        // We can get the instances of other services here
+        const svc_otherService = services.get('other-service');
+    }
+
+    // The service container can listen on the "service event bus"
+    async ['__on_boot.consolidation'] () {}
+    async ['__on_boot.activation'] () {}
+    async ['__on_start.webserver'] () {}
+    async ['__on_install.routes'] () {}
+}
+
+----------------------------------------
+
+TITLE: Implementing Basic Puter Extension in JavaScript
+DESCRIPTION: This snippet demonstrates how to create a basic Puter extension that responds to GET requests. It determines the actor type and returns a personalized greeting.
+
+LANGUAGE: javascript
+CODE:
+const { UserActorType, AppUnderUserActorType } = use.core;
+
+extension.get('/hello-puter', (req, res) => {
+    const actor = req.actor;
+    let who = 'unknown';
+    if ( actor.type instanceof UserActorType ) {
+        who = actor.type.user.username;
+    }
+    if ( actor.type instanceof AppUnderUserActorType ) {
+        who = actor.type.app.name + ' on behalf of ' + actor.type.user.username;
+    }
+    res.send(`Hello, ${who}!`);
+});
+
+----------------------------------------
+
+TITLE: Creating a Basic Puter Extension in JavaScript
+DESCRIPTION: Demonstrates how to create a simple Puter extension that handles HTTP GET requests and listens to core events. It shows how to use Puter's core definitions, handle different actor types, and manipulate Puter's behavior.
+
+LANGUAGE: javascript
+CODE:
+// You can get definitions exposed by Puter via `use`
+const { UserActorType, AppUnderUserActorType } = use.core;
+
+// Endpoints can be registered directly on an extension
+extension.get('/hello-puter', (req, res) => {
+    const actor = req.actor;
+    
+
+    // Make a string "who" which says:
+    //   "<username>", or:
+    //   "<app> acting on behalf of <username>"
+    let who = 'unknown';
+    if ( actor.type instanceof UserActorType ) {
+        who = actor.type.user.username;
+    }
+    if ( actor.type instanceof AppUnderUserActorType ) {
+        who = actor.type.app.name
+            + ' on behalf of '
+            + actor.type.user.username;
+    }
+
+    res.send(`Hello, ${who}!`);
+});
+
+// Extensions can listen to events and manipulate Puter's behavior
+extension.on('core.email.validate', event => {
+    if ( event.email.includes('evil') ) {
+        event.allow = false;
+    }
+});
+
+----------------------------------------
+
+TITLE: Batch File Operations in Puter
+DESCRIPTION: Demonstrates how to perform multiple filesystem operations (creating directories and writing files) in a single batch request. Uses FormData to handle file uploads and operation specifications.
+
+LANGUAGE: javascript
+CODE:
+await (async () => {
+    const endpoint = 'http://api.puter.localhost:4100/batch';
+
+    const ops = [ 
+      {
+        op: 'mkdir',
+        path: '/default_user/Desktop/some-dir',
+      },
+      {
+        op: 'write',
+        path: '/default_user/Desktop/some-file.txt',
+      }
+    ];
+
+    const blob = new Blob(["12345678"], { type: 'text/plain' });
+    const formData = new FormData();
+    for ( const op of ops ) {
+      formData.append('operation', JSON.stringify(op));
+    }
+    formData.append('fileinfo', JSON.stringify({
+        name: 'file.txt',
+        size: 8,
+        mime: 'text/plain',
+    }));
+    formData.append('file', blob, 'hello.txt');
+
+    const response = await fetch(endpoint, {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${puter.authToken}` },
+        body: formData
+    });
+    return await response.json();
+})();
+
+----------------------------------------
+
+TITLE: WebServerService Event Handler - boot.activation
+DESCRIPTION: Starts the web server by configuring Express app, setting up middleware, and initializing Socket.io for real-time communication.
+
+
+
+----------------------------------------
+
+TITLE: Creating and Using Context Objects in JavaScript
+DESCRIPTION: Demonstrates how to create and use Context objects for holding and inheriting values. This snippet shows creating a main context, a sub-context, and accessing values across contexts.
+
+LANGUAGE: javascript
+CODE:
+const ctx = new Context({
+  some_key: 'some value',
+});
+
+ctx.some_key; // works just like a regular object
+
+const a = new Context({
+  some_key: 'some value'
+});
+const b = a.sub({
+  another_key: 'another value'
+});
+
+b.another_key; // "another value"
+b.some_key; // "some value"
+
+a.some_key = 'changed';
+b.some_key; // "changed"
+
+----------------------------------------
+
+TITLE: Creating File and App Shares - JSON Request Body
+DESCRIPTION: Example request body for the /share endpoint showing how to share files and apps with multiple recipients. Demonstrates both file-share and app-share types with various identification methods.
+
+LANGUAGE: json
+CODE:
+{
+    "recipients": [
+        "user_that_gets_shared_to",
+        "another@example.com"
+    ],
+    "shares": [
+        {
+            "$": "app-share",
+            "name": "some-app-name"
+        },
+        {
+            "$": "app-share",
+            "uid": "app-SOME-APP-UID"
+        },
+        {
+            "$": "fs-share",
+            "path": "/some/file/or/directory"
+        },
+        {
+            "$": "fs-share",
+            "path": "SOME-FILE-UUID"
+        }
+    ]
+}
+
+----------------------------------------
+
+TITLE: Docker Compose Setup for Puter on Linux/macOS
+DESCRIPTION: Commands to set up Puter using Docker Compose on Linux/macOS systems, including directory creation and permissions setup.
+
+LANGUAGE: bash
+CODE:
+mkdir -p puter/config puter/data
+sudo chown -R 1000:1000 puter
+wget https://raw.githubusercontent.com/HeyPuter/puter/main/docker-compose.yml
+docker compose up
+
+----------------------------------------
+
+TITLE: Error Service Implementation
+DESCRIPTION: Error handling service that provides error context creation, initialization of alarm and logging services, and error reporting functionality with location tracking.
+
+
+
+----------------------------------------
+
+TITLE: Full Production HTML Example for Puter
+DESCRIPTION: Complete HTML structure for deploying Puter in production. Includes necessary meta tags, favicons, and script initialization for the Puter GUI.
+
+LANGUAGE: html
+CODE:
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <title>Puter</title>
+    <meta name="author" content="Puter Technologies Inc.">
+    <meta name="description" content="Puter is a privacy-first personal cloud to keep all your files, apps, and games in one private and secure place, accessible from anywhere at any time.">
+    <meta name="facebook-domain-verification" content="e29w3hjbnnnypf4kzk2cewcdaxym1y" />
+    <link rel="canonical" href="https://puter.com">
+
+    <!-- Meta meta tags -->
+    <meta property="og:url" content="https://puter.com">
+    <meta property="og:type" content="website">
+    <meta property="og:title" content="Puter">
+    <meta property="og:description" content="Puter is a privacy-first personal cloud to keep all your files, apps, and games in one private and secure place, accessible from anywhere at any time.">
+    <meta property="og:image" content="./dist/images/screenshot.png">
+
+    <!-- Twitter meta tags -->
+    <meta name="twitter:card" content="summary_large_image">
+    <meta property="twitter:domain" content="puter.com">
+    <meta property="twitter:url" content="https://puter.com">
+    <meta name="twitter:title" content="Puter">
+    <meta name="twitter:description" content="Puter is a privacy-first personal cloud to keep all your files, apps, and games in one private and secure place, accessible from anywhere at any time.">
+    <meta name="twitter:image" content="./dist/images/screenshot.png">
+
+    <!-- favicons -->
+    <link rel="apple-touch-icon" sizes="57x57" href="./dist/favicons/apple-icon-57x57.png">
+    <link rel="apple-touch-icon" sizes="60x60" href="./dist/favicons/apple-icon-60x60.png">
+    <link rel="apple-touch-icon" sizes="72x72" href="./dist/favicons/apple-icon-72x72.png">
+    <link rel="apple-touch-icon" sizes="76x76" href="./dist/favicons/apple-icon-76x76.png">
+    <link rel="apple-touch-icon" sizes="114x114" href="./dist/favicons/apple-icon-114x114.png">
+    <link rel="apple-touch-icon" sizes="120x120" href="./dist/favicons/apple-icon-120x120.png">
+    <link rel="apple-touch-icon" sizes="144x144" href="./dist/favicons/apple-icon-144x144.png">
+    <link rel="apple-touch-icon" sizes="152x152" href="./dist/favicons/apple-icon-152x152.png">
+    <link rel="apple-touch-icon" sizes="180x180" href="./dist/favicons/apple-icon-180x180.png">
+    <link rel="icon" type="image/png" sizes="192x192"  href="./dist/favicons/android-icon-192x192.png">
+    <link rel="icon" type="image/png" sizes="32x32" href="./dist/favicons/favicon-32x32.png">
+    <link rel="icon" type="image/png" sizes="96x96" href="./dist/favicons/favicon-96x96.png">
+    <link rel="icon" type="image/png" sizes="16x16" href="./dist/favicons/favicon-16x16.png">
+    <link rel="manifest" href="./dist/manifest.json">
+    <meta name="msapplication-TileColor" content="#ffffff">
+    <meta name="msapplication-TileImage" content="./dist/favicons/ms-icon-144x144.png">
+    <meta name="theme-color" content="#ffffff">
+
+    <!-- Preload images when applicable -->
+    <link rel="preload" as="image" href="./dist/images/wallpaper.webp">
+</head>
+
+<body>
+    <!-- Load the GUI script -->
+    <script type="text/javascript" src="./dist/gui.js"></script>    
+    <!-- Initialize GUI when document is loaded -->
+    <script type="text/javascript">
+    window.addEventListener('load', function() {
+        gui()
+    });
+    </script>
+</body>
+
+</html>
+
+----------------------------------------
+
+TITLE: Demonstrating Terminal Commands in Puter
+DESCRIPTION: Examples of various commands that can be executed in the Puter Terminal Emulator, showcasing integration with AI services, file operations, and command substitution.
+
+LANGUAGE: shell
+CODE:
+ai "write me a story"
+txt2img "a blue computer on a cloud" > puter.png
+neofetch
+echo $(echo "command substitution")
+cat example.txt | grep "find me"
+cat example.json | jq "name"
+
+----------------------------------------
+
+TITLE: Creating Custom Configuration for Puter in JSON
+DESCRIPTION: This snippet demonstrates how to create a custom configuration file (local.json) that references the default config.json. It includes the necessary header and an example of a custom domain setting.
+
+LANGUAGE: json
+CODE:
+{
+    // Always include this header
+    "$version": "v1.1.0",
+    "$requires": [
+        "config.json"
+    ],
+    "config_name": "local",
+    
+    // Your custom configuration
+    "domain": "my-puter.example.com"
+}
+
+----------------------------------------
+
+TITLE: Sample Default Configuration for Puter in JSON
+DESCRIPTION: This snippet shows a sample of the default configuration generated by Puter. It includes various settings such as environment, server details, and service configurations for database, thumbnails, and file cache.
+
+LANGUAGE: json
+CODE:
+{
+    "config_name": "generated default config",
+    "mod_directories": [
+        "{source}/../extensions"
+    ],
+    "env": "dev",
+    "nginx_mode": true,
+    "server_id": "localhost",
+    "http_port": "auto",
+    "domain": "puter.localhost",
+    "protocol": "http",
+    "contact_email": "hey@example.com",
+    "services": {
+        "database": {
+            "engine": "sqlite",
+            "path": "puter-database.sqlite"
+        },
+        "thumbnails": {
+            "engine": "http"
+        },
+        "file-cache": {
+            "disk_limit": 5368709120,
+            "disk_max_size": 204800,
+            "precache_size": 209715200,
+            "path": "./file-cache"
+        }
+    },
+    "cookie_name": "...",
+    "jwt_secret": "...",
+    "url_signature_secret": "...",
+    "private_uid_secret": "...",
+    "private_uid_namespace": "...",
+    "": null
+}
+
+----------------------------------------
+
+TITLE: Accessing Database in Puter Extensions
+DESCRIPTION: Demonstrates how to access the database provided to the extension via 'extension.db'. It shows how to use the 'read' method to execute a SELECT query, and explains the necessity of scoping 'extension' to access 'db' from callbacks.
+
+LANGUAGE: javascript
+CODE:
+const ext = extension;
+
+extension.get('/user-count', { noauth: true }, (req, res) => {
+    const [count] = await ext.db.read(
+        'SELECT COUNT(*) as c FROM `user`'
+    );
+});
+
+----------------------------------------
+
+TITLE: Custom Settings Tab Component Implementation
+DESCRIPTION: Detailed implementation of a custom settings tab component, showing how to create UI elements, handle events, and structure the tab content using Puter's component system.
+
+LANGUAGE: javascript
+CODE:
+import MyWindow from "./MyWindow.js";
+
+export default api => ({
+    id: 'my-settings-tab',
+    title_i18n_key: 'My Settings Tab',
+    icon: 'shield.svg',
+    factory: () => {
+        const NotifCard = api.use('ui.component.NotifCard');
+        const ActionCard = api.use('ui.component.ActionCard');
+        const JustHTML = api.use('ui.component.JustHTML');
+        const Flexer = api.use('ui.component.Flexer');
+        const UIAlert = api.use('ui.window.UIAlert');
+
+        // The root component for our settings tab will be a "flexer",
+        // which by default displays its child components in a vertical
+        // layout.
+        const component = new Flexer({
+            children: [
+                // We can insert raw HTML as a component
+                new JustHTML({
+                    no_shadow: true, // use CSS for settings window
+                    html: '<h1>Some Heading</h1>',
+                }),
+                new NotifCard({
+                    text: 'I am a card with some text',
+                    style: 'settings-card-success',
+                }),
+                new ActionCard({
+                    title: 'Open an Alert',
+                    button_text: 'Click Me',
+                    on_click: async () => {
+                        // Here we open an example window
+                        await UIAlert({
+                            message: 'Hello, Puter!',
+                        });
+                    }
+                })
+            ]
+        });
+
+        return component;
+    }
+});
+
+----------------------------------------
+
+TITLE: Log Service Class
+DESCRIPTION: Extended BaseService class that manages application logging, including middleware registration, log context creation, file path handling, and buffer management. Provides methods for log configuration and access.
+
+
+
+----------------------------------------
+
+TITLE: Registering Service Script Routes in Express
+DESCRIPTION: Example of a service class that registers and serves static service script files using Express. Shows how to integrate with puter-homepage service and handle route installation.
+
+LANGUAGE: javascript
+CODE:
+class MyService extends BaseService {
+    async _init () {
+        // First we tell `puter-homepage` that we're going to be serving
+        // a javascript file which we want to be included when the GUI
+        // loads.
+        const svc_puterHomepage = this.services.get('puter-homepage');
+        svc_puterHomepage.register_script('/my-service-script/main.js');
+    }
+
+    async ['__on_install.routes'] (_, { app }) {
+        // Here we ask express to serve our script. This is made possible
+        // by WebServerService which provides the `app` object when it
+        // emits the 'install.routes` event.
+        app.use('/my-service-script',
+            express.static(
+                PathBuilder.add(__dirname).add('gui').build()
+            )
+        );
+    }
+}
+
+----------------------------------------
+
+TITLE: Processing Wisp Packets with v86 Emulator in JavaScript
+DESCRIPTION: Provides a complete example of using the Wisp utilities with a v86 emulator. It demonstrates how to set up byte streams, process Virtio frames, and handle Wisp packets asynchronously, including sending reflected packets back to the emulator.
+
+LANGUAGE: javascript
+CODE:
+const emulator = new V86(...);
+
+// Get a byte stream for /dev/hvc0
+const byteStream = NewCallbackByteStream();
+emulator.add_listener('virtio-console0-output-bytes',
+    byteStream.listener);
+
+// Get a stream of frames with prepended byte lengths
+// (for example, `twisp` uses this format)
+const virtioStream = NewVirtioFrameStream(byteStream);
+
+// Get a stream of WispPacket objects
+const wispStream = NewWispPacketStream(virtioStream);
+
+// Async iterator
+(async () => {
+    for ( const packet of wispStream ) {
+        console.log('Wisp packet!', packet.describe());
+        
+        // Let's send back a reflected packet for INFO!
+        if ( packet.type === WispPacket.INFO ) {
+            emulator.bus.send(
+                'virtio-console0-input-bytes',
+                packet.toVirtioFrame(),
+            );
+        }
+    }
+})();
+
+----------------------------------------
+
+TITLE: Moderating Chat Content in AIChatService
+DESCRIPTION: Method to moderate chat messages for inappropriate content using OpenAI's moderation service. Takes a parameters object containing an array of messages to check.
+
+LANGUAGE: javascript
+CODE:
+moderate(params) {
+  // params.messages: Array of chat messages to moderate
+}
+
+----------------------------------------
+
+TITLE: Implementing Service Initialization in JavaScript
+DESCRIPTION: This code adds an _init method to the PrankGreetService class to verify that the service is loaded correctly.
+
+LANGUAGE: javascript
+CODE:
+class PrankGreetService extends BaseService {
+    async _init () {
+        // Wait for 5 seconds
+        await new Promise(rslv => setTimeout(rslv), 5000);
+
+        // Display a log message
+        this.log.noticeme('Hello from PrankGreetService!');
+    }
+}
+
+----------------------------------------
+
+TITLE: Using TeePromise for External Promise Resolution in JavaScript
+DESCRIPTION: Illustrates the use of TeePromise, a utility for creating promises with externally accessible resolve and reject methods. This is useful for async/await syntax and avoiding unnecessary callback handling.
+
+LANGUAGE: javascript
+CODE:
+const tp = new TeePromise();
+
+new bb = Busboy({ /* ... */ });
+
+// imagine you have lots of code here, that you don't want to
+// indent in a `new Promise((resolve, reject) => { ...` block
+
+bb.on('error', err => {
+  tp.reject(err);
+});
+bb.on('close', () => {
+  tp.resolve();
+})
+
+return {
+  // Imagine you have other values here that don't require waiting
+  // for the promise to resolve; handling this when a large portion
+  // of the code is wrapped in a Promise constructor is error-prone.
+  promise: tp,
+};
+
+----------------------------------------
+
+TITLE: Basic Service Script Implementation
+DESCRIPTION: Simple example showing how to implement a service script using the service_script global function and handle GUI ready events. Demonstrates importing GUI components.
+
+LANGUAGE: javascript
+CODE:
+import SomeModule from "./SomeModule.js";
+
+service_script(api => {
+    api.on_ready(() => {
+        // This callback is invoked when the GUI is ready
+
+        // We can use api.get() to import anything exposed to
+        // service scripts by Puter's GUI; for example:
+        const Button = api.use('ui.components.Button');
+        // ^ Here we get Puter's Button component, which is made
+        // available to service scripts.
+    });
+});
+
+----------------------------------------
+
+TITLE: Creating Symlinks in Puter
+DESCRIPTION: Shows how to create symbolic links using the batch endpoint. Demonstrates the symlink operation structure and authentication process.
+
+LANGUAGE: javascript
+CODE:
+await (async () => {
+    const endpoint = 'http://api.puter.localhost:4100/batch';
+
+    const ops = [ 
+      {
+        op: 'symlink',
+        path: '~/Desktop',
+        name: 'link',
+        target: '/bb/Desktop/some'
+      },
+    ];
+
+    const formData = new FormData();
+    for ( const op of ops ) {
+      formData.append('operation', JSON.stringify(op));
+    }
+
+    const response = await fetch(endpoint, {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${puter.authToken}` },
+        body: formData
+    });
+    return await response.json();
+})();
+
+----------------------------------------
+
+TITLE: Initializing Puter Kernel with Core Modules
+DESCRIPTION: Demonstrates how to initialize a Puter kernel instance and add essential modules including Core, Database, LocalDiskStorage, and SelfHosted modules.
+
+LANGUAGE: javascript
+CODE:
+const {
+    Kernel,
+    CoreModule,
+    DatabaseModule,
+    LocalDiskStorageModule,
+    SelfHostedModule
+} = (await import('@heyputer/backend')).default;
+
+const k = new Kernel();
+k.add_module(new CoreModule());
+k.add_module(new DatabaseModule());
+k.add_module(new LocalDiskStorageModule());
+k.add_module(new SelfHostedModule());
+k.boot();
+
+----------------------------------------
+
+TITLE: Share Link Operations - JavaScript Examples
+DESCRIPTION: Examples showing how to check, apply and request share links using the sharelink endpoints. Includes request formatting and authentication.
+
+LANGUAGE: javascript
+CODE:
+await fetch(`${config.api_origin}/sharelink/check`, {
+  "headers": {
+    "Content-Type": "application/json",
+    "Authorization": `Bearer ${puter.authToken}`,
+  },
+  "body": JSON.stringify({
+      token: '...',
+  }),
+  "method": "POST",
+});
+
+----------------------------------------
+
+TITLE: OpenAI Image Generation via Puter API
+DESCRIPTION: Generates images using OpenAI's image generation service through Puter API. Creates object URL from the generated image blob.
+
+LANGUAGE: javascript
+CODE:
+URL.createObjectURL(await (await fetch("http://api.puter.localhost:4100/drivers/call", {
+  "headers": {
+    "Content-Type": "application/json",
+    "Authorization": `Bearer ${puter.authToken}`,
+  },
+  "body": JSON.stringify({
+      interface: 'puter-image-generation',
+      driver: 'openai-image-generation',
+      method: 'generate',
+      args: {
+        prompt: 'photorealistic teapot made of swiss cheese',
+      }
+  }),
+  "method": "POST",
+})).blob());
+
+----------------------------------------
+
+TITLE: Creating a Basic Puter Service Class in JavaScript
+DESCRIPTION: This code snippet demonstrates how to create a basic Puter service class by extending the BaseService class.
+
+LANGUAGE: javascript
+CODE:
+const BaseService = require('./BaseService')
+// NOTE: the path specified ^ HERE might be different depending
+//       on the location of your file.
+
+class PrankGreetService extends BaseService {
+}
+
+----------------------------------------
+
+TITLE: Creating Groups via POST /group/create
+DESCRIPTION: Creates a new group with optional metadata and returns a UUID. Requires authentication token. The metadata object can contain arbitrary data that will be preserved, while the extra object is reserved for server use.
+
+LANGUAGE: javascript
+CODE:
+await fetch(`${window.api_origin}/group/create`, {
+  "headers": {
+    "Content-Type": "application/json",
+    "Authorization": `Bearer ${puter.authToken}`,
+  },
+  "body": JSON.stringify({
+    metadata: { title: 'Some Title' }
+  }),
+  "method": "POST",
+});
+
+// { uid: '9c644a1c-3e43-4df4-ab67-de5b68b235b6' }
+
+----------------------------------------
+
+TITLE: Email Verification Endpoints Analysis
+DESCRIPTION: Documentation of backend endpoints handling email changes and verification. Includes /user-protected/change-email for initiating email changes and /change_email/confirm for processing confirmation links.
+
+LANGUAGE: javascript
+CODE:
+// Email change handlers
+/user-protected/change-email  // Initiates email change process
+/change_email/confirm        // Processes confirmation links
+
+----------------------------------------
+
+TITLE: Configuring Email Service in Puter's config.json
+DESCRIPTION: This snippet shows how to add the email service configuration to Puter's config.json file. It specifies the host as 'localhost' and port as 1025 for local email testing with MailHog.
+
+LANGUAGE: javascript
+CODE:
+    "services": {
+        
+        // ... there are probably other service configs
+        
+        "email": {
+            "host": "localhost",
+            "port": 1025
+        }
+    }
+
+----------------------------------------
+
+TITLE: Adding Users to Groups via POST /group/add-users
+DESCRIPTION: Adds one or more users to an existing group identified by UUID. Requires authentication and accepts an array of usernames to add to the specified group.
+
+LANGUAGE: javascript
+CODE:
+await fetch(`${window.api_origin}/group/add-users`, {
+  "headers": {
+    "Content-Type": "application/json",
+    "Authorization": `Bearer ${puter.authToken}`,
+  },
+  "body": JSON.stringify({
+      uid: '9c644a1c-3e43-4df4-ab67-de5b68b235b6',
+      users: ['first_user', 'second_user'],
+  }),
+  "method": "POST",
+});
+
+----------------------------------------
+
+TITLE: Directory Structure Overview
+DESCRIPTION: Key directories and their purposes in the Puter monorepo, including doc, src, volatile, and tools directories. Each directory serves a specific purpose in the project's organization.
+
+LANGUAGE: markdown
+CODE:
+- /doc - General documentation and contribution guidelines
+- /src - Core modules including backend, GUI, and libraries
+  - /backend - Puter's backend implementation
+  - /gui - Puter's graphical user interface
+  - /terminal - Terminal application
+  - /phoenix - Shell implementation
+  - /emulator - Experimental v86 integration
+  - /putility - Common JavaScript utilities
+  - /useapi - Runtime import mechanism
+  - /puter-js - Browser SDK
+- /volatile - Development configuration and runtime directory
+- /tools - NPM workspace modules and development tools
+
+----------------------------------------
+
+TITLE: Sharing File with Read Access in JSON
+DESCRIPTION: This snippet demonstrates how to share a file with read access using its path. The 'path' property specifies the file or directory's path, and the default access level is 'read'.
+
+LANGUAGE: json
+CODE:
+{
+    "$": "file-share",
+    "path": "/some/path"
+}
+
+----------------------------------------
+
+TITLE: Creating Elements - DOM API vs el()
+DESCRIPTION: Comparison between traditional DOM API element creation and the el() utility function approach for creating a div with class and text content.
+
+LANGUAGE: javascript
+CODE:
+const my_div = document.createElement('div');
+my_div.classList.add('my-class');
+my_div.innerText = 'some text';
+
+LANGUAGE: javascript
+CODE:
+const my_div = el('div.my-class', {
+  text: 'hello world'
+});
+
+----------------------------------------
+
+TITLE: Docker Compose Setup for Puter on Windows
+DESCRIPTION: PowerShell commands to set up Puter using Docker Compose on Windows, including directory creation and docker-compose.yml download.
+
+LANGUAGE: powershell
+CODE:
+mkdir -p puter
+cd puter
+New-Item -Path "puter\config" -ItemType Directory -Force
+New-Item -Path "puter\data" -ItemType Directory -Force
+Invoke-WebRequest -Uri "https://raw.githubusercontent.com/HeyPuter/puter/main/docker-compose.yml" -OutFile "docker-compose.yml"
+docker compose up
+
+----------------------------------------
+
+TITLE: Select First 200 Notifications Query
+DESCRIPTION: Query to retrieve the first 200 notifications using the puter-notifications entity storage driver. Requires authentication.
+
+LANGUAGE: javascript
+CODE:
+await fetch("http://api.puter.localhost:4100/drivers/call", {
+  "headers": {
+    "Content-Type": "application/json",
+    "Authorization": `Bearer ${puter.authToken}`,
+  },
+  "body": JSON.stringify({
+    interface: 'puter-notifications',
+    method: 'select',
+    args: {}
+  }),
+  "method": "POST",
+});
+
+----------------------------------------
+
+TITLE: Defining Standard Type-Tagged Object Structure in JavaScript
+DESCRIPTION: Demonstrates the standard structure of a Type-Tagged Object, including the type key '$' and a version meta-key.
+
+LANGUAGE: js
+CODE:
+{
+    "$": "some-type",
+    "$version": "0.0.0",
+    
+    "some_property": "some value",
+}
+
+----------------------------------------
+
+TITLE: Internal Share Type Object Structure
+DESCRIPTION: Defines the structure for internal share objects stored in the share database table. Contains permission specifications.
+
+LANGUAGE: json
+CODE:
+{ "$": "internal:share" }
+
+----------------------------------------
+
+TITLE: Alarm Service Methods
+DESCRIPTION: Methods for creating, clearing and retrieving alarms. Each alarm has a unique ID, message and optional fields. The service handles alarm state management and consolidation.
+
+
+
+----------------------------------------
+
+TITLE: Share API Request Implementation - JavaScript
+DESCRIPTION: JavaScript implementation showing how to make a POST request to the /share endpoint using fetch. Includes authentication and proper request formatting.
+
+LANGUAGE: javascript
+CODE:
+await fetch("http://puter.localhost:4100/share", {
+  headers: {
+    "Content-Type": "application/json",
+    "Authorization": `Bearer ${puter.authToken}`,
+  },
+  body: JSON.stringify({
+    recipients: [
+        "user_that_gets_shared_to",
+        "another@example.com"
+    ],
+    shares: [
+        {
+            $: "app-share",
+            name: "some-app-name"
+        },
+        {
+            $: "app-share",
+            uid: "app-SOME-APP-UID"
+        },
+        {
+            $: "fs-share",
+            path: "/some/file/or/directory"
+        },
+        {
+            $: "fs-share",
+            path: "SOME-FILE-UUID"
+        }
+    ]
+  }),
+  method: "POST",
+});
+
+----------------------------------------
+
+TITLE: Select Next 200 Notifications Query
+DESCRIPTION: Query to retrieve the next 200 notifications with pagination using the puter-notifications entity storage driver. Requires authentication.
+
+LANGUAGE: javascript
+CODE:
+await fetch("http://api.puter.localhost:4100/drivers/call", {
+  "headers": {
+    "Content-Type": "application/json",
+    "Authorization": `Bearer ${puter.authToken}`,
+  },
+  "body": JSON.stringify({
+    interface: 'puter-notifications',
+    method: 'select',
+    args: { offset: 200 }
+  }),
+  "method": "POST",
+});
+
+----------------------------------------
+
+TITLE: Converting XTerm Modifier Keys to Bit Flags in JavaScript
+DESCRIPTION: Script to convert between bit flags and XTerm modifier key encodings. Creates a mapping object for modifier combinations using bitwise operations. The script demonstrates that XTerm's modifier encoding can be converted to bit flags by subtracting 1 from the encoded values.
+
+LANGUAGE: javascript
+CODE:
+const modifier_keys = ['shift', 'ctrl', 'alt', 'meta'];
+const MODIFIER = {};
+for ( let i=0 ; i < modifier_keys.length ; i++ ) {
+    MODIFIER[modifier_keys[i].toUpperCase()] = 1 << i;
+}
+
+const pc_modifier_list = [
+    MODIFIER.SHIFT,
+    MODIFIER.ALT,
+    MODIFIER.CTRL,
+    MODIFIER.META
+];
+
+const PC_STYLE_MODIFIER_MAP = {};
+
+(() => {
+    let i = 2;
+    for ( const mod of pc_modifier_list ) {
+        const new_entries = { [i++]: mod };
+        for ( const key in PC_STYLE_MODIFIER_MAP ) {
+            new_entries[i++] = mod | PC_STYLE_MODIFIER_MAP[key];
+        }
+        for ( const key in new_entries ) {
+            PC_STYLE_MODIFIER_MAP[key] = new_entries[key];
+        }
+    }
+})();
+
+for ( const k in PC_STYLE_MODIFIER_MAP ) {
+    console.log(`${k} :: ${print(PC_STYLE_MODIFIER_MAP[k])}`);
+}
+
+----------------------------------------
+
+TITLE: Select Unread Notifications Query
+DESCRIPTION: Query to retrieve unread notifications using the puter-notifications entity storage driver. Requires authentication.
+
+LANGUAGE: javascript
+CODE:
+await fetch("http://api.puter.localhost:4100/drivers/call", {
+  "headers": {
+    "Content-Type": "application/json",
+    "Authorization": `Bearer ${puter.authToken}`,
+  },
+  "body": JSON.stringify({
+    interface: 'puter-notifications',
+    method: 'select',
+    args: { predicate: ['unread'] }
+  }),
+  "method": "POST",
+});
+
+----------------------------------------
+
+TITLE: Sharing File with Write Access in JSON
+DESCRIPTION: This example shows how to share a file with write access. The 'access' property is explicitly set to 'write', granting more permissions than the default read access.
+
+LANGUAGE: json
+CODE:
+{
+    "$": "file-share",
+    "path": "/some/path",
+    "access": "write"
+}
+
+----------------------------------------
+
+TITLE: Nesting Elements with el()
+DESCRIPTION: Demonstration of creating nested DOM elements using the el() function with array arguments.
+
+LANGUAGE: javascript
+CODE:
+el([ el(), el() ])
+// <div><div></div><div></div></div>
+
+LANGUAGE: html
+CODE:
+<div>
+  <div></div>
+  <div></div>
+</div>
+
+LANGUAGE: javascript
+CODE:
+el([
+  el(),
+  el()
+])
+
+----------------------------------------
+
+TITLE: Modified Underscore Convention for JSON Metadata
+DESCRIPTION: Shows grouping all metadata under a single '_' key, minimizing potential collisions to just one reserved key.
+
+LANGUAGE: json
+CODE:
+{
+    "_": {
+        "type": "api:thing",
+        "version": "v1.0.0"
+    },
+
+    "some": "info"
+}
+
+----------------------------------------
+
+TITLE: Registering a Puter Service in JavaScript
+DESCRIPTION: This snippet shows how to register a new Puter service within a module's install method.
+
+LANGUAGE: javascript
+CODE:
+const { PrankGreetServie } = require('./path/to/PrankGreetServie.js');
+services.registerService('prank-greet', PrankGreetServie);
+
+----------------------------------------
+
+TITLE: Underscore Convention for Metadata in JSON
+DESCRIPTION: Shows the use of '_' prefix for metadata keys as an alternative to the dollar-sign convention.
+
+LANGUAGE: json
+CODE:
+{
+    "_": "api:thing",
+    "_version": "v1.0.0",
+
+    "some": "info"
+}
+
+----------------------------------------
+
+TITLE: Revoking Group Permissions via POST /revoke-user-group
+DESCRIPTION: Revokes previously granted permissions from a group. Requires the group UUID and the specific permission string to revoke.
+
+LANGUAGE: javascript
+CODE:
+await fetch("http://puter.localhost:4100/auth/grant-user-group", {
+  "headers": {
+    "Content-Type": "application/json",
+    "Authorization": `Bearer ${puter.authToken}`,
+  },
+  "body": JSON.stringify({
+      group_uid: '9c644a1c-3e43-4df4-ab67-de5b68b235b6',
+      permission: 'fs:/someuser/somedir/somefile:read'
+  }),
+  "method": "POST",
+});
+
+----------------------------------------
+
+TITLE: Defining Coverage Model for /write API in JavaScript
+DESCRIPTION: This code snippet demonstrates how to create a coverage model for testing the /write API method in Puter's filesystem. It defines possible values for path format, name specification, destination conditions, and overwrite options.
+
+LANGUAGE: javascript
+CODE:
+module.exports = new CoverageModel({
+    path: {
+        format: ['path', 'uid'],
+    },
+    name: ['default', 'specified'],
+    conditions: {
+        destinationIsFile: []
+    },
+    overwrite: [],
+});
+
+----------------------------------------
+
+TITLE: Removing Users from Groups via POST /group/remove-users
+DESCRIPTION: Removes one or more users from an existing group identified by UUID. Requires authentication and accepts an array of usernames to remove from the specified group.
+
+LANGUAGE: javascript
+CODE:
+await fetch(`${window.api_origin}/group/add-users`, {
+  "headers": {
+    "Content-Type": "application/json",
+    "Authorization": `Bearer ${puter.authToken}`,
+  },
+  "body": JSON.stringify({
+      uid: '9c644a1c-3e43-4df4-ab67-de5b68b235b6',
+      users: ['first_user', 'second_user'],
+  }),
+  "method": "POST",
+});
+
+----------------------------------------
+
+TITLE: Monitoring Request Measurements in JavaScript
+DESCRIPTION: Example showing how to listen for the core.request.measured event to track incoming and outgoing request sizes. Provides access to measurement data and actor information.
+
+LANGUAGE: javascript
+CODE:
+extension.on('core.request.measured', data => {
+    const measurements = data.measurements;
+    //    measurements = { sz_incoming: integer, sz_outgoing: integer }
+
+    const actor = data.actor; // instance of Actor
+
+    console.log('\x1B[36;1m === MEASUREMENT ===\x1B[0m\n', {
+        actor: data.actor.uid,
+        measurements: data.measurements
+    });
+});
+
+----------------------------------------
+
+TITLE: Domain Configuration in Puter
+DESCRIPTION: Specifies the domain name for the Puter instance. Used for URL generation and host header validation when allow_all_host_values is disabled.
+
+LANGUAGE: json
+CODE:
+"domain": "example.com"
+
+----------------------------------------
+
+TITLE: Configuring Hosts File for Puter Domains
+DESCRIPTION: This code snippet demonstrates how to add entries to the hosts file for mapping Puter domains to a local IP address. It's applicable for both Windows and Unix-based systems.
+
+LANGUAGE: plaintext
+CODE:
+192.168.1.10 puter.local
+192.168.1.10 api.puter.local
+
+----------------------------------------
+
+TITLE: Sharing File Using UUID in JSON
+DESCRIPTION: This snippet illustrates how to share a file using its UUID instead of a path. This method can be useful when dealing with unique file identifiers rather than file system paths.
+
+LANGUAGE: json
+CODE:
+{
+    "$": "file-share",
+    "path": "b912c381-0c0b-466c-95a6-f9a4fc680a7d"
+}
+
+----------------------------------------
+
+TITLE: Termios Echo Control Implementation
+DESCRIPTION: High-level mimic of termios for echo control, using a custom type-tagged object structure.
+
+LANGUAGE: JavaScript
+CODE:
+{ $: 'chtermios', termios: { echo: false } }
+
+----------------------------------------
+
+TITLE: Sharing App by Name using JSON Configuration
+DESCRIPTION: Example configuration showing how to share an app using its name property. The name parameter specifies the target app's name identifier.
+
+LANGUAGE: json
+CODE:
+{
+    "$": "app-share",
+    "name": "some-app-name"
+}
+
+----------------------------------------
+
+TITLE: Simplified Nesting Convention for JSON Metadata
+DESCRIPTION: Demonstrates nesting the actual data under a 'value' key while keeping metadata at the top level.
+
+LANGUAGE: json
+CODE:
+{
+    "type": "api:thing",
+    "version": "v1.0.0",
+    "value": {
+        "some": "info"
+    }
+}
+
+----------------------------------------
+
+TITLE: Sharing App by UID using JSON Configuration
+DESCRIPTION: Example configuration showing how to share an app using its unique identifier (uid). The uid parameter takes the full UUID of the target app.
+
+LANGUAGE: json
+CODE:
+{
+    "$": "app-share",
+    "uid": "app-0a7337f7-0f8a-49ca-b71a-38d39304fe04"
+}
+
+----------------------------------------
+
+TITLE: Signup Email Verification Flow
+DESCRIPTION: Key code locations in signup.js handling email duplicate checking (line 149) and confirmation email sending (line 290). Includes logic for both verification links and confirmation codes.
+
+LANGUAGE: javascript
+CODE:
+// signup.js:149 - Email duplicate check
+// signup.js:290 - Confirmation email sending
+// Templates:
+// - email_verification_link  // Standard verification
+// - email_verification_code  // Used when requires_email_confirmation is TRUE
+
+----------------------------------------
+
+TITLE: Implementing next method for strataparse Stratum in JavaScript
+DESCRIPTION: This code snippet demonstrates the structure of the next method required for each stratum in the strataparse package. It shows how to use the api object to interact with lower-level parsers and return results in the expected format.
+
+LANGUAGE: javascript
+CODE:
+next (api) {
+  // ... implementation ...
+  return { done: true/false, value: ... };
+}
+
+----------------------------------------
+
+TITLE: Defining Site Permission Syntax
+DESCRIPTION: Explains the structure of site (subdomain) permissions and their automatic rewriting.
+
+LANGUAGE: markdown
+CODE:
+### `site:<NAME-OF-SITE>:access`
+- `<NAME-OF-SITE>` specifies the subdomain that this
+  permission is associated with.
+  Here, "subdomain" means the **"name of the subdomain"**,
+  which means a site accessed via `my-name.example.site`
+  will be specified here with `my-name`.
+- This permission is always rewritten as the permission
+  described below (backend does this automatically).
+
+----------------------------------------
+
+TITLE: Deploying Puter with Docker
+DESCRIPTION: Command to run Puter using Docker, including volume mounts for configuration and data persistence. This method is suitable for quick deployments and testing.
+
+LANGUAGE: bash
+CODE:
+mkdir puter && cd puter && mkdir -p puter/config puter/data && sudo chown -R 1000:1000 puter && docker run --rm -p 4100:4100 -v `pwd`/puter/config:/etc/puter -v `pwd`/puter/data:/var/puter  ghcr.io/heyputer/puter
+
+----------------------------------------
+
+TITLE: Mark Notification as Read Request
+DESCRIPTION: Example of how to mark a notification as read using the /notif/mark-read endpoint. Requires authentication token and notification UUID.
+
+LANGUAGE: javascript
+CODE:
+await fetch("https://api.puter.local/notif/mark-read", {
+  headers: {
+    "Content-Type": "application/json",
+    "Authorization": `Bearer ${puter.authToken}`,
+  },
+  body: JSON.stringify({
+    uid: 'a14ea3d5-828b-42f9-9613-35f43b0a3cb8',
+  }),
+  method: "POST",
+});
+
+----------------------------------------
+
+TITLE: Setting Up Puter with Docker Compose on Linux/macOS
+DESCRIPTION: Steps to create necessary directories, set permissions, download the Docker Compose file, and start Puter using Docker Compose on Linux or macOS systems.
+
+LANGUAGE: bash
+CODE:
+mkdir -p puter/config puter/data
+sudo chown -R 1000:1000 puter
+wget https://raw.githubusercontent.com/HeyPuter/puter/main/docker-compose.yml
+docker compose up
+
+----------------------------------------
+
+TITLE: Share Intent Type Object Structure
+DESCRIPTION: Defines the structure for share intent objects used in the /share endpoint. Supports file and app variants and specifies permissions to be granted.
+
+LANGUAGE: json
+CODE:
+{ "$": "share-intent" }
+
+----------------------------------------
+
+TITLE: Setting Up Puter with Docker Compose on Windows
+DESCRIPTION: PowerShell commands to create directories, download the Docker Compose file, and launch Puter using Docker Compose on Windows systems.
+
+LANGUAGE: powershell
+CODE:
+mkdir -p puter
+cd puter
+New-Item -Path "puter\config" -ItemType Directory -Force
+New-Item -Path "puter\data" -ItemType Directory -Force
+Invoke-WebRequest -Uri "https://raw.githubusercontent.com/HeyPuter/puter/main/docker-compose.yml" -OutFile "docker-compose.yml"
+docker compose up
+
+----------------------------------------
+
+TITLE: Installing Build Essentials on Debian
+DESCRIPTION: Commands to install build-essential package on Debian-based Linux distributions
+
+LANGUAGE: shell
+CODE:
+sudo apt update
+sudo apt install build-essential
+
+----------------------------------------
+
+TITLE: Docker Container Setup for Puter
+DESCRIPTION: Command to create necessary directories and run Puter in a Docker container with volume mounts for configuration and data persistence.
+
+LANGUAGE: bash
+CODE:
+mkdir puter && cd puter && mkdir -p puter/config puter/data && sudo chown -R 1000:1000 puter && docker run --rm -p 4100:4100 -v `pwd`/puter/config:/etc/puter -v `pwd`/puter/data:/var/puter  ghcr.io/heyputer/puter
+
+----------------------------------------
+
+TITLE: Rendering Markdown List of Puter-Compatible Devices
+DESCRIPTION: This markdown snippet lists various devices and platforms that have been shown to run Puter, including gaming consoles, smart watches, TVs, vehicles, and browsers. Each item includes a link to a tweet or video demonstration.
+
+LANGUAGE: markdown
+CODE:
+# #DoesItRunPuter
+
+- [Minecraft](https://twitter.com/HeyPuter/status/1771957571496092036) | [video](https://www.youtube.com/watch?v=GIowZUXkg5g)
+- [Samsung Watch](https://twitter.com/CharmunkDev/status/1781501714543030554)
+- [PlayStation 4](https://twitter.com/HeyPuter/status/1767978053014270059)
+- [Skyworth TV](https://twitter.com/ericalexdube/status/1767983049277411564)
+- [A Fridge!](https://twitter.com/HeyPuter/status/1778890003797745842)
+- [Oculus Quest 2](https://twitter.com/HeyPuter/status/1768664081756754012)
+- [Tesla Model 3](https://twitter.com/EricLighthall/status/1781479732997214501)
+- [Tesla Model S](https://twitter.com/HeyPuter/status/1767971178864587057)
+- [Tesla Model Y](https://twitter.com/HeyPuter/status/1772858333751636310)
+- [Nintendo Switch](https://twitter.com/HeyPuter/status/1780645795240538518)
+- [Steam Deck](https://twitter.com/everythingSung/status/1782162352403828793)
+- [Ladybird Browser](https://x.com/HeyPuter/status/1810783504503800035)
+- [Garry's Mod](https://x.com/HeyPuter/status/1850587712786722862)
+- [Samsung Q88BA](https://x.com/AmirIsAround/status/1862614583263076540)
+- [Supernote](https://x.com/HeyPuter/status/1893049150247444825)
+
+----------------------------------------
+
+TITLE: Share Token Type Object Structure
+DESCRIPTION: Defines the structure for share tokens stored in JWTs. Contains only the share UUID as a unique identifier.
+
+LANGUAGE: json
+CODE:
+{ "$": "token:share" }
+
+----------------------------------------
+
+TITLE: Illustrating Structured Representation of Type-Tagged Objects in JSON
+DESCRIPTION: Shows an alternative 'Structured Representation' of Type-Tagged Objects, which separates meta information and body content for easier client-side processing.
+
+LANGUAGE: json
+CODE:
+{
+    "$": "$meta-body",
+    "type": "some-type",
+    "meta": { "version": "0.0.0" },
+    "body": { "some_property": "some value" }
+}
+
+----------------------------------------
+
+TITLE: HTML vs JavaScript Element Creation Comparison
+DESCRIPTION: Comparison of element creation syntax between HTML and various el() function approaches, showing abbreviated syntax options.
+
+LANGUAGE: html
+CODE:
+<div class="my-class">some text</div>
+
+LANGUAGE: javascript
+CODE:
+el('div.myclass', { text: 'hello wolrd' });
+
+LANGUAGE: javascript
+CODE:
+el('.myclass', { text: 'hello world' });
+
+LANGUAGE: javascript
+CODE:
+el('.myclass', 'hello world');
+
+----------------------------------------
+
+TITLE: Defining App Permission Syntax
+DESCRIPTION: Explains the structure of app permissions and their automatic rewriting.
+
+LANGUAGE: markdown
+CODE:
+### `app:<NAME-OF-APP>:access`
+
+- `<NAME-OF-APP>` specifies the app that this
+  permission is associated with.
+- This permission is always rewritten as the permission
+  described below (backend does this automatically).
+
+----------------------------------------
+
+TITLE: Window Size Information Event
+DESCRIPTION: Event for providing window size information, currently named 'ioctl.set' but planned to be changed to a signal-like convention.
+
+LANGUAGE: JavaScript
+CODE:
+{ $: 'signal', code: 28 }
+
+----------------------------------------
+
+TITLE: Using Comment Writer Utility
+DESCRIPTION: This utility generates comments in source files using generative AI via Puter's AI drivers. It requires configuration and can be run on specified directories.
+
+LANGUAGE: javascript
+CODE:
+// Usage example
+node main.js ../../src/backend/services
+
+----------------------------------------
+
+TITLE: Conventional Commit Examples - Markdown Format
+DESCRIPTION: Examples demonstrating the correct and incorrect formats for commit messages using Conventional Commits specification, including special cases for tense usage.
+
+LANGUAGE: markdown
+CODE:
+- fix: for bug fixes
+- dev: instead of refactor:; covers more basis
+- tweak: for small updates
+- sync: when updating data from another source
+- feat: for a commit that first introduces a new feature
+
+- correct: dev: improve performance of readdir
+- incorrect: dev: improved readdir
+- incorrect: dev: improving readdir
+
+----------------------------------------
+
+TITLE: Checking Translations with check-translations.js
+DESCRIPTION: This script checks for missing translations in the 'src/gui/src/i18n/translations' directory of the Puter project.
+
+LANGUAGE: javascript
+CODE:
+// check-translations.js
+// (No actual code provided in the input text)
+
+----------------------------------------
+
+TITLE: Formalized Comment Prefix Examples
+DESCRIPTION: Examples of standardized comment prefixes including todo, track, wet, compare, and name prefixes, with their specific usage patterns and requirements.
+
+LANGUAGE: markdown
+CODE:
+todo: 
+todo(security): 
+track: 
+wet: 
+compare(<identifier>): 
+name:
+
+----------------------------------------
+
+TITLE: Obvious Solution: Separating Metadata and Body
+DESCRIPTION: Presents a solution that separates metadata ('head') from the actual data ('body') to avoid collisions.
+
+LANGUAGE: json
+CODE:
+{
+  "head": {
+    "type": "api:thing",
+    "version": "v1.0.0"
+  },
+  "body": {
+    "some": "info"
+  }
+}
+
+----------------------------------------
+
+TITLE: Implementing Low-Level Line Reading in JavaScript
+DESCRIPTION: This method reads input until it encounters a line feed character, returning the input as a string. It can optionally write to a stream. The method uses TypedArray operations for potential performance benefits in certain scenarios.
+
+LANGUAGE: javascript
+CODE:
+async readLine (options) {
+    options = options ?? {};
+
+    let stringSoFar = '';
+
+    let lineFeedFound = false;
+    while ( ! lineFeedFound ) {
+        let chunk = await this.getChunk_();
+
+        const iLF = chunk.indexOf(CHAR_LF);
+
+        // do we have a line feed character?
+        if ( iLF >= 0 ) {
+            lineFeedFound = true;
+
+            // defer the rest of the chunk until next read
+            if ( iLF !== chunk.length - 1 ) {
+                this.chunks_.push(chunk.subarray(iLF + 1))
+            }
+
+            // (note): LF is not included in return value or next read
+            chunk = chunk.subarray(0, iLF);
+        }
+
+        if ( options.stream ) {
+            options.stream.write(chunk);
+            if ( lineFeedFound ) {
+                options.stream.write(new Uint8Array([CHAR_LF]));
+            }
+        }
+
+        const text = new TextDecoder().decode(chunk);
+        stringSoFar += text;
+    }
+
+    return stringSoFar;
+}
+
+----------------------------------------
+
+TITLE: Example JSON Object with Potential Collision
+DESCRIPTION: Demonstrates a JSON object where metadata properties ('type' and 'version') could potentially collide with object data.
+
+LANGUAGE: json
+CODE:
+{
+    "type": "api:thing",
+    "version": "v1.0.0",
+    "some": "info"
+}
+
+----------------------------------------
+
+TITLE: Defining Hello World Driver Interface in JavaScript
+DESCRIPTION: This snippet shows the structure of the 'hello-world' driver interface, which defines a 'greet' method with an optional 'subject' parameter.
+
+LANGUAGE: javascript
+CODE:
+'hello-world': {
+    description: 'A simple driver that returns a greeting.',
+    methods: {
+        greet: {
+            description: 'Returns a greeting.',
+            parameters: {
+                subject: {
+                    type: 'string',
+                    optional: true,
+                },
+            },
+            result: { type: 'string' },
+        }
+    }
+},
+
+----------------------------------------
+
+TITLE: Implementing TIOCGWINSZ in XDocumentPTT
+DESCRIPTION: Implementation of TIOCGWINSZ (window size request) using postMessage to communicate with the parent app.
+
+LANGUAGE: JavaScript
+CODE:
+{ $: 'ioctl.request', requestCode: 104 }
+
+----------------------------------------
+
+TITLE: Generating Release Notes with gen-release-notes.js
+DESCRIPTION: This script generates release notes between two hard-coded versions. The versions need to be manually modified in the script before execution.
+
+LANGUAGE: javascript
+CODE:
+// gen-release-notes.js
+// (No actual code provided in the input text)
+
+----------------------------------------
+
+TITLE: Example License Notice Template
+DESCRIPTION: A template for adding the AGPL license notice to source files, including copyright statement and warranty disclaimers.
+
+LANGUAGE: text
+CODE:
+<one line to give the program's name and a brief idea of what it does.>
+Copyright (C) <year>  <name of author>
+
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU Affero General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
+
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU Affero General Public License for more details.
+
+You should have received a copy of the GNU Affero General Public License
+along with this program.  If not, see <https://www.gnu.org/licenses/>.
+
+----------------------------------------
+
+TITLE: Fetching and Echoing Image Using Data URL in JavaScript
+DESCRIPTION: This snippet fetches an image from the Puter API, converts it to a data URL, and then echoes it back. It uses the 'test-image' interface with 'get_image' and 'echo_image' methods.
+
+LANGUAGE: javascript
+CODE:
+blob = await (await fetch("http://api.puter.localhost:4100/drivers/call", {
+  "headers": {
+    "Content-Type": "application/json",
+    "Authorization": `Bearer ${puter.authToken}`,
+  },
+  "body": JSON.stringify({
+      interface: 'test-image',
+      method: 'get_image',
+      args: {
+          source_type: 'string:url:web'
+      }
+  }),
+  "method": "POST",
+})).blob();
+dataurl = await new Promise((y, n) => {
+    a = new FileReader();
+    a.onload = _ => y(a.result);
+    a.onerror = _ => n(a.error);
+    a.readAsDataURL(blob)
+});
+URL.createObjectURL(await (await fetch("http://api.puter.localhost:4100/drivers/call", {
+  "headers": {
+    "Content-Type": "application/json",
+    "Authorization": `Bearer ${puter.authToken}`,
+  },
+  "body": JSON.stringify({
+      interface: 'test-image',
+      method: 'echo_image',
+      args: {
+          source: dataurl,
+      }
+  }),
+  "method": "POST",
+})).blob());
+
+----------------------------------------
+
+TITLE: Installing Development Tools on RHEL
+DESCRIPTION: Command to install development tools on RHEL-family distributions including Fedora and Rocky Linux
+
+LANGUAGE: shell
+CODE:
+sudo dnf groupinstall "Development Tools"
+
+----------------------------------------
+
+TITLE: Fixing Export in Putility Library
+DESCRIPTION: Corrects an export issue in the Putility library's event module.
+
+LANGUAGE: JavaScript
+CODE:
+oops, no export (putility.libs.event) ([fa4b38c](https://github.com/HeyPuter/puter/commit/fa4b38cd028be4b19ec98bcf588227e0fc92af9d))
+
+----------------------------------------
+
+TITLE: Listing Groups via GET /group/list
+DESCRIPTION: Retrieves a list of groups associated with the current user, including both owned groups and groups the user is a member of. Returns group UIDs, metadata, and member lists.
+
+LANGUAGE: json
+CODE:
+{
+    "owned_groups": [
+        {
+            "uid": "c3bd4047-fc65-4da8-9363-e52195890de4",
+            "metadata": {},
+            "members": [
+                "default_user"
+            ]
+        }
+    ],
+    "in_groups": [
+        {
+            "uid": "c3bd4047-fc65-4da8-9363-e52195890de4",
+            "metadata": {},
+            "members": [
+                "default_user"
+            ]
+        }
+    ]
+}
+
+----------------------------------------
+
+TITLE: Markdown Formatting Example for Is/Is Not Statements
+DESCRIPTION: Demonstrates the correct markdown formatting for emphasizing 'is' and 'not' in statements using bold syntax.
+
+LANGUAGE: markdown
+CODE:
+A **is** B
+
+LANGUAGE: markdown
+CODE:
+A is **not** B
+
+----------------------------------------
+
+TITLE: Comment Prefix Pattern Specification
+DESCRIPTION: Regular expression pattern specifying the format for comment prefixes, requiring lowercase letters and hyphens with optional scoping.
+
+LANGUAGE: regex
+CODE:
+/[a-z-]+\([a-z-]a+\):/
+
+----------------------------------------
+
+TITLE: Package Not Found Error Message
+DESCRIPTION: Example error output when @heyputer/backend package cannot be found, typically due to missing npm installation
+
+LANGUAGE: plaintext
+CODE:
+┏━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓
+┃  Cannot find package '@heyputer/backend'              ┃
+┃  📝 this usually happens if you forget `npm install`  ┃
+┃  Suggestions:                                         ┃
+┃  - try running `npm install`                          ┃
+┃  Technical Notes:                                     ┃
+┃  - @heyputer/backend is in an npm workspace           ┃
+┗━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┛
+
+----------------------------------------
+
+TITLE: Creating Custom Puter Module
+DESCRIPTION: Example of creating a custom Puter module that extends AdvancedBase and implements the install method to register a new service.
+
+LANGUAGE: javascript
+CODE:
+class MyPuterModule extends AdvancedBase {
+    async install (context) {
+        const services = context.get('services');
+
+        const MyService = require('./path/to/MyService.js');
+        services.registerService('my-service', MyService, {
+            some_options: 'for-my-service',
+        });
+    }
+}
+
+----------------------------------------
+
+TITLE: Installing Build Base on Alpine Linux
+DESCRIPTION: Command to install build-base package on Alpine Linux, noting that it's pre-installed in Puter's Alpine image
+
+LANGUAGE: shell
+CODE:
+sudo apk add build-base
+
+----------------------------------------
+
+TITLE: Granting Group Permissions via POST /grant-user-group
+DESCRIPTION: Grants permissions from the current user to a group. The permission remains effective only while the granting user maintains the permission themselves.
+
+LANGUAGE: javascript
+CODE:
+await fetch("http://puter.localhost:4100/auth/grant-user-group", {
+  "headers": {
+    "Content-Type": "application/json",
+    "Authorization": `Bearer ${puter.authToken}`,
+  },
+  "body": JSON.stringify({
+      group_uid: '9c644a1c-3e43-4df4-ab67-de5b68b235b6',
+      permission: 'fs:/someuser/somedir/somefile:read'
+  }),
+  "method": "POST",
+});
+
+----------------------------------------
+
+TITLE: Experimenting with Webpack Hooks for Icon Integration in JavaScript
+DESCRIPTION: This code snippet showcases various commented-out attempts to integrate icons into a webpack bundle. It includes methods like tapping into compilation hooks, adding virtual modules, and modifying entry points. These approaches were ultimately unsuccessful and abandoned in favor of a different solution.
+
+LANGUAGE: javascript
+CODE:
+    // compilation.hooks.processAssets.tap(
+    //     {
+    //         name: 'AddImportPlugin',
+    //         stage: compiler.webpack.Compilation.PROCESS_ASSETS_STAGE_ADDITIONS,
+    //     },
+    //     (assets) => {
+    //         for (const assetName of Object.keys(assets)) {
+    //             if (assetName.endsWith('.js')) {
+    //                 const source = assets[assetName].source();
+    //                 const newSource = `${icons}\n${source}`;
+    //                 compilation.updateAsset(assetName, new compiler.webpack.sources.RawSource(newSource));
+    //             }
+    //         }
+    //     }
+    // );
+
+    // Inject into bundle
+    // console.log('adding this:' + icons);
+    // compilation.assets['icons-thing'] = {
+    //     source: () => icons,
+    //     size: () => icons.length,
+    // };
+
+    // compilation.addModule({
+    //   identifier() {
+    //     return 'icons-thing';
+    //   },
+    //   build() {
+    //     this._source = {
+    //       source() {
+    //         return content;
+    //       },
+    //       size() {
+    //         return content.length;
+    //       }
+    //     };
+    //   }
+    // });
+
+
+    // Add the generated module to Webpack's internal modules
+    // compilation.hooks.optimizeModules.tap('IconsPlugin', (modules) => {
+    //     const virtualModule = {
+    //     identifier: () => 'icons.js',
+    //     readableIdentifier: () => 'icons.js',
+    //     build: () => {},
+    //     source: () => icons,
+    //     size: () => icons.length,
+    //     chunks: [],
+    //     assets: [],
+    //     hash: () => 'icons',
+    //     };
+
+    //     modules.push(virtualModule);
+    // });
+
+});
+// this.hooks.entryOption.tap('IconsPlugin', (context, entry) => {
+//     entry.main.import.push('icons-thing');
+// });
+// this.hooks.make.tapAsync('InjectTextEntryPlugin', (compilation, callback) => {
+//     // Create a new asset (fake module) from the generated content
+//     const content = `console.log('${this.options.text}');`;
+
+//     callback();
+// });
+// this.hooks.entryOption.tap('IconsPlugin', (context, entry) => {
+// });
+// this.hooks.entryOption.tap('InjectTextEntryPlugin', (context, entry) => {
+//     // Add this as an additional entry point
+//     this.options.entry = {
+//       ...this.options.entry,
+//       'generated-entry': '// FINDME\n'
+//     };
+// });
+
+----------------------------------------
+
+TITLE: Implementing hello_world Function in JavaScript
+DESCRIPTION: A simple function that returns a greeting string. It's part of the hello_world library in the TemplateModule.
+
+LANGUAGE: JavaScript
+CODE:
+function hello_world() {
+    return "Hello, World!";
+}
+
+----------------------------------------
+
+TITLE: Initializing Puter GUI in HTML
+DESCRIPTION: HTML and JavaScript code to include and initialize the Puter GUI. It demonstrates how to load the 'gui.js' file and configure the GUI with various options.
+
+LANGUAGE: html
+CODE:
+<script type="text/javascript" src="./dist/gui.js"></script>
+<script type="text/javascript">
+    window.addEventListener('load', function() {
+        // Initialize the GUI. All options are optional!
+        gui({
+            // The origin of the app. This is the base URL of the GUI. 
+            gui_origin: "https://puter.com",
+
+            // The origin of the API. This is the base URL of the API endpoints that the GUI will call for all its operations.
+            api_origin: "https://api.puter.com",
+
+            // The domain under which user websites are hosted.
+            hosting_domain: "puter.site",
+
+            // The maximum length of file/directory names.
+            max_item_name_length: 500,
+
+            // If GUI has to enforce email verification before allowing user to publish a website.
+            require_email_verification_to_publish_website: true,
+        })
+    });
+</script>
+
+----------------------------------------
+
+TITLE: Pager Service Integration
+DESCRIPTION: Service for handling alerts and PagerDuty integration. Provides initialization of PagerDuty configuration and methods for sending alerts to registered handlers.
+
+
+
+----------------------------------------
+
+TITLE: Running Test Suite with NPM
+DESCRIPTION: Command to execute the test suite using Mocha testing framework. Tests are located in the test/ directory and require Mocha to be installed as a dependency.
+
+LANGUAGE: sh
+CODE:
+npm test
+
+----------------------------------------
+
+TITLE: Finding Git Repository Root Directory
+DESCRIPTION: Utility function call to locate the git repository root directory and metadata directory. Used to ensure commands are executed with the correct repository context.
+
+LANGUAGE: javascript
+CODE:
+const { dir, gitdir } = await find_repo_root(fs, env.PWD);
+
+----------------------------------------
+
+TITLE: WebServerService Event Handler - boot.consolidation
+DESCRIPTION: Initializes the Express web server with middleware configuration and HTTP server setup.
+
+
+
+----------------------------------------
+
+TITLE: Process Event Service Handler
+DESCRIPTION: Centralized process event handling service that manages uncaught exceptions and unhandled promise rejections. Integrates with logging and error reporting services.
+
+
+
+----------------------------------------
+
+TITLE: Demonstrating Array Representation of Type-Tagged Objects in JSON
+DESCRIPTION: Presents the 'Array Representation' of Type-Tagged Objects, where the type is the first element, followed by the body object and meta information.
+
+LANGUAGE: json
+CODE:
+["some-type",
+    { "some_property": "some value" },
+    { "version": "0.0.0" }
+]
+
+----------------------------------------
+
+TITLE: WebServerService Event Handler - start.webserver
+DESCRIPTION: Starts the web server on a specified port with automatic port selection fallback (4100-4299). Includes development features like browser auto-launch and emits ready events when server is running.
+
+
+
+----------------------------------------
+
+TITLE: Entity Storage Call Flow Diagram
+DESCRIPTION: ASCII diagram showing the request flow from initial /call endpoint through various service layers to the final storage implementation
+
+LANGUAGE: text
+CODE:
+/call -> DriverService
+    -> EntityStoreImplementation -> EntityStoreService -> BaseES
+        -> ...(storage decorators) -> SQLES
+
+----------------------------------------
+
+TITLE: Creating Callback Byte Stream in JavaScript
+DESCRIPTION: Shows how to create a stream for values passed through a callback interface using the NewCallbackByteStream function. This is useful for handling byte streams from emulators or other sources that use callback-based APIs.
+
+LANGUAGE: javascript
+CODE:
+const byteStream = NewCallbackByteStream();
+emulator.add_listener('virtio-console0-output-bytes',
+    byteStream.listener);
+
+----------------------------------------
+
+TITLE: Creating Virtio Frame Stream in JavaScript
+DESCRIPTION: Demonstrates how to create a stream that processes Virtio frames from a byte stream using the NewVirtioFrameStream function. This function assumes the input stream contains length-prefixed data frames.
+
+LANGUAGE: javascript
+CODE:
+const virtioStream = NewVirtioFrameStream(byteStream);
+
+----------------------------------------
+
+TITLE: Creating and Using WispPacket Class in JavaScript
+DESCRIPTION: Demonstrates how to create a WispPacket instance and use its methods. The WispPacket class wraps a Uint8Array containing a Wisp packet and provides utility methods for packet manipulation and debugging.
+
+LANGUAGE: javascript
+CODE:
+const packet = new WispPacket({
+    data: new Uint8Array(...),
+    direction: WispPacket.SEND, // or RECV
+
+    // `extra` is optional, for debugging
+    extra: { some: 'value', },
+});
+
+packet.type; // ex: WispPacket.CONTINUE
+
+packet.describe();
+// ex: "INFO v2.0 f000000000"
+
+----------------------------------------
+
+TITLE: AWS Polly Speech Synthesis
+DESCRIPTION: Method to synthesize speech from text using AWS Polly service. Accepts text input and options including output format specification.
+
+LANGUAGE: javascript
+CODE:
+synthesize_speech(text, options) {
+  // text: The text to synthesize
+  // options: Synthesis options
+  // options.format: Output audio format (e.g. 'mp3')
+}
+
+----------------------------------------
+
+TITLE: Static Hosting Domain Configuration
+DESCRIPTION: Configures the domain name used for public site URLs, particularly for published websites. Can be set to a LAN-specific domain using nip.io for local development.
+
+LANGUAGE: json
+CODE:
+"static_hosting_domain": "site.192.168.555.12.nip.io"
+
+----------------------------------------
+
+TITLE: Demonstrating ES6 Class Method Definition Limitations in JavaScript
+DESCRIPTION: This snippet illustrates the difference between intuitive method definitions and less intuitive assignments of expressions to class properties, which may be unclear when used as methods.
+
+LANGUAGE: javascript
+CODE:
+class ExampleClass extends SomeBase {
+    intuitive_method_definition () {}
+    
+    constructor () {
+        this.less_intuitive = some_expr();
+    }
+}
+
+----------------------------------------
+
+TITLE: Implementing Driver Interface in Puter Service
+DESCRIPTION: This snippet demonstrates how to implement the 'hello-world' driver interface in the PrankGreetService class.
+
+LANGUAGE: javascript
+CODE:
+class PrankGreetService extends BaseService {
+    async _init () {
+        // ... same as before
+    }
+
+    // Now we add this:
+    static IMPLEMENTS = {
+        ['hello-world']: {
+            async greet ({ subject }) {
+                if ( subject ) {
+                    return `Hello ${subject}, tell me about updog!`;
+                }
+                return `Hello, tell me about updog!`;
+            }
+        }
+    }
+}
+
+----------------------------------------
+
+TITLE: Defining Filesystem Permission Syntax
+DESCRIPTION: Explains the structure of filesystem permissions, including path/UUID specification and access levels.
+
+LANGUAGE: markdown
+CODE:
+### `fs:<PATH-OR-UUID>:<ACCESS-LEVEL>`
+
+- `<PATH-OR-UUID>` specifies the file that this permission
+  is associated with.
+  The ACL service
+  (which checks filesystem permissions)
+  knows if the value is a path or UUID based on the presence
+  of a leading slash; if it starts with "/" it's a path.
+- `<ACCESS-LEVEL>` specifies one of:
+  `write`, `read`, `list`, `see`; where each item in that
+  list implies all the access levels which follow.
+
+----------------------------------------
+
+TITLE: Track Comment Pattern Examples in Markdown
+DESCRIPTION: Defines a registry of track comments used for code documentation and maintenance purposes. Each track comment serves as a marker for specific code patterns, type checks, safety measures, or potential refactoring opportunities.
+
+LANGUAGE: markdown
+CODE:
+// track: type check
+// track: adapt
+// track: bounds check
+// track: ruleset
+// track: object description in comment
+// track: slice a prefix
+// track: actor type
+// track: scoping iife
+// track: good candidate for sequence
+// track: opposite condition of sibling
+// track: null check before processing
+// track: manual safe object
+// track: common operations on multiple items
+// track: checkpoint
+
+----------------------------------------
+
+TITLE: Protocol Setting in Puter
+DESCRIPTION: Defines the protocol (http/https) to be used for URL generation in the Puter instance.
+
+LANGUAGE: json
+CODE:
+"protocol": "https"
+
+----------------------------------------
+
+TITLE: Scoping Extension and Use in Puter Extensions
+DESCRIPTION: Explains the importance of scoping the 'extension' and 'use' globals when accessing them within callbacks. This is necessary because these globals are temporary and do not exist after the extension is loaded.
+
+LANGUAGE: javascript
+CODE:
+const ext = extension;
+extension.on('some-event', () => {
+    // This would throw an error
+    // extension.something();
+
+    // This works
+    ext.example();
+})
+
+----------------------------------------
+
+TITLE: Configuring Mod Directory in JSON
+DESCRIPTION: This JSON snippet shows how to configure a mod directory in the Puter configuration. It specifies the path to the mods_available directory.
+
+LANGUAGE: json
+CODE:
+"mod_directories": [
+    "{source}/../mods/mods_available"
+]
+
+----------------------------------------
+
+TITLE: Creating Symlink for Enabling KDMOD in Bash
+DESCRIPTION: This shell command creates a symbolic link in the 'mods/mods_enabled' directory, pointing to the KDMOD directory in 'mods/mods_available'. This is the method used to enable specific Puter mods.
+
+LANGUAGE: sh
+CODE:
+ln -rs ./mods/mods_available/kdmod ./mods/mods_enabled/
+
+----------------------------------------
+
+TITLE: Installing Base Development Tools on Arch Linux
+DESCRIPTION: Command to install base development tools on Arch Linux systems
+
+LANGUAGE: shell
+CODE:
+sudo pacman -S base-devel
+
+----------------------------------------
+
+TITLE: Dollar-Sign Convention for Metadata in JSON
+DESCRIPTION: Illustrates using '$' prefix for metadata keys to distinguish them from regular object properties.
+
+LANGUAGE: json
+CODE:
+{
+    "$": "api:thing",
+    "$version": "v1.0.0",
+
+    "some": "info"
+}
+
+----------------------------------------
+
+TITLE: Adding API Request Examples to Window Object in JavaScript
+DESCRIPTION: A service script adds a 'reqex' object to the client's window, containing example requests to internal API endpoints. This facilitates easier testing and debugging of API interactions.
+
+LANGUAGE: JavaScript
+CODE:
+window.reqex = {
+  // Example API requests would be defined here
+};
+
+----------------------------------------
+
+TITLE: Running API Tests for Puter Project
+DESCRIPTION: Executes the API tests using a specified configuration file. The configuration file should be based on the example_config.yml template with correct values added.
+
+LANGUAGE: bash
+CODE:
+node apitest.js --config=your_config_file.yml
+
+----------------------------------------
+
+TITLE: Installing Dependencies for Puter Tests
+DESCRIPTION: Installs the necessary Node.js dependencies for the Puter project using npm.
+
+LANGUAGE: bash
+CODE:
+npm install
+
+----------------------------------------
+
+TITLE: Parent Element Assignment with el()
+DESCRIPTION: Example of creating and appending a new element to a parent element using el() function's parent element parameter.
+
+LANGUAGE: javascript
+CODE:
+el(some_parent_el, 'h1', 'Hello!');
+
+----------------------------------------
+
+TITLE: Directory Naming Convention Example
+DESCRIPTION: Shows the format for strategy directory names, using <concern>_<class> pattern where <concern> represents the functional area (like storage or fsentry) and <class> is a letter A-Z indicating the architectural layer. Class A represents the highest level of swappable behavior.
+
+LANGUAGE: plaintext
+CODE:
+<concern>_<class>
+
+----------------------------------------
+
+TITLE: Example State Generation in JSON
+DESCRIPTION: This JSON snippet shows an example of a generated state based on the coverage model. It represents one possible combination of input values that will be used in testing the /write API method.
+
+LANGUAGE: json
+CODE:
+{
+    "path.format": "path",
+    "name": "specified",
+    "conditions.destinationIsFile": true,
+    "overwrite": false
+}
+
+----------------------------------------
+
+TITLE: Example Module Structure - JavaScript Backend Modules
+DESCRIPTION: Directory structure pattern for Puter backend kernel modules, where each module contains a main Module.js file and associated Service.js files. May include additional doc/ and lib/ directories for documentation and utilities.
+
+LANGUAGE: plaintext
+CODE:
+<name of>Module.js
+<name of>Service.js
+doc/
+lib/
+
+----------------------------------------
+
+TITLE: SocketioService Event Handler - install.socketio
+DESCRIPTION: Event listener that initializes Socket.io by attaching it to a provided server instance. Provides simplified interface for room and socket messaging.
+
+
+
+----------------------------------------
+
+TITLE: Configuring Puter Mods in JSON
+DESCRIPTION: This snippet shows how to update the configuration file (usually located at './volatile/config.json' or '/var/puter/config.json') to specify mod directories. It demonstrates adding the path for official Puter mods.
+
+LANGUAGE: json
+CODE:
+{
+    "config_name": "example config",
+
+    "mod_directories": [
+        "{source}/mods/mods_enabled"
+    ]
+
+    // ... other config options
+}
+
+----------------------------------------
+
+TITLE: Building Puter with npm
+DESCRIPTION: Command to build the Puter project using npm, which generates the distribution files in the 'dist' directory.
+
+LANGUAGE: bash
+CODE:
+npm run build
+
+----------------------------------------
+
+TITLE: Defining Git Subcommand Structure in JavaScript
+DESCRIPTION: Template for creating git subcommands that defines the command name, usage, description, arguments, and execution function. This structure is used to implement individual git commands in a modular way.
+
+LANGUAGE: javascript
+CODE:
+export default {
+    name: 'help',
+    usage: [
+        'git help [-a|--all]',
+        'git help <command>',
+    ],
+    description: `Display help information for git itself, or a subcommand.`,
+    args: {
+        allowPositionals: true,
+        options: {
+            all: {
+                description: 'List all available subcommands.',
+                type: 'boolean',
+            }
+        },
+    },
+    execute: async (ctx) => {
+        ctx = {
+            io: {
+                stdout,
+                stderr,
+            },
+            fs,
+            args,
+            env,
+        }
+    }
+}
+
+----------------------------------------
+
+TITLE: Configuring nip.io Domains for Puter in JSON
+DESCRIPTION: This JSON snippet shows how to enable nip.io domains for Puter in the configuration file. It allows Puter to use multiple subdomains without configuring DNS or hosts files.
+
+LANGUAGE: json
+CODE:
+{
+  "allow_nipio_domains": true
+}
+
+----------------------------------------
+
+TITLE: Showing Implicit Value Property in Array Representation using JSON
+DESCRIPTION: Illustrates how non-object second elements in the Array Representation are implicitly placed in a 'value' property.
+
+LANGUAGE: json
+CODE:
+["some-type", "hello"]
+
+LANGUAGE: json
+CODE:
+["some-type", { "value": "hello" }]
+
+----------------------------------------
+
+TITLE: Testing Puter Driver Implementation with Fetch API
+DESCRIPTION: This JavaScript code demonstrates how to test the implemented Puter driver using the Fetch API in a browser environment.
+
+LANGUAGE: javascript
+CODE:
+await (await fetch("http://api.puter.localhost:4100/drivers/call", {
+    "headers": {
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${puter.authToken}`,
+    },
+    "body": JSON.stringify({
+        interface: 'hello-world',
+        service: 'prank-greet',
+        method: 'greet',
+        args: {
+            subject: 'World',
+        },
+    }),
+    "method": "POST",
+})).json();
+
+----------------------------------------
+
+TITLE: OpenAI Chat Completion via Puter API
+DESCRIPTION: Implements chat completion functionality using OpenAI through Puter API. Includes system and user message configuration with Spongebob persona.
+
+LANGUAGE: javascript
+CODE:
+await (await fetch("http://api.puter.localhost:4100/drivers/call", {
+    "headers": {
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${puter.authToken}`,
+    },
+    "body": JSON.stringify({
+        interface: 'puter-chat-completion',
+        driver: 'openai-completion',
+        method: 'complete',
+        args: {
+            messages: [
+                {
+                    role: 'system',
+                    content: 'Act like Spongebob'
+                },
+                {
+                    role: 'user',
+                    content: 'How do I make my code run faster?'
+                },
+            ]
+        },
+    }),
+    "method": "POST",
+})).json();
+
+----------------------------------------
+
+TITLE: Using AWS Textract OCR via Puter API
+DESCRIPTION: Makes a POST request to Puter API to perform OCR on an image using AWS Textract service. Requires authentication token and source image path.
+
+LANGUAGE: javascript
+CODE:
+await (await fetch("http://api.puter.localhost:4100/drivers/call", {
+    "headers": {
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${puter.authToken}`,
+    },
+    "body": JSON.stringify({
+        interface: 'puter-ocr',
+        driver: 'aws-textract',
+        method: 'recognize',
+        args: {
+            source: '~/Desktop/testocr.png',
+        },
+    }),
+    "method": "POST",
+})).json();
+
+----------------------------------------
+
+TITLE: Fixing Phoenix Changelog
+DESCRIPTION: Corrects an issue with the Phoenix changelog.
+
+LANGUAGE: JavaScript
+CODE:
+phoenix changelog ([0bcbc8f](https://github.com/HeyPuter/puter/commit/0bcbc8f7845de99305f53c6da2bb1f365b87ac50))
+
+----------------------------------------
+
+TITLE: Updating Package.json
+DESCRIPTION: Updates the package.json file.
+
+LANGUAGE: JavaScript
+CODE:
+update package.json ([c2c5d88](https://github.com/HeyPuter/puter/commit/c2c5d883365ae33749709d11e0c2de9050ca144e))
+
+----------------------------------------
+
+TITLE: Referencing Sequence Class in JavaScript
+DESCRIPTION: A reference to the Sequence class file location, which is mentioned as an example of a feature that could benefit from automatic comments in refactoring tools.
+
+LANGUAGE: javascript
+CODE:
+../../src/backend/src/codex/Sequence.js
+
+----------------------------------------
+
+TITLE: Weather Tool Integration with Puter AI Chat
+DESCRIPTION: Demonstrates tool usage in AI chat for weather queries. Includes function definition and handling of tool responses.
+
+LANGUAGE: javascript
+CODE:
+await puter.ai.chat('What\'s the weather like in Vancouver?', {
+    tools: [
+        {
+            type: 'function',
+            'function': {
+                name: 'get_weather',
+                description: 'A string describing the weather',
+                parameters: {
+                    type: 'object',
+                    properties: {
+                        location: {
+                            type: 'string',
+                            description: 'city',
+                        },
+                    },
+                    required: ['location'],
+                    additionalProperties: false,
+                },
+                strict: true
+            },
+        }
+    ]
+})

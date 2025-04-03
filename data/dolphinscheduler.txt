@@ -1,0 +1,2073 @@
+TITLE: Creating Workflow Using Python API in Apache DolphinScheduler
+DESCRIPTION: This code snippet demonstrates how to create a workflow using the Python API in Apache DolphinScheduler 2.0.2. It defines workflow properties, tasks, and their dependencies using the WorkflowAsCode feature.
+
+LANGUAGE: python
+CODE:
+# 定义工作流属性，包括名称、调度周期、开始时间、使用租户等信息
+with ProcessDefinition(
+    name="tutorial",
+    schedule="0 0 0 * * ? *",
+    start_time="2021-01-01",
+    tenant="tenant_exists",
+) as pd:
+    # 定义4个任务，4个都是 shell 任务，shell 任务的必填参数为任务名、命令信息，这里都是 echo 的 shell 命令
+    task_parent = Shell(name="task_parent", command="echo hello pydolphinscheduler")
+    task_child_one = Shell(name="task_child_one", command="echo 'child one'")
+    task_child_two = Shell(name="task_child_two", command="echo 'child two'")
+    task_union = Shell(name="task_union", command="echo union")
+
+    # 定义任务间依赖关系
+    # 这里将 task_child_one，task_child_two 先声明成一个任务组，通过 python 的 list 声明
+    task_group = [task_child_one, task_child_two]
+    # 使用 set_downstream 方法将任务组 task_group 声明成 task_parent 的下游，如果想要声明上游则使用 set_upstream
+    task_parent.set_downstream(task_group)
+
+    # 使用位操作符 << 将任务 task_union 声明成 task_group 的下游，同时支持通过位操作符 >> 声明
+    task_union << task_group
+
+----------------------------------------
+
+TITLE: Creating Workflow Using Python WorkflowAsCode API
+DESCRIPTION: Demonstrates how to create a workflow programmatically using the new WorkflowAsCode feature in DolphinScheduler 2.0.2. The example shows definition of workflow properties, shell tasks, and task dependencies using Python API.
+
+LANGUAGE: python
+CODE:
+with ProcessDefinition(
+    name="tutorial",
+    schedule="0 0 0 * * ? *",
+    start_time="2021-01-01",
+    tenant="tenant_exists",
+) as pd:
+    task_parent = Shell(name="task_parent", command="echo hello pydolphinscheduler")
+    task_child_one = Shell(name="task_child_one", command="echo 'child one'")
+    task_child_two = Shell(name="task_child_two", command="echo 'child two'")
+    task_union = Shell(name="task_union", command="echo union")
+
+    task_group = [task_child_one, task_child_two]
+    task_parent.set_downstream(task_group)
+    task_union << task_group
+
+----------------------------------------
+
+TITLE: Implementing Custom Logback FileAppender for Task Logging in Java
+DESCRIPTION: Custom FileAppender class that generates log files for each task instance based on process and task IDs extracted from the thread name.
+
+LANGUAGE: java
+CODE:
+public class TaskLogAppender extends FileAppender<ILoggingEvent> {
+
+    @Override
+    protected void append(ILoggingEvent event) {
+
+        if (currentlyActiveFile == null){
+            currentlyActiveFile = getFile();
+        }
+        String activeFile = currentlyActiveFile;
+        // thread name: taskThreadName-processDefineId_processInstanceId_taskInstanceId
+        String threadName = event.getThreadName();
+        String[] threadNameArr = threadName.split("-");
+        // logId = processDefineId_processInstanceId_taskInstanceId
+        String logId = threadNameArr[1];
+        ...
+        super.subAppend(event);
+    }
+}
+
+----------------------------------------
+
+TITLE: MasterSchedulerService Workflow
+DESCRIPTION: Implementation of the scheduler service that handles process instance creation, command processing, and workflow execution through thread pools and state management.
+
+
+
+----------------------------------------
+
+TITLE: WorkflowExecutorThread Process
+DESCRIPTION: Workflow execution implementation including DAG building, task queue initialization, and node submission process for handling task dependencies and execution order.
+
+
+
+----------------------------------------
+
+TITLE: Starting/Stopping DolphinScheduler Services
+DESCRIPTION: Command to start or stop individual DolphinScheduler services like master-server, worker-server, api-server, etc.
+
+LANGUAGE: plain text
+CODE:
+bin/dolphinscheduler-daemon.sh <start|stop> <server-name>
+
+----------------------------------------
+
+TITLE: Parsing Hive SQL Input/Output Tables
+DESCRIPTION: Example of parsing a Hive SQL statement to determine input and output tables using the abstract syntax tree. This is a key part of implementing data dependencies in the scheduling system.
+
+LANGUAGE: sql
+CODE:
+INSERT OVERWRITE TABLE t0
+SELECT t1.id, t2.name
+FROM t1 JOIN t2 ON (t1.id = t2.id)
+
+----------------------------------------
+
+TITLE: Implementing Topological Sort in Java using BFS
+DESCRIPTION: Java implementation of topological sorting using Breadth-First Search algorithm. The code handles directed acyclic graphs (DAG), detects cycles, and returns both the sorting result and whether the graph contains cycles. Uses a queue-based approach to process vertices with zero in-degree.
+
+LANGUAGE: java
+CODE:
+public class TopologicalSort {
+  /**
+   * Determine whether there is a ring and the result of topological sorting
+   *
+   * Only directed acyclic graph (DAG) has topological sorting
+   * The main methods of breadth first search:
+   *    1、Iterate over all the vertices in the graph, and put the vertices whose in-degree is 0 into the queue.
+   *    2、A vertex is polled from the queue, and the in-degree of the adjacent point of the vertex is updated (minus 1). If the in-degree of the adjacent point is reduced by 1 and then equals to 0, the adjacent point is entered into the queue.
+   *    3、Keep executing step 2 until the queue is empty.
+   * If it is impossible to traverse all the vertics, it means that the current graph is not a directed acyclic graph. There is no topological sort.
+   *
+   *
+   * @return key returns the state, true if successful (no-loop), value if failed (loop), value is the result of topological sorting (could be one of these)
+   */
+  private Map.Entry<Boolean, List<Vertex>> topologicalSort() {
+    Queue<Vertex> zeroIndegreeVertexQueue = new LinkedList<>();
+    List<Vertex> topoResultList = new ArrayList<>();
+    Map<Vertex, Integer> notZeroIndegreeVertexMap = new HashMap<>();
+
+    for (Map.Entry<Vertex, VertexInfo> vertices : verticesMap.entrySet()) {
+      Vertex vertex = vertices.getKey();
+      int inDegree = getIndegree(vertex);
+
+      if (inDegree == 0) {
+        zeroIndegreeVertexQueue.add(vertex);
+        topoResultList.add(vertex);
+      } else {
+        notZeroIndegreeVertexMap.put(vertex, inDegree);
+      }
+    }
+
+    if(zeroIndegreeVertexQueue.isEmpty()){
+      return new AbstractMap.SimpleEntry(false, topoResultList);
+    }
+
+    while (!zeroIndegreeVertexQueue.isEmpty()) {
+      Vertex v = zeroIndegreeVertexQueue.poll();
+      Set<Vertex> subsequentNodes = getSubsequentNodes(v);
+
+      for (Vertex subsequentVertex : subsequentNodes) {
+        Integer degree = notZeroIndegreeVertexMap.get(subsequentVertex);
+
+        if(--degree == 0){
+          topoResultList.add(subsequentVertex);
+          zeroIndegreeVertexQueue.add(subsequentVertex);
+          notZeroIndegreeVertexMap.remove(subsequentVertex);
+        }else{
+          notZeroIndegreeVertexMap.put(subsequentVertex, degree);
+        }
+      }
+    }
+
+    AbstractMap.SimpleEntry resultMap = new AbstractMap.SimpleEntry(notZeroIndegreeVertexMap.size() == 0 , topoResultList);
+    return resultMap;
+  }
+}
+
+----------------------------------------
+
+TITLE: ServerNodeManager Implementation
+DESCRIPTION: Manages synchronization between ZooKeeper nodes and database storage, implements node information loading and real-time updates using reentrant locks for thread safety.
+
+
+
+----------------------------------------
+
+TITLE: MasterConfig and Registration Process
+DESCRIPTION: Configuration loading and registration process implementation, including heartbeat thread pool creation, zookeeper lock acquisition, and node registration management.
+
+
+
+----------------------------------------
+
+TITLE: Starting Apache DolphinScheduler Services
+DESCRIPTION: This snippet shows the command to start the four main services of Apache DolphinScheduler: master-server, worker-server, alert-server, and api-server.
+
+LANGUAGE: bash
+CODE:
+dolphinscheduler-daemon.sh start master-server/worker-server/alert-server/api-server
+
+----------------------------------------
+
+TITLE: MasterServer Bean Categories and Initialization
+DESCRIPTION: Overview of the main bean categories injected into MasterServer during startup, including configuration, registry, scheduler services and processors. These components handle different aspects of the master server's functionality.
+
+
+
+----------------------------------------
+
+TITLE: Registering Alert Plugins in AlertPluginManager
+DESCRIPTION: This code snippet shows how alert plugins are registered in the AlertPluginManager class, including creating instances and storing them in a map.
+
+LANGUAGE: Java
+CODE:
+    private final Map<Integer, AlertChannel> channelKeyedById = new HashMap<>();
+    
+    @EventListener
+    public void installPlugin(ApplicationReadyEvent readyEvent) {
+        PrioritySPIFactory<AlertChannelFactory> prioritySPIFactory = new PrioritySPIFactory<>(AlertChannelFactory.class);
+        for (Map.Entry<String, AlertChannelFactory> entry : prioritySPIFactory.getSPIMap().entrySet()) {
+            String name = entry.getKey();
+            AlertChannelFactory factory = entry.getValue();
+            logger.info("Registering alert plugin: {} - {}", name, factory.getClass());
+            final AlertChannel alertChannel = factory.create();
+            logger.info("Registered alert plugin: {} - {}", name, factory.getClass());
+            final List<PluginParams> params = new ArrayList<>(factory.params());
+            params.add(0, warningTypeParams);
+            final String paramsJson = PluginParamsTransfer.transferParamsToJson(params);
+            final PluginDefine pluginDefine = new PluginDefine(name, PluginType.ALERT.getDesc(), paramsJson);
+            final int id = pluginDao.addOrUpdatePluginDefine(pluginDefine);
+            channelKeyedById.put(id, alertChannel);
+        }
+    }
+
+----------------------------------------
+
+TITLE: Implementing Custom Logback Filter for Task Logging in Java
+DESCRIPTION: Custom Filter class that accepts log events only from threads with names starting with 'TaskLogInfo-', used to isolate task-specific logging.
+
+LANGUAGE: java
+CODE:
+public class TaskLogFilter extends Filter<ILoggingEvent> {
+
+    @Override
+    public FilterReply decide(ILoggingEvent event) {
+        if (event.getThreadName().startsWith("TaskLogInfo-")){
+            return FilterReply.ACCEPT;
+        }
+        return FilterReply.DENY;
+    }
+}
+
+----------------------------------------
+
+TITLE: Customizing Time Parameters for Apache DolphinScheduler in Java
+DESCRIPTION: Code modifications to add millisecond-level Unix time functions and improve time parameter handling in Apache DolphinScheduler. This includes adding new constants and modifying the calculateTime method.
+
+LANGUAGE: Java
+CODE:
+public class TaskConstants {
+    // ... existing constants ...
+    public static final String MILLI_UNIXTIME = "milli_unixtime";
+    public static final String MICRO_UNIXTIME = "micro_unixtime";
+    public static final String NANO_UNIXTIME = "nano_unixtime";
+    // ... other new constants ...
+}
+
+public class TimePlaceHolderUtils {
+    public static String calculateTime(String expression) {
+        // ... existing code ...
+        if (MILLI_UNIXTIME.equals(function)) {
+            return String.valueOf(System.currentTimeMillis());
+        } else if (MICRO_UNIXTIME.equals(function)) {
+            return String.valueOf(System.nanoTime() / 1000);
+        } else if (NANO_UNIXTIME.equals(function)) {
+            return String.valueOf(System.nanoTime());
+        }
+        // ... handle other cases ...
+    }
+}
+
+----------------------------------------
+
+TITLE: Adapting Clickhouse Compatibility for Datax Tasks in Java
+DESCRIPTION: Code snippet illustrating the process of converting Apache DolphinScheduler configuration to Datax configuration for Clickhouse compatibility. This involves parsing SQL syntax and handling parameter replacement.
+
+LANGUAGE: Java
+CODE:
+public void buildSqoopJobContentJson(SqoopParameters sqoopParameters) {
+    // ... existing code ...
+    
+    // Parse SQL syntax and handle parameter replacement for Clickhouse
+    String sql = sqoopParameters.getSql();
+    sql = replaceParameters(sql);
+    List<String> columns = parseColumns(sql);
+    
+    // Build JSON configuration
+    JSONObject readerConfig = new JSONObject();
+    readerConfig.put("sql", sql);
+    readerConfig.put("columns", columns);
+    // ... add other configuration ...
+    
+    // ... continue with Datax job configuration ...
+}
+
+----------------------------------------
+
+TITLE: Modifying WorkflowExecuteThread for Service Governance Integration in Java
+DESCRIPTION: Code snippet showing the modification of the handleEvents method in WorkflowExecuteThread class to inject service governance platform data collection code. This allows task monitoring information to be reported to the service governance platform.
+
+LANGUAGE: Java
+CODE:
+private void handleEvents() throws Exception {
+    if (CollectionUtils.isNotEmpty(this.eventQueue)) {
+        Event event = null;
+        while ((event = this.eventQueue.poll()) != null) {
+            switch (event.getType()) {
+                case PROCESS_STATE_CHANGE:
+                    // ... existing code ...
+                    // Inject service governance platform data collection code
+                    reportToServiceGovernancePlatform(processInstance);
+                    break;
+                // ... other cases ...
+            }
+        }
+    }
+}
+
+----------------------------------------
+
+TITLE: Processing Alerts in AlertSenderService
+DESCRIPTION: This code snippet demonstrates how alerts are processed and sent using the registered alert plugins in the AlertSenderService class.
+
+LANGUAGE: Java
+CODE:
+public void send(List<Alert> alerts) {
+    for (Alert alert : alerts) {
+        // get alert group from alert
+        int alertId = Optional.ofNullable(alert.getId()).orElse(0);
+        int alertGroupId = Optional.ofNullable(alert.getAlertGroupId()).orElse(0);
+        List<AlertPluginInstance> alertInstanceList = alertDao.listInstanceByAlertGroupId(alertGroupId);
+        if (CollectionUtils.isEmpty(alertInstanceList)) {
+            logger.error("send alert msg fail,no bind plugin instance.");
+            List<AlertResult> alertResults = Lists.newArrayList(new AlertResult("false",
+                    "no bind plugin instance"));
+            alertDao.updateAlert(AlertStatus.EXECUTION_FAILURE, JSONUtils.toJsonString(alertResults), alertId);
+            continue;
+        }
+        AlertData alertData = AlertData.builder()
+                .id(alertId)
+                .content(alert.getContent())
+                .log(alert.getLog())
+                .title(alert.getTitle())
+                .warnType(alert.getWarningType().getCode())
+                .alertType(alert.getAlertType().getCode())
+                .build();
+
+        int sendSuccessCount = 0;
+        List<AlertResult> alertResults = new ArrayList<>();
+        for (AlertPluginInstance instance : alertInstanceList) {
+            AlertResult alertResult = this.alertResultHandler(instance, alertData);
+            if (alertResult != null) {
+                AlertStatus sendStatus = Boolean.parseBoolean(String.valueOf(alertResult.getStatus()))
+                        ? AlertStatus.EXECUTION_SUCCESS
+                        : AlertStatus.EXECUTION_FAILURE;
+                alertDao.addAlertSendStatus(sendStatus, JSONUtils.toJsonString(alertResult), alertId,
+                        instance.getId());
+                if (sendStatus.equals(AlertStatus.EXECUTION_SUCCESS)) {
+                    sendSuccessCount++;
+                    AlertServerMetrics.incAlertSuccessCount();
+                } else {
+                    AlertServerMetrics.incAlertFailCount();
+                }
+                alertResults.add(alertResult);
+            }
+        }
+        AlertStatus alertStatus = AlertStatus.EXECUTION_SUCCESS;
+        if (sendSuccessCount == 0) {
+            alertStatus = AlertStatus.EXECUTION_FAILURE;
+        } else if (sendSuccessCount < alertInstanceList.size()) {
+            alertStatus = AlertStatus.EXECUTION_PARTIAL_SUCCESS;
+        }
+        alertDao.updateAlert(alertStatus, JSONUtils.toJsonString(alertResults), alertId);
+    }
+}
+
+----------------------------------------
+
+TITLE: Sending Alerts in AlertSenderService
+DESCRIPTION: This code shows the main loop for sending alerts in the AlertSenderService class, including retrieving pending alerts and processing them.
+
+LANGUAGE: Java
+CODE:
+@Override
+public void run() {
+    logger.info("alert sender started");
+    while (!ServerLifeCycleManager.isStopped()) {
+        try {
+            List<Alert> alerts = alertDao.listPendingAlerts();
+            AlertServerMetrics.registerPendingAlertGauge(alerts::size);
+            this.send(alerts);
+            ThreadUtils.sleep(Constants.SLEEP_TIME_MILLIS * 5L);
+        } catch (Exception e) {
+            logger.error("alert sender thread error", e);
+        }
+    }
+}
+
+----------------------------------------
+
+TITLE: Implementing HttpAlertChannel in Java
+DESCRIPTION: This code implements the AlertChannel interface for the HTTP alert plugin, processing the alert information and sending the HTTP request.
+
+LANGUAGE: Java
+CODE:
+public final class HttpAlertChannel implements AlertChannel {
+    @Override
+    public AlertResult process(AlertInfo alertInfo) {
+        AlertData alertData = alertInfo.getAlertData();
+        Map<String, String> paramsMap = alertInfo.getAlertParams();
+        if (null == paramsMap) {
+            return new AlertResult("false", "http params is null");
+        }
+        return new HttpSender(paramsMap).send(alertData.getContent());
+    }
+}
+
+----------------------------------------
+
+TITLE: Handling Alert Results in AlertSenderService
+DESCRIPTION: This code snippet shows how individual alert results are handled, including retrieving the appropriate AlertChannel and processing the alert asynchronously.
+
+LANGUAGE: Java
+CODE:
+private @Nullable AlertResult alertResultHandler(AlertPluginInstance instance, AlertData alertData) {
+    String pluginInstanceName = instance.getInstanceName();
+    int pluginDefineId = instance.getPluginDefineId();
+    Optional<AlertChannel> alertChannelOptional = alertPluginManager.getAlertChannel(instance.getPluginDefineId());
+    if (!alertChannelOptional.isPresent()) {
+        String message = String.format("Alert Plugin %s send error: the channel doesn't exist, pluginDefineId: %s",
+                pluginInstanceName,
+                pluginDefineId);
+        logger.error("Alert Plugin {} send error : not found plugin {}", pluginInstanceName, pluginDefineId);
+        return new AlertResult("false", message);
+    }
+    AlertChannel alertChannel = alertChannelOptional.get();
+
+    Map<String, String> paramsMap = JSONUtils.toMap(instance.getPluginInstanceParams());
+    String instanceWarnType = WarningType.ALL.getDescp();
+
+    if (paramsMap != null) {
+        instanceWarnType = paramsMap.getOrDefault(AlertConstants.NAME_WARNING_TYPE, WarningType.ALL.getDescp());
+    }
+
+    WarningType warningType = WarningType.of(instanceWarnType);
+
+    if (warningType == null) {
+        String message = String.format("Alert Plugin %s send error : plugin warnType is null", pluginInstanceName);
+        logger.error("Alert Plugin {} send error : plugin warnType is null", pluginInstanceName);
+        return new AlertResult("false", message);
+    }
+
+    boolean sendWarning = false;
+    switch (warningType) {
+        case ALL:
+            sendWarning = true;
+            break;
+        case SUCCESS:
+            if (alertData.getWarnType() == WarningType.SUCCESS.getCode()) {
+                sendWarning = true;
+            }
+            break;
+        case FAILURE:
+            if (alertData.getWarnType() == WarningType.FAILURE.getCode()) {
+                sendWarning = true;
+            }
+            break;
+        default:
+    }
+
+    if (!sendWarning) {
+        logger.info(
+                "Alert Plugin {} send ignore warning type not match: plugin warning type is {}, alert data warning type is {}",
+                pluginInstanceName, warningType.getCode(), alertData.getWarnType());
+        return null;
+    }
+
+    AlertInfo alertInfo = AlertInfo.builder()
+            .alertData(alertData)
+            .alertParams(paramsMap)
+            .alertPluginInstanceId(instance.getId())
+            .build();
+    int waitTimeout = alertConfig.getWaitTimeout();
+    try {
+        AlertResult alertResult;
+        if (waitTimeout <= 0) {
+            if (alertData.getAlertType() == AlertType.CLOSE_ALERT.getCode()) {
+                alertResult = alertChannel.closeAlert(alertInfo);
+            } else {
+                alertResult = alertChannel.process(alertInfo);
+            }
+        } else {
+            CompletableFuture<AlertResult> future;
+            if (alertData.getAlertType() == AlertType.CLOSE_ALERT.getCode()) {
+                future = CompletableFuture.supplyAsync(() -> alertChannel.closeAlert(alertInfo));
+            } else {
+                future = CompletableFuture.supplyAsync(() -> alertChannel.process(alertInfo));
+            }
+            alertResult = future.get(waitTimeout, TimeUnit.MILLISECONDS);
+        }
+        if (alertResult == null) {
+            throw new RuntimeException("Alert result cannot be null");
+        }
+        return alertResult;
+    } catch (InterruptedException e) {
+        logger.error("send alert error alert data id :{},", alertData.getId(), e);
+        Thread.currentThread().interrupt();
+        return new AlertResult("false", e.getMessage());
+    } catch (Exception e) {
+        logger.error("send alert error alert data id :{},", alertData.getId(), e);
+        return new AlertResult("false", e.getMessage());
+    }
+}
+
+----------------------------------------
+
+TITLE: Implementing HttpAlertChannelFactory in Java
+DESCRIPTION: This code implements the AlertChannelFactory interface for the HTTP alert plugin, defining the plugin name, parameters, and creation method.
+
+LANGUAGE: Java
+CODE:
+@AutoService(AlertChannelFactory.class)
+public final class HttpAlertChannelFactory implements AlertChannelFactory {
+    @Override
+    public String name() {
+        return "Http";
+    }
+    @Override
+    public List<PluginParams> params() {
+        InputParam url = InputParam.newBuilder(HttpAlertConstants.NAME_URL, HttpAlertConstants.URL)
+                                   .setPlaceholder("input request URL")
+                                   .addValidate(Validate.newBuilder()
+                                                        .setRequired(true)
+                                                        .build())
+                                   .build();
+        InputParam headerParams = InputParam.newBuilder(HttpAlertConstants.NAME_HEADER_PARAMS, HttpAlertConstants.HEADER_PARAMS)
+                                            .setPlaceholder("input request headers as JSON format ")
+                                            .addValidate(Validate.newBuilder()
+                                                                 .setRequired(true)
+                                                                 .build())
+                                            .build();
+        InputParam bodyParams = InputParam.newBuilder(HttpAlertConstants.NAME_BODY_PARAMS, HttpAlertConstants.BODY_PARAMS)
+                                          .setPlaceholder("input request body as JSON format ")
+                                          .addValidate(Validate.newBuilder()
+                                                               .setRequired(false)
+                                                               .build())
+                                          .build();
+...........................Omitting redundant code 
+        return Arrays.asList(url, requestType, headerParams, bodyParams, contentField);
+    }
+    @Override
+    public AlertChannel create() {
+        return new HttpAlertChannel();
+    }
+}
+
+----------------------------------------
+
+TITLE: Implementing TaskChannelFactory for HiveClient Task
+DESCRIPTION: Java class implementing TaskChannelFactory interface to create a custom HiveClient task channel and define its parameters.
+
+LANGUAGE: Java
+CODE:
+package org.apache.dolphinscheduler.plugin.task.hive;
+import org.apache.dolphinscheduler.spi.params.base.PluginParams;
+import org.apache.dolphinscheduler.spi.task.TaskChannel;
+import org.apache.dolphinscheduler.spi.task.TaskChannelFactory;
+import java.util.List;
+public class HiveClientTaskChannelFactory implements TaskChannelFactory {
+    @Override
+    public TaskChannel create() {
+        return new HiveClientTaskChannel();
+    }
+    @Override
+    public String getName() {
+        return "HIVE CLIENT";
+    }
+    @Override
+    public List<PluginParams> getParams() {
+        List<PluginParams> pluginParams = new ArrayList<>();
+        InputParam nodeName = InputParam.newBuilder("name", "$t('Node name')")
+                .addValidate(Validate.newBuilder()
+                        .setRequired(true)
+                        .build())
+                .build();
+        PluginParams runFlag = RadioParam.newBuilder("runFlag", "RUN_FLAG")
+                .addParamsOptions(new ParamsOptions("NORMAL", "NORMAL", false))
+                .addParamsOptions(new ParamsOptions("FORBIDDEN", "FORBIDDEN", false))
+                .build();
+        PluginParams build = CheckboxParam.newBuilder("Hive SQL", "Test HiveSQL")
+                .setDisplay(true)
+                .setValue("-- author: \n --desc:")
+                .build();
+        pluginParams.add(nodeName);
+        pluginParams.add(runFlag);
+        pluginParams.add(build);
+        return pluginParams;
+    }
+}
+
+----------------------------------------
+
+TITLE: Defining Parameters for HiveClient Task
+DESCRIPTION: Java class extending AbstractParameters to define and validate parameters for the HiveClient task.
+
+LANGUAGE: Java
+CODE:
+package org.apache.dolphinscheduler.plugin.task.hive;
+import org.apache.dolphinscheduler.spi.task.AbstractParameters;
+import org.apache.dolphinscheduler.spi.task.ResourceInfo;
+import java.util.List;
+public class HiveClientParameters extends AbstractParameters {
+    private String sql;
+    public String getSql() {
+        return sql;
+    }
+    public void setSql(String sql) {
+        this.sql = sql;
+    }
+    @Override
+    public boolean checkParameters() {
+        return sql != null;
+    }
+    @Override
+    public List<ResourceInfo> getResourceFilesList() {
+        return null;
+    }
+}
+
+----------------------------------------
+
+TITLE: Implementing TaskChannel for HiveClient Task
+DESCRIPTION: Java class implementing TaskChannel interface to create and cancel HiveClient tasks.
+
+LANGUAGE: Java
+CODE:
+public class HiveClientTaskChannel implements TaskChannel {
+    @Override
+    public void cancelApplication(boolean b) {
+        //do nothing
+    }
+    @Override
+    public AbstractTask createTask(TaskRequest taskRequest) {
+        return new HiveClientTask(taskRequest);
+    }
+}
+
+----------------------------------------
+
+TITLE: Implementing HiveClient Task Execution
+DESCRIPTION: Java class extending AbstractYarnTask to implement the execution logic for the HiveClient task, including parameter parsing and command building.
+
+LANGUAGE: Java
+CODE:
+package org.apache.dolphinscheduler.plugin.task.hive;
+import org.apache.dolphinscheduler.plugin.task.api.AbstractYarnTask;
+import org.apache.dolphinscheduler.spi.task.AbstractParameters;
+import org.apache.dolphinscheduler.spi.task.request.TaskRequest;
+import org.apache.dolphinscheduler.spi.utils.JSONUtils;
+import java.io.*;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.*;
+public class HiveClientTask extends AbstractYarnTask {
+    private HiveClientParameters hiveClientParameters;
+    private final TaskRequest taskExecutionContext;
+    public HiveClientTask(TaskRequest taskRequest) {
+        super(taskRequest);
+        this.taskExecutionContext = taskRequest;
+    }
+    @Override
+    public void init() {
+        logger.info("hive client task param is {}", JSONUtils.toJsonString(taskExecutionContext));
+        this.hiveClientParameters = JSONUtils.parseObject(taskExecutionContext.getTaskParams(), HiveClientParameters.class);
+        if (this.hiveClientParameters != null && !hiveClientParameters.checkParameters()) {
+            throw new RuntimeException("hive client task params is not valid");
+        }
+    }
+    @Override
+    protected String buildCommand() {
+        String filePath = getFilePath();
+        if (writeExecutionContentToFile(filePath)) {
+            return "hive -f " + filePath;
+        }
+        return null;
+    }
+    private String getFilePath() {
+        return String.format("%s/hive-%s-%s.sql", this.taskExecutionContext.getExecutePath(), this.taskExecutionContext.getTaskName(), this.taskExecutionContext.getTaskInstanceId());
+    }
+    @Override
+    protected void setMainJarName() {
+        //do nothing
+    }
+    private boolean writeExecutionContentToFile(String filePath) {
+        Path path = Paths.get(filePath);
+        try (BufferedWriter writer = Files.newBufferedWriter(path, StandardCharsets.UTF_8)) {
+            writer.write(this.hiveClientParameters.getSql());
+            logger.info("file:" + filePath + "write success.");
+            return true;
+        } catch (IOException e) {
+            logger.error("file:" + filePath + "write failed. please path auth.");
+            e.printStackTrace();
+            return false;
+        }
+    }
+    @Override
+    public AbstractParameters getParameters() {
+        return this.hiveClientParameters;
+    }
+}
+
+----------------------------------------
+
+TITLE: Declaring Tasks in PyDolphinScheduler
+DESCRIPTION: Examples of declaring different types of tasks in PyDolphinScheduler using the Shell task type.
+
+LANGUAGE: python
+CODE:
+task_parent = Shell(name="task_parent", command="echo parent")\ntask_child_one = Shell(name="task_child_one", command="echo child one")\ntask_child_two = Shell(name="task_child_two", command="echo child two")\ntask_union = Shell(name="task_union", command="echo union")
+
+----------------------------------------
+
+TITLE: Executing Integrated DolphinScheduler Workflow
+DESCRIPTION: Command to execute an integrated DolphinScheduler workflow that combines training and deployment steps.
+
+LANGUAGE: bash
+CODE:
+pydolphinscheduler yaml -f pyds/train_and_deploy.yaml
+
+----------------------------------------
+
+TITLE: Setting Task Dependencies in PyDolphinScheduler
+DESCRIPTION: Example of setting task dependencies using the set_downstream and set_upstream methods in PyDolphinScheduler.
+
+LANGUAGE: python
+CODE:
+task_parent.set_downstream(task_child_one)\ntask_parent.set_downstream(task_child_two)\ntask_child_one.set_downstream(task_union)\ntask_child_two.set_downstream(task_union)
+
+----------------------------------------
+
+TITLE: DolphinScheduler Workflow Execution Action
+DESCRIPTION: GitHub Actions configuration for executing DolphinScheduler Python workflows with environment configuration.
+
+LANGUAGE: yaml
+CODE:
+name: Execute Workflows
+on:
+  push:
+    branches:
+      - main
+jobs:
+  execute:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository code
+        uses: actions/checkout@v3
+      - name: Execute
+        env:
+          PYDS_JAVA_GATEWAY_ADDRESS: <YOUR-STATIC-IP-RUN-DOLPHINSCHEDULER-API-SERVER>
+          PYDS_JAVA_GATEWAY_PORT: <PORT-RUN-DOLPHINSCHEDULER-API-SERVER>
+          PYDS_JAVA_GATEWAY_AUTH_TOKEN: ${{ secrets.YOUR-SECRET-NAME }} 
+        run: |
+          for file in $(find . -name "*.py"); do
+            python "$file"
+          done
+
+----------------------------------------
+
+TITLE: DolphinScheduler GitHub Actions Workflow
+DESCRIPTION: Complete GitHub Actions configuration for executing DolphinScheduler workflows with environment variables and authentication.
+
+LANGUAGE: yaml
+CODE:
+name: Execute Workflows
+on:
+  push:
+    branches:
+      - main
+jobs:
+  execute:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository code
+        uses: actions/checkout@v3
+      - name: Execute
+        env:
+          PYDS_JAVA_GATEWAY_ADDRESS: <YOUR-STATIC-IP-RUN-DOLPHINSCHEDULER-API-SERVER>
+          PYDS_JAVA_GATEWAY_PORT: <PORT-RUN-DOLPHINSCHEDULER-API-SERVER>
+          PYDS_JAVA_GATEWAY_AUTH_TOKEN: ${{ secrets.YOUR-SECRET-NAME }} 
+        run: |
+          for file in $(find . -name "*.py"); do
+            python "$file"
+          done
+
+----------------------------------------
+
+TITLE: Executing DolphinScheduler Workflow for DVC Initialization
+DESCRIPTION: Command to execute a DolphinScheduler workflow for initializing DVC repository using YAML definition.
+
+LANGUAGE: bash
+CODE:
+pydolphinscheduler yaml -f pyds/init_dvc_repo.yaml
+
+----------------------------------------
+
+TITLE: Basic GitHub Actions Workflow
+DESCRIPTION: Hello world example of GitHub Actions configuration showing basic structure and syntax.
+
+LANGUAGE: yaml
+CODE:
+name: GitHub Actions Demo
+on:
+  push:
+    branches:
+      - main
+jobs:
+  hello-world:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Run my very first GitHub Actions
+        run: echo "🎉 Hello World."
+
+----------------------------------------
+
+TITLE: Running Single Python Workflow
+DESCRIPTION: Basic command to execute a single DolphinScheduler Python API workflow file.
+
+LANGUAGE: bash
+CODE:
+python tutorial.py
+
+----------------------------------------
+
+TITLE: Dynamic Workflow Detection Script
+DESCRIPTION: Bash script to dynamically detect and execute all Python workflow files in a directory.
+
+LANGUAGE: bash
+CODE:
+for file in $(find . -name "*.py"); do
+    python "$file"
+done
+
+----------------------------------------
+
+TITLE: Pre-commit Configuration
+DESCRIPTION: Configuration for pre-commit hooks to enforce code style and quality checks for Python files.
+
+LANGUAGE: yaml
+CODE:
+default_stages: [commit, push]
+default_language_version:
+  python: python3
+repos:
+  - repo: https://github.com/pycqa/isort
+    rev: 5.10.1
+    hooks:
+      - id: isort
+        name: isort (python)
+  - repo: https://github.com/psf/black
+    rev: 22.3.0
+    hooks:
+      - id: black
+  - repo: https://github.com/pycqa/flake8
+    rev: 4.0.1
+    hooks:
+      - id: flake8
+        additional_dependencies: [
+          'flake8-docstrings>=1.6',
+          'flake8-black>=0.2',
+        ]
+        args: [
+          --config,
+          .flake8
+        ]
+  - repo: https://github.com/pycqa/autoflake
+    rev: v1.4
+    hooks:
+      - id: autoflake
+        args: [
+          --remove-all-unused-imports,
+          --ignore-init-module-imports,
+          --in-place
+        ]
+
+----------------------------------------
+
+TITLE: Basic GitHub Actions Hello World
+DESCRIPTION: Simple GitHub Actions workflow configuration demonstrating basic structure and syntax.
+
+LANGUAGE: yaml
+CODE:
+name: GitHub Actions Demo
+on:
+  push:
+    branches:
+      - main
+jobs:
+  hello-world:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Run my very first GitHub Actions
+        run: echo "🎉 Hello World."
+
+----------------------------------------
+
+TITLE: Executing Single Python Workflow
+DESCRIPTION: Basic command to execute a single DolphinScheduler Python API workflow script.
+
+LANGUAGE: bash
+CODE:
+python tutorial.py
+
+----------------------------------------
+
+TITLE: Implementing User Service Query Test with Mocking in Java
+DESCRIPTION: Example of a unit test for a UsersService class, demonstrating how to use Mockito to mock DAO layer operations.
+
+LANGUAGE: java
+CODE:
+@Service
+public class UsersServiceImpl extends BaseServiceImpl implements UsersService {
+    
+    /**
+     * query user
+     *
+     * @param name name
+     * @param password password
+     * @return user info
+     */
+    @Override
+    public User queryUser(String name, String password) {
+        String md5 = EncryptionUtils.getMd5(password);
+        return userMapper.queryUserByNamePassword(name, md5);
+    }
+    
+}
+
+LANGUAGE: java
+CODE:
+@RunWith(MockitoJUnitRunner.class)
+public class UsersServiceTest {
+    
+    private static final Logger logger = LoggerFactory.getLogger(UsersServiceTest.class);
+
+    @InjectMocks
+    private UsersServiceImpl usersService;
+
+    @Mock
+    private UserMapper userMapper;
+    
+    @Test
+    public void testQueryUser() {
+        String userName = "userTest0001";
+        String userPassword = "userTest0001";
+        when(userMapper.queryUserByNamePassword(userName, EncryptionUtils.getMd5(userPassword))).thenReturn(getGeneralUser());
+        User queryUser = usersService.queryUser(userName, userPassword);
+        logger.info(queryUser.toString());
+        Assert.assertTrue(queryUser != null);
+    }
+    
+    /**
+     * get user
+     */
+    private User getGeneralUser() {
+        User user = new User();
+        user.setUserType(UserType.GENERAL_USER);
+        user.setUserName("userTest0001");
+        user.setUserPassword("userTest0001");
+        return user;
+    }
+
+}
+
+----------------------------------------
+
+TITLE: Dynamic Workflow Detection Script
+DESCRIPTION: Bash script to dynamically detect and execute all Python workflow files in a directory.
+
+LANGUAGE: bash
+CODE:
+for file in $(find . -name "*.py"); do
+    python "$file"
+done
+
+----------------------------------------
+
+TITLE: Pre-commit Configuration
+DESCRIPTION: Pre-commit hook configuration for Python code formatting and linting in DolphinScheduler projects.
+
+LANGUAGE: yaml
+CODE:
+default_stages: [commit, push]
+default_language_version:
+  python: python3
+repos:
+  - repo: https://github.com/pycqa/isort
+    rev: 5.10.1
+    hooks:
+      - id: isort
+        name: isort (python)
+  - repo: https://github.com/psf/black
+    rev: 22.3.0
+    hooks:
+      - id: black
+  - repo: https://github.com/pycqa/flake8
+    rev: 4.0.1
+    hooks:
+      - id: flake8
+        additional_dependencies: [
+          'flake8-docstrings>=1.6',
+          'flake8-black>=0.2',
+        ]
+        args: [
+          --config,
+          .flake8
+        ]
+  - repo: https://github.com/pycqa/autoflake
+    rev: v1.4
+    hooks:
+      - id: autoflake
+        args: [
+          --remove-all-unused-imports,
+          --ignore-init-module-imports,
+          --in-place
+        ]
+
+----------------------------------------
+
+TITLE: Executing DolphinScheduler Workflow for Data Download
+DESCRIPTION: Command to execute a DolphinScheduler workflow for downloading test data using YAML definition.
+
+LANGUAGE: bash
+CODE:
+pydolphinscheduler yaml -f pyds/download_data.yaml
+
+----------------------------------------
+
+TITLE: Installing PyDolphinScheduler via pip
+DESCRIPTION: Command to install the latest version of PyDolphinScheduler using pip package manager.
+
+LANGUAGE: bash
+CODE:
+python -m pip install apache-dolphinscheduler
+
+----------------------------------------
+
+TITLE: Executing DolphinScheduler Workflow for Model Deployment
+DESCRIPTION: Command to execute a DolphinScheduler workflow for model deployment using YAML definition.
+
+LANGUAGE: bash
+CODE:
+pydolphinscheduler yaml -f pyds/deploy.yaml
+
+----------------------------------------
+
+TITLE: Executing DolphinScheduler Workflow for Model Training
+DESCRIPTION: Command to execute a DolphinScheduler workflow for model training using YAML definition.
+
+LANGUAGE: bash
+CODE:
+pydolphinscheduler yaml -f pyds/train_model.yaml
+
+----------------------------------------
+
+TITLE: Executing DolphinScheduler Workflow for Data Preparation
+DESCRIPTION: Command to execute a DolphinScheduler workflow for data preprocessing using YAML definition.
+
+LANGUAGE: bash
+CODE:
+pydolphinscheduler yaml -f pyds/prepare_data.yaml
+
+----------------------------------------
+
+TITLE: Extracting DolphinScheduler Source Package
+DESCRIPTION: Commands to download and extract the DolphinScheduler source package for deployment
+
+LANGUAGE: bash
+CODE:
+$ tar -zxvf apache-dolphinscheduler-<version>-src.tar.gz
+$ cd apache-dolphinscheduler-<version>-src/deploy/kubernetes/dolphinscheduler
+
+----------------------------------------
+
+TITLE: Configuring DolphinScheduler Values YAML
+DESCRIPTION: YAML configuration for DolphinScheduler deployment including ECR registry, database settings, and S3 storage configuration
+
+LANGUAGE: yaml
+CODE:
+image:
+   registry: "xxxxxx.dkr.ecr.us-east-1.amazonaws.com"
+   tag: "3.1.2"
+postgresql:
+   enabled: false
+mysql:
+   enabled: false
+externalDatabase:
+   type: "postgresql"
+   host: "dolphinscheduler.cluster-xxxxx.us-east-1.rds.amazonaws.com"
+   port: "5432"
+   username: "postgres"
+   password: "xxxxxxxx"
+   database: "dolphinscheduler"
+   params: "characterEncoding=utf8"
+conf:
+   common:
+     resource.storage.type: S3
+     resource.aws.access.key.id: xxxxxxx
+     resource.aws.secret.access.key: xxxxxxxxx
+     resource.aws.region: us-east-1
+     resource.aws.s3.bucket.name: dolphinscheduler-resourse
+     resource.aws.s3.endpoint: https://S3.us-east-1.amazonaws.com
+
+----------------------------------------
+
+TITLE: Creating Kubernetes Namespace
+DESCRIPTION: Command to create a dedicated Kubernetes namespace for DolphinScheduler
+
+LANGUAGE: bash
+CODE:
+$ kubectl create namespace dolphinscheduler
+
+----------------------------------------
+
+TITLE: Updating Task Instance Log Paths
+DESCRIPTION: SQL commands to update log paths in the database and copy log files to new locations after upgrade.
+
+LANGUAGE: sql
+CODE:
+update t_ds_task_instance set log_path=replace(log_path,'/logs/','/worker-server/logs/');
+cp -r {old_dolphinscheduler_directory}/logs/[1-9]* {new_dolphinscheduler_directory}/worker-server/logs/*
+
+----------------------------------------
+
+TITLE: Installing DolphinScheduler with Helm
+DESCRIPTION: Helm commands to deploy DolphinScheduler to the Kubernetes cluster
+
+LANGUAGE: bash
+CODE:
+$ cd apache-dolphinscheduler-<version>-src/deploy/kubernetes/dolphinscheduler
+$ helm repo add bitnami https://charts.bitnami.com/bitnami
+$ helm dependency update .
+$ helm install dolphinscheduler . --set image.tag=3.1.2 -n dolphinscheduler --set region=us-east-1 --set vpcId=vpc-xxx
+
+----------------------------------------
+
+TITLE: Configuring Network Load Balancer
+DESCRIPTION: YAML configuration for creating an AWS Network Load Balancer to expose DolphinScheduler externally
+
+LANGUAGE: yaml
+CODE:
+apiVersion: v1
+kind: Service
+metadata:
+   namespace: dolphinscheduler
+   name: service-dolphinscheduler
+   annotations:
+     service.beta.kubernetes.io/aws-load-balancer-type: external
+     service.beta.kubernetes.io/aws-load-balancer-nlb-target-type: ip
+     service.beta.kubernetes.io/aws-load-balancer-scheme: internet-facing
+     service.beta.kubernetes.io/subnets: subnet-xxx, subnet-xxx
+spec:
+   ports:
+     - port: 12345
+       targetPort: 12345
+       protocol: TCP
+   type: LoadBalancer
+   selector:
+     app.kubernetes.io/name: dolphinscheduler-api
+
+----------------------------------------
+
+TITLE: Setting DolphinScheduler Cluster User and Key Pair
+DESCRIPTION: Configuration for the cluster_env.sh script to set the instance user and key pair location for SSH access to EC2 instances.
+
+LANGUAGE: bash
+CODE:
+export INSTANCE_USER=${INSTANCE_USER:-"ubuntu"}
+export INSTANCE_KEY_PAIR="/change/to/your/personal/to/key/pair"
+
+----------------------------------------
+
+TITLE: Downloading DolphinScheduler Cluster Scripts
+DESCRIPTION: Commands to download the cluster.sh and cluster_env.sh scripts for setting up a DolphinScheduler cluster on AWS EC2 instances.
+
+LANGUAGE: bash
+CODE:
+wget https://raw.githubusercontent.com/WhaleOps/packer_tmpl/main/aws/ami/dolphinscheduler/bin/cluster.sh
+wget https://raw.githubusercontent.com/WhaleOps/packer_tmpl/main/aws/ami/dolphinscheduler/bin/cluster_env.sh
+
+----------------------------------------
+
+TITLE: Configuring DolphinScheduler Cluster Environment
+DESCRIPTION: Example configuration for the cluster_env.sh script, specifying IP addresses for different components of the DolphinScheduler cluster.
+
+LANGUAGE: bash
+CODE:
+export ips="192.168.1.1,192.168.1.2,192.168.1.3,192.168.1.4,192.168.1.5,192.168.1.6,192.168.1.7,192.168.1.8"
+
+export masters="192.168.1.1,192.168.1.2"
+export workers="192.168.1.3:default,192.168.1.4:default,192.168.1.5:default"
+export alertServer="192.168.1.6"
+export apiServers="192.168.1.7"
+export DATABASE_SERVER="192.168.1.8"
+export REGISTRY_SERVER="192.168.1.8"
+
+----------------------------------------
+
+TITLE: Executing DolphinScheduler Cluster Setup Script
+DESCRIPTION: Command to start the DolphinScheduler cluster setup process using the cluster.sh script.
+
+LANGUAGE: bash
+CODE:
+./cluster.sh start
+
+----------------------------------------
+
+TITLE: Downloading DolphinScheduler Cluster Scripts
+DESCRIPTION: Commands to download the required cluster.sh and cluster_env.sh scripts from GitHub repository for cluster deployment
+
+LANGUAGE: bash
+CODE:
+wget https://raw.githubusercontent.com/WhaleOps/packer_tmpl/main/aws/ami/dolphinscheduler/bin/cluster.sh
+wget https://raw.githubusercontent.com/WhaleOps/packer_tmpl/main/aws/ami/dolphinscheduler/bin/cluster_env.sh
+
+----------------------------------------
+
+TITLE: Configuring Cluster Environment Variables
+DESCRIPTION: Configuration settings in cluster_env.sh for defining IP addresses and server roles in the DolphinScheduler cluster
+
+LANGUAGE: bash
+CODE:
+export ips="192.168.1.1,192.168.1.2,192.168.1.3,192.168.1.4,192.168.1.5,192.168.1.6,192.168.1.7,192.168.1.8"
+
+LANGUAGE: bash
+CODE:
+export masters="192.168.1.1,192.168.1.2"
+export workers="192.168.1.3:default,192.168.1.4:default,192.168.1.5:default"
+export alertServer="192.168.1.6"
+export apiServers="192.168.1.7"
+export DATABASE_SERVER="192.168.1.8"
+export REGISTRY_SERVER="192.168.1.8"
+
+LANGUAGE: bash
+CODE:
+export INSTANCE_USER=${INSTANCE_USER:-"ubuntu"}
+export INSTANCE_KEY_PAIR="/change/to/your/personal/to/key/pair"
+
+----------------------------------------
+
+TITLE: Launching DolphinScheduler Cluster
+DESCRIPTION: Command to start the DolphinScheduler cluster deployment process
+
+LANGUAGE: bash
+CODE:
+./cluster.sh start
+
+----------------------------------------
+
+TITLE: Configuring Kerberos Principal Pattern in HDFS
+DESCRIPTION: XML configuration to set the Kerberos principal pattern for HDFS authentication in DolphinScheduler.
+
+LANGUAGE: xml
+CODE:
+<property>
+    <name>dfs.namenode.kerberos.principal.pattern</name>
+    <value>*</value>
+</property>
+
+----------------------------------------
+
+TITLE: Frontend Setup Commands
+DESCRIPTION: NPM commands for setting up and running the frontend UI
+
+LANGUAGE: shell
+CODE:
+npm install
+npm run start
+
+----------------------------------------
+
+TITLE: Configuring MySQL Datasource Properties
+DESCRIPTION: Database connection configuration for DolphinScheduler in datasource.properties file
+
+LANGUAGE: properties
+CODE:
+# mysql
+spring.datasource.driver-class-name=com.mysql.jdbc.Driver
+spring.datasource.url=jdbc:mysql://localhost:3306/dolphinschedulerTest?useUnicode=true&characterEncoding=UTF-8
+spring.datasource.username=root
+spring.datasource.password=rootroot
+
+----------------------------------------
+
+TITLE: Setting Zookeeper Connection Properties
+DESCRIPTION: Zookeeper connection configuration in zookeeper.properties file
+
+LANGUAGE: properties
+CODE:
+zookeeper.quorum=localhost:2181
+
+----------------------------------------
+
+TITLE: Configuring Logback XML
+DESCRIPTION: XML configuration for logging setup in logback configuration files
+
+LANGUAGE: xml
+CODE:
+<root level="INFO">
+    <appender-ref ref="STDOUT"/>  <!-- Add Standard Output -->
+    <appender-ref ref="APILOGFILE"/>
+    <appender-ref ref="SKYWALKING-LOG"/>
+</root>
+
+----------------------------------------
+
+TITLE: Configuring Zookeeper Properties
+DESCRIPTION: Configuration settings for Zookeeper data and log directories in zoo.cfg file
+
+LANGUAGE: properties
+CODE:
+dataDir=I:\\setup\\apache-zookeeper-3.6.3-bin\\data
+dataLogDir=I:\\setup\\apache-zookeeper-3.6.3-bin\\log
+
+----------------------------------------
+
+TITLE: Running MLflow Tracking Server with Docker
+DESCRIPTION: Docker command to start an MLflow tracking server container.
+
+LANGUAGE: bash
+CODE:
+docker run --name mlflow -p 5000:5000 -d jalonzjg/mlflow:latest
+
+----------------------------------------
+
+TITLE: Implementing Basic Calculator Sum Test in Java
+DESCRIPTION: Example of a unit test for a simple Calculator class, demonstrating the Arrange-Act-Assert (3A) principle.
+
+LANGUAGE: java
+CODE:
+public class Calculator {
+    public long sum(long a, long b) {
+        return a + b;
+    }
+}
+
+LANGUAGE: java
+CODE:
+public class CalculatorTest {
+    @Test
+    public void sum() {
+        // Arrange
+        long a = 1L, b = 2L;
+        Calculator calculator = new Calculator();
+        // Act
+        long actual = calculator.sum(a, b);
+        // Assert
+        long expected = 3L;
+        assertEquals(expected, actual);
+    }
+}
+
+----------------------------------------
+
+TITLE: Configuring Conda and Python Environment for DolphinScheduler
+DESCRIPTION: Bash commands to set up Conda and Python environment variables for DolphinScheduler.
+
+LANGUAGE: bash
+CODE:
+cp common.properties apache-dolphinscheduler-3.1.0-bin/standalone-server/conf
+echo "export PATH=$(which conda)/bin:\$PATH" >> apache-dolphinscheduler-3.1.0-bin/bin/env/dolphinscheduler_env.sh
+echo "export PYTHON_HOME=$(dirname $(which conda))/python" >> apache-dolphinscheduler-3.1.0-bin/bin/env/dolphinscheduler_env.sh
+
+----------------------------------------
+
+TITLE: Configuring Java Environment Variables
+DESCRIPTION: Bash commands to set JAVA_HOME and update PATH for Java 8 in the user's profile.
+
+LANGUAGE: bash
+CODE:
+export JAVA_HOME=/usr/lib/jvm/java-1.8.0-openjdk-amd64
+export PATH=$PATH:$JAVA_HOME/bin
+
+----------------------------------------
+
+TITLE: Downloading and Extracting Apache DolphinScheduler 3.1.0
+DESCRIPTION: Commands to download, extract, and clean up the Apache DolphinScheduler 3.1.0 binary package.
+
+LANGUAGE: bash
+CODE:
+cd first-example/install_dolphinscheduler
+wget https://dlcdn.apache.org/dolphinscheduler/3.1.0/apache-dolphinscheduler-3.1.0-bin.tar.gz
+tar -zxvf apache-dolphinscheduler-3.1.0-bin.tar.gz
+rm apache-dolphinscheduler-3.1.0-bin.tar.gz
+
+----------------------------------------
+
+TITLE: Starting Apache DolphinScheduler Standalone Server
+DESCRIPTION: Commands to start the Apache DolphinScheduler standalone server and optionally view logs.
+
+LANGUAGE: bash
+CODE:
+cd apache-dolphinscheduler-3.1.0-bin
+bash bin/dolphinscheduler-daemon.sh start standalone-server
+# tail -500f standalone-server/logs/dolphinscheduler-standalone.log
+
+----------------------------------------
+
+TITLE: Installing Apache DolphinScheduler Python SDK
+DESCRIPTION: Pip command to install the Apache DolphinScheduler Python SDK version 3.1.0.
+
+LANGUAGE: bash
+CODE:
+pip install apache-dolphinscheduler==3.1.0
+
+----------------------------------------
+
+TITLE: Installing MLflow and DVC in Conda Environment
+DESCRIPTION: Command to install MLflow version 1.30.0 and DVC using pip in the Conda environment.
+
+LANGUAGE: bash
+CODE:
+pip install mlflow==1.30.0 dvc
+
+----------------------------------------
+
+TITLE: Installing Java 8 on Ubuntu
+DESCRIPTION: Commands to update package lists, install OpenJDK 8, and verify the Java version on Ubuntu.
+
+LANGUAGE: bash
+CODE:
+sudo apt-get update
+sudo apt-get install openjdk-8-jdk
+java -version
+
+----------------------------------------
+
+TITLE: Creating Directory for ML Example Data
+DESCRIPTION: Command to create a directory for storing machine learning example data.
+
+LANGUAGE: bash
+CODE:
+mkdir /tmp/ds-ml-example
+
+----------------------------------------
+
+TITLE: Cloning DolphinScheduler ML Tutorial Repository
+DESCRIPTION: Commands to clone the DolphinScheduler machine learning tutorial repository and switch to the dev branch.
+
+LANGUAGE: bash
+CODE:
+git clone https://github.com/jieguangzhou/dolphinscheduler-ml-tutorial.git
+git checkout dev
+
+----------------------------------------
+
+TITLE: Creating Maven Project for DolphinScheduler Task Extension
+DESCRIPTION: Maven command to generate a project structure for extending DolphinScheduler with a custom HiveClient task.
+
+LANGUAGE: shell
+CODE:
+mvn archetype:generate \
+    -DarchetypeGroupId=org.apache.dolphinscheduler \
+    -DarchetypeArtifactId=dolphinscheduler-hive-client-task \
+    -DarchetypeVersion=1.10.0 \
+    -DgroupId=org.apache.dolphinscheduler \
+    -DartifactId=dolphinscheduler-hive-client-task \
+    -Dversion=0.1 \
+    -Dpackage=org.apache.dolphinscheduler \
+    -DinteractiveMode=false
+
+----------------------------------------
+
+TITLE: Defining Maven Dependencies for DolphinScheduler Task Extension
+DESCRIPTION: XML snippet showing the required Maven dependencies for extending DolphinScheduler tasks, including the SPI and task API libraries.
+
+LANGUAGE: XML
+CODE:
+<dependency>
+    <groupId>org.apache.dolphinscheduler</groupId>
+    <artifactId>dolphinscheduler-spi</artifactId>
+    <version>${dolphinscheduler.lib.version}</version>
+    <scope>${common.lib.scope}</scope>
+</dependency>
+<dependency>
+    <groupId>org.apache.dolphinscheduler</groupId>
+    <artifactId>dolphinscheduler-task-api</artifactId>
+    <version>${dolphinscheduler.lib.version}</version>
+    <scope>${common.lib.scope}</scope>
+</dependency>
+
+----------------------------------------
+
+TITLE: Creating SPI Configuration File
+DESCRIPTION: Shell commands to create the SPI configuration file for the custom HiveClient task implementation.
+
+LANGUAGE: shell
+CODE:
+# 1,Create META-INF/services folder under Resource, create the file with the same full class name of the interface
+zhang@xiaozhang resources % tree ./
+./
+└── META-INF
+    └── services
+        └─ org.apache.dolphinscheduler.spi.task.TaskChannelFactory
+# 2, write the fully qualified class name of the implemented class in the file
+zhang@xiaozhang resources % more META-INF/services/org.apache.dolphinscheduler.spi.task.TaskChannelFactory
+org.apache.dolphinscheduler.plugin.task.hive.HiveClientTaskChannelFactory
+
+----------------------------------------
+
+TITLE: Packaging and Deploying Custom Task Extension
+DESCRIPTION: Shell commands to package the custom task extension and deploy it to the DolphinScheduler environment.
+
+LANGUAGE: shell
+CODE:
+## 1,Packing
+mvn clean install
+## 2, Deployment
+cp ./target/dolphinscheduler-task-hiveclient-1.0.jar $DOLPHINSCHEDULER_HOME/lib/
+## 3,restart dolphinscheduler server
+
+----------------------------------------
+
+TITLE: Adding SEO Metadata to Markdown Files in Apache DolphinScheduler Website
+DESCRIPTION: Example of adding SEO-related metadata to the beginning of Markdown files in the Apache DolphinScheduler website project.
+
+LANGUAGE: markdown
+CODE:
+---
+title: title
+keywords: keywords1,keywords2, keywords3
+description: some description
+---
+
+----------------------------------------
+
+TITLE: Building and Verifying Apache DolphinScheduler Website
+DESCRIPTION: Commands to build the source code into the dist directory and verify changes locally using a simple Python HTTP server.
+
+LANGUAGE: bash
+CODE:
+yarn build
+python -m SimpleHTTPServer 8000
+# For Python 3:
+python3 -m http.server 8000
+
+----------------------------------------
+
+TITLE: Setting Up Node Environment with NVM for Apache DolphinScheduler Website
+DESCRIPTION: Instructions for using NVM to install and switch to Node.js v18.12.1 for building the Apache DolphinScheduler website.
+
+LANGUAGE: bash
+CODE:
+nvm install v18.12.1
+nvm use v18.12.1
+
+----------------------------------------
+
+TITLE: Building Apache DolphinScheduler Website Locally with Yarn
+DESCRIPTION: Steps to build and run the Apache DolphinScheduler website locally using Yarn. It includes installing dependencies, preparing resources, generating data, and starting a local server.
+
+LANGUAGE: bash
+CODE:
+yarn
+export PROTOCOL_MODE=ssh
+./scripts/prepare_docs.sh
+yarn generate
+yarn dev
+
+----------------------------------------
+
+TITLE: Configuring H2 In-Memory Database for Testing in YAML
+DESCRIPTION: Example of configuring an H2 in-memory database for unit testing in a Spring Boot application.
+
+LANGUAGE: yaml
+CODE:
+spring:
+  database:
+    driver-class-name: org.h2.Driver
+    url: jdbc:h2:mem:test	# test为数据库名称
+    initialization-mode: always	# always: 每次启动时进行初始化
+    schema: classpath:sql/schema.sql	# 用于初始化表结构的sql文件的路径
+    data: classpath:sql/data.sql	# 用于初始化表数据的sql文件的路径
+
+# 打印sql debug日志
+logging:
+  level:
+    org.apache.dolphinscheduler.dao.mapper: debug
+
+----------------------------------------
+
+TITLE: Implementing User Service Query Test with H2 Database in Java
+DESCRIPTION: Example of a unit test for a UsersService class using an H2 in-memory database instead of mocking.
+
+LANGUAGE: java
+CODE:
+@RunWith(MockitoJUnitRunner.class)
+public class UsersServiceTest {
+    
+    private static final Logger logger = LoggerFactory.getLogger(UsersServiceTest.class);
+
+    @InjectMocks
+    private UsersServiceImpl usersService;
+
+    @Mock
+    private UserMapper userMapper;
+    
+    @Before
+    public void createUser() {
+        String userName = "userTest0001";
+        String userPassword = "userTest0001";
+        User user = new User();
+        user.setUserName(userName);
+        user.setUserPassword(userPassword);
+        userMapper.insert(user);
+    }
+    
+    @Test
+    public void testQueryUser() {
+        String userName = "userTest0001";
+        String userPassword = "userTest0001";
+        User queryUser = usersService.queryUser(userName, userPassword);
+        logger.info(queryUser.toString());
+        Assert.assertTrue(queryUser != null);
+    }
+
+}
+
+----------------------------------------
+
+TITLE: Implementing REST Controller Login Test in Java
+DESCRIPTION: Example of a unit test for a UserController class, demonstrating how to test a REST endpoint using MockMvc.
+
+LANGUAGE: java
+CODE:
+@RestController
+public class UserController extends BaseController {
+
+    private final UserService service;
+
+    public UserController(UserService service) {
+        this.service = service;
+    }
+
+    @RequestMapping("/login")
+    @ResponseStatus(HttpStatus.OK)
+    public Result login(@RequestParam(value = "userName", required = false) String userName, @RequestParam(value = "userPassword", required = false) String userPassword) {
+
+        Map<String, Object> result = service.login(userName, userPassword);
+        return returnDataList(result);
+    }
+
+}
+
+LANGUAGE: java
+CODE:
+public class RestUserControllerTest extends AbstractRestControllerTest {
+
+    private static final Logger logger = LoggerFactory.getLogger(RestUserControllerTest.class);
+
+    @Test
+    public void testLogin() throws Exception {
+        // (2) Act
+        MvcResult mvcResult = mockMvc.perform(post("/login"))
+                .andExpect(status().isOk())	// (3) Assert
+                .andReturn();
+
+        MockHttpServletResponse response = mvcResult.getResponse();
+        String content = response.getContentAsString();
+
+        Result result = JSONUtils.parseObject(content, Result.class);
+        // (3) Assert
+        Assert.assertEquals(Status.SUCCESS.getCode(), result.getCode().intValue());
+        logger.info(content);
+    }
+
+    @Override
+    protected Object getTestedController() {
+        // (1) Arrange
+        UserService service = new UserService();
+        return new UserController(service);
+    }
+
+}
+
+----------------------------------------
+
+TITLE: Sample Task JSON Structure
+DESCRIPTION: Example of the JSON structure for a task definition in DolphinScheduler.
+
+LANGUAGE: JSON
+CODE:
+{
+	"type": "SHELL",
+	"id": "tasks-77643",
+	"name": "a",
+	"params": {
+		"resourceList": [],
+		"localParams": [{
+			"prop": "yesterday",
+			"direct": "IN",
+			"type": "VARCHAR",
+			"value": "${system.biz.date}"
+		}],
+		"rawScript": "echo ${yesterday}"
+	},
+	"description": "",
+	"timeout": {
+		"strategy": "",
+		"interval": null,
+		"enable": false
+	},
+	"runFlag": "NORMAL",
+	"conditionResult": {
+		"successNode": [""],
+		"failedNode": [""] 
+	},
+	"dependence": {},
+	"maxRetryTimes": "0",
+	"retryInterval": "1",
+	"taskInstancePriority": "MEDIUM",
+	"workerGroup": "default",
+	"preTasks": []
+}
+
+----------------------------------------
+
+TITLE: Creating Task Definition Table in MySQL
+DESCRIPTION: SQL code for creating the t_ds_task_definition table to store task definitions after JSON splitting.
+
+LANGUAGE: SQL
+CODE:
+CREATE TABLE `t_ds_task_definition` (
+  `id` int(11) NOT NULL AUTO_INCREMENT COMMENT 'self-increasing id',
+  `code` bigint(20) NOT NULL COMMENT 'encoding',
+  `name` varchar(200) DEFAULT NULL COMMENT 'task definition name',
+  `version` int(11) DEFAULT NULL COMMENT 'task definition version',
+  `description` text COMMENT 'description',
+  `project_code` bigint(20) NOT NULL COMMENT 'project code',
+  `user_id` int(11) DEFAULT NULL COMMENT 'task definition creator id',
+  `task_type` varchar(50) NOT NULL COMMENT 'task type',
+  `task_params` text COMMENT 'job custom parameters',
+  `flag` tinyint(2) DEFAULT NULL COMMENT '0 not available, 1 available',
+  `task_priority` tinyint(4) DEFAULT NULL COMMENT 'job priority',
+  `worker_group` varchar(200) DEFAULT NULL COMMENT 'worker grouping',
+  `fail_retry_times` int(11) DEFAULT NULL COMMENT 'number of failed retries',
+  `fail_retry_interval` int(11) DEFAULT NULL COMMENT 'failed retry interval',
+  `timeout_flag` tinyint(2) DEFAULT '0' COMMENT 'timeout flag:0 close, 1 open',
+  `timeout_notify_strategy` tinyint(4) DEFAULT NULL COMMENT 'timeout notification policy: 0 warning, 1 fail',
+  `timeout` int(11) DEFAULT '0' COMMENT 'timeout length,unit: minute',
+  `delay_time` int(11) DEFAULT '0' COMMENT 'delay execution time,unit: minute',
+  `resource_ids` varchar(255) DEFAULT NULL COMMENT 'resource id, separated by comma',
+  `create_time` datetime NOT NULL COMMENT 'create time',
+  `update_time` datetime DEFAULT NULL COMMENT 'update time',
+  PRIMARY KEY (`id`,`code`),
+  UNIQUE KEY `task_unique` (`name`,`project_code`) USING BTREE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8;
+
+----------------------------------------
+
+TITLE: Creating Process Task Relation Table in MySQL
+DESCRIPTION: SQL code for creating the t_ds_process_task_relation table to store task relationships after JSON splitting.
+
+LANGUAGE: SQL
+CODE:
+CREATE TABLE `t_ds_process_task_relation` (
+  `id` int(11) NOT NULL AUTO_INCREMENT COMMENT 'self-increasing id',
+  `name` varchar(200) DEFAULT NULL COMMENT 'relation name',
+  `process_definition_version` int(11) DEFAULT NULL COMMENT 'process version',
+  `project_code` bigint(20) NOT NULL COMMENT 'project code',
+  `process_definition_code` bigint(20) NOT NULL COMMENT 'process code',
+  `pre_task_code` bigint(20) NOT NULL COMMENT 'pre task code',
+  `pre_task_version` int(11) NOT NULL COMMENT 'pre task version',
+  `post_task_code` bigint(20) NOT NULL COMMENT 'post task code',
+  `post_task_version` int(11) NOT NULL COMMENT 'post task version',
+  `condition_type` tinyint(2) DEFAULT NULL COMMENT 'condition type : 0 none, 1 judge 2 delay',
+  `condition_params` text COMMENT 'condition params(json)',
+  `create_time` datetime NOT NULL COMMENT 'create time',
+  `update_time` datetime DEFAULT NULL COMMENT 'update time',
+  PRIMARY KEY (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8;
+
+----------------------------------------
+
+TITLE: Creating Process Definition Table in MySQL
+DESCRIPTION: SQL code for creating the t_ds_process_definition table to store workflow definitions after JSON splitting.
+
+LANGUAGE: SQL
+CODE:
+CREATE TABLE `t_ds_process_definition` (
+  `id` int(11) NOT NULL AUTO_INCREMENT COMMENT 'self-increasing id',
+  `code` bigint(20) NOT NULL COMMENT 'encoding',
+  `name` varchar(200) DEFAULT NULL COMMENT 'process definition name',
+  `version` int(11) DEFAULT NULL COMMENT 'process definition version',
+  `description` text COMMENT 'description',
+  `project_code` bigint(20) NOT NULL COMMENT 'project code',
+  `release_state` tinyint(4) DEFAULT NULL COMMENT 'process definition release state：0:offline,1:online',
+  `user_id` int(11) DEFAULT NULL COMMENT 'process definition creator id',
+  `global_params` text COMMENT 'global parameters',
+  `flag` tinyint(4) DEFAULT NULL COMMENT '0 not available, 1 available',
+  `locations` text COMMENT 'Node location information',
+  `connects` text COMMENT 'Node connection information',
+  `warning_group_id` int(11) DEFAULT NULL COMMENT 'alert group id',
+  `timeout` int(11) DEFAULT '0' COMMENT 'time out, unit: minute',
+  `tenant_id` int(11) NOT NULL DEFAULT '-1' COMMENT 'tenant id',
+  `create_time` datetime NOT NULL COMMENT 'create time',
+  `update_time` datetime DEFAULT NULL COMMENT 'update time',
+  PRIMARY KEY (`id`,`code`),
+  UNIQUE KEY `process_unique` (`name`,`project_code`) USING BTREE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8;
+
+----------------------------------------
+
+TITLE: Configuring Release Versions in Shell
+DESCRIPTION: Example of how to add or modify release version configurations in the conf.sh file. This associates version numbers with their corresponding release branches.
+
+LANGUAGE: shell
+CODE:
+declare -A DEV_RELEASE_DOCS_VERSIONS=(
+  ...
+  ["10.0.0"]="10.0.0-release"
+  ...
+)
+
+----------------------------------------
+
+TITLE: Executing Document Preparation Script in Shell
+DESCRIPTION: Command to run the script that prepares DolphinScheduler documentation by fetching content from various repositories.
+
+LANGUAGE: shell
+CODE:
+./scripts/prepare_docs.sh
+
+----------------------------------------
+
+TITLE: Customizing Documentation Source in Shell
+DESCRIPTION: Commands to set environment variables for customizing the documentation source, useful for testing changes from a forked repository before merging to the main project.
+
+LANGUAGE: shell
+CODE:
+# your github id already fork apache/dolphinscheduler
+export PROJECT_ORG="<YOUR-GITHUB-ID>"
+# the branch name you want to fetch and deploy website's document
+export PROJECT_BRANCH_NAME="<DEPLOY-BRANCH-OF-FORK>"
+
+----------------------------------------
+
+TITLE: DolphinScheduler Service Control Command
+DESCRIPTION: Command to start or stop DolphinScheduler services where server-name can be master-server, worker-server, api-server, alert-server or standalone-server
+
+LANGUAGE: plain
+CODE:
+bin/dolphinscheduler-daemon.sh <start|stop> <server-name>
+
+----------------------------------------
+
+TITLE: Resource Storage Configuration Parameter
+DESCRIPTION: Configuration parameter for specifying the resource storage type in DolphinScheduler
+
+LANGUAGE: plain
+CODE:
+resource.storage.type
+
+----------------------------------------
+
+TITLE: Executing One-Click Upgrade Script for Apache DolphinScheduler
+DESCRIPTION: This bash command runs a script to automatically upgrade Apache DolphinScheduler from version 1.x to version 2.0.1. It allows users to upgrade with a single command and continue running previous workflows without interruption.
+
+LANGUAGE: bash
+CODE:
+sh ./script/create-dolphinscheduler.sh
+
+----------------------------------------
+
+TITLE: Workflow Task Dependency Visualization
+DESCRIPTION: ASCII representation of the workflow task dependencies created by the WorkflowAsCode example.
+
+LANGUAGE: text
+CODE:
+--> task_child_one
+                / \
+task_parent --> --> task_union
+                \ /
+                  --> task_child_two
+
+----------------------------------------
+
+TITLE: LDAP Authentication Configuration
+DESCRIPTION: YAML configuration for setting up LDAP authentication in DolphinScheduler.
+
+LANGUAGE: yaml
+CODE:
+security:
+  authentication:
+    type: LDAP
+    ldap:
+      urls: xxx
+      base-dn: xxx
+      username: xxx
+      password: xxx
+      user:
+        admin: xxx
+        identity-attribute: xxx
+        email-attribute: xxx
+        not-exist-action: CREATE
+
+----------------------------------------
+
+TITLE: Kerberos Credential Update Implementation
+DESCRIPTION: Java implementation for scheduling periodic Kerberos credential updates to prevent expiration.
+
+LANGUAGE: java
+CODE:
+private static void startCheckKeytabTgtAndReloginJob() {
+    Executors.newScheduledThreadPool(1).scheduleWithFixedDelay(() -> {
+        try {
+            UserGroupInformation.getLoginUser().checkTGTAndReloginFromKeytab();
+            logger.warn("Check Kerberos Tgt And Relogin From Keytab Finish.");
+        } catch (IOException e) {
+            logger.error("Check Kerberos Tgt And Relogin From Keytab Error", e);
+        }
+    }, 0, 1, TimeUnit.DAYS);
+    logger.info("Start Check Keytab TGT And Relogin Job Success.");
+}
+
+----------------------------------------
+
+TITLE: Generating Unique Resource IDs in DolphinScheduler Workflows
+DESCRIPTION: Modification to generate absolute path of resources as unique IDs instead of auto-incremented database IDs. This allows workflows to be shared across different environments without primary key conflicts.
+
+LANGUAGE: json
+CODE:
+{
+  "id": 1,
+  "code": 6742745512384,
+  "name": "test",
+  "description": null,
+  "projectCode": 6742719696896,
+  "userId": 1,
+  "userName": null,
+  "taskType": "SHELL",
+  "taskParams": {
+    "resourceList": [
+      {
+        "id": 1,
+        "name": "run.sh",
+        "res": "/run.sh"
+      }
+    ],
+    "localParams": [],
+    "rawScript": "echo \"shell-task\"",
+    "dependence": {},
+    "conditionResult": {
+      "successNode": [],
+      "failedNode": []
+    },
+    "waitStartTimeout": {},
+    "switchResult": {}
+  }
+}
+
+----------------------------------------
+
+TITLE: Referencing Airflow DagFileProcessorManager for Task Migration
+DESCRIPTION: Mentions the core implementation class DagFileProcessorManager from Airflow, which is used as a reference for parsing Python tasks and generating JSON strings for DolphinScheduler task definitions.
+
+LANGUAGE: python
+CODE:
+# No actual code provided, just mentioning the class:
+DagFileProcessorManager
+
+----------------------------------------
+
+TITLE: SQL Query Example for Hive Parsing
+DESCRIPTION: An example SQL query used to demonstrate how Hive parses SQL statements into abstract syntax trees for input/output analysis.
+
+LANGUAGE: sql
+CODE:
+INSERT OVERWRITE TABLE dest_table
+SELECT col1, col2
+FROM source_table
+WHERE col3 > 10
+
+----------------------------------------
+
+TITLE: Airflow Task Migration to Apache DolphinScheduler
+DESCRIPTION: Reference to the DagFileProcessorManager class in Airflow, which is used as a basis for migrating Airflow Python tasks to Apache DolphinScheduler JSON task definitions.
+
+LANGUAGE: python
+CODE:
+DagFileProcessorManager
+
+----------------------------------------
+
+TITLE: Defining HTTP Alert Constants in Java
+DESCRIPTION: This code snippet defines constants used in the HTTP alert plugin, including parameter names and their corresponding display values.
+
+LANGUAGE: Java
+CODE:
+package org.apache.dolphinscheduler.plugin.alert.http;
+public final class HttpAlertConstants {
+    public static final String URL = "$t('url')";
+
+    public static final String NAME_URL = "url";
+
+    public static final String HEADER_PARAMS = "$t('headerParams')";
+
+    public static final String NAME_HEADER_PARAMS = "headerParams";
+
+...........................Omitting redundant code 
+
+    private HttpAlertConstants() {
+        throw new UnsupportedOperationException("This is a utility class and cannot be instantiated");
+    }
+}
+
+----------------------------------------
+
+TITLE: YAML Front Matter for Apache DolphinScheduler K8s Article
+DESCRIPTION: YAML front matter defining metadata for the article about Cisco Hangzhou's K8s task support in Apache DolphinScheduler. It specifies the title, keywords, and a brief description of the content.
+
+LANGUAGE: yaml
+CODE:
+---
+title:Fully Embracing K8s, Cisco Hangzhou Seeks to Support K8s Tasks Based on ApacheDolphinScheduler
+keywords: Apache,DolphinScheduler,scheduler,big data,ETL,airflow,hadoop,orchestration,dataops,K8s
+description: K8s is the future of the cloud and is the only infrastructure platform that
+---
+
+----------------------------------------
+
+TITLE: YAML Frontmatter for DolphinScheduler and Cisco Webex Integration Article
+DESCRIPTION: YAML frontmatter defining the title, keywords, and description for the article about DolphinScheduler and Cisco Webex integration.
+
+LANGUAGE: yaml
+CODE:
+---
+title: DolphinScheduler✖️Cisco Webex: k8s Integration Practice, Boosting Big Data Processing Efficiency!
+keywords: Apache,DolphinScheduler,scheduler,big data,ETL,airflow,hadoop,orchestration,dataops,Meetup
+description: ummary: Cisco Webex is a software company that develops and sells online meeting...
+---
+
+----------------------------------------
+
+TITLE: Configuring Web Crawler Access Rules in robots.txt
+DESCRIPTION: Basic robots.txt configuration that allows all user agents (*) unrestricted access to the site. The empty Disallow directive indicates no paths are restricted.
+
+LANGUAGE: robotstxt
+CODE:
+User-agent: *
+Disallow:
+
+----------------------------------------
+
+TITLE: Starting/Stopping Apache DolphinScheduler Services
+DESCRIPTION: Command to start or stop specific Apache DolphinScheduler services using a shell script.
+
+LANGUAGE: plain
+CODE:
+bin/dolphinscheduler-daemon.sh <start|stop> <server-name>
+
+----------------------------------------
+
+TITLE: Configuring Resource Storage Type in Apache DolphinScheduler
+DESCRIPTION: Configuration option to specify the resource storage type, including support for Amazon S3.
+
+LANGUAGE: plain
+CODE:
+resource.storage.type

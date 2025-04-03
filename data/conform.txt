@@ -1,0 +1,3772 @@
+TITLE: Complete Contact Form Implementation with Conform and Zod in React
+DESCRIPTION: This is the final comprehensive implementation of a contact form using Conform with Zod validation. It includes a complete validation schema, server-side action handling with error responses, and a fully configured form with client validation and accessibility attributes.
+
+LANGUAGE: tsx
+CODE:
+import {
+  useForm,
+  getFormProps,
+  getInputProps,
+  getTextareaProps,
+} from '@conform-to/react';
+import { parseWithZod, getZodConstraint } from '@conform-to/zod';
+import { type ActionFunctionArgs } from '@remix-run/node';
+import { Form, useActionData } from '@remix-run/react';
+import { z } from 'zod';
+import { sendMessage } from '~/message';
+
+const schema = z.object({
+  email: z
+    .string({ required_error: 'Email is required' })
+    .email('Email is invalid'),
+  message: z
+    .string({ required_error: 'Message is required' })
+    .min(10, 'Message is too short')
+    .max(100, 'Message is too long'),
+});
+
+export async function action({ request }: ActionFunctionArgs) {
+  const formData = await request.formData();
+  const submission = parseWithZod(formData, { schema });
+
+  if (submission.status !== 'success') {
+    return submission.reply();
+  }
+
+  const message = await sendMessage(submission.value);
+
+  if (!message.sent) {
+    return submission.reply({
+      formErrors: ['Failed to send the message. Please try again later.'],
+    });
+  }
+
+  return redirect('/messages');
+}
+
+export default function ContactUs() {
+  const lastResult = useActionData<typeof action>();
+  const [form, fields] = useForm({
+    lastResult,
+    constraint: getZodConstraint(schema),
+    shouldValidate: 'onBlur',
+    shouldRevalidate: 'onInput',
+    onValidate({ formData }) {
+      return parseWithZod(formData, { schema });
+    },
+  });
+
+  return (
+    <Form method="post" {...getFormProps(form)}>
+      <div>
+        <label htmlFor={fields.email.id}>Email</label>
+        <input {...getInputProps(fields.email, { type: 'email' })} />
+        <div id={fields.email.errorId}>{fields.email.errors}</div>
+      </div>
+      <div>
+        <label htmlFor={fields.message.id}>Message</label>
+        <textarea {...getTextareaProps(fields.message)} />
+        <div id={fields.message.errorId}>{fields.message.errors}</div>
+      </div>
+      <button>Send</button>
+    </Form>
+  );
+}
+
+----------------------------------------
+
+TITLE: Implementing a Type-Safe Login Form with Conform and Zod in React
+DESCRIPTION: This example demonstrates a complete login form implementation using Conform with Zod validation. It shows both the server-side action handler for processing form submissions and the client-side React component that renders the form. The code handles form validation, error display, and submission processing with progressive enhancement.
+
+LANGUAGE: tsx
+CODE:
+import { useForm } from '@conform-to/react';
+import { parseWithZod } from '@conform-to/zod';
+import { z } from 'zod';
+import { login } from './your-auth-library';
+import { useActionResult, redirect } from './your-server-framework';
+
+// Define a schema for your form
+const schema = z.object({
+  username: z.string(),
+  password: z.string(),
+});
+
+// Optional: Server action handler
+export async function action({ request }) {
+  const formData = await request.formData();
+  const submission = parseWithZod(formData, { schema });
+
+  // Send the submission back to the client if the status is not successful
+  if (submission.status !== 'success') {
+    return submission.reply();
+  }
+
+  const session = await login(submission.value);
+
+  // Send the submission with addional error message if login fails
+  if (!session) {
+    return submission.reply({
+      formErrors: ['Incorrect username or password'],
+    });
+  }
+
+  return redirect('/dashboard');
+}
+
+// Client form component
+export default function LoginForm() {
+  // Grab the last submission result if you have defined a server action handler
+  // This could be `useActionData()` or `useFormState()` depending on the framework
+  const lastResult = useActionResult();
+  const [form, fields] = useForm({
+    // Configure when each field should be validated
+    shouldValidate: 'onBlur',
+    // Optional: Required only if you're validating on the server
+    lastResult,
+    // Optional: Client validation. Fallback to server validation if not provided
+    onValidate({ formData }) {
+      return parseWithZod(formData, { schema });
+    },
+  });
+
+  return (
+    <form method="post" id={form.id} onSubmit={form.onSubmit}>
+      <div>{form.errors}</div>
+      <div>
+        <label>Username</label>
+        <input type="text" name={fields.username.name} />
+        <div>{fields.username.errors}</div>
+      </div>
+      <div>
+        <label>Password</label>
+        <input type="password" name={fields.password.name} />
+        <div>{fields.password.errors}</div>
+      </div>
+      <button>Login</button>
+    </form>
+  );
+}
+
+----------------------------------------
+
+TITLE: Basic Usage of useForm React Hook
+DESCRIPTION: Basic example showing how to use the useForm hook to create a form in React. The hook returns the form and fields metadata to enhance an HTML form.
+
+LANGUAGE: tsx
+CODE:
+const [form, fields] = useForm(options);
+
+----------------------------------------
+
+TITLE: Implementing Server-Side Form Validation with Conform and Zod
+DESCRIPTION: This example demonstrates how to set up server-side form validation using Conform with Zod for schema validation. The validation occurs during form submission and also when the user interacts with form fields, providing feedback without including validation logic in the client bundle.
+
+LANGUAGE: tsx
+CODE:
+import { useForm } from '@conform-to/react';
+import { parseWithZod } from '@conform-to/zod';
+import { z } from 'zod';
+
+export async function action({ request }: ActionArgs) {
+  const formData = await request.formData();
+  const submission = parseWithZod(formData, {
+    schema: z.object({
+      email: z.string().email(),
+      message: z.string().max(100),
+    }),
+  });
+
+  if (submission.status !== 'success') {
+    return submission.reply();
+  }
+
+  return await signup(data);
+}
+
+export default function Signup() {
+  // Last result returned by the server
+  const lastResult = useActionData<typeof action>();
+  const [form] = useForm({
+    // Sync the result of last submission
+    lastResult,
+
+    // Configure when each field should be validated
+    shouldValidate: 'onBlur',
+    shouldRevalidate: 'onInput',
+  });
+
+  // ...
+}
+
+----------------------------------------
+
+TITLE: Implementing Async Email Validation with conformZodMessage in a Signup Form
+DESCRIPTION: A complete signup form example that demonstrates how to use conformZodMessage to handle async validation for email uniqueness. The example shows how to create a dynamic schema creator that responds to validation intents, conditionally performs async validation, and properly handles validation states for both client and server validation.
+
+LANGUAGE: tsx
+CODE:
+import type { Intent } from '@conform-to/react';
+import { useForm } from '@conform-to/react';
+import { parseWithZod, conformZodMessage } from '@conform-to/zod';
+import { z } from 'zod';
+
+// Instead of sharing a schema, prepare a schema creator
+function createSchema(
+  // The `intent` will be provided by the `parseWithZod` helper
+  intent: Intent | null,
+  options?: {
+    isEmailUnique: (email: string) => Promise<boolean>;
+  },
+) {
+  return z
+    .object({
+      email: z
+        .string()
+        .email()
+        // Pipe the schema so it runs only if the email is valid
+        .pipe(
+          z.string().superRefine((email, ctx) => {
+            const isValidatingEmail =
+              intent === null ||
+              (intent.type === 'validate' && intent.payload.name === 'email');
+
+            if (!isValidatingEmail) {
+              ctx.addIssue({
+                code: 'custom',
+                message: conformZodMessage.VALIDATION_SKIPPED,
+              });
+              return;
+            }
+
+            if (typeof options?.isEmailUnique !== 'function') {
+              ctx.addIssue({
+                code: 'custom',
+                message: conformZodMessage.VALIDATION_UNDEFINED,
+                fatal: true,
+              });
+              return;
+            }
+
+            return options.isEmailUnique(email).then((isUnique) => {
+              if (!isUnique) {
+                ctx.addIssue({
+                  code: 'custom',
+                  message: 'Email is already used',
+                });
+              }
+            });
+          }),
+        ),
+    })
+    .and(
+      z
+        .object({
+          password: z.string({ required_error: 'Password is required' }),
+          confirmPassword: z.string({
+            required_error: 'Confirm password is required',
+          }),
+        })
+        .refine((data) => data.password === data.confirmPassword, {
+          message: 'Password does not match',
+          path: ['confirmPassword'],
+        }),
+    );
+}
+
+export async function action({ request }) {
+  const formData = await request.formData();
+  const submission = await parseWithZod(formData, {
+    schema: (intent) =>
+      // create the zod schema based on the intent
+      createSchema(intent, {
+        isEmailUnique(email) {
+          // query from your database
+        },
+      }),
+    async: true,
+  });
+
+  if (submission.status !== 'success') {
+    return submission.reply();
+  }
+
+  // ...
+}
+
+export default function Signup() {
+  const lastResult = useActionData();
+  const [form, fields] = useForm({
+    lastResult,
+    onValidate({ formData }) {
+      return parseWithZod(formData, {
+        // Create the schema without `isEmailUnique` defined
+        schema: (intent) => createSchema(intent),
+      });
+    },
+  });
+
+  // ...
+}
+
+----------------------------------------
+
+TITLE: Fully enhanced contact form using Conform's useForm and getZodConstraint
+DESCRIPTION: Complete implementation of the contact form using Conform's useForm hook and getZodConstraint utility to manage form metadata, validation attributes, and accessibility features.
+
+LANGUAGE: tsx
+CODE:
+import { useForm } from '@conform-to/react';
+import { parseWithZod, getZodConstraint } from '@conform-to/zod';
+import { type ActionFunctionArgs } from '@remix-run/node';
+import { Form, useActionData } from '@remix-run/react';
+import { z } from 'zod';
+import { sendMessage } from '~/message';
+import { getUser } from '~/session';
+
+const schema = z.object({
+	// ...
+});
+
+export async function action({ request }: ActionFunctionArgs) {
+	// ...
+}
+
+export default function ContactUs() {
+	const lastResult = useActionData<typeof action>();
+	// The useForm hook will return all the metadata we need to render the form
+	// and put focus on the first invalid field when the form is submitted
+	const [form, fields] = useForm({
+		// This not only syncs the error from the server
+		// But is also used as the default value of the form
+		// in case the document is reloaded for progressive enhancement
+		lastResult,
+
+		// To derive all validation attributes
+		constraint: getZodConstraint(schema),
+	});
+
+	return (
+		<Form
+			method="post"
+      {/* The only additional attribute you need is the `id` attribute */}
+			id={form.id}
+			aria-invalid={form.errors ? true : undefined}
+			aria-describedby={form.errors ? form.errorId : undefined}
+		>
+			<div id={form.errorId}>{form.errors}</div>
+			<div>
+				<label htmlFor={fields.email.id}>Email</label>
+				<input
+					id={fields.email.id}
+					type="email"
+					name={fields.email.name}
+					defaultValue={fields.email.initialValue}
+					required={fields.email.required}
+					aria-invalid={fields.email.errors ? true : undefined}
+					aria-describedby={
+						fields.email.errors ? fields.email.errorId : undefined
+					}
+				/>
+				<div id={fields.email.errorId}>{fields.email.errors}</div>
+			</div>
+			<div>
+				<label htmlFor={fields.message.id}>Message</label>
+				<textarea
+					id={fields.message.id}
+					name={fields.message.name}
+					defaultValue={fields.message.initialValue}
+					required={fields.message.required}
+					minLength={fields.message.minLength}
+					maxLength={fields.message.maxLength}
+					aria-invalid={fields.message.errors ? true : undefined}
+					aria-describedby={
+						fields.message.errors ? fields.message.errorId : undefined
+					}
+				/>
+				<div id={fields.message.errorId}>{fields.message.errors}</div>
+			</div>
+			<button>Send</button>
+		</Form>
+	);
+}
+
+----------------------------------------
+
+TITLE: Creating a Login Form with Conform and Remix
+DESCRIPTION: A comprehensive example of a login form implementation using Conform with Remix. It demonstrates schema validation with Zod, server-side validation in the action function, and client-side form handling with proper error display.
+
+LANGUAGE: tsx
+CODE:
+import { getFormProps, getInputProps, useForm } from '@conform-to/react';
+import { parseWithZod } from '@conform-to/zod';
+import type { ActionArgs } from '@remix-run/node';
+import { json, redirect } from '@remix-run/node';
+import { Form, useActionData } from '@remix-run/react';
+import { z } from 'zod';
+
+const schema = z.object({
+  email: z.string().email(),
+  password: z.string(),
+  remember: z.boolean().optional(),
+});
+
+export async function action({ request }: ActionArgs) {
+  const formData = await request.formData();
+  const submission = parseWithZod(formData, { schema });
+
+  if (submission.status !== 'success') {
+    return json(submission.reply());
+  }
+
+  // ...
+}
+
+export default function Login() {
+  // Last submission returned by the server
+  const lastResult = useActionData<typeof action>();
+  const [form, fields] = useForm({
+    // Sync the result of last submission
+    lastResult,
+
+    // Reuse the validation logic on the client
+    onValidate({ formData }) {
+      return parseWithZod(formData, { schema });
+    },
+
+    // Validate the form on blur event triggered
+    shouldValidate: 'onBlur',
+    shouldRevalidate: 'onInput',
+  });
+
+  return (
+    <Form method="post" id={form.id} onSubmit={form.onSubmit} noValidate>
+      <div>
+        <label>Email</label>
+        <input
+          type="email"
+          key={fields.email.key}
+          name={fields.email.name}
+          defaultValue={fields.email.initialValue}
+        />
+        <div>{fields.email.errors}</div>
+      </div>
+      <div>
+        <label>Password</label>
+        <input
+          type="password"
+          key={fields.password.key}
+          name={fields.password.name}
+          defaultValue={fields.password.initialValue}
+        />
+        <div>{fields.password.errors}</div>
+      </div>
+      <label>
+        <div>
+          <span>Remember me</span>
+          <input
+            type="checkbox"
+            key={fields.remember.key}
+            name={fields.remember.name}
+            defaultChecked={fields.remember.initialValue === 'on'}
+          />
+        </div>
+      </label>
+      <hr />
+      <button>Login</button>
+    </Form>
+  );
+}
+
+----------------------------------------
+
+TITLE: Parsing FormData with Constraints and Error Formatting in TypeScript
+DESCRIPTION: Demonstrates how to use the parse function to validate form data on the server side using type constraints and a custom error formatter. The function validates email and password fields and returns appropriate error messages.
+
+LANGUAGE: typescript
+CODE:
+import { type FormConstraints, type FormatErrorArgs, parse } from '@conform-to/validitystate';
+
+const constraints = {
+    email: { type: 'email', required: true },
+    password: { type: 'password', required: true },
+    remember: { type: 'checkbox' },
+} satisify FormConstraints;
+
+function formatError({ input }: FormatErrorArgs) {
+    switch (input.name) {
+        case 'email': {
+            if (input.validity.valueMissing) {
+                return 'Email is required';
+            } else if (input.validity.typeMismatch) {
+                return 'Email is invalid';
+            }
+            break;
+        }
+        case 'password': {
+            if (input.validity.valueMissing) {
+                return 'Password is required';
+            }
+            break;
+        }
+     }
+
+     return '';
+}
+
+const submission = parse(formData, {
+  constraints,
+  formatError,
+});
+
+// The error will be a dictionary mapping input name to the corresponding errors
+// e.g. { email: 'Email is required', password: 'Password is required' }
+console.log(submission.error);
+
+if (!submission.error) {
+    // If no error, the parsed data will be available with the inferred type.
+    // e.g. { email: string; password: string; remember: boolean; }
+    console.log(submission.value);
+}
+
+----------------------------------------
+
+TITLE: Adding Client-Side Validation with Conform and Zod in React
+DESCRIPTION: This code shows how to implement client-side validation using Conform and Zod to provide immediate feedback without server round-trips. It uses the `onValidate` callback to perform validation on the client using the same schema logic that runs on the server.
+
+LANGUAGE: tsx
+CODE:
+import { useForm } from '@conform-to/react';
+import { parseWithZod } from '@conform-to/zod';
+import { type ActionFunctionArgs, type LoaderFunctionArgs } from '@remix-run/node';
+import { Form, useActionData, useLoaderData } from '@remix-run/react';
+import { sendMessage } from '~/message';
+import { getUser } from '~/session';
+
+const schema = z.object({
+	// ...
+});
+
+export async function action({ request }: ActionFunctionArgs) {
+	// ...
+}
+
+export default function ContactUs() {
+	const user = useLoaderData<typeof loader>();
+	const lastResult = useActionData<typeof action>();
+	const [form, fields] = useForm({
+		// ... previous config
+
+		// Run the same validation logic on client
+		onValidate({ formData }) {
+			return parseWithZod(formData, { schema });
+		},
+	});
+
+	return (
+    <Form
+      method="post"
+			id={form.id}
+      {/* The `onSubmit` handler is required for client validation */}
+      onSubmit={form.onSubmit}
+			aria-invalid={form.errors ? true : undefined}
+			aria-describedby={form.errors ? form.errorId : undefined}
+    >
+      {/* ... */}
+    </Form>
+  );
+}
+
+----------------------------------------
+
+TITLE: Implementing Async Form Validation with Conform and Zod
+DESCRIPTION: This example demonstrates how to handle async validation (like checking email uniqueness) by implementing a schema creator function that can gracefully fall back to server validation when needed. It shows how to conditionally execute async validation logic on the server while providing a smooth client experience.
+
+LANGUAGE: tsx
+CODE:
+import { refine } from '@conform-to/zod';
+
+// Instead of sharing a schema, prepare a schema creator
+function createSchema(
+  options?: {
+    isEmailUnique: (email: string) => Promise<boolean>;
+  },
+) {
+  return z
+    .object({
+      email: z
+        .string()
+        .email()
+        // Pipe the schema so it runs only if the email is valid
+        .pipe(
+          // Note: The callback cannot be async here
+          // As we run zod validation synchronously on the client
+          z.string().superRefine((email, ctx) => {
+            // This makes Conform to fallback to server validation
+            // by indicating that the validation is not defined
+            if (typeof options?.isEmailUnique !== 'function') {
+              ctx.addIssue({
+                code: 'custom',
+                message: conformZodMessage.VALIDATION_UNDEFINED,
+                fatal: true,
+              });
+              return;
+            }
+
+            // If it reaches here, then it must be validating on the server
+            // Return the result as a promise so Zod knows it's async instead
+            return options.isEmailUnique(email).then((isUnique) => {
+              if (!isUnique) {
+                ctx.addIssue({
+                  code: 'custom',
+                  message: 'Email is already used',
+                });
+              }
+            });
+          }),
+        ),
+    }),
+    // ...
+}
+
+export function action() {
+	const formData = await request.formData();
+	const submission = await parseWithZod(formData, {
+		// create the zod schema with `isEmailUnique()` implemented
+		schema: createSchema({
+			async isEmailUnique(email) {
+				// ...
+			},
+		}),
+
+		// Enable async validation on the server
+    // We won't set `async: true` on the client
+    // as client validation must be synchronous
+		async: true,
+	});
+
+	// ...
+}
+
+export default function Signup() {
+	const lastResult = useActionData();
+	const [form] = useForm({
+		lastResult,
+		onValidate({ formData }) {
+			return parseWithZod(formData, {
+				// Create the schema without implementing `isEmailUnique()`
+				schema: createSchema(),
+			});
+		},
+	});
+
+	// ...
+}
+
+----------------------------------------
+
+TITLE: Managing Multiple File Uploads with Conform and Zod in React
+DESCRIPTION: This code demonstrates handling multiple file uploads using Conform with Zod validation. It includes more advanced validation rules like checking file size restrictions and setting a minimum required number of files. It also shows how to access and display all validation errors across multiple files.
+
+LANGUAGE: tsx
+CODE:
+import { useForm } from '@conform-to/react';
+import { parse } from '@conform-to/zod';
+import { z } from 'zod';
+
+const schema = z.object({
+  files: z
+    .array(
+      z
+        .instanceof(File)
+        .refine((file) => file.size < 1024, 'File size must be less than 1kb'),
+    )
+    .min(1, 'At least 1 file is required')
+    .refine(
+      (files) => files.every((file) => file.size < 1024),
+      'File size must be less than 1kb',
+    ),
+});
+
+function Example() {
+  const [form, fields] = useForm({
+    onValidate({ formData }) {
+      return parseWithZod(formData, { schema });
+    },
+  });
+
+  return (
+    <form method="POST" encType="multipart/form-data" id={form.id}>
+      <div>
+        <label>Mutliple Files</label>
+        <input type="file" name={fields.files.name} multiple />
+        <div>{Object.values(fields.files.allErrors).flat()}</div>
+      </div>
+      <button>Upload</button>
+    </form>
+  );
+}
+
+----------------------------------------
+
+TITLE: Complete Example of getFieldsetProps with useForm
+DESCRIPTION: Shows a complete example of using getFieldsetProps with the useForm hook to create an accessible fieldset element in a React component.
+
+LANGUAGE: tsx
+CODE:
+import { useForm, getFieldsetProps } from '@conform-to/react';
+
+function Example() {
+  const [form, fields] = useForm();
+
+  return <fieldset {...getFieldsetProps(fields.address)} />;
+}
+
+----------------------------------------
+
+TITLE: Implementing Server Action for Login Form Submission in Next.js
+DESCRIPTION: Creates a server action function that handles form submission using Conform with Zod validation. If validation succeeds, it redirects to the dashboard, otherwise returns validation errors.
+
+LANGUAGE: typescript
+CODE:
+'use server'; // action.ts
+
+import { redirect } from 'next/navigation';
+import { parseWithZod } from '@conform-to/zod';
+import { loginSchema } from '@/app/schema';
+
+export async function login(prevState: unknown, formData: FormData) {
+  const submission = parseWithZod(formData, {
+    schema: loginSchema,
+  });
+
+  if (submission.status !== 'success') {
+    return submission.reply();
+  }
+
+  redirect('/dashboard');
+}
+
+----------------------------------------
+
+TITLE: Client-side Validation with Custom Constraints in React
+DESCRIPTION: Demonstrates how to use the validate function to implement client-side validation in a React form. This approach applies custom validation constraints and error formatting before form submission.
+
+LANGUAGE: tsx
+CODE:
+import { validate } from '@conform-to/validitystate';
+
+function Example() {
+  return (
+    <form
+      onSubmit={(event) => {
+        const form = event.currentTarget;
+
+        // validate before reporting new error
+        validate(form, {
+          constraints,
+          formatError,
+        });
+
+        if (!form.reportValidity()) {
+          event.preventDefault();
+        }
+      }}
+      noValidate
+    >
+      {/* ... */}
+    </form>
+  );
+}
+
+----------------------------------------
+
+TITLE: Implementing Conditional Validation with Conform and Zod
+DESCRIPTION: This example shows how to optimize validation performance by conditionally validating fields based on submission intent. It demonstrates how to skip validation for fields that aren't currently being interacted with, which is especially useful for expensive async validations.
+
+LANGUAGE: tsx
+CODE:
+import { parseWithZod, conformZodMessage } from '@conform-to/zod';
+
+function createSchema(
+  // The `intent` will be provieded by the `parseWithZod` helper
+  intent: Intent | null,
+  options?: {
+    isEmailUnique: (email: string) => Promise<boolean>;
+  },
+) {
+  return z
+    .object({
+      email: z
+        .string()
+        .email()
+        .pipe(
+          z.string().superRefine((email, ctx) => {
+            const isValidatingEmail =
+              intent === null ||
+              (intent.type === 'validate' && intent.payload.name === 'email');
+
+            // This make Conform to use the previous result instead
+            // by indicating that the validation is skipped
+            if (!isValidatingEmail) {
+              ctx.addIssue({
+                code: 'custom',
+                message: conformZodMessage.VALIDATION_SKIPPED,
+              });
+              return;
+            }
+
+            if (typeof options?.isEmailUnique !== 'function') {
+              ctx.addIssue({
+                code: 'custom',
+                message: conformZodMessage.VALIDATION_UNDEFINED,
+                fatal: true,
+              });
+              return;
+            }
+
+            return options.isEmailUnique(email).then((isUnique) => {
+              if (!isUnique) {
+                ctx.addIssue({
+                  code: 'custom',
+                  message: 'Email is already used',
+                });
+              }
+            });
+          }),
+        ),
+    }),
+    // ...
+}
+
+export async function action({ request }: ActionArgs) {
+	const formData = await request.formData();
+	const submission = await parseWithZod(formData, {
+		// Retrieve the intent by providing a function instead
+		schema: (intent) =>
+			createSchema(intent, {
+				async isEmailUnique(email) {
+					// ...
+				},
+			}),
+
+		async: true,
+	});
+
+	// ...
+}
+
+export default function Signup() {
+	const lastResult = useActionData();
+	const [form] = useForm({
+		lastResult,
+		onValidate({ formData }) {
+			return parseWithZod(formData, {
+				// Similar to the action above
+				schema: (intent) => createSchema(intent),
+			});
+		},
+	});
+
+	// ...
+}
+
+----------------------------------------
+
+TITLE: Using FormStateInput Component with React in Conform
+DESCRIPTION: Example of how to implement the FormStateInput component within a React form to persist form state across page reloads. The component needs to be placed inside a FormProvider with the appropriate context from useForm.
+
+LANGUAGE: tsx
+CODE:
+import { FormProvider, FormStateInput, useForm } from '@conform-to/react';
+
+export default function SomeParent() {
+  const [form, fields] = useForm();
+
+  return (
+    <FormProvider context={form.context}>
+      <FormStateInput />
+    </FormProvider>
+  );
+}
+
+----------------------------------------
+
+TITLE: Building Client-Side Login Form Component with Conform and React in Next.js
+DESCRIPTION: Implements a client-side login form component using Conform hooks for form validation and state management. The component leverages useForm and useFormState hooks to handle form submission, validation, and error display.
+
+LANGUAGE: typescript
+CODE:
+'use client'; // form.tsx
+
+import { useForm } from '@conform-to/react';
+import { parseWithZod } from '@conform-to/zod';
+import { useFormState } from 'react-dom';
+import { login } from '@/app/actions';
+import { loginSchema } from '@/app/schema';
+
+export function LoginForm() {
+  const [lastResult, action] = useFormState(login, undefined);
+  const [form, fields] = useForm({
+    // Sync the result of last submission
+    lastResult,
+
+    // Reuse the validation logic on the client
+    onValidate({ formData }) {
+      return parseWithZod(formData, { schema: loginSchema });
+    },
+
+    // Validate the form on blur event triggered
+    shouldValidate: 'onBlur',
+    shouldRevalidate: 'onInput',
+  });
+
+  return (
+    <form id={form.id} onSubmit={form.onSubmit} action={action} noValidate>
+      <div>
+        <label>Email</label>
+        <input
+          type="email"
+          key={fields.email.key}
+          name={fields.email.name}
+          defaultValue={fields.email.initialValue}
+        />
+        <div>{fields.email.errors}</div>
+      </div>
+      <div>
+        <label>Password</label>
+        <input
+          type="password"
+          key={fields.password.key}
+          name={fields.password.name}
+          defaultValue={fields.password.initialValue}
+        />
+        <div>{fields.password.errors}</div>
+      </div>
+      <label>
+        <div>
+          <span>Remember me</span>
+          <input
+            type="checkbox"
+            key={fields.remember.key}
+            name={fields.remember.name}
+            defaultChecked={fields.remember.initialValue === 'on'}
+          />
+        </div>
+      </label>
+      <button>Login</button>
+    </form>
+  );
+}
+
+----------------------------------------
+
+TITLE: Complete Example of Using getCollectionProps with Radio Buttons
+DESCRIPTION: A comprehensive example demonstrating how to use getCollectionProps with radio buttons in a React component. The example shows how to map over the generated props to create a collection of radio inputs.
+
+LANGUAGE: tsx
+CODE:
+import { useForm, getCollectionProps } from '@conform-to/react';
+
+function Example() {
+  const [form, fields] = useForm();
+
+  return (
+    <>
+      {getCollectionProps(fields.color, {
+        type: 'radio',
+        options: ['red', 'green', 'blue'],
+      }).map((props) => (
+        <label key={props.id} htmlFor={props.id}>
+          <input {...props} />
+          <span>{props.value}</span>
+        </label>
+      ))}
+    </>
+  );
+}
+
+----------------------------------------
+
+TITLE: Implementing Single File Upload with Conform and Zod in React
+DESCRIPTION: This example demonstrates how to set up a simple file upload form using Conform with Zod validation. It shows the configuration for handling a single file upload, including form setup with multipart/form-data encoding and validation to ensure a file is provided.
+
+LANGUAGE: tsx
+CODE:
+import { useForm } from '@conform-to/react';
+import { parseWithZod } from '@conform-to/zod';
+import { z } from 'zod';
+
+const schema = z.object({
+  profile: z.instanceof(File, { message: 'Profile is required' }),
+});
+
+function Example() {
+  const [form, fields] = useForm({
+    onValidate({ formData }) {
+      return parseWithZod(formData, { schema });
+    },
+  });
+
+  return (
+    <form method="POST" encType="multipart/form-data" id={form.id}>
+      <div>
+        <label>Profile</label>
+        <input type="file" name={fields.profile.name} />
+        <div>{fields.profile.error}</div>
+      </div>
+      <button>Upload</button>
+    </form>
+  );
+}
+
+----------------------------------------
+
+TITLE: Using Zod Schema for Validation Attributes
+DESCRIPTION: This example shows how to derive HTML validation attributes (required, minLength, maxLength, pattern) from a Zod schema using Conform's integration. The validation constraints are automatically extracted and applied to the form fields.
+
+LANGUAGE: tsx
+CODE:
+import { parseWithZod, getZodConstraint } from '@conform-to/zod';
+import { useForm } from '@conform-to/react';
+import { z } from 'zod';
+
+const schema = z.object({
+  message: z
+    .string()
+    .min(10)
+    .max(100)
+    .regex(/^[A-Za-z0-9 ]{10-100}$/),
+});
+
+function Example() {
+  const [form, fields] = useForm({
+    constraint: getZodConstraint(schema),
+    onValidate({ formData }) {
+      return parseWithZod(formData, { schema });
+    },
+  });
+
+  return (
+    <form id={form.id}>
+      <input
+        type="text"
+        name={fields.message.name}
+        required={fields.message.required}
+        minLength={fields.message.minLength}
+        maxLength={fields.message.maxLength}
+        pattern={fields.message.pattern}
+      />
+      <button>Send</button>
+    </form>
+  );
+}
+
+----------------------------------------
+
+TITLE: Comparison Between Direct Props and getInputProps Helper
+DESCRIPTION: Demonstrates how getInputProps reduces boilerplate by comparing code with and without the helper function for both text inputs and checkboxes.
+
+LANGUAGE: tsx
+CODE:
+// Before
+function Example() {
+  return (
+    <form>
+      {/* text input */}
+      <input
+        key={fields.task.key}
+        id={fields.task.id}
+        name={fields.task.name}
+        form={fields.task.formId}
+        defaultValue={fields.task.initialValue}
+        aria-invalid={!fields.task.valid || undefined}
+        aria-describedby={!fields.task.valid ? fields.task.errorId : undefined}
+        required={fields.task.required}
+        minLength={fields.task.minLength}
+        maxLength={fields.task.maxLength}
+        min={fields.task.min}
+        max={fields.task.max}
+        step={fields.task.step}
+        pattern={fields.task.pattern}
+        multiple={fields.task.multiple}
+      />
+      {/* checkbox */}
+      <input
+        type="checkbox"
+        key={fields.completed.key}
+        id={fields.completed.id}
+        name={fields.completed.name}
+        form={fields.completed.formId}
+        value="yes"
+        defaultChecked={fields.completed.initialValue === 'yes'}
+        aria-invalid={!fields.completed.valid || undefined}
+        aria-describedby={
+          !fields.completed.valid ? fields.completed.errorId : undefined
+        }
+        required={fields.completed.required}
+      />
+    </form>
+  );
+}
+
+// After
+function Example() {
+  return (
+    <form>
+      {/* text input */}
+      <input {...getInputProps(fields.task, { type: 'text' })} />
+      {/* checkbox */}
+      <input
+        {...getInputProps(fields.completed, {
+          type: 'checkbox',
+          value: 'yes',
+        })}
+      />
+    </form>
+  );
+}
+
+----------------------------------------
+
+TITLE: Implementing Early Validation Feedback with Conform and Zod in React
+DESCRIPTION: This code demonstrates how to set up early validation feedback in a form using Conform library's `shouldValidate` and `shouldRevalidate` options. It configures validation to trigger when users leave a field and revalidate as they start typing again.
+
+LANGUAGE: tsx
+CODE:
+import { useForm } from '@conform-to/react';
+import { parseWithZod } from '@conform-to/zod';
+import {
+  type ActionFunctionArgs,
+  type LoaderFunctionArgs,
+  json,
+} from '@remix-run/node';
+import { Form, useActionData, useLoaderData } from '@remix-run/react';
+import { sendMessage } from '~/message';
+import { getUser } from '~/session';
+
+const schema = z.object({
+  // ...
+});
+
+export async function loader({ request }: LoaderFunctionArgs) {
+  // ...
+}
+
+export async function action({ request }: ActionFunctionArgs) {
+  // ...
+}
+
+export default function ContactUs() {
+  const user = useLoaderData<typeof loader>();
+  const lastResult = useActionData<typeof action>();
+  const [form, fields] = useForm({
+    // ... previous config
+
+    // Validate field once user leaves the field
+    shouldValidate: 'onBlur',
+    // Then, revalidate field as user types again
+    shouldRevalidate: 'onInput',
+  });
+
+  // ...
+}
+
+----------------------------------------
+
+TITLE: Complete Example of getTextareaProps with useForm in React
+DESCRIPTION: Shows a complete example of using getTextareaProps with the useForm hook to create an accessible textarea element.
+
+LANGUAGE: tsx
+CODE:
+import { useForm, getTextareaProps } from '@conform-to/react';
+
+function Example() {
+  const [form, fields] = useForm();
+
+  return <textarea {...getTextareaProps(fields.content)} />;
+}
+
+----------------------------------------
+
+TITLE: Reducing Form Boilerplate with Conform Helper Functions in React
+DESCRIPTION: This code demonstrates how to use Conform's helper functions like `getFormProps`, `getInputProps`, and `getTextareaProps` to minimize boilerplate when setting up forms with validation. These helpers automatically handle necessary attributes and IDs.
+
+LANGUAGE: tsx
+CODE:
+import {
+  useForm,
+  getFormProps,
+  getInputProps,
+  getTextareaProps,
+} from '@conform-to/react';
+import { parseWithZod, getZodConstraint } from '@conform-to/zod';
+import { type ActionFunctionArgs } from '@remix-run/node';
+import { Form, useActionData } from '@remix-run/react';
+import { sendMessage } from '~/message';
+
+const schema = z.object({
+  // ...
+});
+
+export async function action({ request }: ActionFunctionArgs) {
+  // ...
+}
+
+export default function ContactUs() {
+  const lastResult = useActionData<typeof action>();
+  const [form, fields] = useForm({
+    // ...
+  });
+
+  return (
+    <Form method="post" {...getFormProps(form)}>
+      <div>
+        <label htmlFor={fields.email.id}>Email</label>
+        <input {...getInputProps(fields.email, { type: 'email' })} />
+        <div id={fields.email.errorId}>{fields.email.errors}</div>
+      </div>
+      <div>
+        <label htmlFor={fields.message.id}>Message</label>
+        <textarea {...getTextareaProps(fields.message)} />
+        <div id={fields.message.errorId}>{fields.message.errors}</div>
+      </div>
+      <button>Send</button>
+    </Form>
+  );
+}
+
+----------------------------------------
+
+TITLE: Basic Usage of coerceFormValue with Zod Schema
+DESCRIPTION: Demonstrates the basic syntax for enhancing a Zod schema with the coerceFormValue helper, which applies default preprocessing rules to handle form input values.
+
+LANGUAGE: typescript
+CODE:
+const enhancedSchema = coerceFormValue(schema, options);
+
+----------------------------------------
+
+TITLE: Basic Usage of coerceFormValue with Zod Schema
+DESCRIPTION: Demonstrates the basic syntax for enhancing a Zod schema with the coerceFormValue helper, which applies default preprocessing rules to handle form input values.
+
+LANGUAGE: typescript
+CODE:
+const enhancedSchema = coerceFormValue(schema, options);
+
+----------------------------------------
+
+TITLE: Implementing Aria Attributes with Conform
+DESCRIPTION: This snippet demonstrates how to use Conform to automatically generate IDs for form elements and properly set up aria attributes for accessibility. It shows the basic structure with label association, aria-invalid, and aria-describedby attributes.
+
+LANGUAGE: tsx
+CODE:
+import { useForm } from '@conform-to/react';
+
+function Example() {
+  const [form, fields] = useForm();
+
+  return (
+    <form id={form.id}>
+      <label htmlFor={fields.message.id}>Message</label>
+      <input
+        type="text"
+        id={fields.message.id}
+        name={fields.message.name}
+        aria-invalid={!fields.message.valid ? true : undefined}
+        aria-describedby={
+          !fields.message.valid
+            ? `${fields.message.errorId} ${fields.message.descriptionId}`
+            : fields.message.descriptionId
+        }
+      />
+      <div id={fields.message.descriptionId}>The message you want to send</div>
+      <div id={fields.message.errorId}>{fields.message.errors}</div>
+      <button>Send</button>
+    </form>
+  );
+}
+
+----------------------------------------
+
+TITLE: Basic Usage of getSelectProps in React
+DESCRIPTION: Shows the basic syntax for using the getSelectProps function to generate accessibility-oriented props for a select element.
+
+LANGUAGE: tsx
+CODE:
+const props = getSelectProps(meta, options);
+
+----------------------------------------
+
+TITLE: Implementing Nested Objects with Conform in React
+DESCRIPTION: Demonstrates how to create form fields for a nested object structure using getFieldset() method. This example creates a form with an address object containing street, zipcode, city, and country fields, validating with Zod schema.
+
+LANGUAGE: tsx
+CODE:
+import { useForm } from '@conform-to/react';
+import { parseWithZod } from '@conform-to/zod';
+import { z } from 'zod';
+
+const schema = z.object({
+  address: z.object({
+    street: z.string(),
+    zipcode: z.string(),
+    city: z.string(),
+    country: z.string(),
+  }),
+});
+
+function Example() {
+  const [form, fields] = useForm({
+    onValidate({ formData }) {
+      return parseWithZod(formData, { schema });
+    },
+  });
+  const address = fields.address.getFieldset();
+
+  return (
+    <form id={form.id}>
+      {/* Set the name to `address.street`, `address.zipcode` etc. */}
+      <input name={address.street.name} />
+      <div>{address.street.errors}</div>
+      <input name={address.zipcode.name} />
+      <div>{address.zipcode.errors}</div>
+      <input name={address.city.name} />
+      <div>{address.city.errors}</div>
+      <input name={address.country.name} />
+      <div>{address.country.errors}</div>
+    </form>
+  );
+}
+
+----------------------------------------
+
+TITLE: Improved Type Inference with FormId Type in TypeScript
+DESCRIPTION: Shows how to use the FormId type for better TypeScript type inference when working with form metadata, making form errors and fieldset types properly typed.
+
+LANGUAGE: tsx
+CODE:
+import { type FormId, useFormMetadata } from '@conform-to/react';
+
+type ExampleComponentProps = {
+  formId: FormId<Schema, FormError>;
+};
+
+function ExampleComponent({ formId }: ExampleComponentProps) {
+  // Now it recognize the type of `form.errors` and the result of `form.getFieldset()`
+  const form = useFormMetadata(formId);
+
+  return <div>{/* ... */}</div>;
+}
+
+----------------------------------------
+
+TITLE: Improved Type Inference with FormId Type in TypeScript
+DESCRIPTION: Shows how to use the FormId type for better TypeScript type inference when working with form metadata, making form errors and fieldset types properly typed.
+
+LANGUAGE: tsx
+CODE:
+import { type FormId, useFormMetadata } from '@conform-to/react';
+
+type ExampleComponentProps = {
+  formId: FormId<Schema, FormError>;
+};
+
+function ExampleComponent({ formId }: ExampleComponentProps) {
+  // Now it recognize the type of `form.errors` and the result of `form.getFieldset()`
+  const form = useFormMetadata(formId);
+
+  return <div>{/* ... */}</div>;
+}
+
+----------------------------------------
+
+TITLE: Creating Array Form Fields with Conform in React
+DESCRIPTION: Shows how to handle array data structures using the getFieldList() method. This example creates a form with a list of tasks that dynamically generates input fields with proper naming convention (tasks[0], tasks[1], etc.) for validation.
+
+LANGUAGE: tsx
+CODE:
+import { useForm } from '@conform-to/react';
+import { parseWithZod } from '@conform-to/zod';
+import { z } from 'zod';
+
+const schema = z.object({
+  tasks: z.array(z.string()),
+});
+
+function Example() {
+  const [form, fields] = useForm({
+    onValidate({ formData }) {
+      return parseWithZod(formData, { schema });
+    },
+  });
+  const tasks = fields.tasks.getFieldList();
+
+  return (
+    <form id={form.id}>
+      <ul>
+        {tasks.map((task) => (
+          <li key={task.key}>
+            {/* Set the name to `task[0]`, `tasks[1]` etc */}
+            <input name={task.name} />
+            <div>{task.errors}</div>
+          </li>
+        ))}
+      </ul>
+    </form>
+  );
+}
+
+----------------------------------------
+
+TITLE: Implementing Checkbox Groups with Conform in React
+DESCRIPTION: This example shows how to implement a checkbox group with conform. It handles both string and array initialValues, and demonstrates how to correctly determine if a checkbox should be checked by default. The example also shows how to display all validation errors using the allErrors property.
+
+LANGUAGE: tsx
+CODE:
+import { useForm } from '@conform-to/react';
+
+function Example() {
+  const [form, fields] = useForm();
+
+  return (
+    <form id={form.id}>
+      <fieldset>
+        <legend>Please select the correct answers</legend>
+        {['a', 'b', 'c', 'd'].map((value) => (
+          <div key={value}>
+            <label>{value}</label>
+            <input
+              type="checkbox"
+              name={fields.answer.name}
+              value={value}
+              defaultChecked={
+                fields.answer.initialValue &&
+                Array.isArray(fields.answer.initialValue)
+                  ? fields.answer.initialValue.includes(value)
+                  : fields.answer.initialValue === value
+              }
+            />
+          </div>
+        ))}
+        <div>{Object.values(fields.answer.allErrors).flat()}</div>
+      </fieldset>
+      <button>Submit</button>
+    </form>
+  );
+}
+
+----------------------------------------
+
+TITLE: Implementing Radio Groups with Conform in React
+DESCRIPTION: This code demonstrates how to set up a radio group using the useForm hook from @conform-to/react. It ensures all radio buttons share the same name attribute and uses the initialValue to determine which option should be checked by default.
+
+LANGUAGE: tsx
+CODE:
+import { useForm } from '@conform-to/react';
+
+function Example() {
+  const [form, fields] = useForm();
+
+  return (
+    <form id={form.id}>
+      <fieldset>
+        <legend>Please select your favorite color</legend>
+        {['red', 'green', 'blue'].map((value) => (
+          <div key={value}>
+            <label>{value}</label>
+            <input
+              type="radio"
+              name={fields.color.name}
+              value={value}
+              defaultChecked={fields.color.initialValue === value}
+            />
+          </div>
+        ))}
+        <div>{fields.color.errors}</div>
+      </fieldset>
+      <button>Submit</button>
+    </form>
+  );
+}
+
+----------------------------------------
+
+TITLE: Example of Default Error Format in JSON
+DESCRIPTION: Shows the default error format returned by the defaultFormatError helper. This format represents validation errors as arrays of failed validation types for each field.
+
+LANGUAGE: json
+CODE:
+{ "email": ["required", "type"], "password": ["required"] }
+
+----------------------------------------
+
+TITLE: Manipulating Field Lists with Insert, Remove, and Reorder Intents
+DESCRIPTION: This example demonstrates how to manipulate array fields using insert, remove, and reorder intents. It shows a task list implementation with Zod validation where tasks can be added, deleted, and reordered.
+
+LANGUAGE: tsx
+CODE:
+import { useForm } from '@conform-to/react';
+import { parseWithZod } from "@conform-to/zod";
+import { z } from "zod";
+
+const todosSchema = z.object({
+  title: z.string(),
+  tasks: z.array(z.string()),
+});
+
+export default function Tasks() {
+  const [form, fields] = useForm({
+    onValidate({ formData }) {
+      return parseWithZod(formData, { schema: todosSchema });
+    },
+    shouldValidate: "onBlur",
+  });
+  const tasks = fields.tasks.getFieldList();
+
+  return (
+    <form id={form.id} onSubmit={form.onSubmit}>
+      <ul>
+        {tasks.map((task, index) => (
+          <li key={task.key}>
+            <input name={task.name} />
+            <button
+              {...form.reorder.getButtonProps({
+                name: fields.tasks.name,
+                from: index,
+                to: 0,
+              })}
+            >
+              Move to top
+            </button>
+            <button
+              {...form.remove.getButtonProps({
+                name: fields.tasks.name,
+                index,
+              })}
+            >
+              Delete
+            </button>
+          </li>
+        ))}
+      </ul>
+      <button
+        {...form.insert.getButtonProps({
+          name: fields.tasks.name,
+        })}
+      >
+        Add task
+      </button>
+      <button>Save</button>
+    </form>
+  );
+}
+
+----------------------------------------
+
+TITLE: Comparison Between Direct Field Metadata Usage and getCollectionProps
+DESCRIPTION: This example contrasts the verbose approach of manually setting props with the simplified approach using getCollectionProps. It demonstrates how the helper reduces boilerplate when creating checkbox collections.
+
+LANGUAGE: tsx
+CODE:
+// Before
+function Example() {
+  return (
+    <form>
+      {['a', 'b', 'c'].map((value) => (
+        <label key={value} htmlFor={`${fields.category.id}-${value}`}>
+          <input
+            type="checkbox"
+            key={`${fields.category.key}-${value}`}
+            id={`${fields.category.id}-${value}`}
+            name={fields.category.name}
+            form={fields.category.formId}
+            value={value}
+            defaultChecked={fields.category.initialValue?.includes(value)}
+            aria-invalid={!fields.category.valid || undefined}
+            aria-describedby={
+              !fields.category.valid ? fields.category.errorId : undefined
+            }
+          />
+          <span>{value}</span>
+        </label>
+      ))}
+      x
+    </form>
+  );
+}
+
+// After
+function Example() {
+  return (
+    <form>
+      {getCollectionProps(fields.category, {
+        type: 'checkbox',
+        options: ['a', 'b', 'c'],
+      }).map((props) => (
+        <label key={props.id} htmlFor={props.id}>
+          <input {...props} />
+          <span>{props.value}</span>
+        </label>
+      ))}
+    </form>
+  );
+}
+
+----------------------------------------
+
+TITLE: Using Reset and Update Intents for Form Field Manipulation
+DESCRIPTION: This example shows how to use reset and update intents to modify form fields. It demonstrates resetting the entire form, resetting specific fields, updating field values, and clearing all validation errors.
+
+LANGUAGE: tsx
+CODE:
+import { useForm } from '@conform-to/react';
+
+export default function Tasks() {
+  const [form, fields] = useForm();
+
+  return (
+    <form id={form.id}>
+      <button {...form.reset.getButtonProps()}>Reset form</button>
+      <button
+        {...form.reset.getButtonProps({
+          name: fields.tasks.name,
+        })}
+      >
+        Reset field (including nested / list field)
+      </button>
+      <button
+        {...form.update.getButtonProps({
+          name: fields.agenda.name,
+          value: {
+            title: 'My agenda',
+            description: 'This is my agenda',
+          },
+        })}
+      >
+        Update field (including nested / list field)
+      </button>
+      <button
+        {...form.update.getButtonProps({
+          validated: false,
+        })}
+      >
+        Clear all error
+      </button>
+    </form>
+  );
+}
+
+----------------------------------------
+
+TITLE: Setting Default Values with Schema Transformations
+DESCRIPTION: Shows how to define default values when using coerceFormValue by leveraging Zod's transform method to provide fallback values for undefined inputs.
+
+LANGUAGE: typescript
+CODE:
+const schema = z.object({
+  foo: z.string().optional(), // string | undefined
+  bar: z
+    .string()
+    .optional()
+    .transform((value) => value ?? ''), // string
+  baz: z
+    .string()
+    .optional()
+    .transform((value) => value ?? null), // string | null
+});
+
+----------------------------------------
+
+TITLE: Reducing Boilerplate with Conform Helper Functions
+DESCRIPTION: This snippet compares manual attribute setup with Conform's helper functions for reducing boilerplate. It shows how getInputProps can simplify setting up accessibility attributes like aria-invalid and aria-describedby along with validation attributes.
+
+LANGUAGE: tsx
+CODE:
+import { parseWithZod, getZodConstraint } from '@conform-to/zod';
+import { useForm } from '@conform-to/react';
+import { z } from 'zod';
+
+const schema = z.object({
+  message: z
+    .string()
+    .min(10)
+    .max(100)
+    .regex(/^[A-Za-z0-9 ]{10-100}$/),
+});
+
+function Example() {
+  const [form, fields] = useForm({
+    constraint: getZodConstraint(schema),
+    onValidate({ formData }) {
+      return parseWithZod(formData, { schema });
+    },
+  });
+
+  return (
+    <form id={form.id}>
+      {/* Before */}
+      <input
+        type="text"
+        id={fields.message.id}
+        name={fields.message.name}
+        required={fields.message.required}
+        minLength={fields.message.minLength}
+        maxLength={fields.message.maxLength}
+        pattern={fields.message.pattern}
+        aria-invalid={!fields.message.valid ? true : undefined}
+        aria-describedby={
+          !fields.message.valid
+            ? `${fields.message.errorId} ${fields.message.descriptionId}`
+            : fields.message.descriptionId
+        }
+      />
+      {/* After */}
+      <input
+        {...getInputProps(fields.message, {
+          type: 'text',
+          ariaDescribedBy: fields.message.descriptionId,
+        })}
+      />
+      <button>Send</button>
+    </form>
+  );
+}
+
+----------------------------------------
+
+TITLE: Component Usage with Form ID and Fields in React
+DESCRIPTION: Demonstrates how to use the typed form ID in a parent component by passing form.id or fields.fieldName.formId to child components.
+
+LANGUAGE: tsx
+CODE:
+import { useForm } from '@conform-to/react';
+
+function Example() {
+  const [form, fields] = useForm();
+
+  return (
+    <>
+      <ExampleComponent formId={form.id} />
+      <ExampleComponent formId={fields.fieldName.formId} />
+    </>
+  );
+}
+
+----------------------------------------
+
+TITLE: Component Usage with Form ID and Fields in React
+DESCRIPTION: Demonstrates how to use the typed form ID in a parent component by passing form.id or fields.fieldName.formId to child components.
+
+LANGUAGE: tsx
+CODE:
+import { useForm } from '@conform-to/react';
+
+function Example() {
+  const [form, fields] = useForm();
+
+  return (
+    <>
+      <ExampleComponent formId={form.id} />
+      <ExampleComponent formId={fields.fieldName.formId} />
+    </>
+  );
+}
+
+----------------------------------------
+
+TITLE: Implementing Submission Intent with Buttons in React Forms using Conform
+DESCRIPTION: This snippet demonstrates how to use button submitters to define different submission intents within a form. It uses the useForm hook to handle form submission and processes different actions based on the 'intent' value.
+
+LANGUAGE: tsx
+CODE:
+import { useForm } from '@conform-to/react';
+
+function Product() {
+  const [form] = useForm({
+    onSubmit(event, { formData }) {
+      event.preventDefault();
+
+      switch (formData.get('intent')) {
+        case 'add-to-cart':
+          // Add to cart
+          break;
+        case 'buy-now':
+          // Buy now
+          break;
+      }
+    },
+  });
+
+  return (
+    <form id={form.id}>
+      <input type="hidden" name="productId" value="rf23g43" />
+      <button type="submit" name="intent" value="add-to-cart">
+        Add to Cart
+      </button>
+      <button type="submit" name="intent" value="buy-now">
+        Buy now
+      </button>
+    </form>
+  );
+}
+
+----------------------------------------
+
+TITLE: Example FormId Type Variations for Different Cases
+DESCRIPTION: Shows different ways to type the formId prop for components with varying degrees of specificity, from generic string to typed schema and error objects.
+
+LANGUAGE: ts
+CODE:
+type ExampleComponentProps = {
+  // If you don't care about the type of Schema or FormError
+  formId: string;
+  // If you are accessing a specific field from the form metadata
+  formId: FormId<{ fieldName: string }>;
+  // If you have a custom error type
+  formId: FormId<Record<string, any>, CustomFormError>;
+};
+
+----------------------------------------
+
+TITLE: Implementing a Single Checkbox with Conform in React
+DESCRIPTION: This code shows how to implement a single checkbox input using the useForm hook. It demonstrates how to handle the default browser behavior where a checkbox's value is 'on' when checked, and sets the defaultChecked property accordingly based on the initialValue.
+
+LANGUAGE: tsx
+CODE:
+import { useForm } from '@conform-to/react';
+
+function Example() {
+  const [form, fields] = useForm();
+
+  return (
+    <form id={form.id}>
+      <div>
+        <label>Terms and conditions</label>
+        <input
+          name={fields.toc}
+          defaultChecked={fields.toc.initialValue === 'on'}
+        />
+        <div>{fields.toc.errors}</div>
+      </div>
+      <button>Submit</button>
+    </form>
+  );
+}
+
+----------------------------------------
+
+TITLE: Defining Custom Coercion for Specific Schemas
+DESCRIPTION: Demonstrates how to define custom coercion for specific schema instances using the customize option, in this example parsing a JSON string into an object.
+
+LANGUAGE: typescript
+CODE:
+import {
+  parseWithZod,
+  unstable_coerceFormValue as coerceFormValue,
+} from '@conform-to/zod';
+import { useForm } from '@conform-to/react';
+import { z } from 'zod';
+import { json } from './schema';
+
+const metadata = z.object({
+  number: z.number(),
+  confirmed: z.boolean(),
+});
+
+const schema = coerceFormValue(
+  z.object({
+    ref: z.string(),
+    metadata,
+  }),
+  {
+    customize(type) {
+      // Customize how the `metadata` field value is coerced
+      if (type === metadata) {
+        return (value) => {
+          if (typeof value !== 'string') {
+            return value;
+          }
+
+          // Parse the value as JSON
+          return JSON.parse(value);
+        };
+      }
+
+      // Return `null` to keep the default behavior
+      return null;
+    },
+  },
+);
+
+----------------------------------------
+
+TITLE: Triggering Field Validation on Blur Event in Conform
+DESCRIPTION: This snippet demonstrates how to validate a field when the user leaves it by directly triggering the validate intent in the onBlur event handler, rather than using a separate button.
+
+LANGUAGE: tsx
+CODE:
+import { useForm } from '@conform-to/react';
+
+function EmailForm() {
+  const [form, fields] = useForm();
+
+  return (
+    <form id={form.id}>
+      <input
+        name={fields.email.name}
+        onBlur={(event) => form.validate({ name: event.target.name })}
+      />
+    </form>
+  );
+}
+
+----------------------------------------
+
+TITLE: Implementing Validation Intent with Button Props in Conform
+DESCRIPTION: This example shows how to trigger field validation using a dedicated button with the validate intent. It uses the getButtonProps helper to configure the button with the appropriate field name to validate.
+
+LANGUAGE: tsx
+CODE:
+import { useForm } from '@conform-to/react';
+
+function EmailForm() {
+  const [form, fields] = useForm();
+
+  return (
+    <form id={form.id}>
+      <input name={fields.email.name} />
+      <button {...form.validate.getButtonProps({ name: fields.email.name })}>
+        Validate Email
+      </button>
+    </form>
+  );
+}
+
+----------------------------------------
+
+TITLE: Implementing Progressive Enhancement with Form Lists
+DESCRIPTION: This example demonstrates how Conform supports progressive enhancement by allowing manipulation of field lists with form data and state persistence across page refreshes, which helps with accessibility during network issues.
+
+LANGUAGE: tsx
+CODE:
+import { useForm } from '@conform-to/react';
+
+export default function Example() {
+  const [form, fields] = useForm();
+
+  return (
+    <form id={form.id}>
+      <ul>
+        {tasks.map((task) => (
+          <li key={task.key}>
+            <input name={task.name} defaultValue={task.initialValue} />
+            <button
+              {...form.remove.getButtonProps({
+                name: fields.tasks.name,
+                index,
+              })}
+            >
+              Delete
+            </button>
+          </li>
+        ))}
+      </ul>
+      <button
+        {...form.insert.getButtonProps({
+          name: fields.tasks.name,
+        })}
+      >
+        Add task
+      </button>
+      <button>Save</button>
+    </form>
+  );
+}
+
+----------------------------------------
+
+TITLE: CSS for Screen Reader Only Elements
+DESCRIPTION: CSS styling for creating visually hidden elements that are still accessible to screen readers and can be used for focus delegation with custom inputs.
+
+LANGUAGE: tsx
+CODE:
+const style = {
+  position: 'absolute',
+  width: '1px',
+  height: '1px',
+  padding: 0,
+  margin: '-1px',
+  overflow: 'hidden',
+  clip: 'rect(0,0,0,0)',
+  whiteSpace: 'nowrap',
+  border: 0,
+};
+
+----------------------------------------
+
+TITLE: Managing Nested Arrays in Conform Forms
+DESCRIPTION: Demonstrates how to combine getFieldset() and getFieldList() methods to handle nested array structures. This example creates a form with an array of todo objects, each containing title and notes fields.
+
+LANGUAGE: tsx
+CODE:
+import { useForm } from '@conform-to/react';
+import { parseWithZod } from '@conform-to/zod';
+import { z } from 'zod';
+
+const schema = z.object({
+  todos: z.array(
+    z.object({
+      title: z.string(),
+      notes: z.string(),
+    }),
+  ),
+});
+
+function Example() {
+  const [form, fields] = useForm({
+    onValidate({ formData }) {
+      return parseWithZod(formData, { schema });
+    },
+  });
+  const todos = fields.todos.getFieldList();
+
+  return (
+    <form id={form.id}>
+      <ul>
+        {todos.map((todo) => {
+          const todoFields = todo.getFieldset();
+
+          return (
+            <li key={todo.key}>
+              <input name={todoFields.title.name} />
+              <div>{todoFields.title.errors}</div>
+              <input name={todoFields.notes.name} />
+              <div>{todoFields.notes.errors}</div>
+            </li>
+          );
+        })}
+      </ul>
+    </form>
+  );
+}
+
+----------------------------------------
+
+TITLE: Nesting FormProvider Components for Complex Form Structures
+DESCRIPTION: Demonstrates how FormProvider can be nested to create complex form structures with parent-child relationships. Shows how to reference specific form contexts using formId when needed.
+
+LANGUAGE: tsx
+CODE:
+import { FormProvider, useForm } from '@conform-to/react';
+
+function Field({ name, formId }) {
+  //  useField will look for the closest FormContext if no formId is provided
+  const [meta] = useField(name, { formId });
+
+  return <input name={meta.name} form={meta.form} />;
+}
+
+function Parent() {
+  const [form, fields] = useForm({ id: 'parent' });
+  return (
+    <FormProvider context={form.context}>
+      <form id={form.id} />
+
+      <Field name={fields.category.name} />
+      <Child />
+    </FormProvider>
+  );
+}
+
+function Child() {
+  const [form, fields] = useForm({ id: 'child' });
+
+  return (
+    <FormProvider context={form.context}>
+      <form id={form.id} />
+      <Field name={fields.title.name} />
+
+      {/* This will look for the form context with the id 'parent' instead */}
+      <Field name={fields.bar.name} formId="parent" />
+    </FormProvider>
+  );
+}
+
+----------------------------------------
+
+TITLE: Using FormProvider with Form Elements Outside the Form
+DESCRIPTION: Shows how FormProvider allows inputs to be placed outside the actual form element by associating them through the form attribute. The form and inputs can be in different parts of the component tree.
+
+LANGUAGE: tsx
+CODE:
+function Example() {
+  const [form, fields] = useForm();
+  return (
+    <FormProvider context={form.context}>
+      <div>
+        <form id={form.id} />
+      </div>
+      <div>
+        <input name={fields.title.name} form={form.id} />
+      </div>
+    </FormProvider>
+  );
+}
+
+----------------------------------------
+
+TITLE: Basic FormProvider Usage with React
+DESCRIPTION: Demonstrates how to use FormProvider with the useForm hook to create a form context. The FormProvider wraps child components that need access to the form state.
+
+LANGUAGE: tsx
+CODE:
+import { FormProvider, useForm } from '@conform-to/react';
+
+export default function SomeParent() {
+  const [form, fields] = useForm();
+
+  return <FormProvider context={form.context}>{/* ... */}</FormProvider>;
+}
+
+----------------------------------------
+
+TITLE: Example Implementation of parseWithZod with useForm Hook
+DESCRIPTION: Shows how to integrate parseWithZod with the useForm hook from @conform-to/react. This example creates a form with email and password validation using Zod schema.
+
+LANGUAGE: tsx
+CODE:
+import { parseWithZod } from '@conform-to/zod';
+import { useForm } from '@conform-to/react';
+import { z } from 'zod';
+
+const schema = z.object({
+  email: z.string().email(),
+  password: z.string(),
+});
+
+function Example() {
+  const [form, fields] = useForm({
+    onValidate({ formData }) {
+      return parseWithZod(formData, { schema });
+    },
+  });
+
+  // ...
+}
+
+----------------------------------------
+
+TITLE: Custom Type Coercion with parseWithZod
+DESCRIPTION: Demonstrates how to disable automatic type coercion and implement custom preprocessing for form values. This example shows custom handling of a numeric field with comma formatting.
+
+LANGUAGE: tsx
+CODE:
+import { parseWithZod } from '@conform-to/zod';
+import { useForm } from '@conform-to/react';
+import { z } from 'zod';
+
+const schema = z.object({
+  // Strip empty value and coerce the number yourself
+  amount: z.preprocess((value) => {
+    if (typeof value !== 'string') {
+      return value;
+    }
+
+    if (value === '') {
+      return undefined;
+    }
+
+    return Number(value.trim().replace(/,/g, ''));
+  }, z.number()),
+});
+
+function Example() {
+  const [form, fields] = useForm({
+    onValidate({ formData }) {
+      return parseWithZod(formData, {
+        schema,
+        disableAutoCoercion: true,
+      });
+    },
+  });
+
+  // ...
+}
+
+----------------------------------------
+
+TITLE: Basic Usage of parseWithZod Function in Conform
+DESCRIPTION: Demonstrates the basic syntax for using the parseWithZod function to validate form data against a Zod schema.
+
+LANGUAGE: tsx
+CODE:
+const submission = parseWithZod(payload, options);
+
+----------------------------------------
+
+TITLE: Using Default Error Formatter with Custom Logic in TypeScript
+DESCRIPTION: Shows how to extend the default error formatter with custom validation logic. This example adds a password confirmation check while retaining the standard validation behavior for other fields.
+
+LANGUAGE: typescript
+CODE:
+import { type FormConstraints, type FormatErrorArgs, defaultFormatError } from '@conform-to/validitystate';
+
+const constraints = {
+    email: { type: 'email', required: true },
+    password: { type: 'password', required: true },
+    confirmPassowrd: { type: 'password', required: true },
+} satisify FormConstraints;
+
+function formatError({ input }: FormatErrorArgs<typeof constraints>) {
+    const error = defaultFormatError({ input });
+
+    if (input.name === 'confirmPassword' && error.length === 0 && value.password !== value.confirmPassword) {
+        error.push('notmatch');
+    }
+
+    return error;
+}
+
+const submission = parse(formData, {
+    constraints,
+    formatError,
+});
+
+----------------------------------------
+
+TITLE: Formatting Multiple Validation Errors in TypeScript
+DESCRIPTION: Shows how to use a custom error formatter that returns multiple errors for each field. This approach allows for more detailed validation feedback when multiple validation rules fail for a single input.
+
+LANGUAGE: typescript
+CODE:
+function formatError({ input }: FormatErrorArgs) {
+  const error = [];
+
+  switch (input.name) {
+    case 'email': {
+      if (input.validity.valueMissing) {
+        error.push('Email is required');
+      }
+      if (input.validity.typeMismatch) {
+        error.push('Email is invalid');
+      }
+      break;
+    }
+    case 'password': {
+      if (input.validity.valueMissing) {
+        error.push('Password is required');
+      }
+      if (input.validity.tooShort) {
+        error.push('Password is too short');
+      }
+      break;
+    }
+  }
+
+  return error;
+}
+
+----------------------------------------
+
+TITLE: Retrieving Validation Error Messages in React
+DESCRIPTION: Demonstrates how to use the getError function to access validation error messages in a React form. This helps manage form state by capturing error messages when invalid inputs are detected.
+
+LANGUAGE: tsx
+CODE:
+import { getError } from '@conform-to/validitystate';
+
+function Example() {
+  const [error, setError] = useState({});
+
+  return (
+    <form
+      onInvalid={(event) => {
+        const input = event.target as HTMLInputElement;
+
+        setError((prev) => ({
+          ...prev,
+          [input.name]: getError(input.validationMessage),
+        }));
+
+        event.preventDefault();
+      }}
+    >
+      {/* ... */}
+    </form>
+  );
+}
+
+----------------------------------------
+
+TITLE: Focus Delegation with Custom Inputs
+DESCRIPTION: Example showing how to implement focus delegation for custom inputs to ensure proper form validation behavior, using a hidden proxy input element.
+
+LANGUAGE: tsx
+CODE:
+import { useForm, useInputControl } from '@conform-to/react';
+import { Select, Option } from './custom-ui';
+
+function Example() {
+  const [form, fields] = useForm();
+  const inputRef = useRef(null);
+  const color = useInputControl(fields.color);
+
+  return (
+    <>
+        <input
+            name={fields.color.name}
+            defaultValue={fields.color.initialValue}
+            className="sr-only"
+            tabIndex={-1}
+            onFocus={() => inputRef.current?.focus()}
+        />
+        <Select
+            ref={inputRef}
+            value={color.value}
+            onChange={color.change}
+            onFocus={color.focus}
+            onBlur={color.blur}
+        >
+            <Option value="red">Red</Option>
+            <Option value="green">Green</Option>
+            <Option value="blue">Blue</Option>
+        </Select>
+    </>
+  );
+}
+
+----------------------------------------
+
+TITLE: Custom Select Input with useInputControl
+DESCRIPTION: Example of integrating a custom select component with Conform using useInputControl to manage events and state.
+
+LANGUAGE: tsx
+CODE:
+import { useForm, useInputControl } from '@conform-to/react';
+import { Select, Option } from './custom-ui';
+
+function Example() {
+  const [form, fields] = useForm();
+  const color = useInputControl(fields.color);
+
+  return (
+    <Select
+      name={fields.color.name}
+      value={color.value}
+      onChange={color.change}
+      onFocus={color.focus}
+      onBlur={color.blur}
+    >
+      <Option value="red">Red</Option>
+      <Option value="green">Green</Option>
+      <Option value="blue">Blue</Option>
+    </Select>
+  );
+}
+
+----------------------------------------
+
+TITLE: Basic useInputControl Hook Usage
+DESCRIPTION: Basic syntax for using the useInputControl hook to control browser events for custom inputs in Conform.
+
+LANGUAGE: tsx
+CODE:
+const control = useInputControl(metaOrOptions);
+
+----------------------------------------
+
+TITLE: Basic Usage of useFormMetadata Hook in React
+DESCRIPTION: Demonstrates the basic usage pattern of the useFormMetadata hook to retrieve form metadata by providing a form ID.
+
+LANGUAGE: tsx
+CODE:
+const form = useFormMetadata(formId);
+
+----------------------------------------
+
+TITLE: FieldName Type Variations for Different Use Cases
+DESCRIPTION: Provides examples of different ways to use the FieldName type based on specific component needs, from simple string usage to complex nested form structures.
+
+LANGUAGE: ts
+CODE:
+type ExampleComponentProps = {
+  // If you don't care about the type of value or errors etc
+  name: string;
+  // If you are accessing the field value
+  name: FieldName<number>;
+  // If you have a deeply nested form and wanted to access a specific fields at the top
+  name: FieldName<number, { fieldName: string }>;
+  // If you have a custom error type
+  name: FieldName<number, any, CustomFormError>;
+};
+
+----------------------------------------
+
+TITLE: Implementing Form Component with useField and useForm
+DESCRIPTION: Shows how to implement a form component using both useForm and useField hooks together, demonstrating how field names are passed between components.
+
+LANGUAGE: tsx
+CODE:
+import { useForm } from '@conform-to/react';
+
+function Example() {
+  const [form, fields] = useForm();
+
+  return <ExampleComponent name={fields.fieldName.name} />;
+}
+
+----------------------------------------
+
+TITLE: Using FieldName Type for Better Type Safety
+DESCRIPTION: Demonstrates how to use the FieldName type to improve type inference of field and form metadata, providing better TypeScript integration.
+
+LANGUAGE: tsx
+CODE:
+import { type FieldName, useField } from '@conform-to/react';
+
+type ExampleComponentProps = {
+  name: FieldName<FieldSchema, FormSchema, FormError>;
+};
+
+function ExampleComponent({ name }: ExampleComponentProps) {
+  // Now it recognize the type of `meta.value`, `meta.errors`, `form.errors` etc
+  const [meta, form] = useField(name);
+
+  return <div>{/* ... */}</div>;
+}
+
+----------------------------------------
+
+TITLE: Basic Usage of useField Hook in React
+DESCRIPTION: Shows the basic syntax for using the useField hook to access field metadata and form context from the closest FormProvider.
+
+LANGUAGE: tsx
+CODE:
+const [meta, form] = useField(name, options);
+
+----------------------------------------
+
+TITLE: Comparison of Manual Props vs. getTextareaProps Helper in React
+DESCRIPTION: Shows the difference between manually setting all textarea props and using the getTextareaProps helper function, demonstrating how the helper reduces boilerplate code.
+
+LANGUAGE: tsx
+CODE:
+// Before
+function Example() {
+  return (
+    <form>
+      <textarea
+        key={fields.content.key}
+        id={fields.content.id}
+        name={fields.content.name}
+        form={fields.content.formId}
+        defaultValue={fields.content.initialValue}
+        aria-invalid={!fields.content.valid || undefined}
+        aria-describedby={
+          !fields.content.valid ? fields.content.errorId : undefined
+        }
+        required={fields.content.required}
+        minLength={fields.content.minLength}
+        maxLength={fields.content.maxLength}
+      />
+    </form>
+  );
+}
+
+// After
+function Example() {
+  return (
+    <form>
+      <textarea {...getTextareaProps(fields.content)} />
+    </form>
+  );
+}
+
+----------------------------------------
+
+TITLE: Basic Usage of getTextareaProps Function in React
+DESCRIPTION: Demonstrates how to use the getTextareaProps function to generate props for a textarea element.
+
+LANGUAGE: tsx
+CODE:
+const props = getTextareaProps(meta, options);
+
+----------------------------------------
+
+TITLE: Using Field Metadata Directly Instead of getSelectProps
+DESCRIPTION: Compares manual prop assignment versus using the getSelectProps helper, showing how the helper reduces boilerplate when setting up accessible select elements.
+
+LANGUAGE: tsx
+CODE:
+// Before
+function Example() {
+  return (
+    <form>
+      <select
+        key={fields.category.key}
+        id={fields.category.id}
+        name={fields.category.name}
+        form={fields.category.formId}
+        defaultValue={fields.category.initialValue}
+        aria-invalid={!fields.category.valid || undefined}
+        aria-describedby={
+          !fields.category.valid ? fields.category.errorId : undefined
+        }
+        required={fields.category.required}
+        multiple={fields.category.multiple}
+      />
+    </form>
+  );
+}
+
+// After
+function Example() {
+  return (
+    <form>
+      <select {...getSelectProps(fields.category)} />
+    </form>
+  );
+}
+
+----------------------------------------
+
+TITLE: Complete Example of getSelectProps with useForm
+DESCRIPTION: Demonstrates how to use getSelectProps together with useForm to create an accessible select element in a React component.
+
+LANGUAGE: tsx
+CODE:
+import { useForm, getSelectProps } from '@conform-to/react';
+
+function Example() {
+  const [form, fields] = useForm();
+
+  return <select {...getSelectProps(fields.category)} />;
+}
+
+----------------------------------------
+
+TITLE: Complete Example of getInputProps with useForm
+DESCRIPTION: Shows how to use getInputProps in conjunction with useForm to create an accessible password input.
+
+LANGUAGE: tsx
+CODE:
+import { useForm, getInputProps } from '@conform-to/react';
+
+function Example() {
+  const [form, fields] = useForm();
+
+  return <input {...getInputProps(fields.password, { type: 'password' })} />;
+}
+
+----------------------------------------
+
+TITLE: Basic Usage of getInputProps Helper in React
+DESCRIPTION: Demonstrates the basic syntax for using getInputProps to generate props for an input element.
+
+LANGUAGE: tsx
+CODE:
+const props = getInputProps(meta, options);
+
+----------------------------------------
+
+TITLE: Manual Form Props Implementation vs. getFormProps Helper
+DESCRIPTION: Compares setting form accessibility attributes manually versus using the getFormProps helper function, demonstrating how the helper reduces boilerplate code.
+
+LANGUAGE: tsx
+CODE:
+// Before
+function Example() {
+  return (
+    <form
+      id={form.id}
+      onSubmit={form.onSubmit}
+      noValidate={form.noValidate}
+      aria-invalid={!form.valid || undefined}
+      aria-describedby={!form.valid ? form.errorId : undefined}
+    />
+  );
+}
+
+// After
+function Example() {
+  return <form {...getFormProps(form)} />;
+}
+
+----------------------------------------
+
+TITLE: Example Implementation of getFormProps with useForm
+DESCRIPTION: Shows how to use getFormProps in conjunction with useForm to create an accessible form element in a React component.
+
+LANGUAGE: tsx
+CODE:
+import { useForm, getFormProps } from '@conform-to/react';
+
+function Example() {
+  const [form, fields] = useForm();
+
+  return <form {...getFormProps(form)} />;
+}
+
+----------------------------------------
+
+TITLE: Basic Usage of getFormProps in React
+DESCRIPTION: Demonstrates the basic syntax for using the getFormProps helper function to generate form props.
+
+LANGUAGE: tsx
+CODE:
+const props = getFormProps(form, options);
+
+----------------------------------------
+
+TITLE: Manual Implementation vs getFieldsetProps Helper
+DESCRIPTION: Compares manual prop assignment with using the getFieldsetProps helper, demonstrating how the helper reduces boilerplate code when creating accessible fieldset elements.
+
+LANGUAGE: tsx
+CODE:
+// Before
+function Example() {
+  return (
+    <fieldset
+      id={fields.address.id}
+      name={fields.address.name}
+      form={fields.address.formId}
+      aria-invalid={!form.valid || undefined}
+      aria-describedby={!form.valid ? form.errorId : undefined}
+    />
+  );
+}
+
+// After
+function Example() {
+  return <fieldset {...getFieldsetProps(fields.address)} />;
+}
+
+----------------------------------------
+
+TITLE: Basic Usage of getFieldsetProps in Conform
+DESCRIPTION: Demonstrates the basic syntax for using the getFieldsetProps helper function to generate accessibility-compliant props for a fieldset element.
+
+LANGUAGE: tsx
+CODE:
+const props = getFieldsetProps(meta, options);
+
+----------------------------------------
+
+TITLE: Basic Usage of getCollectionProps in React
+DESCRIPTION: A simple example showing how to use the getCollectionProps function to get the necessary props for making accessible input collections.
+
+LANGUAGE: tsx
+CODE:
+const collectionProps = getCollectionProps(meta, options);
+
+----------------------------------------
+
+TITLE: Implementing Form Validation with Yup in React Components
+DESCRIPTION: Complete example showing how to integrate parseWithYup with useForm hook from @conform-to/react. The example defines a Yup schema for email and password validation and uses it in a form validation function.
+
+LANGUAGE: tsx
+CODE:
+import { parseWithYup } from '@conform-to/yup';
+import { useForm } from '@conform-to/react';
+import * as yup from 'yup';
+
+const schema = yup.object({
+  email: yup.string().email(),
+  password: yup.string(),
+});
+
+function Example() {
+  const [form, fields] = useForm({
+    onValidate({ formData }) {
+      return parseWithYup(formData, { schema });
+    },
+  });
+
+  // ...
+}
+
+----------------------------------------
+
+TITLE: Basic Usage of parseWithYup Helper Function
+DESCRIPTION: Simple demonstration of how to use the parseWithYup function to validate form data with a Yup schema.
+
+LANGUAGE: tsx
+CODE:
+const submission = parseWithYup(payload, options);
+
+----------------------------------------
+
+TITLE: Complete Example of getYupConstraint with React Form Integration
+DESCRIPTION: A comprehensive example demonstrating how to use getYupConstraint with @conform-to/react's useForm hook. Shows how to define a Yup schema with string validation rules and apply the constraints to a form.
+
+LANGUAGE: tsx
+CODE:
+import { getYupConstraint } from '@conform-to/yup';
+import { useForm } from '@conform-to/react';
+import * as yup from 'yup';
+
+const schema = yup.object({
+  title: yup.string().required().min(5).max(20),
+  description: yup.string().optional().min(100).max(1000),
+});
+
+function Example() {
+  const [form, fields] = useForm({
+    constraint: getYupConstraint(schema),
+  });
+
+  // ...
+}
+
+----------------------------------------
+
+TITLE: Basic Usage of getYupConstraint Helper Function in TypeScript/React
+DESCRIPTION: A simple example showing how to use the getYupConstraint function to extract validation constraints from a Yup schema.
+
+LANGUAGE: tsx
+CODE:
+const constraint = getYupConstraint(schema);
+
+----------------------------------------
+
+TITLE: Integration Example with useForm in React
+DESCRIPTION: A complete example demonstrating how to use getZodConstraint with @conform-to/react's useForm hook. The example shows defining a Zod schema with validation rules and then using the extracted constraints in a form.
+
+LANGUAGE: tsx
+CODE:
+import { getZodConstraint } from '@conform-to/zod';
+import { useForm } from '@conform-to/react';
+import { z } from 'zod';
+
+const schema = z.object({
+  title: z.string().min(5).max(20),
+  description: z.string().min(100).max(1000).optional(),
+});
+
+function Example() {
+  const [form, fields] = useForm({
+    constraint: getZodConstraint(schema),
+  });
+
+  // ...
+}
+
+----------------------------------------
+
+TITLE: Basic Usage of getZodConstraint Function in TypeScript
+DESCRIPTION: A simple example showing how to use the getZodConstraint function to extract validation constraints from a Zod schema.
+
+LANGUAGE: tsx
+CODE:
+const constraint = getZodConstraint(schema);
+
+----------------------------------------
+
+TITLE: Overriding Default Coercion Behavior
+DESCRIPTION: Demonstrates how to customize the default coercion behavior by specifying the defaultCoercion mapping in options, including custom handling for string-based fields, numbers, and booleans.
+
+LANGUAGE: typescript
+CODE:
+const schema = coerceFormValue(
+  z.object({
+    // ...
+  }),
+  {
+    defaultCoercion: {
+      // Trim the value for all string-based fields
+      // e.g. `z.string()`, `z.number()` or `z.boolean()`
+      string: (value) => {
+        if (typeof value !== 'string') {
+          return value;
+        }
+
+        const result = value.trim();
+
+        // Treat it as `undefined` if the value is empty
+        if (result === '') {
+          return undefined;
+        }
+
+        return result;
+      },
+
+      // Override the default coercion with `z.number()`
+      number: (value) => {
+        // Pass the value as is if it's not a string
+        if (typeof value !== 'string') {
+          return value;
+        }
+
+        // Trim and remove commas before casting it to number
+        return Number(value.trim().replace(/,/g, ''));
+      },
+
+      // Disable coercion for `z.boolean()`
+      boolean: false,
+    },
+  },
+);
+
+----------------------------------------
+
+TITLE: Complete Example of Form Validation with coerceFormValue
+DESCRIPTION: Shows a complete example of using coerceFormValue with useForm hook to handle form validation. The schema defines various field types that will be automatically coerced according to their types.
+
+LANGUAGE: typescript
+CODE:
+import { parseWithZod, unstable_coerceFormValue as coerceFormValue } from '@conform-to/zod';
+import { useForm } from '@conform-to/react';
+import { z } from 'zod';
+import { jsonSchema } from './jsonSchema';
+
+const schema = coerceFormValue(
+  z.object({
+    ref: z.string()
+    date: z.date(),
+    amount: z.number(),
+    confirm: z.boolean(),
+  }),
+);
+
+function Example() {
+  const [form, fields] = useForm({
+    onValidate({ formData }) {
+      return parseWithZod(formData, {
+        schema,
+        defaultTypeCoercion: false,
+      });
+    },
+  });
+
+  // ...
+}
+
+----------------------------------------
+
+TITLE: Using useInputControl for Custom Input Integration in React
+DESCRIPTION: Example demonstrating the new useInputControl hook which replaces useInputEvent. This hook provides a simpler way to integrate custom input components with automatic value handling and form reset support.
+
+LANGUAGE: tsx
+CODE:
+import { useForm, useInputControl } from '@conform-to/react';
+import { CustomSelect } from './some-ui-library';
+
+function Example() {
+  const [form, fields] = useForm();
+  const control = useInputControl(fields.title);
+
+  return (
+    <CustomSelect
+      name={fields.title.name}
+      value={control.value}
+      onChange={(e) => control.change(e.target.value)}
+      onFocus={control.focus}
+      onBlur={control.blur}
+    />
+  );
+}
+
+----------------------------------------
+
+TITLE: Improved Form Submission Handling with Zod in React
+DESCRIPTION: Example showing the redesigned submission handling pattern using parseWithZod. This pattern simplifies form validation and error handling by providing a unified submission object with status information.
+
+LANGUAGE: tsx
+CODE:
+export async function action({ request }: ActionArgs) {
+  const formData = await request.formData();
+  const submission = parseWithZod(formData, { schema });
+
+  /**
+   * The submission status could be either "success", "error" or undefined
+   * If the status is undefined, it means that the submission is not ready (i.e. `intent` is not `submit`)
+   */
+  if (submission.status !== 'success') {
+    return json(submission.reply(), {
+      // You can also use the status to determine the HTTP status code
+      status: submission.status === 'error' ? 400 : 200,
+    });
+  }
+
+  const result = await save(submission.value);
+
+  if (!result.successful) {
+    return json(
+      submission.reply({
+        // You can also pass additional error to the `reply` method
+        formErrors: ['Submission failed'],
+        fieldErrors: {
+          address: ['Address is invalid'],
+        },
+
+        // or avoid sending the the field value back to client by specifying the field names
+        hideFields: ['password'],
+      }),
+    );
+  }
+
+  // Reply the submission with `resetForm` option
+  return json(submission.reply({ resetForm: true }));
+}
+
+export default function Example() {
+  const lastResult = useActionData<typeof action>();
+  const [form, fields] = useForm({
+    // `lastSubmission` is renamed to `lastResult` to avoid confusion
+    lastResult,
+  });
+
+  // We can now find out the status of the submission from the form metadata as well
+  console.log(form.status); // "success", "error" or undefined
+}
+
+----------------------------------------
+
+TITLE: Using Form Metadata Methods for List Operations in React
+DESCRIPTION: Example demonstrating how to use methods on the form metadata object for list operations like insert, remove, reorder. These methods replace the separate list object that was previously exported.
+
+LANGUAGE: tsx
+CODE:
+function Example() {
+  const [form, fields] = useForm();
+  const tasks = fields.tasks.getFieldList();
+
+  return (
+    <form>
+      <ul>
+        {tasks.map((task) => {
+          return <li key={task.key}>{/* ... */}</li>;
+        })}
+      </ul>
+      <button {...form.insert.getButtonProps({ name: fields.tasks.name })}>
+        Add (Declarative API)
+      </button>
+      <button onClick={() => form.insert({ name: fields.tasks.name })}>
+        Add (Imperative API)
+      </button>
+    </form>
+  );
+}
+
+----------------------------------------
+
+TITLE: Using Field Metadata Methods instead of useFieldset/useFieldList in React
+DESCRIPTION: Example showing how to use the getFieldset() and getFieldList() methods on field metadata objects, which replace the removed useFieldset and useFieldList hooks for more direct field access.
+
+LANGUAGE: tsx
+CODE:
+function Example() {
+  const [form, fields] = useForm();
+
+  // Before: useFieldset(form.ref, fields.address)
+  const address = fields.address.getFieldset();
+  // Before: useFieldList(form.ref, fields.tasks)
+  const tasks = fields.tasks.getFieldList();
+
+  return (
+    <form>
+      <ul>
+        {tasks.map((task) => {
+          // It is no longer necessary to define an additional component
+          // with nested list as you can access the fieldset directly
+          const taskFields = task.getFieldset();
+
+          return <li key={task.key}>{/* ... */}</li>;
+        })}
+      </ul>
+    </form>
+  );
+}
+
+----------------------------------------
+
+TITLE: Using getFormProps Helper for Form Setup in React
+DESCRIPTION: Example of setting up a form using the getFormProps helper, which replaces the removed form.props property. This demonstrates the new pattern for applying form properties.
+
+LANGUAGE: tsx
+CODE:
+import { useForm, getFormProps } from '@conform-to/react';
+
+function Example() {
+  const [form] = useForm();
+
+  return <form {...getFormProps(form)} />;
+}
+
+----------------------------------------
+
+TITLE: Using getInputProps with ariaDescribedBy Parameter in React
+DESCRIPTION: Example showing how to use the getInputProps helper with the ariaDescribedBy parameter, which replaces the deprecated description option and now expects a string ID instead of a boolean.
+
+LANGUAGE: tsx
+CODE:
+<input
+  {...getInputProps(fields.title, {
+    ariaDescribedBy: fields.title.descriptionId,
+  })}
+/>
+
+----------------------------------------
+
+TITLE: Using getInputProps with Required Type Parameter in React
+DESCRIPTION: Example of using the getInputProps helper function with the now required type parameter. The type parameter must be explicitly specified when using this function.
+
+LANGUAGE: tsx
+CODE:
+<input {...getInputProps(fields.title, { type: 'text' })} />
+
+----------------------------------------
+
+TITLE: Enhanced Remix action using Conform's parseWithZod
+DESCRIPTION: Improved action handler that uses Conform's parseWithZod utility to simplify form data parsing, validation, and error handling.
+
+LANGUAGE: tsx
+CODE:
+import { parseWithZod } from '@conform-to/zod';
+import { type ActionFunctionArgs } from '@remix-run/node';
+import { z } from 'zod';
+import { sendMessage } from '~/message';
+
+const schema = z.object({
+  // ...
+});
+
+export async function action({ request }: ActionFunctionArgs) {
+  const formData = await request.formData();
+
+  // Replace `Object.fromEntries()` with the parseWithZod helper
+  const submission = parseWithZod(formData, { schema });
+
+  // Report the submission to client if it is not successful
+  if (submission.status !== 'success') {
+    return submission.reply();
+  }
+
+  const message = await sendMessage(submission.value);
+
+  // Return a form error if the message is not sent
+  if (!message.sent) {
+    return submission.reply({
+      formErrors: ['Failed to send the message. Please try again later.'],
+    });
+  }
+
+  return redirect('/messages');
+}
+
+----------------------------------------
+
+TITLE: Simplified Zod schema without preprocessing for Conform
+DESCRIPTION: Updated Zod schema that removes the preprocessing logic as Conform's Zod integration automatically handles empty string validation.
+
+LANGUAGE: tsx
+CODE:
+import { z } from 'zod';
+
+const schema = z.object({
+  email: z
+    .string({ required_error: 'Email is required' })
+    .email('Email is invalid'),
+  message: z
+    .string({ required_error: 'Message is required' })
+    .min(10, 'Message is too short')
+    .max(100, 'Message is too long'),
+});
+
+----------------------------------------
+
+TITLE: Accessible Remix contact form with ARIA attributes
+DESCRIPTION: Enhanced contact form with accessibility improvements including proper form element associations, aria-invalid attributes, and aria-describedby for error messages.
+
+LANGUAGE: tsx
+CODE:
+import { type ActionFunctionArgs } from '@remix-run/node';
+import { Form, useActionData } from '@remix-run/react';
+import { z } from 'zod';
+import { sendMessage } from '~/message';
+
+const schema = z.object({
+  // ...
+});
+
+export async function action({ request }: ActionFunctionArgs) {
+  // ...
+}
+
+export default function ContactUs() {
+  const result = useActionData<typeof action>();
+
+  return (
+    <Form
+      method="POST"
+      aria-invalid={result?.formErrors ? true : undefined}
+      aria-describedby={result?.formErrors ? 'contact-error' : undefined}
+    >
+      <div id="contact-error">{result?.formErrors}</div>
+      <div>
+        <label htmlFor="contact-email">Email</label>
+        <input
+          id="contact-email"
+          type="email"
+          name="email"
+          defaultValue={result?.payload.email}
+          required
+          aria-invalid={result?.fieldErrors.email ? true : undefined}
+          aria-describedby={
+            result?.fieldErrors.email ? 'contact-email-error' : undefined
+          }
+        />
+        <div id="contact-email-error">{result?.fieldErrors.email}</div>
+      </div>
+      <div>
+        <label htmlFor="contact-message">Message</label>
+        <textarea
+          id="contact-message"
+          name="message"
+          defaultValue={result?.payload.message}
+          required
+          minLength={10}
+          maxLength={100}
+          aria-invalid={result?.fieldErrors.message ? true : undefined}
+          aria-describedby={
+            result?.fieldErrors.message ? 'contact-email-message' : undefined
+          }
+        />
+        <div id="contact-email-message">{result?.fieldErrors.message}</div>
+      </div>
+      <button>Send</button>
+    </Form>
+  );
+}
+
+----------------------------------------
+
+TITLE: Basic Remix contact form with validation
+DESCRIPTION: Simple contact form implementation that displays validation errors and preserves form values on reload using Remix's useActionData hook.
+
+LANGUAGE: tsx
+CODE:
+import { type ActionFunctionArgs } from '@remix-run/node';
+import { Form, useActionData } from '@remix-run/react';
+import { z } from 'zod';
+import { sendMessage } from '~/message';
+
+const schema = z.object({
+  // ...
+});
+
+export async function action({ request }: ActionFunctionArgs) {
+  // ...
+}
+
+export default function ContactUs() {
+  const result = useActionData<typeof action>();
+
+  return (
+    <Form method="POST">
+      <div>{result?.formErrors}</div>
+      <div>
+        <label>Email</label>
+        <input type="email" name="email" defaultValue={result?.payload.email} />
+        <div>{result?.fieldErrors.email}</div>
+      </div>
+      <div>
+        <label>Message</label>
+        <textarea name="message" defaultValue={result?.payload.message} />
+        <div>{result?.fieldErrors.message}</div>
+      </div>
+      <button>Send</button>
+    </Form>
+  );
+}
+
+----------------------------------------
+
+TITLE: Implementing a Remix action with Zod validation
+DESCRIPTION: Basic Remix action handler that parses form data, validates it with Zod, and returns errors or redirects based on validation results.
+
+LANGUAGE: tsx
+CODE:
+import { type ActionFunctionArgs, redirect } from '@remix-run/node';
+import { z } from 'zod';
+import { sendMessage } from '~/message';
+
+const schema = z.object({
+  // ...
+});
+
+export async function action({ request }: ActionFunctionArgs) {
+  const formData = await request.formData();
+
+  // Construct an object using `Object.fromEntries`
+  const payload = Object.fromEntries(formData);
+  // Then parse it with zod
+  const result = schema.safeParse(payload);
+
+  // Return the error to the client if the data is not valid
+  if (!result.success) {
+    const error = result.error.flatten();
+
+    return {
+      payload,
+      formErrors: error.formErrors,
+      fieldErrors: error.fieldErrors,
+    };
+  }
+
+  // We will skip the implementation as it is not important to the tutorial
+  const message = await sendMessage(result.data);
+
+  // Return a form error if the message is not sent
+  if (!message.sent) {
+    return {
+      payload,
+      formErrors: ['Failed to send the message. Please try again later.'],
+      fieldErrors: {},
+    };
+  }
+
+  return redirect('/messages');
+}
+
+----------------------------------------
+
+TITLE: Defining a Zod validation schema with preprocessing
+DESCRIPTION: Initial Zod schema definition with preprocessing to handle empty string values properly for form validation.
+
+LANGUAGE: typescript
+CODE:
+import { z } from 'zod';
+
+const schema = z.object({
+  // The preprocess step is required for zod to perform the required check properly
+  // as the value of an empty input is usually an empty string
+  email: z.preprocess(
+    (value) => (value === '' ? undefined : value),
+    z.string({ required_error: 'Email is required' }).email('Email is invalid'),
+  ),
+  message: z.preprocess(
+    (value) => (value === '' ? undefined : value),
+    z
+      .string({ required_error: 'Message is required' })
+      .min(10, 'Message is too short')
+      .max(100, 'Message is too long'),
+  ),
+});
+
+----------------------------------------
+
+TITLE: Installing Conform packages with npm
+DESCRIPTION: Command to install the required Conform packages for React and Zod integration.
+
+LANGUAGE: shell
+CODE:
+npm install @conform-to/react @conform-to/zod --save
+
+----------------------------------------
+
+TITLE: Simplifying Integration with FormProvider and useField
+DESCRIPTION: This example shows how to simplify custom input integration using FormProvider and useField hooks. This approach allows field components to access the form context directly, making the code more modular and maintainable.
+
+LANGUAGE: tsx
+CODE:
+import {
+  type FieldName,
+  FormProvider,
+  useForm,
+  useField,
+  useInputControl,
+} from '@conform-to/react';
+import * as Select from '@radix-ui/react-select';
+import {
+  CheckIcon,
+  ChevronDownIcon,
+  ChevronUpIcon,
+} from '@radix-ui/react-icons';
+
+type SelectFieldProps = {
+  // Instead of using the `FieldMetadata` type, we will use the `FieldName` type
+  // We can also restrict the type of the field it accepts through its generics
+  name: FieldName<string>;
+  options: Array<string>;
+};
+
+function Select({ name, options }: SelectFieldProps) {
+  const [meta] = useField(name);
+  const control = useInputControl(meta);
+
+  return (
+    <Select.Root
+      name={meta.name}
+      value={control.value}
+      onValueChange={(value) => {
+        control.change(value);
+      }}
+      onOpenChange={(open) => {
+        if (!open) {
+          control.blur();
+        }
+      }}
+    >
+      {/* ... */}
+    </Select.Root>
+  );
+}
+
+function Example() {
+  const [form, fields] = useForm();
+
+  return (
+    <FormProvider context={form.context}>
+      <form id={form.id}>
+        <div>
+          <label>Color</label>
+          <Select name={fields.color.name} options={['red', 'green', 'blue']} />
+          <div>{fields.color.errors}</div>
+        </div>
+        <button>Submit</button>
+      </form>
+    </FormProvider>
+  );
+}
+
+----------------------------------------
+
+TITLE: Integrating Radix UI Select with useInputControl
+DESCRIPTION: This example demonstrates how to integrate a Radix UI Select component with Conform using the useInputControl hook. It shows how to properly connect the custom component to Conform's form validation system by manually dispatching necessary form events.
+
+LANGUAGE: tsx
+CODE:
+import {
+  type FieldMetadata,
+  useForm,
+  useInputControl,
+} from '@conform-to/react';
+import * as Select from '@radix-ui/react-select';
+import {
+  CheckIcon,
+  ChevronDownIcon,
+  ChevronUpIcon,
+} from '@radix-ui/react-icons';
+
+type SelectFieldProps = {
+  // You can use the `FieldMetadata` type to define the `meta` prop
+  // And restrict the type of the field it accepts through its generics
+  meta: FieldMetadata<string>;
+  options: Array<string>;
+};
+
+function SelectField({ meta, options }: SelectFieldProps) {
+  const control = useInputControl(meta);
+
+  return (
+    <Select.Root
+      name={meta.name}
+      value={control.value}
+      onValueChange={(value) => {
+        control.change(value);
+      }}
+      onOpenChange={(open) => {
+        if (!open) {
+          control.blur();
+        }
+      }}
+    >
+      <Select.Trigger>
+        <Select.Value />
+        <Select.Icon>
+          <ChevronDownIcon />
+        </Select.Icon>
+      </Select.Trigger>
+      <Select.Portal>
+        <Select.Content>
+          <Select.ScrollUpButton>
+            <ChevronUpIcon />
+          </Select.ScrollUpButton>
+          <Select.Viewport>
+            {options.map((option) => (
+              <Select.Item key={option} value={option}>
+                <Select.ItemText>{option}</Select.ItemText>
+                <Select.ItemIndicator>
+                  <CheckIcon />
+                </Select.ItemIndicator>
+              </Select.Item>
+            ))}
+          </Select.Viewport>
+          <Select.ScrollDownButton>
+            <ChevronDownIcon />
+          </Select.ScrollDownButton>
+        </Select.Content>
+      </Select.Portal>
+    </Select.Root>
+  );
+}
+
+function Example() {
+  const [form, fields] = useForm();
+
+  return (
+    <form id={form.id}>
+      <div>
+        <label>Currency</label>
+        <SelectField meta={fields.color} options={['red', 'green', 'blue']} />
+        <div>{fields.color.errors}</div>
+      </div>
+      <button>Submit</button>
+    </form>
+  );
+}
+
+----------------------------------------
+
+TITLE: Testing Custom Input for Form Event Bubbling
+DESCRIPTION: This snippet shows how to test if a custom input component properly bubbles form events. By wrapping the custom input in a div with event listeners, you can determine if integration with Conform is needed.
+
+LANGUAGE: tsx
+CODE:
+import { CustomInput } from 'your-ui-library';
+
+function Example() {
+  return (
+    <div onInput={console.log} onBlur={console.log}>
+      <CustomInput />
+    </div>
+  );
+}
+
+----------------------------------------
+
+TITLE: Using Native Inputs with Conform
+DESCRIPTION: This example demonstrates a basic Conform setup with native form inputs. It shows how Conform automatically handles input and focusout events through event delegation without requiring explicit event handlers on individual form elements.
+
+LANGUAGE: tsx
+CODE:
+function Example() {
+  const [form, fields] = useForm({
+    // Optional, Conform will generate a random id if not provided
+    id: 'example',
+  });
+
+  return (
+    <form id={form.id}>
+      <div>
+        <label>Title</label>
+        <input type="text" name="title" />
+        <div>{fields.title.errors}</div>
+      </div>
+      <div>
+        <label>Description</label>
+        <textarea name="description" />
+        <div>{fields.description.errors}</div>
+      </div>
+      <div>
+        <label>Color</label>
+        <select name="color">
+          <option>Red</option>
+          <option>Green</option>
+          <option>Blue</option>
+        </select>
+        <div>{fields.color.errors}</div>
+      </div>
+      <button form={form.id}>Submit</button>
+    </form>
+  );
+}
+
+----------------------------------------
+
+TITLE: Handling Form Reset Synchronization in Remix with Conform
+DESCRIPTION: Solution for handling state synchronization issues when resetting a form from an action in Remix. This approach ensures default values from loaders don't override reset values by waiting for navigation state to be idle before syncing form state.
+
+LANGUAGE: tsx
+CODE:
+export default function Example() {
+  const { defaultValue } = useLoaderData<typeof loader>();
+  const lastResult = useActionData<typeof action>();
+  const navigation = useNavigation();
+  const [form, fields] = useForm({
+    // If the default value comes from loader
+    defaultValue,
+
+    // Sync the result of last submission only when the state is idle
+    lastResult: navigation.state === 'idle' ? lastResult : null,
+
+    // or, if you are using a fetcher:
+    // lastResult: fetcher.state === 'idle' ? lastResult : null,
+
+    // ...
+  });
+
+  // ...
+}
+
+----------------------------------------
+
+TITLE: Defining Login Form Schema with Zod in Next.js
+DESCRIPTION: Creates a Zod schema for validating login form data. The schema defines validation rules for email, password, and an optional remember me checkbox.
+
+LANGUAGE: typescript
+CODE:
+// schema.ts
+import { z } from 'zod';
+
+export const loginSchema = z.object({
+  email: z.string().email(),
+  password: z.string(),
+  remember: z.boolean().optional(),
+});
+
+----------------------------------------
+
+TITLE: Complete Example of parseWithYup with useForm
+DESCRIPTION: A comprehensive example demonstrating how to use parseWithYup with the useForm hook from @conform-to/react. It shows validation of email and password fields using a Yup schema.
+
+LANGUAGE: tsx
+CODE:
+import { parseWithYup } from '@conform-to/yup';
+import { useForm } from '@conform-to/react';
+import * as yup from 'yup';
+
+const schema = yup.object({
+  email: yup.string().email(),
+  password: yup.string(),
+});
+
+function Example() {
+  const [form, fields] = useForm({
+    onValidate({ formData }) {
+      return parseWithYup(formData, { schema });
+    },
+  });
+
+  // ...
+}
+
+----------------------------------------
+
+TITLE: Basic Usage of parseWithYup Function
+DESCRIPTION: Simple usage example of the parseWithYup function showing the basic syntax for parsing form data with a Yup schema.
+
+LANGUAGE: tsx
+CODE:
+const submission = parseWithYup(payload, options);
+
+----------------------------------------
+
+TITLE: Custom Coercion for Specific Schema Types
+DESCRIPTION: Example demonstrating how to define custom coercion logic for specific schema types, such as parsing JSON for a metadata field.
+
+LANGUAGE: typescript
+CODE:
+import {
+  parseWithZod,
+  unstable_coerceFormValue as coerceFormValue,
+} from '@conform-to/zod';
+import { useForm } from '@conform-to/react';
+import { z } from 'zod';
+import { json } from './schema';
+
+const metadata = z.object({
+  number: z.number(),
+  confirmed: z.boolean(),
+});
+
+const schema = coerceFormValue(
+  z.object({
+    ref: z.string(),
+    metadata,
+  }),
+  {
+    customize(type) {
+      // Customize how the `metadata` field value is coerced
+      if (type === metadata) {
+        return (value) => {
+          if (typeof value !== 'string') {
+            return value;
+          }
+
+          // Parse the value as JSON
+          return JSON.parse(value);
+        };
+      }
+
+      // Return `null` to keep the default behavior
+      return null;
+    },
+  },
+);
+
+----------------------------------------
+
+TITLE: Defining Default Values with Zod Transforms
+DESCRIPTION: Example showing how to handle empty values by defining default values using Zod transforms.
+
+LANGUAGE: typescript
+CODE:
+const schema = z.object({
+  foo: z.string().optional(), // string | undefined
+  bar: z
+    .string()
+    .optional()
+    .transform((value) => value ?? ''), // string
+  baz: z
+    .string()
+    .optional()
+    .transform((value) => value ?? null), // string | null
+});
+
+----------------------------------------
+
+TITLE: Overriding Default Coercion Behavior
+DESCRIPTION: Example of how to override the default coercion rules by providing custom handlers for different data types.
+
+LANGUAGE: typescript
+CODE:
+const schema = coerceFormValue(
+  z.object({
+    // ...
+  }),
+  {
+    defaultCoercion: {
+      // Trim the value for all string-based fields
+      // e.g. `z.string()`, `z.number()` or `z.boolean()`
+      string: (value) => {
+        if (typeof value !== 'string') {
+          return value;
+        }
+
+        const result = value.trim();
+
+        // Treat it as `undefined` if the value is empty
+        if (result === '') {
+          return undefined;
+        }
+
+        return result;
+      },
+
+      // Override the default coercion with `z.number()`
+      number: (value) => {
+        // Pass the value as is if it's not a string
+        if (typeof value !== 'string') {
+          return value;
+        }
+
+        // Trim and remove commas before casting it to number
+        return Number(value.trim().replace(/,/g, ''));
+      },
+
+      // Disable coercion for `z.boolean()`
+      boolean: false,
+    },
+  },
+);
+
+----------------------------------------
+
+TITLE: Complete Example with React Form Integration
+DESCRIPTION: Example showing how to use coerceFormValue with Conform and React to create a form with automatic value coercion for different field types.
+
+LANGUAGE: typescript
+CODE:
+import { parseWithZod, unstable_coerceFormValue as coerceFormValue } from '@conform-to/zod';
+import { useForm } from '@conform-to/react';
+import { z } from 'zod';
+import { jsonSchema } from './jsonSchema';
+
+const schema = coerceFormValue(
+  z.object({
+    ref: z.string()
+    date: z.date(),
+    amount: z.number(),
+    confirm: z.boolean(),
+  }),
+);
+
+function Example() {
+  const [form, fields] = useForm({
+    onValidate({ formData }) {
+      return parseWithZod(formData, {
+        schema,
+        defaultTypeCoercion: false,
+      });
+    },
+  });
+
+  // ...
+}
+
+----------------------------------------
+
+TITLE: Using coerceFormValue with Zod Schema
+DESCRIPTION: Basic usage of the coerceFormValue function to enhance a Zod schema for form value preprocessing.
+
+LANGUAGE: typescript
+CODE:
+const enhancedSchema = coerceFormValue(schema, options);
+
+----------------------------------------
+
+TITLE: FormId Type Variations for Component Props in TypeScript
+DESCRIPTION: Shows different ways to type the formId prop in component props interfaces, from simple string types to more specific FormId generic types.
+
+LANGUAGE: ts
+CODE:
+type ExampleComponentProps = {
+  // スキーマやフォームエラーの型を気にしない場合
+  formId: string;
+  // フォームメタデータから特定のフィールドにアクセスしている場合
+  formId: FormId<{ fieldName: string }>;
+  // カスタムエラータイプを持っている場合
+  formId: FormId<Record<string, any>, CustomFormError>;
+};
+
+----------------------------------------
+
+TITLE: Using Form IDs with ExampleComponent in React
+DESCRIPTION: Demonstrates how to use form IDs generated by the useForm hook when rendering components that require FormId type parameters.
+
+LANGUAGE: tsx
+CODE:
+import { useForm } from '@conform-to/react';
+
+function Example() {
+  const [form, fields] = useForm();
+
+  return (
+    <>
+      <ExampleComponent formId={form.id} />
+      <ExampleComponent formId={fields.fieldName.formId} />
+    </>
+  );
+}
+
+----------------------------------------
+
+TITLE: Improving Type Inference with FormId Type in TypeScript
+DESCRIPTION: Shows how to use the FormId generic type to improve TypeScript type inference when working with form metadata. This approach enables better type checking for form errors and field values.
+
+LANGUAGE: tsx
+CODE:
+import { type FormId, useFormMetadata } from '@conform-to/react';
+
+type ExampleComponentProps = {
+  formId: FormId<Schema, FormError>;
+};
+
+function ExampleComponent({ formId }: ExampleComponentProps) {
+  // これで `form.errors` と `form.getFieldset()` の結果の型を認識する。
+  const form = useFormMetadata(formId);
+
+  return <div>{/* ... */}</div>;
+}
+
+----------------------------------------
+
+TITLE: Basic Usage of useFormMetadata Hook in React
+DESCRIPTION: Demonstrates the basic usage of the useFormMetadata hook to retrieve form metadata by passing a formId parameter.
+
+LANGUAGE: tsx
+CODE:
+const form = useFormMetadata(formId);

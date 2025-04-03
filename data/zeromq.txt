@@ -1,0 +1,3266 @@
+TITLE: Implementing Request-Response Pattern with NetMQ in C#
+DESCRIPTION: Demonstrates how to create a client-server communication using the Request-Response pattern in NetMQ. The client sends a 'Hello' message and receives a response, while the server receives the message and responds with 'World'.
+
+LANGUAGE: csharp
+CODE:
+using (var client = new RequestSocket())
+{
+    client.Connect("tcp://127.0.0.1:5556");
+    client.SendFrame("Hello");
+    var msg = client.ReceiveFrameString();
+    Console.WriteLine("From Server: {0}", msg);
+}
+
+LANGUAGE: csharp
+CODE:
+using (var server = new ResponseSocket())
+{
+    server.Bind("tcp://*:5556");
+    string msg = server.ReceiveFrameString();
+    Console.WriteLine("From Client: {0}", msg);
+    server.SendFrame("World");
+}
+
+----------------------------------------
+
+TITLE: Implementing ZeroMQ REQ-REP Client in Go
+DESCRIPTION: A client implementation that creates a REQ socket, connects to a server on localhost:5555, and sends 10 'Hello' requests while waiting for responses. Uses the github.com/pebbe/zmq4 library for ZeroMQ functionality.
+
+LANGUAGE: Go
+CODE:
+package main
+
+import (
+        "fmt"
+
+        zmq "github.com/pebbe/zmq4"
+)
+
+func main() {
+        zctx, _ := zmq.NewContext()
+
+        // Socket to talk to server
+        fmt.Printf("Connecting to the server...\n")
+        s, _ := zctx.NewSocket(zmq.REQ)
+        s.Connect("tcp://localhost:5555")
+
+        // Do 10 requests, waiting each time for a response
+        for i := 0; i < 10; i++ {
+                fmt.Printf("Sending request %d...\n", i)
+                s.Send("Hello", 0)
+
+                msg, _ := s.Recv(0)
+                fmt.Printf("Received reply %d [ %s ]\n", i, msg)
+        }
+}
+
+----------------------------------------
+
+TITLE: Implementing Pub/Sub Pattern in Node.js with ZeroMQ
+DESCRIPTION: Shows how to create a publisher that sends messages and a subscriber that receives messages using the Pub/Sub pattern in ZeroMQ with Node.js.
+
+LANGUAGE: javascript
+CODE:
+const zmq = require("zeromq")
+
+async function run() {
+  const sock = new zmq.Publisher()
+
+  await sock.bind("tcp://127.0.0.1:3000")
+  console.log("Publisher bound to port 3000")
+
+  while (true) {
+    console.log("sending a multipart message envelope")
+    await sock.send(["kitty cats", "meow!"])
+    await new Promise(resolve => {
+      setTimeout(resolve, 500)
+    })
+  }
+}
+
+run()
+
+LANGUAGE: javascript
+CODE:
+const zmq = require("zeromq")
+
+async function run() {
+  const sock = new zmq.Subscriber()
+
+  sock.connect("tcp://127.0.0.1:3000")
+  sock.subscribe("kitty cats")
+  console.log("Subscriber connected to port 3000")
+
+  for await (const [topic, msg] of sock) {
+    console.log(
+      "received a message related to:",
+      topic,
+      "containing message:",
+      msg,
+    )
+  }
+}
+
+run()
+
+----------------------------------------
+
+TITLE: ZeroMQ REP Server Implementation in Python
+DESCRIPTION: Server implementation that binds to TCP port 5555 and responds to client requests. The server receives 'Hello' messages and replies with 'World' after a 1-second delay to simulate work.
+
+LANGUAGE: python
+CODE:
+#
+#   Hello World server in Python
+#   Binds REP socket to tcp://*:5555
+#   Expects b"Hello" from client, replies with b"World"
+#
+
+import time
+import zmq
+
+context = zmq.Context()
+socket = context.socket(zmq.REP)
+socket.bind("tcp://*:5555")
+
+while True:
+    #  Wait for next request from client
+    message = socket.recv()
+    print("Received request: %s" % message)
+
+    #  Do some 'work'
+    time.sleep(1)
+
+    #  Send reply back to client
+    socket.send(b"World")
+
+----------------------------------------
+
+TITLE: Implementing ZeroMQ Request-Reply Client in C
+DESCRIPTION: A C program that implements a ZeroMQ client using the request-reply (REQ) socket pattern. The client connects to a server on port 5555, sends 10 'Hello' messages sequentially, and waits for responses. It demonstrates basic ZeroMQ socket creation, connection, message sending/receiving, and proper cleanup.
+
+LANGUAGE: C
+CODE:
+//  Hello World client
+#include <zmq.h>
+#include <string.h>
+#include <stdio.h>
+#include <unistd.h>
+
+int main (void)
+{
+    printf ("Connecting to hello world server…\n");
+    void *context = zmq_ctx_new ();
+    void *requester = zmq_socket (context, ZMQ_REQ);
+    zmq_connect (requester, "tcp://localhost:5555");
+
+    int request_nbr;
+    for (request_nbr = 0; request_nbr != 10; request_nbr++) {
+        char buffer [10];
+        printf ("Sending Hello %d…\n", request_nbr);
+        zmq_send (requester, "Hello", 5, 0);
+        zmq_recv (requester, buffer, 10, 0);
+        printf ("Received World %d\n", request_nbr);
+    }
+    zmq_close (requester);
+    zmq_ctx_destroy (context);
+    return 0;
+}
+
+----------------------------------------
+
+TITLE: Implementing ZeroMQ REQ-REP Server with JeroMQ
+DESCRIPTION: Example of a simple request-reply server implementation using JeroMQ. The server listens on port 5555, receives messages, prints them, and responds with 'Hello, world!' to each request. Uses ZContext for proper resource management and implements a continuous message processing loop.
+
+LANGUAGE: java
+CODE:
+import org.zeromq.ZMQ;
+import org.zeromq.ZContext;
+
+public class HelloWorldServer
+{
+    public static void main(String[] args) throws Exception
+    {
+        try (ZContext context = new ZContext()) {
+            // Socket to talk to clients
+            ZMQ.Socket socket = context.createSocket(ZMQ.REP);
+            socket.bind("tcp://*:5555");
+
+            while (!Thread.currentThread().isInterrupted()) {
+                // Block until a message is received
+                byte[] reply = socket.recv(0);
+
+                // Print the message
+                System.out.println(
+                    "Received: [" + new String(reply, ZMQ.CHARSET) + "]"
+                );
+
+                // Send a response
+                String response = "Hello, world!";
+                socket.send(response.getBytes(ZMQ.CHARSET), 0);
+            }
+        }
+    }
+}
+
+----------------------------------------
+
+TITLE: Implementing ZeroMQ Hello World Server in C
+DESCRIPTION: This code snippet demonstrates a basic ZeroMQ server implementation in C. It creates a REP socket, binds it to port 5555, and enters a loop to receive messages and send responses. The server receives 'Hello' and responds with 'World' after a 1-second delay.
+
+LANGUAGE: c
+CODE:
+//  Hello World server
+#include <zmq.h>
+#include <string.h>
+#include <stdio.h>
+#include <unistd.h>
+#include <assert.h>
+
+int main (void)
+{
+    //  Socket to talk to clients
+    void *context = zmq_ctx_new ();
+    void *responder = zmq_socket (context, ZMQ_REP);
+    int rc = zmq_bind (responder, "tcp://*:5555");
+    assert (rc == 0);
+
+    while (1) {
+        char buffer [10];
+        zmq_recv (responder, buffer, 10, 0);
+        printf ("Received Hello\n");
+        sleep (1);          //  Do some 'work'
+        zmq_send (responder, "World", 5, 0);
+    }
+    return 0;
+}
+
+----------------------------------------
+
+TITLE: Implementing ZeroMQ REP Server in Python
+DESCRIPTION: Creates a ZeroMQ REP socket server that binds to port 5555, listens for incoming messages, and responds with 'World'. The server includes a 1-second simulated processing delay between receiving a request and sending the response.
+
+LANGUAGE: python
+CODE:
+#
+#   Hello World server in Python
+#   Binds REP socket to tcp://*:5555
+#   Expects b"Hello" from client, replies with b"World"
+#
+
+import time
+import zmq
+
+context = zmq.Context()
+socket = context.socket(zmq.REP)
+socket.bind("tcp://*:5555")
+
+while True:
+    #  Wait for next request from client
+    message = socket.recv()
+    print(f"Received request: {message}")
+
+    #  Do some 'work'
+    time.sleep(1)
+
+    #  Send reply back to client
+    socket.send(b"World")
+
+----------------------------------------
+
+TITLE: Implementing ZeroMQ Request-Reply Client in C#
+DESCRIPTION: A C# client that connects to a ZeroMQ server on localhost:5555, sends 10 'Hello' requests, and receives responses. Uses NetMQ.Sockets.RequestSocket for communication and implements proper resource disposal with 'using' statement.
+
+LANGUAGE: csharp
+CODE:
+using System;
+using NetMQ;
+using NetMQ.Sockets;
+
+static class Program
+{
+    public static void Main()
+    {
+        Console.WriteLine("Connecting to hello world server…");
+        using(var requester = new RequestSocket())
+        {
+            requester.Connect("tcp://localhost:5555");
+
+            int requestNumber;
+            for (requestNumber = 0; requestNumber != 10; requestNumber++)
+            {
+                Console.WriteLine("Sending Hello {0}...", requestNumber);
+                requester.SendFrame("Hello");
+                string str = requester.ReceiveFrameString();
+                Console.WriteLine("Received World {0}", requestNumber);
+            }
+        }
+    }    
+}
+
+----------------------------------------
+
+TITLE: Implementing ZeroMQ REP Server in Node.js
+DESCRIPTION: This code sets up a ZeroMQ REP (Reply) socket server using the zeromq.js library. It binds to tcp://*:5555, listens for incoming 'Hello' messages, and responds with 'World'. The server runs in an infinite loop, processing messages asynchronously.
+
+LANGUAGE: javascript
+CODE:
+//  Hello World server
+//  Binds REP socket to tcp://*:5555
+//  Expects "Hello" from client, replies with "World"
+
+const zmq = require('zeromq');
+
+async function runServer() {
+  const sock = new zmq.Reply();
+
+  await sock.bind('tcp://*:5555');
+
+  for await (const [msg] of sock) {
+    console.log('Received ' + ': [' + msg.toString() + ']');
+    await sock.send('World');
+    // Do some 'work'
+  }
+}
+
+runServer();
+
+----------------------------------------
+
+TITLE: Implementing ZeroMQ REQ Client in C++
+DESCRIPTION: Creates a ZeroMQ client that sends 10 'Hello' requests to a server on localhost:5555 using the REQ-REP pattern. Demonstrates context initialization, socket connection, message sending and receiving with proper ZeroMQ flags.
+
+LANGUAGE: cpp
+CODE:
+#include <string>
+#include <iostream>
+
+#include <zmq.hpp>
+
+int main()
+{
+    // initialize the zmq context with a single IO thread
+    zmq::context_t context{1};
+
+    // construct a REQ (request) socket and connect to interface
+    zmq::socket_t socket{context, zmq::socket_type::req};
+    socket.connect("tcp://localhost:5555");
+
+    // set up some static data to send
+    const std::string data{"Hello"};
+
+    for (auto request_num = 0; request_num < 10; ++request_num) 
+    {
+        // send the request message
+        std::cout << "Sending Hello " << request_num << "..." << std::endl;
+        socket.send(zmq::buffer(data), zmq::send_flags::none);
+        
+        // wait for reply from server
+        zmq::message_t reply{};
+        socket.recv(reply, zmq::recv_flags::none);
+
+        std::cout << "Received " << reply.to_string(); 
+        std::cout << " (" << request_num << ")";
+        std::cout << std::endl;
+    }
+
+    return 0;
+}
+
+----------------------------------------
+
+TITLE: Implementing Req/Rep Pattern in Node.js with ZeroMQ
+DESCRIPTION: Demonstrates how to create a client that sends requests and a server that replies to those requests using the Req/Rep pattern in ZeroMQ with Node.js.
+
+LANGUAGE: javascript
+CODE:
+const zmq = require("zeromq")
+
+async function run() {
+  const sock = new zmq.Request()
+
+  sock.connect("tcp://127.0.0.1:3000")
+  console.log("Producer bound to port 3000")
+
+  await sock.send("4")
+  const [result] = await sock.receive()
+
+  console.log(result)
+}
+
+run()
+
+LANGUAGE: javascript
+CODE:
+const zmq = require("zeromq")
+
+async function run() {
+  const sock = new zmq.Reply()
+
+  await sock.bind("tcp://127.0.0.1:3000")
+
+  for await (const [msg] of sock) {
+    await sock.send(2 * parseInt(msg, 10))
+  }
+}
+
+run()
+
+----------------------------------------
+
+TITLE: Implementing ZeroMQ REP Server in Rust
+DESCRIPTION: This code sets up a ZeroMQ REP socket, binds it to a TCP port, and enters a loop to receive messages and send responses. It expects "Hello" from clients and replies with "World". The server introduces a 1-second delay between receiving and responding.
+
+LANGUAGE: rust
+CODE:
+#![crate_name = "helloworld_server"]
+
+//! Hello World server in Rust
+//! Binds REP socket to tcp://*:5555
+//! Expects "Hello" from client, replies with "World"
+
+use std::thread;
+use std::time::Duration;
+
+fn main() {
+    let context = zmq::Context::new();
+    let responder = context.socket(zmq::REP).unwrap();
+
+    assert!(responder.bind("tcp://*:5555").is_ok());
+
+    let mut msg = zmq::Message::new();
+    loop {
+        responder.recv(&mut msg, 0).unwrap();
+        println!("Received {}", msg.as_str().unwrap());
+        thread::sleep(Duration::from_millis(1000));
+        responder.send("World", 0).unwrap();
+    }
+}
+
+----------------------------------------
+
+TITLE: Implementing ZeroMQ Hello World Client in Java with JeroMQ
+DESCRIPTION: This code snippet demonstrates a ZeroMQ client in Java using the JeroMQ library. It creates a REQ socket, connects to a server on localhost:5555, sends 'Hello' messages, and receives 'World' responses. The client sends 10 requests in total.
+
+LANGUAGE: java
+CODE:
+//  Hello World client in Java
+//  Connects REQ socket to tcp://localhost:5555
+//  Sends "Hello" to server, expects "World" back
+
+import org.zeromq.SocketType;
+import org.zeromq.ZMQ;
+import org.zeromq.ZContext;
+
+public class hwclient
+{
+    public static void main(String[] args)
+    {
+        try (ZContext context = new ZContext()) {
+            System.out.println("Connecting to hello world server");
+
+      		//  Socket to talk to server
+            ZMQ.Socket socket = context.createSocket(SocketType.REQ);
+            socket.connect("tcp://localhost:5555");
+
+            for (int requestNbr = 0; requestNbr != 10; requestNbr++) {
+                String request = "Hello";
+                System.out.println("Sending Hello " + requestNbr);
+                socket.send(request.getBytes(ZMQ.CHARSET), 0);
+
+                byte[] reply = socket.recv(0);
+                System.out.println(
+                    "Received " + new String(reply, ZMQ.CHARSET) + " " +
+                    requestNbr
+                );
+            }
+        }
+    }
+}
+
+----------------------------------------
+
+TITLE: libzmq Example: REP Socket Server
+DESCRIPTION: Implements a simple ZeroMQ REP (reply) socket server using libzmq. The server binds to a TCP port, receives messages, processes them, and sends replies. Demonstrates context and socket creation, binding, and basic message handling.
+
+LANGUAGE: c
+CODE:
+#include <zmq.h>
+#include <stdio.h>
+#include <unistd.h>
+#include <string.h>
+#include <assert.h>
+
+int main (void)
+{
+    //  Socket to talk to clients
+    void *context = zmq_ctx_new ();
+    void *responder = zmq_socket (context, ZMQ_REP);
+    int rc = zmq_bind (responder, "tcp://*:5555");
+    assert (rc == 0);
+
+    while (1) {
+        char buffer [10];
+        zmq_recv (responder, buffer, 10, 0);
+        printf ("Received Hello\n");
+        sleep (1);          //  Do some 'work'
+        zmq_send (responder, "World", 5, 0);
+    }
+    return 0;
+}
+
+----------------------------------------
+
+TITLE: Implementing Request-Reply Pattern in Perl with ZeroMQ
+DESCRIPTION: This example demonstrates the request-reply pattern using ZeroMQ in Perl. It creates two sockets, one for the requester (ZMQ_REQ) and one for the replier (ZMQ_REP), and shows how to send and receive messages between them.
+
+LANGUAGE: perl
+CODE:
+use 5.012;
+use ZMQ::FFI qw(ZMQ_REQ ZMQ_REP);
+
+my $endpoint = "ipc://zmq-ffi-$$";
+my $ctx      = ZMQ::FFI->new();
+
+my $s1 = $ctx->socket(ZMQ_REQ);
+$s1->connect($endpoint);
+
+my $s2 = $ctx->socket(ZMQ_REP);
+$s2->bind($endpoint);
+
+$s1->send('ohhai');
+
+say $s2->recv();
+# ohhai
+
+----------------------------------------
+
+TITLE: Implementing a ZeroMQ Server in C++
+DESCRIPTION: This code snippet demonstrates how to create a basic ZeroMQ server that binds to port 5555 and waits for messages. It uses a REP (reply) socket type for handling request-response communication.
+
+LANGUAGE: C++
+CODE:
+{{< example hello_world_server >}}
+
+----------------------------------------
+
+TITLE: Implementing Topic-Based ZeroMQ Subscriber in C++
+DESCRIPTION: Creates a ZeroMQ subscriber that connects to a local publisher on port 5555 and subscribes to the 'status' topic. Uses multipart message receiving to handle topic-message pairs and continuously monitors for new messages. Requires cppzmq library and demonstrates proper socket configuration and message handling.
+
+LANGUAGE: cpp
+CODE:
+//  Subscribe to the 'status'
+#include <string>
+#include <iostream>
+#include <vector>
+
+#include <zmq.hpp>
+#include <zmq_addon.hpp>
+
+int main()
+{
+    // initialize the zmq context with a single IO thread
+    zmq::context_t context{1};
+
+    // construct a SUB (subscriber) socket and connect to interface
+    zmq::socket_t subscriber{context, zmq::socket_type::sub};
+    subscriber.connect("tcp://localhost:5555");
+    
+    // set topics you want to sub
+    subscriber.set(zmq::sockopt::subscribe, "status");
+
+    while(true){
+        // Receive all parts of the message
+        std::vector<zmq::message_t> recv_msgs;
+        zmq::recv_result_t result =
+            zmq::recv_multipart(subscriber, std::back_inserter(recv_msgs));
+        assert(result && "recv failed");
+        assert(*result == 2);
+
+        std::cout << "Subscriber: [" << recv_msgs[0].to_string() << "] "
+                  << recv_msgs[1].to_string() << std::endl;
+    }
+
+    return 0;
+}
+
+----------------------------------------
+
+TITLE: Implementing ZeroMQ Publisher with Topics in Python
+DESCRIPTION: Creates a ZeroMQ publisher that sends messages with topics. The publisher binds to TCP port 5555 and sends two different messages ('status 5' and 'All is well') in a loop, with a 1-second delay between iterations. Uses signal handling for clean interruption.
+
+LANGUAGE: Python
+CODE:
+import signal
+import time
+import zmq
+
+
+signal.signal(signal.SIGINT, signal.SIG_DFL)
+
+context = zmq.Context()
+socket = context.socket(zmq.PUB)
+socket.bind('tcp://*:5555')
+
+for i in range(5):
+    socket.send(b'status 5')
+    socket.send(b'All is well')
+    time.sleep(1)
+
+----------------------------------------
+
+TITLE: Implementing ZeroMQ Hello World Server in C++
+DESCRIPTION: This snippet shows how to create a ZeroMQ REP socket server using cppzmq. It initializes a ZMQ context, binds a socket to a TCP port, and enters an infinite loop to receive requests, simulate work, and send responses.
+
+LANGUAGE: cpp
+CODE:
+#include <string>
+#include <chrono>
+#include <thread>
+#include <iostream>
+
+#include <zmq.hpp>
+
+int main() 
+{
+    using namespace std::chrono_literals;
+
+    // initialize the zmq context with a single IO thread
+    zmq::context_t context{1};
+
+    // construct a REP (reply) socket and bind to interface
+    zmq::socket_t socket{context, zmq::socket_type::rep};
+    socket.bind("tcp://*:5555");
+
+    // prepare some static data for responses
+    const std::string data{"World"};
+
+    for (;;) 
+    {
+        zmq::message_t request;
+
+        // receive a request from client
+        socket.recv(request, zmq::recv_flags::none);
+        std::cout << "Received " << request.to_string() << std::endl;
+
+        // simulate work
+        std::this_thread::sleep_for(1s);
+
+        // send the reply to the client
+        socket.send(zmq::buffer(data), zmq::send_flags::none);
+    }
+
+    return 0;
+}
+
+----------------------------------------
+
+TITLE: Using ZeroMQ with TypeScript in Node.js
+DESCRIPTION: Shows how to import and use ZeroMQ in a TypeScript project. The library provides typings for TypeScript version 3.0.x and later.
+
+LANGUAGE: typescript
+CODE:
+import {Request} from "zeromq"
+// or as namespace
+import * as zmq from "zeromq"
+
+const reqSock = new Request()
+//...
+const repSock = new zmq.Reply()
+
+----------------------------------------
+
+TITLE: Implementing ZeroMQ Hello World Server in C# with NetMQ
+DESCRIPTION: This code creates a ZeroMQ server using NetMQ's ResponseSocket. It binds to TCP port 5555, continuously listens for incoming messages, prints a received message notification, simulates work with a 1-second delay, and responds with 'World'.
+
+LANGUAGE: csharp
+CODE:
+using System;
+using System.Threading;
+using NetMQ;
+using NetMQ.Sockets;
+
+static class Program
+{
+    public static void Main()
+    {        
+        using (var responder = new ResponseSocket())
+        {
+            responder.Bind("tcp://*:5555");
+
+            while (true) 
+            {
+                string str = responder.ReceiveFrameString();
+                Console.WriteLine("Received Hello");
+                Thread.Sleep(1000);  //  Do some 'work'
+                responder.SendFrame("World");
+            }
+        }
+    }
+}
+
+----------------------------------------
+
+TITLE: Basic Socket Operations with FsNetMQ in F#
+DESCRIPTION: Demonstrates creating router and dealer sockets, binding, connecting, and sending/receiving frames using FsNetMQ.
+
+LANGUAGE: fsharp
+CODE:
+use router = Socket.router ()
+router.bind socket "tcp://*:6566"
+
+use dealer = Socket.dealer ()
+Socket.connect socket "tcp://127.0.0.1:6566"
+
+Frame.send dealer "Hello"B
+
+let frame,more = Frame.recv router
+
+----------------------------------------
+
+TITLE: Implementing ZeroMQ Request-Reply Client in C with CZMQ
+DESCRIPTION: A simple ZeroMQ client that connects to a server on localhost:5555, sends 10 'Hello' requests, and processes the responses. Uses CZMQ library for simplified ZeroMQ socket handling and message processing. Demonstrates proper resource cleanup with zsock_destroy.
+
+LANGUAGE: C
+CODE:
+//  Hello World client
+#include <czmq.h>
+
+int main (void)
+{
+    printf ("Connecting to hello world server…\n");
+    zsock_t *requester = zsock_new (ZMQ_REQ);
+    zsock_connect (requester, "tcp://localhost:5555");
+
+    int request_nbr;
+    for (request_nbr = 0; request_nbr != 10; request_nbr++) {
+        printf ("Sending Hello %d…\n", request_nbr);
+        zstr_send (requester, "Hello");
+        char *str = zstr_recv (requester);
+        printf ("Received World %d\n", request_nbr);
+        zstr_free (&str);
+    }
+    zsock_destroy (&requester);
+    return 0;
+}
+
+----------------------------------------
+
+TITLE: Basic ZeroMQ Messaging Example in Ruby
+DESCRIPTION: Demonstrates basic ZeroMQ messaging pattern using UPSTREAM and DOWNSTREAM sockets in Ruby. Shows how to create a context, establish connections, send messages, and implement a message processing loop.
+
+LANGUAGE: ruby
+CODE:
+require "zmq"
+
+context = ZMQ::Context.new(1)
+
+puts "Opening connection for READ"
+inbound = context.socket(ZMQ::UPSTREAM)
+inbound.bind("tcp://127.0.0.1:9000")
+
+outbound = context.socket(ZMQ::DOWNSTREAM)
+outbound.connect("tcp://127.0.0.1:9000")
+p outbound.send("Hello World!")
+p outbound.send("QUIT")
+
+loop do
+  data = inbound.recv
+  p data
+  break if data == "QUIT"
+end
+
+----------------------------------------
+
+TITLE: Implementing Publish-Subscribe Pattern in Perl with ZeroMQ
+DESCRIPTION: This example shows how to use the publish-subscribe pattern with ZeroMQ in Perl. It demonstrates subscribing to all topics and specific topics, as well as publishing and receiving messages based on those subscriptions.
+
+LANGUAGE: perl
+CODE:
+use 5.012;
+use ZMQ::FFI qw(ZMQ_PUB ZMQ_SUB);
+use Time::HiRes q(usleep);
+
+my $endpoint = "ipc://zmq-ffi-$$";
+my $ctx      = ZMQ::FFI->new();
+
+my $s = $ctx->socket(ZMQ_SUB);
+my $p = $ctx->socket(ZMQ_PUB);
+
+$s->connect($endpoint);
+$p->bind($endpoint);
+
+# all topics
+{
+    $s->subscribe('');
+
+    until ($s->has_pollin) {
+        # compensate for slow subscriber
+        usleep 100_000;
+        $p->send('ohhai');
+    }
+
+    say $s->recv();
+    # ohhai
+
+    $s->unsubscribe('');
+}
+
+# specific topics
+{
+    $s->subscribe('topic1');
+    $s->subscribe('topic2');
+
+    until ($s->has_pollin) {
+        usleep 100_000;
+        $p->send('topic1 ohhai');
+        $p->send('topic2 ohhai');
+    }
+
+    while ($s->has_pollin) {
+        say join ' ', $s->recv();
+        # topic1 ohhai
+        # topic2 ohhai
+    }
+}
+
+----------------------------------------
+
+TITLE: Implementing ZeroMQ REQ Client in Haskell
+DESCRIPTION: A ZeroMQ client that connects to tcp://localhost:5555, sends 'Hello' messages, and receives responses. Uses REQ socket type and performs 10 request-response cycles. Demonstrates the use of ByteString for efficient message handling and ZMQ4 monadic interface.
+
+LANGUAGE: haskell
+CODE:
+-- This lets us conviniently use efficient ByteString to send and recieve messages
+{-# LANGUAGE OverloadedStrings #-}
+
+{-
+   Hello World client in Haskell
+   Connects REQ socket to tcp://localhost:5555
+   Sends "Hello" to server, expects "World" back
+-}
+
+import System.ZMQ4.Monadic (runZMQ, socket, connect, send, receive, Socket, Req(..))
+import Control.Monad (forM_)
+import Control.Monad.IO.Class (liftIO)
+import Data.ByteString.Char8 (pack, unpack)
+
+main :: IO ()
+main = runZMQ $ do
+    --  Socket to talk to server
+    reqSocket <- socket Req
+    connect reqSocket "tcp://localhost:5555"
+
+    --  Do 10 requests, waiting each time for a response
+    forM_ [1..10] $ \i -> do
+        liftIO $ putStrLn ("Sending request " ++ show i ++ "...")
+        send reqSocket [] (pack "Hello")
+
+        --  Get the reply
+        message <- receive reqSocket
+        liftIO $ putStrLn ("Received reply " ++ show i ++ " [" ++ unpack message ++ "]")
+
+----------------------------------------
+
+TITLE: Implementing Non-blocking Operations in Perl with ZeroMQ and AnyEvent
+DESCRIPTION: This example demonstrates how to perform non-blocking operations with ZeroMQ in Perl using the AnyEvent library. It shows asynchronous sending and receiving of messages using PUSH and PULL sockets.
+
+LANGUAGE: perl
+CODE:
+use 5.012;
+use ZMQ::FFI qw(ZMQ_PUSH ZMQ_PULL);
+use AnyEvent;
+use EV;
+
+my $endpoint = "ipc://zmq-ffi-$$";
+my $ctx      = ZMQ::FFI->new();
+my @messages = qw(foo bar baz);
+
+
+my $pull = $ctx->socket(ZMQ_PULL);
+$pull->bind($endpoint);
+
+my $fd = $pull->get_fd();
+
+my $recv = 0;
+my $w = AE::io $fd, 0, sub {
+    while ( $pull->has_pollin ) {
+        say $pull->recv();
+        # foo, bar, baz
+
+        $recv++;
+        if ($recv == 3) {
+            EV::break();
+        }
+    }
+};
+
+
+my $push = $ctx->socket(ZMQ_PUSH);
+$push->connect($endpoint);
+
+my $sent = 0;
+my $t;
+$t = AE::timer 0, .1, sub {
+    $push->send($messages[$sent]);
+
+    $sent++;
+    if ($sent == 3) {
+        undef $t;
+    }
+};
+
+EV::run();
+
+----------------------------------------
+
+TITLE: Implementing ZeroMQ REQ Client in C++
+DESCRIPTION: A C++ client that establishes a REQ socket connection to a ZeroMQ server on localhost:5555. It sends 10 'Hello' messages sequentially and receives responses, demonstrating basic ZeroMQ message patterns and ZMQPP wrapper usage.
+
+LANGUAGE: cpp
+CODE:
+//  Hello World client
+#include <zmqpp/zmqpp.hpp>
+#include <string>
+#include <iostream>
+
+using namespace std;
+
+int main(int argc, char *argv[]) {
+  const string endpoint = "tcp://localhost:5555";
+
+  // initialize the 0MQ context
+  zmqpp::context context;
+
+  // generate a push socket
+  zmqpp::socket_type type = zmqpp::socket_type::req;
+  zmqpp::socket socket (context, type);
+
+  // open the connection
+  cout << "Connecting to hello world server…" << endl;
+  socket.connect(endpoint);
+  int request_nbr;
+  for (request_nbr = 0; request_nbr != 10; request_nbr++) {
+    // send a message
+    cout << "Sending Hello " << request_nbr <<"…" << endl;
+    zmqpp::message message;
+    // compose a message from a string and a number
+    message << "Hello";
+    socket.send(message);
+    string buffer;
+    socket.receive(buffer);
+    
+    cout << "Received World " << request_nbr << endl;
+  }
+}
+
+----------------------------------------
+
+TITLE: ZeroMQ Router-Dealer Communication Example in Go using goczmq
+DESCRIPTION: Demonstrates creating a router and dealer socket, sending messages between them, and handling routing frames. Uses the goczmq library to interact with ZeroMQ.
+
+LANGUAGE: go
+CODE:
+package main
+
+import (
+	"log"
+
+	"github.com/zeromq/goczmq"
+)
+
+func main() {
+	// Create a router socket and bind it to port 5555.
+	router, err := goczmq.NewRouter("tcp://*:5555")
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer router.Destroy()
+
+	log.Println("router created and bound")
+
+	// Create a dealer socket and connect it to the router.
+	dealer, err := goczmq.NewDealer("tcp://127.0.0.1:5555")
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer dealer.Destroy()
+
+	log.Println("dealer created and connected")
+
+	// Send a 'Hello' message from the dealer to the router.
+	// Here we send it as a frame ([]byte), with a FlagNone
+	// flag to indicate there are no more frames following.
+	err = dealer.SendFrame([]byte("Hello"), goczmq.FlagNone)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	log.Println("dealer sent 'Hello'")
+
+	// Receive the message. Here we call RecvMessage, which
+	// will return the message as a slice of frames ([][]byte).
+	// Since this is a router socket that support async
+	// request / reply, the first frame of the message will
+	// be the routing frame.
+	request, err := router.RecvMessage()
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	log.Printf("router received '%s' from '%v'", request[1], request[0])
+
+	// Send a reply. First we send the routing frame, which
+	// lets the dealer know which client to send the message.
+	// The FlagMore flag tells the router there will be more
+	// frames in this message.
+	err = router.SendFrame(request[0], goczmq.FlagMore)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	log.Printf("router sent 'World'")
+
+	// Next send the reply. The FlagNone flag tells the router
+	// that this is the last frame of the message.
+	err = router.SendFrame([]byte("World"), goczmq.FlagNone)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	// Receive the reply.
+	reply, err := dealer.RecvMessage()
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	log.Printf("dealer received '%s'", string(reply[0]))
+}
+
+----------------------------------------
+
+TITLE: Sending String Messages with ZeroMQ in C
+DESCRIPTION: Function to send a string message through a ZeroMQ socket. The function sends the entire string as a single frame with length matching the string length. Uses strdup to create a copy of the string before sending.
+
+LANGUAGE: C
+CODE:
+static void
+s_send_string (void *socket, const char *string) {
+	zmq_send (socket, strdup(string), strlen(string), 0);
+}
+
+----------------------------------------
+
+TITLE: Implementing Multipart Messaging in Perl with ZeroMQ
+DESCRIPTION: This example illustrates how to send and receive multipart messages using ZeroMQ in Perl. It uses DEALER and ROUTER sockets to demonstrate the transmission of multiple message parts.
+
+LANGUAGE: perl
+CODE:
+use 5.012;
+use ZMQ::FFI qw(ZMQ_DEALER ZMQ_ROUTER);
+
+my $endpoint = "ipc://zmq-ffi-$$";
+my $ctx      = ZMQ::FFI->new();
+
+my $d = $ctx->socket(ZMQ_DEALER);
+$d->set_identity('dealer');
+
+my $r = $ctx->socket(ZMQ_ROUTER);
+
+$d->connect($endpoint);
+$r->bind($endpoint);
+
+$d->send_multipart([qw(ABC DEF GHI)]);
+
+say join ' ', $r->recv_multipart;
+# dealer ABC DEF GHI
+
+----------------------------------------
+
+TITLE: Message Initialization Functions in ZeroMQ
+DESCRIPTION: Core functions for initializing ZeroMQ messages including basic initialization, size-based initialization, and data-based initialization
+
+LANGUAGE: C
+CODE:
+zmq_msg_init()
+zmq_msg_init_size()
+zmq_msg_init_data()
+
+----------------------------------------
+
+TITLE: Publisher-Subscriber Pattern with azmq
+DESCRIPTION: Shows implementation of a pub-sub pattern using azmq Boost Asio bindings. Creates a subscriber that connects to multiple endpoints and filters for 'NASDAQ' messages, then forwards them through a publisher.
+
+LANGUAGE: C++
+CODE:
+#include <azmq/socket.hpp>
+#include <boost/asio.hpp>
+#include <array>
+
+namespace asio = boost::asio;
+
+int main(int argc, char** argv) {
+    asio::io_service ios;
+    azmq::sub_socket subscriber(ios);
+    subscriber.connect("tcp://192.168.55.112:5556");
+    subscriber.connect("tcp://192.168.55.201:7721");
+    subscriber.set_option(azmq::socket::subscribe("NASDAQ"));
+
+    azmq::pub_socket publisher(ios);
+    publisher.bind("ipc://nasdaq-feed");
+
+    std::array<char, 256> buf;
+    for (;;) {
+        auto size = subscriber.receive(asio::buffer(buf));
+        publisher.send(asio::buffer(buf));
+    }
+    return 0;
+}
+
+----------------------------------------
+
+TITLE: Implementing ZeroMQ Dish Socket for Message Reception in C++
+DESCRIPTION: This code snippet demonstrates how to create a ZeroMQ Dish socket, connect it to a local interface, join message groups, and continuously receive messages. It uses the cppzmq library and requires a ZeroMQ context and socket setup.
+
+LANGUAGE: cpp
+CODE:
+#include <cstdlib>
+#include <iostream>
+#include <zmq.hpp>
+
+int main() {
+  // Initialize the zmq context with a single IO thread
+  zmq::context_t context{1};
+
+  // Construct a Dish socket and connect to interface
+  zmq::socket_t dish{context, zmq::socket_type::dish};
+  dish.connect("tcp://localhost:5555");
+
+  // Join message groups
+  dish.join("group1");
+  dish.join("group2");
+
+  // Receive messages forever
+  while (true) {
+    std::cout << "Waiting to receive...\n";
+    zmq::message_t msg;
+    dish.recv(msg, zmq::recv_flags::none);
+    std::cout << "Received a message: " << msg.to_string() << "\n";
+  }
+
+  return EXIT_SUCCESS;
+}
+
+----------------------------------------
+
+TITLE: Basic Message Sending with cppzmq
+DESCRIPTION: Demonstrates basic message sending using the cppzmq header-only binding. Creates a PUSH socket, binds to an inproc transport, and sends a message without waiting.
+
+LANGUAGE: C++
+CODE:
+#include <string>
+#include <zmq.hpp>
+int main()
+{
+   zmq::context_t ctx;
+   zmq::socket_t sock(ctx, zmq::socket_type::push);
+   sock.bind("inproc://test");
+   const std::string_view m = "Hello, world";
+   sock.send(zmq::buffer(m), zmq::send_flags::dontwait);
+}
+
+----------------------------------------
+
+TITLE: Sending String Messages with NetMQ
+DESCRIPTION: Demonstrates how to send a string message through a NetMQ socket using the SendFrame method. This is a simple way to transmit text data across the network.
+
+LANGUAGE: csharp
+CODE:
+socket.SendFrame("Hello");
+
+----------------------------------------
+
+TITLE: Connecting and Receiving Messages with ZeroMQ in Zig
+DESCRIPTION: This snippet shows how to create a ZeroMQ client socket, connect to a server, and receive a message using the zzmq library in Zig. It demonstrates the use of PAIR socket type and dynamic endpoint construction.
+
+LANGUAGE: zig
+CODE:
+const zzmq = @import("zzmq");
+
+var socket = try zzmq.ZSocket.init(allocator, zzmq.ZSocketType.Pair);
+defer socket.deinit();
+
+const endpoint = try std.fmt.allocPrint(allocator, "tcp://127.0.0.1:{}", .{port});
+defer allocator.free(endpoint);
+
+try socket.connect(endpoint);
+
+// receive a message
+var frame = try socket.receive();
+defer frame.deinit();
+
+const data = try frame.data();
+
+----------------------------------------
+
+TITLE: Sending Multi-Part String Messages with ZeroMQ in C
+DESCRIPTION: This function sends an array of strings as a multi-part message using ZeroMQ. It uses the ZMQ_SNDMORE flag to indicate that more message parts will follow, except for the last part.
+
+LANGUAGE: C
+CODE:
+static void
+s_send_strings (void *socket, const char[] *strings, int no_of_strings) {
+    for (index = 0; index < no_of_strings; index++) {
+        int FLAG = (index + 1) == no_of_strings ? 0 : ZMQ_SNDMORE;
+        zmq_send (socket, strdup(strings[index]), strlen(strings[index]), FLAG);
+    }
+}
+
+----------------------------------------
+
+TITLE: Constructing Multi-Frame Messages with ZMsg in Java
+DESCRIPTION: Shows how to construct a multi-frame message using the ZMsg class, which provides an alternative to the socket's send API for creating and sending multi-part messages.
+
+LANGUAGE: java
+CODE:
+ZMsg *strings = new ZMsg();
+strings.add("HELLO");
+strings.add("beautiful");
+strings.add("WORLD");
+strings.send(socket);
+
+----------------------------------------
+
+TITLE: Implementing ZeroMQ Radio Socket for Group Messaging in C++
+DESCRIPTION: This snippet demonstrates how to create a ZeroMQ Radio socket, bind it to a TCP interface, and send messages to multiple groups. It uses the cppzmq library and showcases continuous message sending with group rotation.
+
+LANGUAGE: cpp
+CODE:
+#include <chrono>
+#include <cstdlib>
+#include <iostream>
+#include <string>
+#include <thread>
+#include <zmq.hpp>
+
+int main() {
+  // Initialize the zmq context with a single IO thread
+  zmq::context_t context{1};
+
+  // Construct a Radio socket and connect to interface.
+  zmq::socket_t radio{context, zmq::socket_type::radio};
+  radio.bind("tcp://*:5555");
+
+  // Send messages forever, alternating between 3 groups.
+  for (uint32_t i = 1; true; i = (i % 3 == 0) ? 1 : i + 1) {
+    std::string group = "group" + std::to_string(i);
+    std::string payload = "This is for " + group;
+    zmq::message_t msg{payload};
+    msg.set_group(group.c_str());
+    radio.send(msg, zmq::send_flags::none);
+    std::cout << "Sent a message to " << group << "\n";
+    std::this_thread::sleep_for(std::chrono::seconds(1));
+  }
+
+  return EXIT_SUCCESS;
+}
+
+----------------------------------------
+
+TITLE: Sending Multi-Frame String Messages with ZeroMQ in Java
+DESCRIPTION: Demonstrates how to send multiple string frames in one message using the sendMore method. This method postpones the actual sending until the last frame is sent.
+
+LANGUAGE: java
+CODE:
+socket.sendMore (socket, "HELLO");
+socket.sendMore (socket, "beautiful");
+socket.send (socket, "WORLD!");
+
+----------------------------------------
+
+TITLE: Sending String Message via ZeroMQ Socket in Java
+DESCRIPTION: This snippet shows how to send a string as a single-frame message to a ZeroMQ socket. The string's length equals the frame's length.
+
+LANGUAGE: java
+CODE:
+socket.send("HELLO");
+
+----------------------------------------
+
+TITLE: Receiving Multi-Frame String Messages with ZeroMQ in Java
+DESCRIPTION: Illustrates how to receive a series of string frames by calling the recvStr function multiple times on the socket.
+
+LANGUAGE: java
+CODE:
+String hello     = socket.recvStr();
+String beautiful = socket.recvStr();
+String world 	 = socket.recvStr();
+
+----------------------------------------
+
+TITLE: Sending Basic String Message with ZeroMQ
+DESCRIPTION: Demonstrates how to send a simple C string as a single-frame message through a ZeroMQ socket. The string's length determines the frame length.
+
+LANGUAGE: C
+CODE:
+zstr_send (socket, "HELLO");
+
+----------------------------------------
+
+TITLE: Retrieving Multi-Frame Messages with ZMsg in Java
+DESCRIPTION: Demonstrates how to retrieve an entire multi-frame message in one call using the static recvMsg method of the ZMsg class, and then extract individual string frames.
+
+LANGUAGE: java
+CODE:
+ZMsg strings = ZMsg.recvMsg(socket);
+String hello     = strings.popString();
+String beautiful = strings.popString();
+String world     = strings.popString();
+
+----------------------------------------
+
+TITLE: Installing ZeroMQ on OSX using Homebrew
+DESCRIPTION: This snippet shows how to install ZeroMQ on OSX using the Homebrew package manager. It requires Brew to be installed and configured.
+
+LANGUAGE: bash
+CODE:
+brew install zmq
+
+----------------------------------------
+
+TITLE: CZMQ Example: Push-Pull Socket Communication
+DESCRIPTION: Demonstrates basic usage of CZMQ library to create push and pull sockets, send a message, and receive it. Includes proper socket creation, message sending/receiving, and resource cleanup.
+
+LANGUAGE: c
+CODE:
+#include <czmq.h>
+int main (void)
+{
+    zsock_t *push = zsock_new_push ("inproc://example");
+    zsock_t *pull = zsock_new_pull ("inproc://example");
+    zstr_send (push, "Hello, World");
+
+    char *string = zstr_recv (pull);
+    puts (string);
+    zstr_free (&string);
+
+    zsock_destroy (&pull);
+    zsock_destroy (&push);
+    return 0;
+}
+
+----------------------------------------
+
+TITLE: Installing ZeroMQ on Ubuntu/Debian/Mint Linux
+DESCRIPTION: This command installs the ZeroMQ development package on Ubuntu, Debian, or Mint Linux distributions using the apt-get package manager.
+
+LANGUAGE: bash
+CODE:
+apt-get install libzmq3-dev
+
+----------------------------------------
+
+TITLE: Using a Poller with Multiple Sockets in FsNetMQ
+DESCRIPTION: Shows how to use a poller with multiple sockets in FsNetMQ, utilizing IObservable for message notifications.
+
+LANGUAGE: fsharp
+CODE:
+use poller = Poller.create ()
+use dealer = Socket.dealer ()
+use subscriber = Socker.sub ()
+
+// Connecting and subscribing...
+
+let dealerObservable =
+  Poller.addSocket poller dealer
+  |> Observable.map Frame.recv
+
+let subObservable =
+  Poller.addSocket poller subscriber
+  |> Observable.map Frame.recv
+
+use observer =
+  Observable.merge dealerObservable subObservable
+  |> Observable.subscribe (fun msg -> printfn "%A" msg)
+
+Poller.run poller
+
+----------------------------------------
+
+TITLE: Building azmq on Linux/OS X with CMake
+DESCRIPTION: Commands to build, test and install the azmq library on Unix-like systems using CMake. Creates a build directory, configures the project, compiles, runs tests and installs the library.
+
+LANGUAGE: bash
+CODE:
+$ mkdir build && cd build
+$ cmake ..
+$ make
+$ make test
+$ make install
+
+----------------------------------------
+
+TITLE: Client-Server Example using fszmq in F#
+DESCRIPTION: Provides a complete client-server example using the deprecated fszmq library, demonstrating socket creation, message sending/receiving, and basic error handling.
+
+LANGUAGE: fsharp
+CODE:
+open fszmq
+open fszmq.Context
+open fszmq.Socket
+
+let server () =
+  // create a ZMQ context
+  use context = new Context()
+
+  // create reply socket
+  use server  = rep context
+  // begin receiving connections
+  bind server "tcp://*:5555"
+
+  let rec loop () =
+    // process request (i.e. 'recv' a message from our 'server')
+    // NOTE: it's convenient to 'decode' the (binary) message into a string
+    match server |> recv |> decode with
+    | "hello"   ->  // valid request; send a reply back
+                    // NOTE: "..."B is short-hand for a byte array of ASCII-encoded chars
+                    "world"B |>> server
+                    // wait for next request
+                    loop()
+    | _         ->  // invalid request; stop receiving connections
+                    "goodbye"B |>> server
+
+  // wait for next request
+  loop ()
+
+let client () =
+  // create a ZMQ context
+  use context = new Context()
+
+  // create a request socket
+  use client  = req context
+  // connect to the server
+  "tcp://localhost:5555" |> connect client
+
+  for i in 1 .. 10 do
+    // 'send' a request to the server
+    let request = if i = 10 then "goodbye" else "hello"
+    // NOTE: we need to 'encode' a string to binary (before transmission)
+    request |> encode |> send client
+    printfn "(%i) sent: %s" i request
+    // receive and print a reply from the server
+    let reply = (recv >> decode) client
+    printfn "(%i) got: %s" i reply
+
+----------------------------------------
+
+TITLE: Adding JeroMQ Maven Dependencies
+DESCRIPTION: Maven dependency configurations for adding JeroMQ to a project, including both stable and snapshot versions. Also includes repository configuration for accessing snapshot releases.
+
+LANGUAGE: xml
+CODE:
+<dependency>
+<groupId>org.zeromq</groupId>
+<artifactId>jeromq</artifactId>
+<version>0.5.3</version>
+</dependency>
+
+<!-- for the latest SNAPSHOT -->
+<dependency>
+<groupId>org.zeromq</groupId>
+<artifactId>jeromq</artifactId>
+<version>0.6.0-SNAPSHOT</version>
+</dependency>
+
+<!-- If you can't find the latest snapshot -->
+<repositories>
+<repository>
+<id>sonatype-nexus-snapshots</id>
+<url>https://oss.sonatype.org/content/repositories/snapshots</url>
+<releases>
+<enabled>false</enabled>
+</releases>
+<snapshots>
+<enabled>true</enabled>
+</snapshots>
+</repository>
+</repositories>
+
+----------------------------------------
+
+TITLE: ZeroMQ REQ Client Implementation in Python
+DESCRIPTION: Client implementation that connects to a server on localhost:5555 and sends multiple requests. The client sends 'Hello' messages and receives 'World' responses, performing 10 request-reply cycles.
+
+LANGUAGE: python
+CODE:
+#
+#   Hello World client in Python
+#   Connects REQ socket to tcp://localhost:5555
+#   Sends "Hello" to server, expects "World" back
+#
+
+import zmq
+
+context = zmq.Context()
+
+#  Socket to talk to server
+print("Connecting to hello world server…")
+socket = context.socket(zmq.REQ)
+socket.connect("tcp://localhost:5555")
+
+#  Do 10 requests, waiting each time for a response
+for request in range(10):
+    print("Sending request %s …" % request)
+    socket.send(b"Hello")
+
+    #  Get the reply.
+    message = socket.recv()
+    print("Received reply %s [ %s ]" % (request, message))
+
+----------------------------------------
+
+TITLE: Working with Multi-Part Messages in ZeroMQ using CZMQ (C)
+DESCRIPTION: The zmsg function from the CZMQ library is used for working with multi-part messages in ZeroMQ. It provides functionality to create, manipulate, and send complex multi-part messages.
+
+LANGUAGE: C
+CODE:
+// Example usage of zmsg (not provided in the original text)
+// Refer to http://czmq.zeromq.org/czmq4-0:zmsg for detailed documentation
+
+----------------------------------------
+
+TITLE: Implementing ZeroMQ Hello World Client in Python
+DESCRIPTION: This Python script creates a ZeroMQ REQ socket client that connects to a server on localhost:5555. It sends 10 'Hello' requests and receives responses, demonstrating basic ZeroMQ communication patterns.
+
+LANGUAGE: python
+CODE:
+import zmq
+
+context = zmq.Context()
+
+#  Socket to talk to server
+print("Connecting to hello world server…")
+socket = context.socket(zmq.REQ)
+socket.connect("tcp://localhost:5555")
+
+#  Do 10 requests, waiting each time for a response
+for request in range(10):
+    print(f"Sending request {request} …")
+    socket.send(b"Hello")
+
+    #  Get the reply.
+    message = socket.recv()
+    print(f"Received reply {request} [ {message} ]")
+
+----------------------------------------
+
+TITLE: Installing Latest goczmq from GitHub in Go
+DESCRIPTION: This command installs the latest version of goczmq directly from the GitHub repository. It's used for the CZMQ master branch.
+
+LANGUAGE: go
+CODE:
+go get github.com/zeromq/goczmq
+
+----------------------------------------
+
+TITLE: Implementing ZeroMQ Request-Reply Client in Node.js
+DESCRIPTION: Creates a ZeroMQ client that connects to a local server on port 5555, sends 10 'Hello' messages sequentially, and prints the responses. Uses async/await pattern for handling asynchronous communications.
+
+LANGUAGE: javascript
+CODE:
+//  Hello World client
+const zmq = require('zeromq');
+
+async function runClient() {
+  console.log('Connecting to hello world server…');
+
+  //  Socket to talk to server
+  const sock = new zmq.Request();
+  sock.connect('tcp://localhost:5555');
+
+  for (let i = 0; i < 10; i++) {
+    console.log('Sending Hello ', i);
+    await sock.send('Hello');
+    const [result] = await sock.receive();
+    console.log('Received ', result.toString(), i);
+  }
+}
+
+runClient();
+
+----------------------------------------
+
+TITLE: Checking ZeroMQ Installation on Linux/Darwin
+DESCRIPTION: This command verifies the installed version of ZeroMQ on Linux or Darwin systems using pkg-config.
+
+LANGUAGE: bash
+CODE:
+$ pkg-config --modversion libzmq
+
+----------------------------------------
+
+TITLE: Implementing ZeroMQ Hello World Client in Rust
+DESCRIPTION: This snippet creates a ZeroMQ client that connects to a server on localhost:5555, sends 10 'Hello' messages, and receives 'World' responses. It uses the zmq::Context and zmq::Socket types from the rust-zmq library.
+
+LANGUAGE: rust
+CODE:
+#![crate_name = "helloworld_client"]
+
+//! Hello World client
+
+fn main() {
+    println!("Connecting to hello world server...\n");
+
+    let context = zmq::Context::new();
+    let requester = context.socket(zmq::REQ).unwrap();
+
+    assert!(requester.connect("tcp://localhost:5555").is_ok());
+
+    let mut msg = zmq::Message::new();
+
+    for request_nbr in 0..10 {
+        println!("Sending Hello {}...", request_nbr);
+        requester.send("Hello", 0).unwrap();
+
+        requester.recv(&mut msg, 0).unwrap();
+        println!("Received World {}: {}", msg.as_str().unwrap(), request_nbr);
+    }
+}
+
+----------------------------------------
+
+TITLE: Installing NetMQ via NuGet in C#
+DESCRIPTION: Instructions for downloading NetMQ using the NuGet package manager. NetMQ is a C# implementation of ZeroMQ, providing messaging capabilities for .NET applications.
+
+
+
+----------------------------------------
+
+TITLE: Implementing ZeroMQ Hello World Client in Zig
+DESCRIPTION: This snippet shows a complete implementation of a ZeroMQ client in Zig. It connects to a server, sends multiple 'Hello' requests, and processes the responses. The code uses the zzmq library for ZeroMQ operations and demonstrates proper memory management with Zig's allocator.
+
+LANGUAGE: Zig
+CODE:
+const std = @import("std");
+const zzmq = @import("zzmq");
+
+pub fn main() !void {
+    std.log.info("Connecting to the server...", .{});
+
+    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
+    defer {
+        if (gpa.deinit() == .leak)
+            @panic("Memory leaked");
+    }
+
+    const allocator = gpa.allocator();
+
+    var socket = try zzmq.ZSocket.init(allocator, zzmq.ZSocketType.Req);
+    defer socket.deinit();
+
+    try socket.connect("tcp://127.0.0.1:5555");
+
+    // Do 10 requests, waiting each time for a response
+    for (0..9) |i| {
+        // Send the request
+        {
+            std.log.info("Sending request {}...", .{i});
+
+            var frame = try zzmq.ZFrame.init("Hello");
+            defer frame.deinit();
+
+            try socket.send(&frame, .{});
+        }
+
+        // Receive the reply
+        {
+            var frame = try socket.receive();
+            defer frame.deinit();
+
+            const data = try frame.data();
+
+            std.log.info("Received reply {} [ {s} ]", .{ i, data });
+        }
+    }
+}
+
+----------------------------------------
+
+TITLE: Installing CZMQ using vcpkg on Windows
+DESCRIPTION: This snippet demonstrates how to install CZMQ using vcpkg on Windows. It shows commands for building 32-bit and 64-bit versions, as well as including optional libraries and using draft APIs.
+
+LANGUAGE: bash
+CODE:
+vcpkg.exe install czmq
+
+LANGUAGE: bash
+CODE:
+vcpkg.exe install czmq:x64-windows-static
+
+LANGUAGE: bash
+CODE:
+vcpkg.exe install czmq[curl,httpd,lz4]:x64-windows
+
+LANGUAGE: bash
+CODE:
+vcpkg install czmq[draft]
+
+LANGUAGE: bash
+CODE:
+vcpkg.exe install czmq --head
+
+----------------------------------------
+
+TITLE: Implementing ZeroMQ Topic Subscriber in Python
+DESCRIPTION: Creates a ZeroMQ subscriber socket that connects to a local publisher and filters messages based on the 'status' topic. The script handles SIGINT signals for clean termination and continuously listens for incoming messages.
+
+LANGUAGE: python
+CODE:
+import signal
+import zmq
+
+
+signal.signal(signal.SIGINT, signal.SIG_DFL)
+
+context = zmq.Context()
+
+socket = context.socket(zmq.SUB)
+socket.connect('tcp://localhost:5555')
+socket.setsockopt(zmq.SUBSCRIBE, b'status')
+
+while True:
+    message = socket.recv_multipart()
+    print(f'Received: {message}')
+
+----------------------------------------
+
+TITLE: Installing libsodium, ZeroMQ, and zmqpp
+DESCRIPTION: A series of bash commands to clone, build, and install libsodium (for security features), ZeroMQ, and zmqpp. This process includes running autogen scripts, configuring with specific options, and using make commands for building and installation.
+
+LANGUAGE: bash
+CODE:
+# Build, check, and install libsodium
+git clone git://github.com/jedisct1/libsodium.git
+cd libsodium
+./autogen.sh
+./configure && make check
+sudo make install
+sudo ldconfig
+cd ../
+# Build, check, and install the latest version of ZeroMQ
+git clone git://github.com/zeromq/libzmq.git
+cd libzmq
+./autogen.sh
+./configure --with-libsodium && make
+sudo make install
+sudo ldconfig
+cd ../
+# Now install ZMQPP
+git clone git://github.com/zeromq/zmqpp.git
+cd zmqpp
+make
+make check
+sudo make install
+make installcheck
+
+----------------------------------------
+
+TITLE: ZeroMQ Topic Publishing Example
+DESCRIPTION: Example of publishing a message with a topic using ZeroMQ PUB socket
+
+
+
+----------------------------------------
+
+TITLE: Installing pyzmq Package
+DESCRIPTION: Command to install the Python ZeroMQ bindings using pip package manager
+
+LANGUAGE: bash
+CODE:
+pip install pyzmq
+
+----------------------------------------
+
+TITLE: ZeroMQ Topic Subscription Example
+DESCRIPTION: Example of subscribing to a topic using ZeroMQ SUB socket
+
+
+
+----------------------------------------
+
+TITLE: Installing goczmq ZeroMQ Binding for Go
+DESCRIPTION: Command to install the goczmq library using Go's package manager. Requires libzmq and CZMQ to be installed beforehand.
+
+LANGUAGE: bash
+CODE:
+go get gopkg.in/zeromq/goczmq.v4
+
+----------------------------------------
+
+TITLE: ZeroMQ Client-Server Routing ID Example
+DESCRIPTION: Example of setting and getting routing IDs for SERVER socket communication
+
+
+
+----------------------------------------
+
+TITLE: Installing Native Rust ZeroMQ via Cargo
+DESCRIPTION: This snippet shows how to install the 'zeromq' crate, which is a native Rust implementation of ZeroMQ (work in progress), using the 'cargo add' command.
+
+LANGUAGE: bash
+CODE:
+cargo add zeromq
+
+----------------------------------------
+
+TITLE: ZeroMQ Radio Socket Example
+DESCRIPTION: Example of using RADIO socket for group-based message distribution
+
+
+
+----------------------------------------
+
+TITLE: Installing ZeroMQ for Node.js
+DESCRIPTION: Command to install the ZeroMQ package from npm.
+
+LANGUAGE: bash
+CODE:
+$ npm install zeromq
+
+----------------------------------------
+
+TITLE: Sending Message on Specific Topic with ZeroMQ Publisher in Node.js
+DESCRIPTION: This code demonstrates how to send a message on the 'status' topic using a ZeroMQ publisher socket. It utilizes the zeromq.js library to implement the publish-subscribe pattern with topics.
+
+LANGUAGE: javascript
+CODE:
+//  Send a message on the 'status' topic
+pub.send(['status', 'All is well']);
+
+----------------------------------------
+
+TITLE: Creating an Actor with FsNetMQ in F#
+DESCRIPTION: Demonstrates how to create an actor (a thread with an attached socket) using FsNetMQ, allowing for message sending and cancellation.
+
+LANGUAGE: fsharp
+CODE:
+// Actor is disposable, so whenever you call dispose
+// on the actor the end message will be sent and the thread will exit
+let actor =
+  Actor.create (fun shim ->
+    use poller = Poller.create ()
+
+    // Registering for the end message which will cancel the actor
+    use emObserver = Poller.registerEndMessage poller shim
+
+    // Creating sockets and adding them to the poller
+    ...
+
+    // Signalling that the actor is ready, this will let the Actor.create function to return
+    Actor.signal shim
+
+    Poller.run poller
+
+----------------------------------------
+
+TITLE: Subscribing to ZeroMQ Topics in JavaScript
+DESCRIPTION: Shows how to subscribe to specific topics in a ZeroMQ pub/sub pattern. The example demonstrates subscribing to a 'status' topic using the subscribe() method.
+
+LANGUAGE: javascript
+CODE:
+//  Subscribe to the 'status'
+sub.subscribe('status');
+
+----------------------------------------
+
+TITLE: Initializing and Sending Messages with ZeroMQ in Zig
+DESCRIPTION: This snippet demonstrates how to initialize a ZeroMQ socket, bind it to a port, and send a message using the zzmq library in Zig. It shows the creation of a PAIR socket type and the use of ZFrame for message handling.
+
+LANGUAGE: zig
+CODE:
+const zzmq = @import("zzmq");
+
+var socket = try zzmq.ZSocket.init(allocator, zzmq.ZSocketType.Pair);
+defer socket.deinit();
+
+const port = try socket.bind("tcp://127.0.0.1:!");
+
+// send a message
+var frame = try zzmq.ZFrame.init(data);
+defer frame.deinit();
+
+try socket.send(&frame, .{});
+
+----------------------------------------
+
+TITLE: Publishing Topic-Based Messages with ZeroMQ in Java
+DESCRIPTION: Demonstrates sending a two-part message where the first part is the topic ('Status') and the second part is the message content ('All is well'). Uses sendMore() for the topic to indicate there's more message parts coming.
+
+LANGUAGE: java
+CODE:
+//  Send a message on the 'status' topic
+pub.sendMore("Status");
+pub.send("All is well");
+
+----------------------------------------
+
+TITLE: Implementing Push/Pull Pattern in Node.js with ZeroMQ
+DESCRIPTION: Demonstrates how to create a producer that pushes information onto a socket and a worker that pulls information from the socket using ZeroMQ in Node.js.
+
+LANGUAGE: javascript
+CODE:
+const zmq = require("zeromq")
+
+async function run() {
+  const sock = new zmq.Push()
+
+  await sock.bind("tcp://127.0.0.1:3000")
+  console.log("Producer bound to port 3000")
+
+  while (true) {
+    await sock.send("some work")
+    await new Promise(resolve => {
+      setTimeout(resolve, 500)
+    })
+  }
+}
+
+run()
+
+LANGUAGE: javascript
+CODE:
+const zmq = require("zeromq")
+
+async function run() {
+  const sock = new zmq.Pull()
+
+  sock.connect("tcp://127.0.0.1:3000")
+  console.log("Worker connected to port 3000")
+
+  for await (const [msg] of sock) {
+    console.log("work: %s", msg.toString())
+  }
+}
+
+run()
+
+----------------------------------------
+
+TITLE: Subscribing to ZeroMQ Topics with JeroMQ
+DESCRIPTION: Shows how to subscribe to a specific topic ('status') using the ZeroMQ Socket class in JeroMQ. The subscribe method filters messages based on the specified topic prefix.
+
+LANGUAGE: java
+CODE:
+//  Subscribe to the 'status'
+sub.subscribe("status");
+
+----------------------------------------
+
+TITLE: ZeroMQ Dish Socket Example
+DESCRIPTION: Example of using DISH socket for subscribing to message groups
+
+
+
+----------------------------------------
+
+TITLE: Publishing Topic-based Messages with ZeroMQ in C
+DESCRIPTION: Demonstrates sending a multi-part message where the first frame contains the topic ('status') and the second frame contains the message content ('All is well'). Uses ZMQ_SNDMORE flag to indicate multiple message parts.
+
+LANGUAGE: C
+CODE:
+//  Send a message on the 'status' topic
+zmq_send (pub, "status", 6, ZMQ_SNDMORE);
+zmq_send (pub, "All is well", 11, 0);
+
+----------------------------------------
+
+TITLE: Generating Language-Specific Example Stubs with Hugo
+DESCRIPTION: This command uses Hugo to create a new example stub for a specific programming language and framework in the documentation.
+
+LANGUAGE: sh
+CODE:
+hugo new --kind examples docs/examples/<your language>/<your framework name>
+
+----------------------------------------
+
+TITLE: Installing CZMQ Dependencies on Ubuntu-based Systems
+DESCRIPTION: Shell commands for installing the CZMQ development library (version 4.0 or higher) on Ubuntu-based systems. Separate commands are provided for building and running environments.
+
+LANGUAGE: sh
+CODE:
+# Building on Ubuntu, PoP_OS, ZorinOS, etc.
+sudo apt install libczmq-dev
+
+# Running on Ubuntu, PoP_OS, ZorinOS, etc.
+sudo apt install libczmq
+
+----------------------------------------
+
+TITLE: Running ZeroMQ Website Locally with Make
+DESCRIPTION: These commands install dependencies and start a local server for the ZeroMQ website on port 1313 using Make.
+
+LANGUAGE: sh
+CODE:
+npm install
+make serve
+
+----------------------------------------
+
+TITLE: Configuring build.zig for ZeroMQ Integration in Zig Project
+DESCRIPTION: This code snippet demonstrates how to configure the build.zig file to include the zzmq module and link necessary system libraries for a Zig project using ZeroMQ.
+
+LANGUAGE: zig
+CODE:
+const zzmq = b.dependency("zzmq", .{
+    .target = target,
+    .optimize = optimize,
+});
+
+// Note: starting with zig 0.12 the function will be 
+//       `exe.root_module.addImport` instead of `exe.addModule`
+exe.addModule("zzmq", zzmq.module("zzmq"));
+
+exe.linkSystemLibrary("czmq");
+exe.linkLibC();
+
+----------------------------------------
+
+TITLE: Running ZeroMQ Website with Docker
+DESCRIPTION: These commands build and run a Docker container for the ZeroMQ website, starting a local server on port 80.
+
+LANGUAGE: sh
+CODE:
+npm install
+make docker-build
+make docker-run
+
+----------------------------------------
+
+TITLE: Configuring Dependencies in build.zig.zon for Zig Project
+DESCRIPTION: This snippet shows how to add the zzmq dependency to the build.zig.zon file. It specifies the URL and hash for the library version to be used in the project.
+
+LANGUAGE: zig
+CODE:
+.{
+    .dependencies = .{
+        .zzmq = .{
+            .url = "https://github.com/nine-lives-later/zzmq/archive/refs/tags/v0.1.0-zig0.11.tar.gz",
+            .hash = "122080e22e9823dc0a4567c71553c4884978a33877c9b3d46f4594ca5f299d534f9b",
+        },
+    },
+}
+
+----------------------------------------
+
+TITLE: Setting Headless Configuration for ZeroMQ Project in YAML
+DESCRIPTION: This snippet sets a configuration option for a ZeroMQ project, specifying that the content is headless. This typically means the content is intended to be used without a full HTML structure or visible header.
+
+LANGUAGE: YAML
+CODE:
+---
+headless: true
+---
+
+----------------------------------------
+
+TITLE: Installing ZeroMQ.js with Shared Library using npm
+DESCRIPTION: This command installs ZeroMQ.js version 6.0.0-beta.17 by linking against a shared ZeroMQ library. It skips downloading libzmq and uses the installed library instead.
+
+LANGUAGE: sh
+CODE:
+npm install zeromq@6.0.0-beta.17 --zmq-shared
+
+----------------------------------------
+
+TITLE: Configuring Headless Mode in YAML for ZeroMQ Project
+DESCRIPTION: This YAML snippet sets the 'headless' property to true, which is likely used to configure how the content is processed or rendered in a static site generator or documentation system.
+
+LANGUAGE: yaml
+CODE:
+---
+headless: true
+---
+
+----------------------------------------
+
+TITLE: Building ZeroMQ.js from Source using npm
+DESCRIPTION: This command installs ZeroMQ.js version 6.0.0-beta.17 by building from source. It requires Node.js 10+, a C++17 compiler, Python, CMake 2.8+, and curl.
+
+LANGUAGE: sh
+CODE:
+npm install zeromq@6.0.0-beta.17 --build-from-source
+
+----------------------------------------
+
+TITLE: Configuring Hugo Frontmatter for ZeroMQ Project
+DESCRIPTION: This YAML frontmatter configuration sets the 'headless' property to true for a Hugo page or section. In Hugo, a headless page or section is one that doesn't create its own output file but can still be used for data organization or templating purposes.
+
+LANGUAGE: yaml
+CODE:
+---
+headless: true
+---
+
+----------------------------------------
+
+TITLE: Installing ZeroMQ.js with Prebuilt Binaries using npm
+DESCRIPTION: This command installs ZeroMQ.js version 6.0.0-beta.17 using npm. It requires Node.js 10.2+ or Electron 3+ with N-API version 3+.
+
+LANGUAGE: sh
+CODE:
+npm install zeromq@6.0.0-beta.17
+
+----------------------------------------
+
+TITLE: Configuring Headless Mode in YAML for ZeroMQ Project
+DESCRIPTION: This YAML configuration snippet sets the 'headless' property to true. In many static site generators or content management systems, this typically indicates that the content should be rendered without a standalone HTML page or header.
+
+LANGUAGE: yaml
+CODE:
+---
+headless: true
+---
+
+----------------------------------------
+
+TITLE: Installing libzmq on RHEL-based systems
+DESCRIPTION: Installs the libzmq development files on RHEL-based Linux distributions using yum. This is recommended before compiling PyZMQ from source.
+
+LANGUAGE: bash
+CODE:
+sudo yum install libzmq3-devel
+
+----------------------------------------
+
+TITLE: Configuring Headless Mode in YAML for ZeroMQ Project
+DESCRIPTION: This YAML snippet sets the 'headless' property to true, which likely indicates that the associated content or page should be rendered without a header or title section.
+
+LANGUAGE: yaml
+CODE:
+---
+headless: true
+---
+
+----------------------------------------
+
+TITLE: Installing libzmq on Debian-based systems
+DESCRIPTION: Installs the libzmq development files on Debian-based Linux distributions using apt-get. This is recommended before compiling PyZMQ from source.
+
+LANGUAGE: bash
+CODE:
+sudo apt-get install libzmq3-dev
+
+----------------------------------------
+
+TITLE: Configuring Headless Mode in YAML
+DESCRIPTION: This snippet sets a configuration option for headless mode to true. In the context of web content or documentation generation, headless typically means the content should be rendered without a full HTML header.
+
+LANGUAGE: YAML
+CODE:
+---
+headless: true
+---
+
+----------------------------------------
+
+TITLE: Forcing PyZMQ compilation from source
+DESCRIPTION: Forces pip to compile PyZMQ from source instead of using pre-built wheels. This is useful when you want to use a specific libzmq installation or when the pre-built wheels are not compatible with your system.
+
+LANGUAGE: bash
+CODE:
+pip install --no-binary=:all: pyzmq
+
+----------------------------------------
+
+TITLE: Configuring ZeroMQ Project Settings in YAML
+DESCRIPTION: YAML configuration that sets the headless parameter to true for the ZeroMQ project settings.
+
+LANGUAGE: yaml
+CODE:
+---
+headless: true
+---
+
+----------------------------------------
+
+TITLE: Installing PyZMQ with pip
+DESCRIPTION: Installs PyZMQ using pip, which will download and install pre-built wheels on supported platforms (macOS, Windows, and Linux). This is the recommended method for most users.
+
+LANGUAGE: bash
+CODE:
+pip install pyzmq
+
+----------------------------------------
+
+TITLE: Message Communication Functions in ZeroMQ
+DESCRIPTION: Functions for sending and receiving messages in ZeroMQ applications
+
+LANGUAGE: C
+CODE:
+zmq_msg_send()
+zmq_msg_recv()
+
+----------------------------------------
+
+TITLE: Installing ZeroMQ Ruby Gem on Windows with Custom Directories
+DESCRIPTION: Windows-specific command to install the ZeroMQ Ruby gem. Specifies both the libzmq directory and the location of the lib files.
+
+LANGUAGE: bash
+CODE:
+gem install zmq -- --with-zmq-dir=c:/src/zeromq-4.3.2 --with-zmq-lib=c:/src/zeromq-4.3.2/src/.libs
+
+----------------------------------------
+
+TITLE: Message Cleanup Functions in ZeroMQ
+DESCRIPTION: Functions for properly releasing and cleaning up ZeroMQ message resources
+
+LANGUAGE: C
+CODE:
+zmq_msg_close()
+
+----------------------------------------
+
+TITLE: Installing ZeroMQ Ruby Gem with Custom libzmq Directory
+DESCRIPTION: Command to install the ZeroMQ Ruby gem when libzmq is installed in a non-standard location. Specifies the custom directory for libzmq installation.
+
+LANGUAGE: bash
+CODE:
+gem install zmq -- --with-zmq-dir=/opt/local
+
+----------------------------------------
+
+TITLE: Message Content Access Functions in ZeroMQ
+DESCRIPTION: Functions for accessing message content, size information, and multi-part message status
+
+LANGUAGE: C
+CODE:
+zmq_msg_data()
+zmq_msg_size()
+zmq_msg_more()
+
+----------------------------------------
+
+TITLE: Installing ZeroMQ Ruby Gem via Command Line
+DESCRIPTION: Basic command to install the ZeroMQ Ruby gem using the gem package manager. Requires libzmq to be installed separately.
+
+LANGUAGE: bash
+CODE:
+gem install zmq
+
+----------------------------------------
+
+TITLE: Message Property Management Functions in ZeroMQ
+DESCRIPTION: Functions for getting and setting message properties in ZeroMQ
+
+LANGUAGE: C
+CODE:
+zmq_msg_get()
+zmq_msg_set()
+
+----------------------------------------
+
+TITLE: Installing ZeroMQ Perl FFI Bindings
+DESCRIPTION: Command to install the ZMQ::FFI Perl module using the CPAN package manager (cpanm). The -v flag enables verbose output during installation.
+
+LANGUAGE: bash
+CODE:
+cpanm -v ZMQ::FFI
+
+----------------------------------------
+
+TITLE: Message Manipulation Functions in ZeroMQ
+DESCRIPTION: Functions for copying and moving messages between message objects
+
+LANGUAGE: C
+CODE:
+zmq_msg_copy()
+zmq_msg_move()
+
+----------------------------------------
+
+TITLE: Installing CZMQ on Ubuntu/Debian/Mint
+DESCRIPTION: Command to install the CZMQ development package on Ubuntu, Debian, or Mint Linux distributions using apt-get.
+
+LANGUAGE: bash
+CODE:
+apt-get install libczmq-dev
+
+----------------------------------------
+
+TITLE: Installing ZeroMQ on Fedora Linux
+DESCRIPTION: This command installs the ZeroMQ development package on Fedora Linux using the dnf package manager.
+
+LANGUAGE: bash
+CODE:
+dnf install zeromq-devel
+
+----------------------------------------
+
+TITLE: Installing CZMQ on Fedora
+DESCRIPTION: Command to install the CZMQ development package on Fedora Linux distribution using dnf.
+
+LANGUAGE: bash
+CODE:
+dnf install czmq-devel
+
+----------------------------------------
+
+TITLE: Installing ZeroMQ on Arch Linux
+DESCRIPTION: This command installs ZeroMQ on Arch Linux using the pacman package manager.
+
+LANGUAGE: bash
+CODE:
+pacman -S zeromq
+
+----------------------------------------
+
+TITLE: Installing CZMQ on macOS
+DESCRIPTION: Command to install CZMQ on macOS using the Homebrew package manager.
+
+LANGUAGE: bash
+CODE:
+brew install czmq
+
+----------------------------------------
+
+TITLE: Installing ZeroMQ on SUSE Linux
+DESCRIPTION: This command installs the ZeroMQ development package on SUSE Linux using the zypper package manager.
+
+LANGUAGE: bash
+CODE:
+zypper install zeromq-devel
+
+----------------------------------------
+
+TITLE: Installing ZeroMQ Ruby Gem
+DESCRIPTION: Basic installation command for the ZeroMQ Ruby gem using RubyGems package manager.
+
+LANGUAGE: bash
+CODE:
+gem install zmq
+
+----------------------------------------
+
+TITLE: Adding ZeroMQ repository and installing on Debian 9
+DESCRIPTION: This snippet demonstrates how to add the ZeroMQ repository for Debian 9 and install the libzmq development package. It adds the repository to sources.list, imports the GPG key, and installs the package.
+
+LANGUAGE: bash
+CODE:
+echo "deb http://download.opensuse.org/repositories/network:/messaging:/zeromq:/release-stable/Debian_9.0/ ./" >> /etc/apt/sources.list
+wget https://download.opensuse.org/repositories/network:/messaging:/zeromq:/release-stable/Debian_9.0/Release.key -O- | sudo apt-key add
+apt-get install libzmq3-dev
+
+----------------------------------------
+
+TITLE: Installing ZeroMQ Ruby Gem with Custom Path
+DESCRIPTION: Installation command for ZeroMQ Ruby gem with custom libzmq directory path specification.
+
+LANGUAGE: bash
+CODE:
+gem install zmq -- --with-zmq-dir=/opt/local
+
+----------------------------------------
+
+TITLE: Sending Formatted String Message with ZeroMQ
+DESCRIPTION: Shows how to send a formatted string message using printf-style formatting through a ZeroMQ socket. This allows for dynamic string construction before sending.
+
+LANGUAGE: C
+CODE:
+zstr_sendf (socket, "%s-%d", "HELLO", 1);
+
+----------------------------------------
+
+TITLE: Installing ZeroMQ Ruby Gem on Windows
+DESCRIPTION: Windows-specific installation command for ZeroMQ Ruby gem with custom directory and library paths.
+
+LANGUAGE: bash
+CODE:
+gem install zmq -- --with-zmq-dir=c:/src/zeromq-4.3.2 --with-zmq-lib=c:/src/zeromq-4.3.2/src/.libs
+
+----------------------------------------
+
+TITLE: Receiving String Message from ZeroMQ Socket
+DESCRIPTION: Demonstrates how to receive a string message from a ZeroMQ socket using the zstr_recv function. Returns a dynamically allocated string that must be freed by the caller.
+
+LANGUAGE: C
+CODE:
+char *string = zstr_recv (socket);
+
+----------------------------------------
+
+TITLE: Installing dartzmq Package for Flutter
+DESCRIPTION: Command to add the dartzmq package to a Flutter project using the pub package manager. Requires libzmq to be installed as a prerequisite.
+
+LANGUAGE: bash
+CODE:
+flutter pub add dartzmq
+
+----------------------------------------
+
+TITLE: Sending Multiple String Frames with zstr_sendx in C using CZMQ
+DESCRIPTION: Shows a simpler method to send multiple string frames using the zstr_sendx function. The last parameter must be NULL to indicate the end of the message.
+
+LANGUAGE: C
+CODE:
+zstr_sendx (socket, "HELLO", "beautiful", "WORLD!", NULL);
+
+----------------------------------------
+
+TITLE: Installing pebbe/zmq4 ZeroMQ Binding for Go
+DESCRIPTION: Command to install the pebbe/zmq4 library using Go's package manager. Requires libzmq to be installed beforehand.
+
+LANGUAGE: bash
+CODE:
+go get github.com/pebbe/zmq4
+
+----------------------------------------
+
+TITLE: Sending Multiple String Frames using zmsg Class in C with CZMQ
+DESCRIPTION: Illustrates how to use the zmsg class to create a message object, add multiple string frames, and send the entire message at once.
+
+LANGUAGE: C
+CODE:
+zmsg_t *strings = zmsg_new ();
+zmsg_addstr ("HELLO");
+zmsg_addstr ("beautiful");
+zmsg_addstr ("WORLD");
+zmsg_send (&strings, socket);
+
+----------------------------------------
+
+TITLE: Installing ZeroMQ Bindings via Cargo
+DESCRIPTION: This snippet shows how to install the 'zmq' crate, which provides Rust bindings for libzmq, using the 'cargo add' command.
+
+LANGUAGE: bash
+CODE:
+cargo add zmq
+
+----------------------------------------
+
+TITLE: Receiving Multiple String Frames with zstr_recvx in C using CZMQ
+DESCRIPTION: Demonstrates how to receive a series of string frames using the zstr_recvx function. Each string is dynamically allocated and filled with the received data.
+
+LANGUAGE: C
+CODE:
+char *hello, beautiful, world;
+zstr_recvx (socket, &hello, &beautiful, &world, NULL);
+
+----------------------------------------
+
+TITLE: Adding ZeroMQ Bindings to Cargo.toml
+DESCRIPTION: This snippet demonstrates how to add the 'zmq' crate as a dependency in the Cargo.toml file for a Rust project.
+
+LANGUAGE: toml
+CODE:
+[dependencies]
+zmq = "0.10.5"
+
+----------------------------------------
+
+TITLE: Receiving Multiple String Frames using zmsg Class in C with CZMQ
+DESCRIPTION: Shows how to receive multiple string frames using the zmsg class, which allows for easy extraction of individual string frames from the received message.
+
+LANGUAGE: C
+CODE:
+zmsg_t *strings = zmsg_recv (socket);
+char *hello = zmsg_popstr (strings);
+char *beautiful = zmsg_popstr (strings);
+char *world = zmsg_popstr (strings);
+
+----------------------------------------
+
+TITLE: Adding Native Rust ZeroMQ to Cargo.toml
+DESCRIPTION: This snippet demonstrates how to add the 'zeromq' crate as a dependency in the Cargo.toml file for a Rust project.
+
+LANGUAGE: toml
+CODE:
+[dependencies]
+zeromq = "0.3.5"
+
+----------------------------------------
+
+TITLE: String Operations in ZeroMQ using CZMQ (C)
+DESCRIPTION: The zstr function from the CZMQ library provides utilities for working with strings in the context of ZeroMQ messaging. It offers convenient methods for string manipulation and conversion in ZeroMQ applications.
+
+LANGUAGE: C
+CODE:
+// Example usage of zstr (not provided in the original text)
+// Refer to http://czmq.zeromq.org/czmq4-0:zstr for detailed documentation
+
+----------------------------------------
+
+TITLE: Installing ZMQ::FFI Perl Module
+DESCRIPTION: This snippet shows how to install the ZMQ::FFI module using cpanm. ZMQ::FFI is a Perl binding for ZeroMQ that allows interaction with ZeroMQ sockets.
+
+LANGUAGE: bash
+CODE:
+cpanm -v ZMQ::FFI
+
+----------------------------------------
+
+TITLE: Publishing Topic Message with CZMQ
+DESCRIPTION: Uses zstr_sendx to send a message with 'status' as the topic and 'All is well' as the message content. The NULL parameter terminates the variable argument list.
+
+LANGUAGE: C
+CODE:
+//  Send a message on the 'status' topic
+zstr_sendx (pub, "status", "All is well", NULL);
+
+----------------------------------------
+
+TITLE: Handling Single Message Frames in ZeroMQ using CZMQ (C)
+DESCRIPTION: The zframe function from the CZMQ library is used for working with single message frames in ZeroMQ. It allows for the creation, manipulation, and transmission of individual message frames.
+
+LANGUAGE: C
+CODE:
+// Example usage of zframe (not provided in the original text)
+// Refer to http://czmq.zeromq.org/czmq4-0:zframe for detailed documentation
+
+----------------------------------------
+
+TITLE: Setting Topic Subscription in ZeroMQ Using CZMQ
+DESCRIPTION: Demonstrates how to subscribe to a specific topic ('status') using the zsock_set_subscribe method from the CZMQ library. This allows the subscriber to filter and receive only messages that match the specified topic.
+
+LANGUAGE: C
+CODE:
+//  Subscribe to the 'status'
+zsock_set_subscribe(sub, "status");
+
+----------------------------------------
+
+TITLE: Configuring ZeroMQ Page Properties in YAML
+DESCRIPTION: This YAML snippet sets the 'headless' property to true, which is likely used in a static site generator or content management system to indicate that this page should be rendered without a header.
+
+LANGUAGE: yaml
+CODE:
+---
+headless: true
+---
+
+----------------------------------------
+
+TITLE: Receiving String Messages with ZeroMQ in C
+DESCRIPTION: Function to receive a string message from a ZeroMQ socket with buffer overflow protection. It uses a fixed 256-byte buffer, limits the string to 255 characters, adds null termination, and returns a duplicated string. Returns NULL on receive error.
+
+LANGUAGE: C
+CODE:
+//  Receive string from socket and convert into C string
+//  Chops string at 255 chars, if it's longer
+static char *
+s_recv_string (void *socket) {
+    char buffer [256];
+    int size = zmq_recv (socket, buffer, 255, 0);
+    if (size == -1)
+        return NULL;
+    if (size > 255)
+        size = 255;
+    buffer [size] = \0;
+    /* use strndup(buffer, sizeof(buffer)-1) in *nix */
+    return strdup (buffer);
+}
+
+----------------------------------------
+
+TITLE: Configuring Headless Page in YAML
+DESCRIPTION: YAML frontmatter configuration that sets the page to headless mode, typically used to create content-less pages that serve as data sources or templates.
+
+LANGUAGE: yaml
+CODE:
+---
+headless: true
+---
+
+----------------------------------------
+
+TITLE: Receiving Multi-Part String Messages with ZeroMQ in C
+DESCRIPTION: This code snippet demonstrates how to receive a multi-part message as an array of strings using ZeroMQ. It uses the ZMQ_RCVMORE socket option to check if there are more parts to receive after each message part.
+
+LANGUAGE: C
+CODE:
+char *strings[25];
+int rcvmore;
+size_t option_len = sizeof (int);
+int index = 0;
+do {
+    strings[index++] = s_recv_string (socket);
+    zmq_getsockopt (socket, ZMQ_RCVMORE, &rcvmore, &option_len);
+} while (rcvmore);
+
+----------------------------------------
+
+TITLE: Configuring Headless Mode in YAML Front Matter
+DESCRIPTION: Simple YAML front matter configuration that sets the headless property to true. This is commonly used in static site generators and other systems to indicate a page should be processed without generating a full HTML page.
+
+LANGUAGE: yaml
+CODE:
+---
+headless: true
+---
+
+----------------------------------------
+
+TITLE: Configuring ZeroMQ Topic Subscription in C
+DESCRIPTION: Sets up a ZeroMQ subscriber socket to listen for messages with the 'status' topic prefix. Uses zmq_setsockopt with ZMQ_SUBSCRIBE option to filter incoming messages based on the specified topic string.
+
+LANGUAGE: C
+CODE:
+//  Subscribe to the 'status' topic
+zmq_setsockopt (sub, ZMQ_SUBSCRIBE, "status", strlen ("status"));
+
+----------------------------------------
+
+TITLE: Setting Headless Flag in YAML Configuration
+DESCRIPTION: YAML configuration snippet that sets the headless flag to true, indicating this document should be rendered without headers.
+
+LANGUAGE: yaml
+CODE:
+headless: true
+
+----------------------------------------
+
+TITLE: Receiving String Messages with NetMQ
+DESCRIPTION: Shows how to receive a string message from a NetMQ socket using the ReceiveFrameString method. This method blocks until a message is received and returns the message as a string.
+
+LANGUAGE: csharp
+CODE:
+string str = socket.ReceiveFrameString();
+
+----------------------------------------
+
+TITLE: Configuring ZeroMQ Download for Rust Project
+DESCRIPTION: This YAML configuration specifies the project name, language, and library for downloading ZeroMQ in a Rust environment. It is automatically generated and warns against manual edits.
+
+LANGUAGE: yaml
+CODE:
+# THIS FILE IS 100% GENERATED. If you edit this file, you will lose  your
+# changes at the next build cycle. DO NOT MAKE ANY CHANGES YOU WISH TO KEEP.
+name: download
+language: rust
+library: rust-zmq
+
+----------------------------------------
+
+TITLE: Sending Multi-Frame String Messages with NetMQ
+DESCRIPTION: Demonstrates how to send multiple string frames in sequence using the SendMoreFrame function. The message frames are sent together when the last frame is ready.
+
+LANGUAGE: csharp
+CODE:
+socket.SendMoreFrame("HELLO")
+    .SendMoreFrame("beautiful")
+    .SendMore("WORLD!");
+
+----------------------------------------
+
+TITLE: Implementing a ZeroMQ Client in C++
+DESCRIPTION: This code snippet shows how to create a ZeroMQ client that connects to a server on port 5555 and sends messages. It uses a REQ (request) socket type for request-response communication.
+
+LANGUAGE: C++
+CODE:
+{{< example hello_world_client >}}
+
+----------------------------------------
+
+TITLE: Receiving Multi-Frame String Messages with NetMQ
+DESCRIPTION: Shows how to receive multiple string frames as a list using the ReceiveMultipartStrings function. Returns all message frames as a List<string>.
+
+LANGUAGE: csharp
+CODE:
+List<string> strings = socket.ReceiveMultipartStrings();
+
+----------------------------------------
+
+TITLE: Git Commit Message Example
+DESCRIPTION: Example of a properly formatted git commit message following ZeroMQ standards with a problem statement and solution.
+
+LANGUAGE: text
+CODE:
+Problem: Windows build script requires edit of VS version
+
+Solution: Use CMD.EXE environment variable to extract
+DevStudio version number and build using it.
+
+----------------------------------------
+
+TITLE: Publishing Topic-Based Messages with ZeroMQ in C#
+DESCRIPTION: Demonstrates how to send a multi-frame message where the first frame contains the topic ('status') and the second frame contains the message payload ('All is well'). Uses the SendMoreFrame method for the topic and SendFrame for the final message part.
+
+LANGUAGE: csharp
+CODE:
+//  Send a message on the 'status' topic
+pub.SendMoreFrame("status").SendFrame("All is well");
+
+----------------------------------------
+
+TITLE: C++ Comment Style Example
+DESCRIPTION: Demonstrates proper comment formatting and code organization in C++ following ZeroMQ standards.
+
+LANGUAGE: cpp
+CODE:
+//  Compute the factorial.
+int factorial = 1;
+for (int i = 2; i != 11; i++)
+    factorial *= i;
+
+//  Present the result to the user.
+cout << "Factorial of 10 is " << factorial << "." << endl;
+
+----------------------------------------
+
+TITLE: Subscribing to ZeroMQ Topics with NetMQ in C#
+DESCRIPTION: This snippet demonstrates how to use the Subscribe method of SubscriberSocket to specify which topics a subscriber is interested in. In this example, the subscriber is subscribing to the 'status' topic.
+
+LANGUAGE: csharp
+CODE:
+//  Subscribe to the 'status'
+sub.Subscribe("status");
+
+----------------------------------------
+
+TITLE: C++ Complex Number Class Definition
+DESCRIPTION: Example showing proper class structure and naming conventions for types and parameters in C++.
+
+LANGUAGE: cpp
+CODE:
+struct complex_t
+{
+    complex_t (float real_, float imaginary_) :
+        real (real_),
+        imaginary (imaginary_)
+    {
+    }
+
+    float real;
+    float imaginary;
+};
+
+----------------------------------------
+
+TITLE: Implementing ZeroMQ Reply Server in C++
+DESCRIPTION: Creates a ZeroMQ server that binds to TCP port 5555, receives messages, and responds with 'World'. The server runs in an infinite loop, processing each request with a simulated 1-second work delay. Uses the zmqpp library for ZeroMQ functionality.
+
+LANGUAGE: cpp
+CODE:
+//  Hello World server
+
+#include <zmqpp/zmqpp.hpp>
+#include <string>
+#include <iostream>
+#include <chrono>
+#include <thread>
+
+using namespace std;
+
+int main(int argc, char *argv[]) {
+  const string endpoint = "tcp://*:5555";
+
+  // initialize the 0MQ context
+  zmqpp::context context;
+
+  // generate a pull socket
+  zmqpp::socket_type type = zmqpp::socket_type::reply;
+  zmqpp::socket socket (context, type);
+
+  // bind to the socket
+  socket.bind(endpoint);
+  while (1) {
+    // receive the message
+    zmqpp::message message;
+    // decompose the message 
+    socket.receive(message);
+    string text;
+    message >> text;
+
+    //Do some 'work'
+    std::this_thread::sleep_for(std::chrono::seconds(1));
+    cout << "Received Hello" << endl;
+    socket.send("World");
+  }
+
+}
+
+----------------------------------------
+
+TITLE: PHP String Concatenation Style
+DESCRIPTION: Shows proper spacing for string concatenation operations in PHP code.
+
+LANGUAGE: php
+CODE:
+$foo = $bar . " " . $bat;
+
+----------------------------------------
+
+TITLE: Building azmq on Windows with CMake
+DESCRIPTION: Commands to build, test and install the azmq library on Windows systems using CMake. Creates a build directory, configures the project, builds in Release mode and runs tests.
+
+LANGUAGE: batch
+CODE:
+> mkdir build
+> cd build
+> cmake ..
+> cmake --build . --config Release
+> ctest . -C Release
+
+----------------------------------------
+
+TITLE: C++ Include Guard Example
+DESCRIPTION: Demonstrates proper include guard formatting and file structure for C++ header files.
+
+LANGUAGE: cpp
+CODE:
+/* Initial comments */
+
+#ifndef GUARD
+#define GUARD
+
+namespace xyz
+{
+    // main content
+}
+
+#endif
+
+----------------------------------------
+
+TITLE: Adding Chumak Dependency in Rebar3 Config
+DESCRIPTION: Configuration snippet for adding Chumak as a dependency in a rebar.config file. The version number should be replaced with a specific release version from the project's releases page.
+
+LANGUAGE: erlang
+CODE:
+{deps,[
+	{chumak, "X.Y.Z"}
+]}.
+
+----------------------------------------
+
+TITLE: Implementing ZeroMQ REQ Client in Erlang
+DESCRIPTION: A basic ZeroMQ client that connects to a server on localhost:5555, sends 10 'Hello' messages, and receives responses. Uses the chumak library for ZeroMQ functionality and implements a recursive message sending pattern.
+
+LANGUAGE: erlang
+CODE:
+-module(hello_world_client).
+-export([main/0]).
+
+main() ->
+    application:start(chumak),
+    {ok, Socket} = chumak:socket(req, "hello world client"),
+
+    {ok, Pid} = chumak:connect(Socket, tcp, "localhost", 5555),
+
+    send_messages(Socket, 10).
+
+send_messages(Socket, 0) ->
+    ok;
+
+send_messages(Socket, N) ->
+    io:format("Sending Hello ~p\n...", [N]),
+    ok = chumak:send(Socket, <<"Hello">>),
+
+    {ok, RecvMessage} = chumak:recv(Socket),
+    io:format("Received: ~p\n", [RecvMessage]),
+
+    send_messages(Socket, N-1).
+
+----------------------------------------
+
+TITLE: Implementing ZeroMQ REP Server in Erlang
+DESCRIPTION: A basic ZeroMQ server that binds to localhost:5555 and responds to incoming messages. The server uses the REP socket pattern to receive messages and reply with 'Hello Friend'. It runs in an infinite loop processing messages sequentially.
+
+LANGUAGE: erlang
+CODE:
+-module(hello_world_server).
+-export([main/0]).
+
+main() ->
+    application:start(chumak),
+    {ok, Socket} = chumak:socket(rep, "hello world server"),
+
+    {ok, _BindPid} = chumak:bind(Socket, tcp, "localhost", 5555),
+    loop(Socket).
+
+loop(Socket) ->
+    Reply = chumak:recv(Socket),
+    io:format("Question: ~p\n", [Reply]),
+    chumak:send(Socket, <<"Hello Friend">>),
+    loop(Socket).
+
+----------------------------------------
+
+TITLE: Installing goczmq v4 for CZMQ 4.2 in Go
+DESCRIPTION: This command installs version 4 of goczmq, which is compatible with CZMQ 4.2. Note that CZMQ 4.2 has not been released yet at the time of writing.
+
+LANGUAGE: go
+CODE:
+go get gopkg.in/zeromq/goczmq.v4
+
+----------------------------------------
+
+TITLE: Installing goczmq v1 for CZMQ Before 4.0 in Go
+DESCRIPTION: This command installs version 1 of goczmq, which is compatible with CZMQ versions before 4.0.
+
+LANGUAGE: go
+CODE:
+go get gopkg.in/zeromq/goczmq.v1
+
+----------------------------------------
+
+TITLE: Implementing ZeroMQ Dealer Client in Go
+DESCRIPTION: This snippet demonstrates how to create a ZeroMQ dealer socket, connect it to a router, send multiple requests, and receive responses using the goczmq library. It includes error handling and proper resource cleanup.
+
+LANGUAGE: Go
+CODE:
+package main
+
+import (
+	"log"
+
+	"github.com/zeromq/goczmq"
+)
+
+func main() {
+	// Create a dealer socket and connect it to the router.
+	dealer, err := goczmq.NewDealer("tcp://127.0.0.1:5555")
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer dealer.Destroy()
+
+	log.Println("dealer created and connected")
+
+	// Do 10 requests, waiting each time for a response
+	for i := 0; i < 10; i++ {
+		// Send a 'Hello' message from the dealer to the router.
+		// Here we send it as a frame ([]byte), with a FlagNone
+		// flag to indicate there are no more frames following.
+		err = dealer.SendFrame([]byte("Hello"), goczmq.FlagNone)
+		if err != nil {
+			log.Fatal(err)
+		}
+
+		log.Println("dealer sent 'Hello'")
+
+		// Receive the reply.
+		reply, err := dealer.RecvMessage()
+		if err != nil {
+			log.Fatal(err)
+		}
+
+		log.Printf("dealer received '%s'", string(reply[0]))
+	}
+}
+
+----------------------------------------
+
+TITLE: Implementing ZeroMQ Router Server in Go
+DESCRIPTION: Creates a ZeroMQ Router socket server that listens on port 5555, receives messages with routing frames, simulates work with a delay, and sends responses back to clients. The server handles message frames separately to maintain proper routing information for asynchronous communication.
+
+LANGUAGE: Go
+CODE:
+package main
+
+import (
+	"log"
+	"time"
+
+	"github.com/zeromq/goczmq"
+)
+
+func main() {
+	// Create a router socket and bind it to port 5555.
+	router, err := goczmq.NewRouter("tcp://*:5555")
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer router.Destroy()
+
+	log.Println("router created and bound")
+
+	for {
+		// Receive the message. Here we call RecvMessage, which
+		// will return the message as a slice of frames ([][]byte).
+		// Since this is a router socket that support async
+		// request / reply, the first frame of the message will
+		// be the routing frame.
+		request, err := router.RecvMessage()
+		if err != nil {
+			log.Fatal(err)
+		}
+
+		log.Printf("router received '%s' from '%v'", request[1], request[0])
+
+		// Do some 'work'
+		time.Sleep(time.Second * 1)
+
+		// Send a reply. First we send the routing frame, which
+		// lets the dealer know which client to send the message.
+		// The FlagMore flag tells the router there will be more
+		// frames in this message.
+		err = router.SendFrame(request[0], goczmq.FlagMore)
+		if err != nil {
+			log.Fatal(err)
+		}
+
+		log.Printf("router sent 'World'")
+
+		// Next send the reply. The FlagNone flag tells the router
+		// that this is the last frame of the message.
+		err = router.SendFrame([]byte("World"), goczmq.FlagNone)
+		if err != nil {
+			log.Fatal(err)
+		}
+	}
+}
+
+----------------------------------------
+
+TITLE: Verifying CGO_ENABLED Status in Go
+DESCRIPTION: This command checks if the Go compiler is configured to compile C code, which is necessary for zmq4.
+
+LANGUAGE: bash
+CODE:
+$ go env CGO_ENABLED
+
+----------------------------------------
+
+TITLE: Configuring Windows Build Environment for zmq4
+DESCRIPTION: These PowerShell commands set the necessary environment variables for building zmq4 on Windows, specifying include and library paths.
+
+LANGUAGE: powershell
+CODE:
+$env:CGO_CFLAGS='-ID:/dev/vcpkg/installed/x64-windows/include'
+$env:CGO_LDFLAGS='-LD:/dev/vcpkg/installed/x64-windows/lib -l:libzmq-mt-4_3_4.lib'
+
+----------------------------------------
+
+TITLE: Installing zmq4 Go Package
+DESCRIPTION: This command installs the zmq4 Go package from GitHub using the go get command.
+
+LANGUAGE: bash
+CODE:
+go get github.com/pebbe/zmq4
+
+----------------------------------------
+
+TITLE: Implementing ZeroMQ Hello World Server in Go
+DESCRIPTION: This code snippet sets up a ZeroMQ REP socket server that listens for client requests, processes them, and sends back responses. It uses the github.com/pebbe/zmq4 library for ZeroMQ functionality in Go.
+
+LANGUAGE: Go
+CODE:
+package main
+
+import (
+        "log"
+        "time"
+
+        zmq "github.com/pebbe/zmq4"
+)
+
+func main() {
+        zctx, _ := zmq.NewContext()
+
+        s, _ := zctx.NewSocket(zmq.REP)
+        s.Bind("tcp://*:5555")
+
+        for {
+                // Wait for next request from client
+                msg, _ := s.Recv(0)
+                log.Printf("Received %s\n", msg)
+
+                // Do some 'work'
+                time.Sleep(time.Second * 1)
+
+                // Send reply back to client
+                s.Send("World", 0)
+        }
+}
+
+----------------------------------------
+
+TITLE: Implementing ZeroMQ REP Server in Haskell
+DESCRIPTION: A server implementation that creates a REP socket, binds to port 5555, and handles incoming requests with a delayed response. Uses the zeromq4-haskell library and demonstrates message handling with ByteStrings. Includes a simulated work delay of 1 second between receiving and responding.
+
+LANGUAGE: haskell
+CODE:
+-- This lets us conviniently use efficient ByteString to send and recieve messages
+{-# LANGUAGE OverloadedStrings #-}         
+
+{-
+   Hello World server in Haskell
+   Binds REP socket to tcp://*:5555
+   Expects "Hello" from client, replies with "World"
+-}
+
+import System.ZMQ4.Monadic (runZMQ, socket, bind, send, receive, Socket, Rep(..))
+import Control.Monad (forever)
+import Control.Monad.IO.Class (liftIO)
+import Control.Concurrent (threadDelay)
+import Data.ByteString.Char8 (pack, unpack)
+
+main :: IO ()
+main = runZMQ $ do
+    repSocket <- socket Rep
+    bind repSocket "tcp://*:5555"
+    forever $ do
+        --  Wait for next request from client
+        message <- receive repSocket
+        liftIO $ putStrLn ("Received request: " ++ unpack message)
+
+        --  Do some 'work' (waiting for 1 second here)
+        liftIO $ threadDelay (1 * 1000000)
+
+        --  Send reply back to client
+        send repSocket [] (pack "World")
+
+----------------------------------------
+
+TITLE: Generating Ant Build File from Maven POM
+DESCRIPTION: Command to generate an Ant build file from an existing Maven pom.xml configuration.
+
+LANGUAGE: bash
+CODE:
+mvn ant:ant
+
+----------------------------------------
+
+TITLE: Implementing ZeroMQ REP Server in Java with JeroMQ
+DESCRIPTION: A basic ZeroMQ server that binds to tcp://*:5555, receives messages, and responds with 'world'. Uses REP socket type for request-reply pattern and includes basic error handling with try-with-resources for context management.
+
+LANGUAGE: java
+CODE:
+//  Hello World server in Java
+//  Binds REP socket to tcp://*:5555
+//  Expects "Hello" from client, replies with "World"
+
+import org.zeromq.SocketType;
+import org.zeromq.ZMQ;
+import org.zeromq.ZContext;
+
+public class hwserver
+{
+  public static void main(String[] args) throws Exception
+  {
+    try (ZContext context = new ZContext()) {
+      //  Socket to talk to clients
+      ZMQ.Socket socket = context.createSocket(SocketType.REP);
+      socket.bind("tcp://*:5555");
+
+      while (!Thread.currentThread().isInterrupted()) {
+        byte[] reply = socket.recv(0);
+        System.out.println(
+          "Received " + ": [" + new String(reply, ZMQ.CHARSET) + "]"
+        );
+        String response = "world";
+        socket.send(response.getBytes(ZMQ.CHARSET), 0);
+        Thread.sleep(1000); //  Do some 'work'
+      }
+    }
+  }
+
+----------------------------------------
+
+TITLE: Receiving String Message from ZeroMQ Socket in Java
+DESCRIPTION: This snippet demonstrates how to receive a string message from a ZeroMQ socket using the recvStr function.
+
+LANGUAGE: java
+CODE:
+String hello = socket.recvStr()
+
+----------------------------------------
+
+TITLE: Receiving ZFrame and Extracting String Content in Java with JeroMQ
+DESCRIPTION: This snippet shows how to receive a ZFrame from a ZeroMQ socket and extract its string content. It uses the ZMQ.CHARSET for string serialization and deserialization.
+
+LANGUAGE: java
+CODE:
+ZFrame stringFrame = ZFrame.recvFrame(socket);
+String hello = stringFrame.getString(ZMQ.CHARSET);
+
+----------------------------------------
+
+TITLE: Implementing ZeroMQ Hello World Client
+DESCRIPTION: This snippet serves as a template for creating a ZeroMQ Hello World client. The specific programming language and ZeroMQ library or framework should be specified in the placeholders.
+
+LANGUAGE: plaintext
+CODE:
+<language name>
+
+----------------------------------------
+
+TITLE: Publishing Topic-based Messages in ZeroMQ
+DESCRIPTION: Code template showing how to send a message on the 'status' topic using ZeroMQ's publish-subscribe pattern. The example demonstrates the basic structure for topic-based message publishing.
+
+LANGUAGE: unknown
+CODE:
+//  Send a message on the 'status' topic
+
+----------------------------------------
+
+TITLE: Subscribing to ZeroMQ PubSub Topic in <language name>
+DESCRIPTION: This code snippet demonstrates how to subscribe to a specific topic ('status') in a ZeroMQ publish-subscribe system. It's a crucial step in setting up a subscriber that filters messages based on topics of interest.
+
+LANGUAGE: <language name>
+CODE:
+//  Subscribe to the 'status'
+
+----------------------------------------
+
+TITLE: Sending Multiple String Frames with zstr_sendm in C using CZMQ
+DESCRIPTION: Demonstrates how to send multiple string frames using the zstr_sendm function, which postpones sending until the last frame is ready. The final frame is sent using zstr_send.
+
+LANGUAGE: C
+CODE:
+zstr_sendm (socket, "HELLO");
+zstr_sendm (socket, "beautiful");
+zstr_send (socket, "WORLD!");
+
+----------------------------------------
+
+TITLE: Implementing ZeroMQ Hello World Server in C using CZMQ
+DESCRIPTION: This snippet creates a ZeroMQ REP socket server that binds to port 5555, receives messages, prints a confirmation, waits for 1 second, and sends 'World' as a response. It uses the CZMQ library for simplified ZeroMQ operations.
+
+LANGUAGE: C
+CODE:
+//  Hello World server
+#include <czmq.h>
+
+int main (void)
+{
+    //  Socket to talk to clients
+    zsock_t *responder = zsock_new (ZMQ_REP);
+    int rc = zsock_bind (responder, "tcp://*:5555");
+    assert (rc == 5555);
+
+    while (1) {
+        char *str = zstr_recv (responder);
+        printf ("Received Hello\n");
+        sleep (1);          //  Do some 'work'
+        zstr_send (responder, "World");
+        zstr_free (&str);
+    }
+    return 0;
+}
+
+----------------------------------------
+
+TITLE: Installing DartZMQ Package in Flutter
+DESCRIPTION: Command to add the DartZMQ package to a Flutter project using the pub package manager. Requires libzmq to be installed as a prerequisite.
+
+LANGUAGE: bash
+CODE:
+flutter pub add dartzmq
+
+----------------------------------------
+
+TITLE: Installing CZMQ on Windows using vcpkg
+DESCRIPTION: Commands to install CZMQ on Windows using vcpkg, with options for 32-bit shared library, 64-bit static library, and including draft APIs.
+
+LANGUAGE: batch
+CODE:
+.\vcpkg.exe install czmq
+
+LANGUAGE: batch
+CODE:
+.\vcpkg.exe install czmq:x64-windows-static
+
+LANGUAGE: batch
+CODE:
+.\vcpkg install czmq[draft]

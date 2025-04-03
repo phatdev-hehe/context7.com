@@ -1,0 +1,5636 @@
+TITLE: Implementing Node Functionality in JavaScript
+DESCRIPTION: This code defines the runtime behavior of the lowercase node. It exports a function that creates and registers the node, handling input events and transforming the payload to lowercase.
+
+LANGUAGE: javascript
+CODE:
+module.exports = function(RED) {
+    function LowerCaseNode(config) {
+        RED.nodes.createNode(this,config);
+        var node = this;
+        node.on('input', function(msg) {
+            msg.payload = msg.payload.toLowerCase();
+            node.send(msg);
+        });
+    }
+    RED.nodes.registerType("lower-case",LowerCaseNode);
+}
+
+----------------------------------------
+
+TITLE: Sending Messages from Node-RED Node (JavaScript)
+DESCRIPTION: This code shows how to send messages from a Node-RED node, both in response to external events and within the input event listener. It ensures compatibility with different Node-RED versions.
+
+LANGUAGE: javascript
+CODE:
+var msg = { payload:"hi" }
+this.send(msg);
+
+let node = this;
+this.on('input', function(msg, send, done) {
+    // For maximum backwards compatibility, check that send exists.
+    // If this node is installed in Node-RED 0.x, it will need to
+    // fallback to using `node.send`
+    send = send || function() { node.send.apply(node,arguments) }
+
+    msg.payload = "hi";
+    send(msg);
+
+    if (done) {
+        done();
+    }
+});
+
+----------------------------------------
+
+TITLE: Installing Node-RED using npm
+DESCRIPTION: Global installation of Node-RED using npm package manager. This command installs Node-RED and its dependencies globally on the system.
+
+LANGUAGE: bash
+CODE:
+sudo npm install -g --unsafe-perm node-red
+
+----------------------------------------
+
+TITLE: Defining Node Properties and UI in HTML
+DESCRIPTION: This HTML file defines the node's properties, edit dialog, and help text. It includes scripts for registering the node type, specifying its appearance and behavior in the flow editor.
+
+LANGUAGE: html
+CODE:
+<script type="text/javascript">
+    RED.nodes.registerType('lower-case',{
+        category: 'function',
+        color: '#a6bbcf',
+        defaults: {
+            name: {value:""}
+        },
+        inputs: 1,
+        outputs: 1,
+        icon: "file.svg",
+        label: function() {
+            return this.name||"lower-case";
+        }
+    });
+</script>
+
+<script type="text/html" data-template-name="lower-case">
+    <div class="form-row">
+        <label for="node-input-name"><i class="fa fa-tag"></i> Name</label>
+        <input type="text" id="node-input-name" placeholder="Name">
+    </div>
+</script>
+
+<script type="text/html" data-help-name="lower-case">
+    <p>A simple node that converts the message payloads into all lower-case characters</p>
+</script>
+
+----------------------------------------
+
+TITLE: Configuring package.json for Node-RED Custom Node
+DESCRIPTION: This snippet shows the structure of the package.json file for a custom Node-RED node, including the required 'node-red' section that specifies the node files.
+
+LANGUAGE: json
+CODE:
+{
+    "name" : "node-red-contrib-example-lower-case",
+    ...
+    "node-red" : {
+        "nodes": {
+            "lower-case": "lower-case.js"
+        }
+    }
+}
+
+----------------------------------------
+
+TITLE: Unit Testing Node-RED Custom Node
+DESCRIPTION: This JavaScript code demonstrates how to create unit tests for the lowercase node using the node-red-node-test-helper framework. It includes tests for node loading and functionality.
+
+LANGUAGE: javascript
+CODE:
+var helper = require("node-red-node-test-helper");
+var lowerNode = require("../lower-case.js");
+
+describe('lower-case Node', function () {
+
+  afterEach(function () {
+    helper.unload();
+  });
+
+  it('should be loaded', function (done) {
+    var flow = [{ id: "n1", type: "lower-case", name: "test name" }];
+    helper.load(lowerNode, flow, function () {
+      var n1 = helper.getNode("n1");
+      n1.should.have.property('name', 'test name');
+      done();
+    });
+  });
+
+  it('should make payload lower case', function (done) {
+    var flow = [{ id: "n1", type: "lower-case", name: "test name",wires:[["n2"]] },
+    { id: "n2", type: "helper" }];
+    helper.load(lowerNode, flow, function () {
+      var n2 = helper.getNode("n2");
+      var n1 = helper.getNode("n1");
+      n2.on("input", function (msg) {
+        msg.should.have.property('payload', 'uppercase');
+        done();
+      });
+      n1.receive({ payload: "UpperCase" });
+    });
+  });
+});
+
+----------------------------------------
+
+TITLE: Configuring HTTPS in Node-RED Settings
+DESCRIPTION: Example configuration for enabling HTTPS access in Node-RED by specifying key and certificate files in the settings.js file.
+
+LANGUAGE: javascript
+CODE:
+https: {
+    key: require("fs").readFileSync('privkey.pem'),
+    cert: require("fs").readFileSync('cert.pem')
+},
+
+----------------------------------------
+
+TITLE: Configuring Memory Context Store in Node-RED
+DESCRIPTION: This code snippet demonstrates how to configure the default memory store for context storage in Node-RED. The memory store holds all context data in memory and is cleared when Node-RED restarts. It supports both synchronous and asynchronous access.
+
+LANGUAGE: javascript
+CODE:
+contextStorage: {
+   default: {
+       module:"memory",
+   }
+}
+
+----------------------------------------
+
+TITLE: Handling Input Messages in Node-RED Node (JavaScript)
+DESCRIPTION: This code demonstrates how to register an input listener for a Node-RED node, compatible with both Node-RED 1.0+ and earlier versions. It shows proper use of the 'done' function for completion notification.
+
+LANGUAGE: javascript
+CODE:
+this.on('input', function(msg, send, done) {
+    // do something with 'msg'
+
+    // Once finished, call 'done'.
+    // This call is wrapped in a check that 'done' exists
+    // so the node will work in earlier versions of Node-RED (<1.0)
+    if (done) {
+        done();
+    }
+});
+
+----------------------------------------
+
+TITLE: Handling Multiple Outputs in Node-RED Function
+DESCRIPTION: Demonstrates routing messages to different outputs based on a condition.
+
+LANGUAGE: javascript
+CODE:
+if (msg.topic === "banana") {
+   return [ null, msg ];
+} else {
+   return [ msg, null ];
+}
+
+----------------------------------------
+
+TITLE: Implementing HTTP Middleware in Node-RED (JavaScript)
+DESCRIPTION: This code shows how to add custom HTTP middleware to all admin routes in Node-RED. It allows for request processing before passing control to the next middleware.
+
+LANGUAGE: javascript
+CODE:
+httpAdminMiddleware: function(req,res,next) {
+    // Perform any processing on the request.
+    // Be sure to call next() if the request should be passed on
+}
+
+----------------------------------------
+
+TITLE: Running Node-RED Docker Container
+DESCRIPTION: Basic command to run Node-RED in a Docker container, mapping port 1880 and using a named volume for data persistence.
+
+LANGUAGE: bash
+CODE:
+docker run -it -p 1880:1880 -v node_red_data:/data --name mynodered nodered/node-red
+
+----------------------------------------
+
+TITLE: Implementing Custom User Authentication in Node-RED
+DESCRIPTION: Example of a custom user authentication module that can be used to integrate Node-RED with existing authentication schemes.
+
+LANGUAGE: javascript
+CODE:
+module.exports = {
+   type: "credentials",
+   users: function(username) {
+       return new Promise(function(resolve) {
+           // Do whatever work is needed to check username is a valid
+           // user.
+           if (valid) {
+               // Resolve with the user object. It must contain
+               // properties 'username' and 'permissions'
+               var user = { username: "admin", permissions: "*" };
+               resolve(user);
+           } else {
+               // Resolve with null to indicate this user does not exist
+               resolve(null);
+           }
+       });
+   },
+   authenticate: function(username,password) {
+       return new Promise(function(resolve) {
+           // Do whatever work is needed to validate the username/password
+           // combination.
+           if (valid) {
+               // Resolve with the user object. Equivalent to having
+               // called users(username);
+               var user = { username: "admin", permissions: "*" };
+               resolve(user);
+           } else {
+               // Resolve with null to indicate the username/password pair
+               // were not valid.
+               resolve(null);
+           }
+       });
+   },
+   default: function() {
+       return new Promise(function(resolve) {
+           // Resolve with the user object for the default user.
+           // If no default user exists, resolve with null.
+           resolve({anonymous: true, permissions:"read"});
+       });
+   }
+}
+
+----------------------------------------
+
+TITLE: Defining Configuration Node Frontend in Node-RED
+DESCRIPTION: HTML and JavaScript code for defining a configuration node's frontend components including the node registration and edit template. Sets up a remote server configuration with host and port fields.
+
+LANGUAGE: html
+CODE:
+<script type="text/javascript">
+    RED.nodes.registerType('remote-server',{
+        category: 'config',
+        defaults: {
+            host: {value:"localhost",required:true},
+            port: {value:1234,required:true,validate:RED.validators.number()},
+        },
+        label: function() {
+            return this.host+":"+this.port;
+        }
+    });
+</script>
+
+<script type="text/html" data-template-name="remote-server">
+    <div class="form-row">
+        <label for="node-config-input-host"><i class="fa fa-bookmark"></i> Host</label>
+        <input type="text" id="node-config-input-host">
+    </div>
+    <div class="form-row">
+        <label for="node-config-input-port"><i class="fa fa-bookmark"></i> Port</label>
+        <input type="text" id="node-config-input-port">
+    </div>
+</script>
+
+----------------------------------------
+
+TITLE: Initializing Node-RED Node Constructor in JavaScript
+DESCRIPTION: This snippet shows how to create a basic Node-RED node constructor function and register it with the runtime. It initializes shared features and allows for node-specific code.
+
+LANGUAGE: javascript
+CODE:
+function SampleNode(config) {
+    RED.nodes.createNode(this,config);
+    // node-specific code goes here
+
+}
+
+RED.nodes.registerType("sample",SampleNode);
+
+----------------------------------------
+
+TITLE: Implementing a Custom Context Store Module for Node-RED (JavaScript)
+DESCRIPTION: This snippet demonstrates the structure of a custom context store module for Node-RED. It includes a constructor function and the open method, which are required for implementing the Store Module API.
+
+LANGUAGE: javascript
+CODE:
+var ContextStore = function(config) {
+    this.config = config;
+}
+
+ContextStore.prototype.open = function() { ... }
+
+
+module.exports = function(config){
+    return new ContextStore(config);
+};
+
+----------------------------------------
+
+TITLE: Implementing Configuration Node Runtime in Node-RED
+DESCRIPTION: JavaScript runtime implementation of a configuration node that stores host and port settings. Creates a basic container for configuration with no runtime behavior.
+
+LANGUAGE: javascript
+CODE:
+module.exports = function(RED) {
+    function RemoteServerNode(n) {
+        RED.nodes.createNode(this,n);
+        this.host = n.host;
+        this.port = n.port;
+    }
+    RED.nodes.registerType("remote-server",RemoteServerNode);
+}
+
+----------------------------------------
+
+TITLE: Using Context in Node-RED Function
+DESCRIPTION: Demonstrates how to use context to maintain state across function calls.
+
+LANGUAGE: javascript
+CODE:
+var count = context.get('count')||0;
+count += 1;
+context.set('count',count);
+msg.count = count;
+return msg;
+
+----------------------------------------
+
+TITLE: Configuring Custom Storage Module in Node-RED
+DESCRIPTION: This snippet demonstrates how to configure a custom storage module in Node-RED using the storageModule property in settings.js.
+
+LANGUAGE: javascript
+CODE:
+storageModule: require("my-node-red-storage-plugin")
+
+----------------------------------------
+
+TITLE: Customizing Node-RED Editor Theme (JavaScript)
+DESCRIPTION: This extensive configuration object demonstrates how to customize various aspects of the Node-RED editor theme, including page layout, header, deploy button, menu items, and more.
+
+LANGUAGE: javascript
+CODE:
+editorTheme: {
+    page: {
+        title: "Node-RED",
+        favicon: "/absolute/path/to/theme/icon",
+        css: "/absolute/path/to/custom/css/file",
+        scripts: [ "/absolute/path/to/custom/script/file", "/another/script/file"]
+    },
+    header: {
+        title: "Node-RED",
+        image: "/absolute/path/to/header/image", // or null to remove image
+        url: "http://nodered.org" // optional url to make the header text/image a link to this url
+    },
+    deployButton: {
+        type:"simple",
+        label:"Save",
+        icon: "/absolute/path/to/deploy/button/image" // or null to remove image
+    },
+    menu: { // Hide unwanted menu items by id. see packages/node_modules/@node-red/editor-client/src/js/red.js:loadEditor for complete list
+        "menu-item-import-library": false,
+        "menu-item-export-library": false,
+        "menu-item-keyboard-shortcuts": false,
+        "menu-item-help": {
+            label: "Alternative Help Link Text",
+            url: "http://example.com"
+        }
+    },
+    tours: false, // disable the Welcome Tour for new users
+    userMenu: false, // Hide the user-menu even if adminAuth is enabled
+    login: {
+        image: "/absolute/path/to/login/page/big/image" // a 256x256 image
+    },
+    logout: {
+        redirect: "http://example.com"
+    },
+    palette: {
+        editable: true, // *Deprecated* - use externalModules.palette.allowInstall instead
+        catalogues: [   // Alternative palette manager catalogues
+            'https://catalogue.nodered.org/catalogue.json'
+        ],
+        theme: [ // Override node colours - rules test against category/type by RegExp.
+            { category: ".*", type: ".*", color: "#f0f" }
+        ]
+    },
+    projects: {
+        enabled: false // Enable the projects feature
+    },
+    theme: "", // Select a color theme for the editor. See https://github.com/node-red-contrib-themes/theme-collection for a collection of themes to choose from
+    codeEditor: {
+        lib: "ace", // Select the text editor component used by the editor. Defaults to "ace", but can be set to "ace" or "monaco"
+        options: {
+            // The following only apply if the editor is set to "monaco"
+            theme: "vs", // Select a color theme for the text editor component. Must match the file name of a theme in packages/node_modules/@node-red/editor-client/src/vendor/monaco/dist/theme
+        }
+    },
+    mermaid: {
+        theme: "default" // Select a color theme for the Mermaid diagramming and charting tool. Must match the name of a theme in https://mermaid.js.org/config/theming.html#available-themes
+    }
+},
+
+----------------------------------------
+
+TITLE: Using Configuration Nodes in Node-RED
+DESCRIPTION: Example of how to use a configuration node within another node, including both the node definition and runtime implementation
+
+LANGUAGE: javascript
+CODE:
+defaults: {
+   server: {value:"", type:"remote-server"},
+},
+
+LANGUAGE: javascript
+CODE:
+module.exports = function(RED) {
+    function MyNode(config) {
+        RED.nodes.createNode(this,config);
+
+        // Retrieve the config node
+        this.server = RED.nodes.getNode(config.server);
+
+        if (this.server) {
+            // Do something with:
+            //  this.server.host
+            //  this.server.port
+        } else {
+            // No config node configured
+        }
+    }
+    RED.nodes.registerType("my-node",MyNode);
+}
+
+----------------------------------------
+
+TITLE: Registering Node Type in Node-RED Editor
+DESCRIPTION: Demonstrates how to register a node type with the editor using RED.nodes.registerType function. This defines the node's basic properties and behavior.
+
+LANGUAGE: html
+CODE:
+<script type="text/javascript">
+    RED.nodes.registerType('node-type',{
+        // node definition
+    });
+</script>
+
+----------------------------------------
+
+TITLE: Configuring Local Filesystem Context Store in Node-RED
+DESCRIPTION: This snippet shows how to configure the Local Filesystem Context Store in Node-RED. It sets up the default context storage using the 'localfilesystem' module, which can be further customized with additional config options.
+
+LANGUAGE: javascript
+CODE:
+contextStorage: {
+   default: {
+       module:"localfilesystem",
+       config: {
+           // see below
+       }
+   }
+}
+
+----------------------------------------
+
+TITLE: Node Edit Dialog Template
+DESCRIPTION: Shows the structure of an edit dialog template that defines the user interface for configuring node properties. Includes form elements and styling.
+
+LANGUAGE: html
+CODE:
+<script type="text/html" data-template-name="node-type">
+    <div class="form-row">
+        <label for="node-input-name"><i class="fa fa-tag"></i> Name</label>
+        <input type="text" id="node-input-name" placeholder="Name">
+    </div>
+    <div class="form-tips"><b>Tip:</b> This is here to help.</div>
+</script>
+
+----------------------------------------
+
+TITLE: Backwards Compatible Message Handler Implementation
+DESCRIPTION: Complete implementation that maintains compatibility with both pre-1.0 and 1.0+ versions of Node-RED using feature detection.
+
+LANGUAGE: javascript
+CODE:
+let node = this;
+this.on('input', function(msg, send, done) {
+    // If this is pre-1.0, 'send' will be undefined, so fallback to node.send
+    send = send || function() { node.send.apply(node,arguments) }
+    // do some work with msg
+    someImaginaryLibrary(msg, (err, result) => {
+        if (err) {
+            // Report back the error
+            if (done) {
+                 // Use done if defined (1.0+)
+                done(err)
+            } else {
+                // Fallback to node.error (pre-1.0)
+                node.error(err, msg);
+            }
+        } else {
+            msg.payload = result;
+            send(msg);
+            // Check done exists (1.0+)
+            if (done) {
+                done();
+            }
+        }
+    })
+})
+
+----------------------------------------
+
+TITLE: Configuring HTTP Basic Authentication in Node-RED (JavaScript)
+DESCRIPTION: This snippet demonstrates how to enable HTTP Basic Authentication for the Node-RED editor UI. It includes a hashed password and instructions for generating the hash.
+
+LANGUAGE: javascript
+CODE:
+httpAdminAuth: {user:"nol", pass:"5f4dcc3b5aa765d61d8327deb882cf99"}
+
+----------------------------------------
+
+TITLE: Implementing Synchronous onSend Hook in Node-RED
+DESCRIPTION: This snippet demonstrates how to add a synchronous onSend hook in Node-RED. The hook logs the number of messages being sent.
+
+LANGUAGE: javascript
+CODE:
+// Example synchronous onSend hook
+RED.hooks.add("onSend", (sendEvents) => {
+    console.log(`Sending ${sendEvents.length} messages`);
+});
+
+----------------------------------------
+
+TITLE: Node Help Text Template
+DESCRIPTION: Defines the help documentation template that appears in the info tab when the node is selected. Includes description, outputs, and detailed information.
+
+LANGUAGE: html
+CODE:
+<script type="text/html" data-help-name="node-type">
+   <p>Some useful help text to introduce the node.</p>
+   <h3>Outputs</h3>
+       <dl class="message-properties">
+       <dt>payload
+           <span class="property-type">string | buffer</span>
+       </dt>
+   <h3>Details</h3>
+   <p>Some more information about the node.</p>
+</script>
+
+----------------------------------------
+
+TITLE: Enabling Flow File Formatting in Node-RED Settings (JavaScript)
+DESCRIPTION: This code snippet shows how to enable the option to format the flow file for better readability in Node-RED. It demonstrates uncommenting a line in the settings.js file.
+
+LANGUAGE: javascript
+CODE:
+flowFilePretty: true,
+
+----------------------------------------
+
+TITLE: Configuring Username/Password Authentication in Node-RED
+DESCRIPTION: Example configuration for enabling username/password based authentication for the Node-RED editor and admin API using bcrypt hashed passwords.
+
+LANGUAGE: javascript
+CODE:
+adminAuth: {
+    type: "credentials",
+    users: [
+        {
+            username: "admin",
+            password: "$2a$08$zZWtXTja0fB1pzD4sHCMyOCMYz2Z6dNbM6tl8sJogENOMcxWV9DN.",
+            permissions: "*"
+        },
+        {
+            username: "george",
+            password: "$2b$08$wuAqPiKJlVN27eF5qJp.RuQYuy6ZYONW7a/UWYxDTtwKFCdB8F19y",
+            permissions: "read"
+        }
+    ]
+}
+
+----------------------------------------
+
+TITLE: Configuring Static Content Serving in Node-RED (JavaScript)
+DESCRIPTION: This snippet illustrates how to configure Node-RED to serve static web content from multiple directories, including custom middleware and CORS options.
+
+LANGUAGE: javascript
+CODE:
+httpStatic: [
+  {
+      path: '/opt/static/',
+      root: '/private/',
+      middleware: myCustomHttpMiddleware,
+      cors: {
+
+      }
+  }
+]
+
+----------------------------------------
+
+TITLE: Node Help HTML Template
+DESCRIPTION: Example HTML template for Node-RED node help documentation showing the proper structure with sections for introduction, inputs, outputs, details, and references.
+
+LANGUAGE: html
+CODE:
+<script type="text/html" data-help-name="node-type">
+<p>Connects to a MQTT broker and publishes messages.</p>
+
+<h3>Inputs</h3>
+    <dl class="message-properties">
+        <dt>payload
+            <span class="property-type">string | buffer</span>
+        </dt>
+        <dd> the payload of the message to publish. </dd>
+        <dt class="optional">topic <span class="property-type">string</span></dt>
+        <dd> the MQTT topic to publish to.</dd>
+    </dl>
+
+ <h3>Outputs</h3>
+     <ol class="node-ports">
+         <li>Standard output
+             <dl class="message-properties">
+                 <dt>payload <span class="property-type">string</span></dt>
+                 <dd>the standard output of the command.</dd>
+             </dl>
+         </li>
+         <li>Standard error
+             <dl class="message-properties">
+                 <dt>payload <span class="property-type">string</span></dt>
+                 <dd>the standard error of the command.</dd>
+             </dl>
+         </li>
+     </ol>
+
+<h3>Details</h3>
+    <p><code>msg.payload</code> is used as the payload of the published message.
+    If it contains an Object it will be converted to a JSON string before being sent.
+    If it contains a binary Buffer the message will be published as-is.</p>
+    <p>The topic used can be configured in the node or, if left blank, can be set
+    by <code>msg.topic</code>.</p>
+    <p>Likewise the QoS and retain values can be configured in the node or, if left
+    blank, set by <code>msg.qos</code> and <code>msg.retain</code> respectively.</p>
+
+<h3>References</h3>
+    <ul>
+        <li><a>Twitter API docs</a> - full description of <code>msg.tweet</code> property</li>
+        <li><a>GitHub</a> - the nodes github repository</li>
+    </ul>
+</script>
+
+----------------------------------------
+
+TITLE: Installing Node Modules via npm in Node-RED
+DESCRIPTION: Command to install a node module from the command-line within the Node-RED user data directory. Requires restarting Node-RED to pick up new nodes.
+
+LANGUAGE: bash
+CODE:
+npm install <npm-package-name>
+
+----------------------------------------
+
+TITLE: Configuring Multiple Context Stores in Node-RED
+DESCRIPTION: This example demonstrates how to configure multiple context stores in Node-RED, including an in-memory store and a file-based store. It allows for flexible storage options based on data persistence requirements.
+
+LANGUAGE: javascript
+CODE:
+contextStorage: {
+   default: "memoryOnly",
+   memoryOnly: { module: 'memory' },
+   file: { module: 'localfilesystem' }
+}
+
+----------------------------------------
+
+TITLE: Implementing Asynchronous HTTPS Configuration in Node-RED
+DESCRIPTION: Example of using a function to asynchronously provide HTTPS configuration options, allowing for dynamic certificate loading.
+
+LANGUAGE: javascript
+CODE:
+https: function() {
+    return new Promise((resolve, reject) => {
+        var key, cert;
+        // Do some work to obtain valid certificates
+        // ...
+        resolve({
+            key: key
+            cert: cert
+        })
+    });
+}
+
+----------------------------------------
+
+TITLE: Node Help Markdown Template
+DESCRIPTION: Example Markdown template for Node-RED node help documentation showing the same structure as the HTML version but using Markdown syntax.
+
+LANGUAGE: markdown
+CODE:
+<script type="text/markdown" data-help-name="node-type">
+Connects to a MQTT broker and publishes messages.
+
+### Inputs
+
+: payload (string | buffer) :  the payload of the message to publish.
+: *topic* (string)          :  the MQTT topic to publish to.
+
+
+### Outputs
+
+1. Standard output
+: payload (string) : the standard output of the command.
+
+2. Standard error
+: payload (string) : the standard error of the command.
+
+### Details
+
+`msg.payload` is used as the payload of the published message.
+If it contains an Object it will be converted to a JSON string before being sent.
+If it contains a binary Buffer the message will be published as-is.
+
+The topic used can be configured in the node or, if left blank, can be set
+`msg.topic`.
+
+Likewise the QoS and retain values can be configured in the node or, if left
+blank, set by `msg.qos` and `msg.retain` respectively.
+
+### References
+
+ - [Twitter API docs]() - full description of `msg.tweet` property
+ - [GitHub]() - the nodes github repository
+</script>
+
+----------------------------------------
+
+TITLE: Configuring Node-RED settings.js for AWS S3 Storage
+DESCRIPTION: This code snippet shows the additional configuration required in the Node-RED settings.js file to enable AWS S3 storage. It specifies the AWS region, S3 application name, and the storage module to use.
+
+LANGUAGE: javascript
+CODE:
+     awsRegion: 'eu-west-1',
+     awsS3Appname: 'demoapp',
+     storageModule: require('node-red-contrib-storage-s3'),
+
+----------------------------------------
+
+TITLE: Implementing Custom Library Store Plugin
+DESCRIPTION: Implementation template for a custom Node-RED library store plugin. Includes basic structure with init, getEntry, and saveEntry methods that need to be implemented.
+
+LANGUAGE: javascript
+CODE:
+module.exports = function(RED) {
+
+    // This must be a unique identifier for the library store type
+    const PLUGIN_TYPE_ID = "node-red-library-custom-store";
+
+    class CustomStorePlugin {
+
+        /**
+         * @param {object} config an object containing the configuration for an
+         *                        instance of the store
+         */
+        constructor(config) {
+            // Required properties
+            this.type = PLUGIN_TYPE_ID;
+            this.id = config.id;
+            this.label = config.label;
+        }
+
+        /**
+         * Initialise the store.
+         */
+        async init() {
+        }
+
+        /**
+         * Get an entry from the store
+         * @param {string} type The type of entry, for example, "flow"
+         * @param {string} path The path to the library entry
+         * @return if 'path' resolves to a single entry, it returns the contents
+         *         of that entry.
+         *         if 'path' resolves to a 'directory', it returns a listing of
+         *         the contents of the directory
+         *         if 'path' is not valid, it should throw a suitable error
+         */
+        async getEntry(type,path) {
+            throw new Error("Not implemented")
+        }
+
+        /**
+         * Save an entry to the library
+         * @param {string} type The type of entry, for example, "flow"
+         * @param {string} path The path to the library entry
+         * @param {object} meta An object of key/value meta data about the entry
+         * @param {string} body The entry contents
+         */
+        async saveEntry(type,path,meta,body) {
+            throw new Error("Not implemented")
+        }
+    }
+
+    // Register the plugin.
+    RED.plugins.registerPlugin(PLUGIN_TYPE_ID, {
+        // This tells Node-RED the plugin is a library source plugin
+        type: "node-red-library-source",
+        class: CustomStorePlugin
+    })
+}
+
+----------------------------------------
+
+TITLE: Initializing Node-RED in an Express Application (JavaScript)
+DESCRIPTION: This code demonstrates how to embed Node-RED into an Express application. It sets up the necessary dependencies, creates an Express app and server, configures Node-RED settings, and initializes the Node-RED runtime.
+
+LANGUAGE: javascript
+CODE:
+var http = require('http');
+var express = require("express");
+var RED = require("node-red");
+
+// Create an Express app
+var app = express();
+
+// Add a simple route for static content served from 'public'
+app.use("/",express.static("public"));
+
+// Create a server
+var server = http.createServer(app);
+
+// Create the settings object - see default settings.js file for other options
+var settings = {
+    httpAdminRoot:"/red",
+    httpNodeRoot: "/api",
+    userDir:"/home/nol/.nodered/",
+    functionGlobalContext: { }    // enables global context
+};
+
+// Initialise the runtime with a server and settings
+RED.init(server,settings);
+
+// Serve the editor UI from /red
+app.use(settings.httpAdminRoot,RED.httpAdmin);
+
+// Serve the http nodes UI from /api
+app.use(settings.httpNodeRoot,RED.httpNode);
+
+server.listen(8000);
+
+// Start the runtime
+RED.start();
+
+----------------------------------------
+
+TITLE: Implementing onReceive Hook in Node-RED
+DESCRIPTION: This example demonstrates how to implement an onReceive hook in Node-RED. It logs the destination node ID when a message is about to be received.
+
+LANGUAGE: javascript
+CODE:
+// Example onReceive hook
+RED.hooks.add("onReceive", (receiveEvent) => {
+    console.log(`Message about to be passed to node: ${receiveEvent.destination.id}`);
+});
+
+----------------------------------------
+
+TITLE: Configuring Context Storage in Node-RED (JavaScript)
+DESCRIPTION: This snippet demonstrates how to configure context storage in Node-RED's settings.js file. It shows the structure of the contextStorage object, including the module and config properties.
+
+LANGUAGE: javascript
+CODE:
+contextStorage: {
+   default: {
+       module:"memory",
+       config: {
+           customOption: 'value'
+       }
+   }
+}
+
+----------------------------------------
+
+TITLE: Implementing Rate Limiting Middleware for HTTP Nodes in Node-RED
+DESCRIPTION: Example of custom middleware configuration to implement rate limiting for HTTP In nodes using the express-rate-limit package.
+
+LANGUAGE: javascript
+CODE:
+// Run `npm install express-rate-limit` on `~/.node-red/` directory in advance
+var rateLimit = require("express-rate-limit");
+module.exports = {
+    httpNodeMiddleware: rateLimit({
+        windowMs: 1000, // 1000 milliseconds is set as the window time.
+        max: 10 // limit access rate to 10 requests/second
+    })
+}
+
+----------------------------------------
+
+TITLE: Basic Function Node Usage in Node-RED
+DESCRIPTION: Demonstrates the simplest function that returns the message as-is.
+
+LANGUAGE: javascript
+CODE:
+return msg;
+
+----------------------------------------
+
+TITLE: Defining Node Configuration in Node-RED
+DESCRIPTION: Represents the configuration of a single node within a flow. Contains essential properties like ID, type, coordinates, and wire connections.
+
+LANGUAGE: json
+CODE:
+{
+  "id": "123",
+  "type": "inject",
+  "x": 0,
+  "y": 0,
+  "z": "456",
+  "wires": [ ... ]
+}
+
+----------------------------------------
+
+TITLE: Installing node-red-admin globally using npm
+DESCRIPTION: Command to install the node-red-admin tool globally using npm. The --unsafe-perm flag is used to ensure proper installation, and sudo may be required on Linux/OS X systems.
+
+LANGUAGE: bash
+CODE:
+npm install -g --unsafe-perm node-red-admin
+
+----------------------------------------
+
+TITLE: Defining Node Credentials Structure in JavaScript
+DESCRIPTION: Demonstrates how to define credential properties in a Node-RED node definition, specifying text and password field types.
+
+LANGUAGE: javascript
+CODE:
+credentials: {
+    username: {type:"text"},
+    password: {type:"password"}
+},
+
+----------------------------------------
+
+TITLE: Implementing Logstash Logging in Node-RED
+DESCRIPTION: This example shows how to create a custom logger that sends metrics events to a Logstash instance over a TCP connection. It includes basic connection handling and message formatting.
+
+LANGUAGE: javascript
+CODE:
+logging: {
+    console: {
+        level: "info",
+        metrics: false,
+        audit: false
+    },
+    logstash: {
+        level:'off',
+        metrics:true,
+        handler: function(conf) {
+            var net = require('net');
+            var logHost = '192.168.99.100',logPort = 9563;
+            var conn = new net.Socket();
+            conn.connect(logPort,logHost)
+                .on('connect',function() {
+                    console.log("Logger connected")
+                })
+                .on('error', function(err) {
+                    // Should attempt to reconnect in a real env
+                    // This example just exits...
+                    process.exit(1);
+                });
+            // Return the function that will do the actual logging
+            return function(msg) {
+                var message = {
+                    '@tags': ['node-red', 'test'],
+                    '@fields': msg,
+                    '@timestamp': (new Date(msg.timestamp)).toISOString()
+                }
+                try {
+                    conn.write(JSON.stringify(message)+"\n");
+                }catch(err) { console.log(err);}
+            }
+        }
+    }
+}
+
+----------------------------------------
+
+TITLE: Complete Flow Configuration in Node-RED
+DESCRIPTION: Represents the entire set of flows as a flat array of Node objects, used by the /flows API.
+
+LANGUAGE: json
+CODE:
+[
+  {
+    "id": "1234",
+    "type": "inject"
+  },
+  {
+    "id": "5678",
+    "type": "debug"
+  }
+]
+
+----------------------------------------
+
+TITLE: Dockerfile for Custom Node-RED Image
+DESCRIPTION: Dockerfile to create a custom Node-RED image with local resources and additional npm packages.
+
+LANGUAGE: dockerfile
+CODE:
+FROM nodered/node-red
+
+WORKDIR /data
+COPY package.json /data
+RUN npm install --unsafe-perm --no-update-notifier --no-fund --only=production
+WORKDIR /usr/src/node-red
+
+COPY settings.js /data/settings.js
+COPY flows_cred.json /data/flows_cred.json
+COPY flows.json /data/flows.json
+
+----------------------------------------
+
+TITLE: Implementing onComplete Hook in Node-RED
+DESCRIPTION: This example demonstrates how to implement an onComplete hook in Node-RED. It logs an error message if the node completed with an error.
+
+LANGUAGE: javascript
+CODE:
+// Example onComplete hook
+RED.hooks.add("onComplete", (completeEvent) => {
+    if (completeEvent.error) {
+        console.log(`Message completed with error: ${completeEvent.error}`);
+    }
+});
+
+----------------------------------------
+
+TITLE: Implementing postUninstall Hook in Node-RED
+DESCRIPTION: This snippet shows how to add a postUninstall hook in Node-RED. The hook logs a message after a module has been removed.
+
+LANGUAGE: javascript
+CODE:
+RED.hooks.add("postUninstall",  (uninstallEvent) => {
+    console.log(`Removed ${uninstallEvent.module}`);
+});
+
+----------------------------------------
+
+TITLE: Complete Flow Configuration with Revision (v2) in Node-RED
+DESCRIPTION: Enhanced flow configuration format that includes a revision identifier, available when using API v2.
+
+LANGUAGE: json
+CODE:
+{
+    "rev": "abc-123",
+    "flows": [
+      {
+        "id": "1234",
+        "type": "inject"
+      },
+      {
+        "id": "5678",
+        "type": "debug"
+      }
+    ]
+}
+
+----------------------------------------
+
+TITLE: Error Handling in Node-RED Node Input Function (JavaScript)
+DESCRIPTION: This snippet illustrates how to handle errors in a Node-RED node's input function, compatible with both Node-RED 1.0+ and earlier versions. It demonstrates proper error reporting to the runtime.
+
+LANGUAGE: javascript
+CODE:
+let node = this;
+this.on('input', function(msg, send, done) {
+    // do something with 'msg'
+
+    // If an error is hit, report it to the runtime
+    if (err) {
+        if (done) {
+            // Node-RED 1.0 compatible
+            done(err);
+        } else {
+            // Node-RED 0.x compatible
+            node.error(err, msg);
+        }
+    }
+});
+
+----------------------------------------
+
+TITLE: Implementing Custom Logging in Node-RED
+DESCRIPTION: This example demonstrates how to set up a custom logging module in Node-RED. It includes configuration for console logging and a custom logger with a handler function.
+
+LANGUAGE: javascript
+CODE:
+// Configure the logging output
+logging: {
+    // Console logging
+    console: {
+        level: "info",
+        metrics: false,
+        audit: false
+    },
+    // Custom logger
+    myCustomLogger: {
+        level: 'debug',
+        metrics: true,
+        handler: function(settings) {
+            // Called when the logger is initialised
+
+            // Return the logging function
+            return function(msg) {
+                console.log(msg.timestamp, msg.event);
+            }
+        }
+    }
+}
+
+----------------------------------------
+
+TITLE: Constructing New Message Object in Node-RED Function
+DESCRIPTION: Shows how to create a new message object with a modified payload.
+
+LANGUAGE: javascript
+CODE:
+var newMsg = { payload: msg.payload.length };
+return newMsg;
+
+----------------------------------------
+
+TITLE: Adding Hook Handler in Node-RED
+DESCRIPTION: Demonstrates how to add a hook handler using RED.hooks.add(). This example shows a preDeliver hook that logs information about message destination.
+
+LANGUAGE: javascript
+CODE:
+RED.hooks.add("preDeliver.my-hooks", (sendEvent) => {
+    console.log(`About to deliver to ${sendEvent.destination.id}`);
+});
+
+----------------------------------------
+
+TITLE: Adding Custom Tab to Node-RED Sidebar
+DESCRIPTION: Demonstrates how to create and add a custom tab to the Node-RED sidebar including content, toolbar header, and action registration. Shows the full tab configuration with properties like id, label, name, iconClass, and action.
+
+LANGUAGE: javascript
+CODE:
+// The sidebar content
+const content = $("<div>").css({"position":"relative","height":"100%"});
+
+// (optional) A toolbar header for the sidebar
+const header = $("<div>", {class:"red-ui-sidebar-header"}).appendTo(content);
+
+
+RED.actions.add("my-custom-tab:show-custom-tab",function() {
+    RED.sidebar.show("my-custom-tab");
+});
+
+RED.sidebar.addTab({
+    id: "my-custom-tab",
+    label: "custom",
+    name: "My Custom Tab",
+    iconClass: "fa fa-database",
+    content: content,
+    action: "my-custom-tab:show-custom-tab"
+});
+
+----------------------------------------
+
+TITLE: Accessing Credentials in Runtime
+DESCRIPTION: Demonstrates how to access credential values within a node's runtime context.
+
+LANGUAGE: javascript
+CODE:
+function MyNode(config) {
+    RED.nodes.createNode(this,config);
+    var username = this.credentials.username;
+    var password = this.credentials.password;
+}
+
+----------------------------------------
+
+TITLE: Setting Node Status in Node-RED Function
+DESCRIPTION: Shows how to update the visual status of a function node.
+
+LANGUAGE: javascript
+CODE:
+node.status({fill:"red",shape:"ring",text:"disconnected"});
+node.status({fill:"green",shape:"dot",text:"connected"});
+node.status({text:"Just text status"});
+node.status({});   // to clear the status
+
+----------------------------------------
+
+TITLE: Configuring Runtime State Settings in Node-RED
+DESCRIPTION: Configuration snippet for enabling the ability to edit stopped flows in Node-RED. Adds runtime state controls to the deploy menu.
+
+LANGUAGE: javascript
+CODE:
+runtimeState: {
+   enabled: true,
+   ui: true
+}
+
+----------------------------------------
+
+TITLE: Configuring File-based Context Storage in Node-RED
+DESCRIPTION: This snippet shows how to configure Node-RED to use file-based storage for context data using the localfilesystem module. This allows context data to persist across Node-RED restarts.
+
+LANGUAGE: javascript
+CODE:
+contextStorage: {
+   default: {
+       module: "localfilesystem"
+   }
+}
+
+----------------------------------------
+
+TITLE: Configuring Console Logging in Node-RED
+DESCRIPTION: This snippet shows how to configure console logging in Node-RED's settings file. It allows setting the logging level, enabling metrics output, and audit logging.
+
+LANGUAGE: javascript
+CODE:
+// Configure the logging output
+logging: {
+    // Console logging
+    console: {
+        level: "info",
+        metrics: false,
+        audit: false
+    }
+}
+
+----------------------------------------
+
+TITLE: Adding Items to EditableList with Callback
+DESCRIPTION: Example demonstrating how to configure the addItem callback function to handle new list items.
+
+LANGUAGE: javascript
+CODE:
+$("ol.list").editableList({
+    addItem: function(row, index, data) {
+        $(row).html("Item "+index);
+    }
+});
+
+----------------------------------------
+
+TITLE: Configuring Monaco Text Editor in Node-RED 2.0
+DESCRIPTION: This snippet shows how to enable the Monaco text editor in Node-RED 2.0 by modifying the editorTheme section of the settings file. Monaco provides a richer code editing experience compared to the default ACE editor.
+
+LANGUAGE: javascript
+CODE:
+editorTheme: {
+    codeEditor: {
+        lib: "monaco"
+    }
+},
+
+----------------------------------------
+
+TITLE: Configuring Multiple Context Stores in Node-RED (JavaScript)
+DESCRIPTION: This snippet shows how to configure multiple context stores in Node-RED, including a built-in memory store and a custom store loaded using require().
+
+LANGUAGE: javascript
+CODE:
+contextStorage: {
+   default: {
+       module:"memory",
+   },
+   custom: {
+       module:require("my-custom-store")
+   }
+}
+
+----------------------------------------
+
+TITLE: Implementing Asynchronous preRoute Hook in Node-RED
+DESCRIPTION: This example shows how to implement an asynchronous preRoute hook in Node-RED. It clones the message if needed and performs an asynchronous operation before proceeding.
+
+LANGUAGE: javascript
+CODE:
+// Example async preRoute hook
+RED.hooks.add("preRoute", (sendEvent, done) => {
+    // As this hook needs to do async work, clone the message if needed
+    if (sendEvent.cloneMessage) {
+        sendEvent.msg = RED.util.cloneMessage(sendEvent.msg);
+        sendEvent.cloneMessage = false;
+    }
+    someAsyncAPI(sendEvent).then(() => {
+        done()
+    }).catch(err => {
+        // An error means stop processing this message
+        done(err);
+    })
+});
+
+----------------------------------------
+
+TITLE: Running Node-RED locally on Raspberry Pi with memory optimization
+DESCRIPTION: This command starts Node-RED on a Raspberry Pi with an additional argument to optimize memory usage, freeing up unused memory sooner than the default behavior.
+
+LANGUAGE: bash
+CODE:
+node-red-pi --max-old-space-size=256
+
+----------------------------------------
+
+TITLE: Sorting EditableList Items
+DESCRIPTION: Example showing how to implement custom sorting logic for EditableList items.
+
+LANGUAGE: javascript
+CODE:
+$("ol.list").editableList({
+    sort: function(dataA, dataB) {
+        return dataA.index-dataB.index;
+    }
+});
+
+----------------------------------------
+
+TITLE: Invoking Custom Action in Node-RED Editor
+DESCRIPTION: Demonstrates how to programmatically invoke a registered action. Actions can be called with optional arguments when invoked through the API.
+
+LANGUAGE: javascript
+CODE:
+RED.actions.invoke("my-custom-tab:show-custom-tab")
+
+----------------------------------------
+
+TITLE: Closing Node-RED Node and Handling Removal (JavaScript)
+DESCRIPTION: This snippet demonstrates how to register a close event listener for a Node-RED node, allowing for cleanup operations. It includes handling for both node removal and restart scenarios.
+
+LANGUAGE: javascript
+CODE:
+this.on('close', function(removed, done) {
+    if (removed) {
+        // This node has been disabled/deleted
+    } else {
+        // This node is being restarted
+    }
+    done();
+});
+
+----------------------------------------
+
+TITLE: Configuring Notification Buttons in JavaScript
+DESCRIPTION: This snippet demonstrates how to configure buttons for a notification using the RED.notify API. It shows the structure of the buttons array, including text, click handlers, and optional CSS classes.
+
+LANGUAGE: javascript
+CODE:
+buttons: [
+    {
+        text: "cancel",
+        click: function(e) {
+            myNotification.close();
+        }
+    },
+    {
+        text: "okay",
+        class:"primary",
+        click: function(e) {
+            myNotification.close();
+        }
+    }
+
+----------------------------------------
+
+TITLE: Configuring PM2 for Node-RED Auto-start
+DESCRIPTION: Commands to install and configure PM2 process manager to automatically start Node-RED on system boot. Includes PM2 installation, Node-RED service configuration, and startup script generation.
+
+LANGUAGE: bash
+CODE:
+sudo npm install -g --unsafe-perm pm2
+pm2 start `which node-red` -- -v
+pm2 save
+pm2 startup
+
+----------------------------------------
+
+TITLE: Using JSONata $moment Function in Node-RED 1.1
+DESCRIPTION: Examples of using the newly added $moment function in JSONata expressions within Node-RED 1.1. This function provides date/time manipulation capabilities, including timezone support.
+
+LANGUAGE: javascript
+CODE:
+$moment().tz("Pacific/Auckland")
+
+LANGUAGE: javascript
+CODE:
+$moment().add(2, "hours")
+
+LANGUAGE: javascript
+CODE:
+$moment($.payload, "YYYY-MM-DD")
+
+----------------------------------------
+
+TITLE: Accessing Context Scopes in Node-RED Custom Nodes
+DESCRIPTION: Demonstrates how to access different context scopes (node, flow, and global) within a custom Node-RED node. This allows nodes to store and retrieve data at different visibility levels.
+
+LANGUAGE: javascript
+CODE:
+// Access the node's context object
+var nodeContext = this.context();
+
+var flowContext = this.context().flow;
+
+var globalContext = this.context().global;
+
+----------------------------------------
+
+TITLE: Implementing a Modal Notification with Buttons in JavaScript
+DESCRIPTION: This example shows how to create a modal notification with custom buttons using RED.notify. It demonstrates setting various options like modal, fixed, type, and buttons, and how to use the returned notification object to close the notification.
+
+LANGUAGE: javascript
+CODE:
+let myNotification = RED.notify("This is the message to display",{
+    modal: true,
+    fixed: true,
+    type: 'warning',
+    buttons: [
+        {
+            text: "cancel",
+            click: function(e) {
+                myNotification.close();
+            }
+        },
+        {
+            text: "okay",
+            class:"primary",
+            click: function(e) {
+                myNotification.close();
+            }
+        }
+    ]
+});
+
+----------------------------------------
+
+TITLE: Creating a Warning Notification with Timeout in JavaScript
+DESCRIPTION: This snippet demonstrates how to create a warning notification that displays for 10 seconds using RED.notify with type and timeout options.
+
+LANGUAGE: javascript
+CODE:
+RED.notify("Something has happened", { type: "warning", timeout: 10000 });
+
+----------------------------------------
+
+TITLE: Defining property validators in Node-RED (JavaScript)
+DESCRIPTION: This snippet demonstrates how to use built-in validators and custom validation functions for node properties in Node-RED.
+
+LANGUAGE: javascript
+CODE:
+defaults: {
+   minimumLength: { value:0, validate:RED.validators.number() },
+   lowerCaseOnly: {value:"", validate:RED.validators.regex(/[a-z]+/) },
+   custom: { value:"", validate:function(v) {
+      var minimumLength=$("#node-input-minimumLength").length?$("#node-input-minimumLength").val():this.minimumLength;
+      return v.length > minimumLength
+   } }
+},
+
+----------------------------------------
+
+TITLE: PM2 Startup for SystemD Linux Systems
+DESCRIPTION: Specific command to generate startup configuration for systems using systemd init system.
+
+LANGUAGE: bash
+CODE:
+pm2 startup systemd
+
+----------------------------------------
+
+TITLE: Showing Specific TreeList Item Example
+DESCRIPTION: Example demonstrating how to make a specific item visible in the TreeList using its ID.
+
+LANGUAGE: javascript
+CODE:
+$(".input").treeList('show','my-red-item');
+
+----------------------------------------
+
+TITLE: Custom Labeled AutoComplete Results
+DESCRIPTION: Demonstrates how to create custom-styled labels for autocomplete results using DOM elements, including highlighting the matched portion of text.
+
+LANGUAGE: html
+CODE:
+<input type="text" id="node-input-example2">
+
+LANGUAGE: javascript
+CODE:
+$("#node-input-example3").autoComplete({
+    search: function(val) {
+        var matches = [];
+        animals.forEach(v => {
+            var i = v.toLowerCase().indexOf(val.toLowerCase());
+            if (i > -1) {
+                var pre = v.substring(0,i);
+                var matchedVal = v.substring(i,i+val.length);
+                var post = v.substring(i+val.length)
+
+                var el = $('<div/>',{style:"white-space:nowrap"});
+                $('<span/>').text(pre).appendTo(el);
+                $('<span/>',{style:"font-weight: bold; color:red"}).text(matchedVal).appendTo(el);
+                $('<span/>').text(post).appendTo(el);
+
+                matches.push({
+                    value: v,
+                    label: el,
+                    i:i
+                })
+            }
+        })
+        matches.sort(function(A,B){return A.i-B.i})
+        return matches
+    }
+})
+
+----------------------------------------
+
+TITLE: Setting Flows with Encrypted Node Credentials (JSON)
+DESCRIPTION: Example of setting flows with encrypted node credentials in the request body, where credentials are provided as an encrypted string in the top-level 'credentials' object.
+
+LANGUAGE: json
+CODE:
+{
+    "rev": "abc-123",
+    "flows": [
+      {
+        "type": "tab",
+        "id": "396c2376.c693dc",
+        "label": "Sheet 1"
+      }
+    ],
+    "credentials": {
+        "$": "beea417990012379ca6d4116bd1fda5bOWbwy7UnQvccxAEH1V1pSEETTfSNerYGvP4Aai6RT/DNpnjCCP/fdzildzlJhFjYcRKdO1Q="
+    }
+}
+
+----------------------------------------
+
+TITLE: Initializing TypedInput Widget in JavaScript
+DESCRIPTION: This snippet shows how to initialize a TypedInput widget in the node's oneditprepare function. It demonstrates setting up multiple input types and a separate type field.
+
+LANGUAGE: javascript
+CODE:
+$("#node-input-example1").typedInput({
+    type:"str",
+    types:["str","num","bool"],
+    typeField: "#node-input-example1-type"
+})
+
+----------------------------------------
+
+TITLE: Retrieving Flow Configuration in Node-RED API (JSON)
+DESCRIPTION: This JSON snippet represents the response body of a successful GET /flow/:id request. It includes the flow's id, label, and arrays for nodes, configs, and subflows.
+
+LANGUAGE: json
+CODE:
+{
+  "id": "91ad451.f6e52b8",
+  "label": "Sheet 1",
+  "nodes": [ ],
+  "configs": [ ],
+  "subflows": [ ]
+}
+
+----------------------------------------
+
+TITLE: Asynchronous AutoComplete Search
+DESCRIPTION: Shows how to implement asynchronous search functionality using a callback. Includes a simulated delay to demonstrate async behavior.
+
+LANGUAGE: html
+CODE:
+<input type="text" id="node-input-example2">
+
+LANGUAGE: javascript
+CODE:
+$("#node-input-example2").autoComplete({
+    search: function(val, done) {
+        var matches = [];
+        animals.forEach(v => {
+            var i = v.toLowerCase().indexOf(val.toLowerCase());
+            if (i > -1) {
+                matches.push({
+                    value: v,
+                    label: v,
+                    i: i
+                })
+            }
+        });
+        matches.sort(function(A,B){return A.i-B.i})
+        setTimeout(function() {
+            done(matches);
+        },1000)
+    }
+})
+
+----------------------------------------
+
+TITLE: Configuring File Store Library in Node-RED Settings
+DESCRIPTION: Example configuration for adding a file store library source in Node-RED's settings.js file under the editorTheme section. Shows how to specify library path, label, icon and other configuration options.
+
+LANGUAGE: javascript
+CODE:
+editorTheme: {
+    library: {
+        sources: [
+            {
+                id: "team-collaboration-library",
+                type: "node-red-library-file-store",
+                path: "/Users/tom/work/team-library/",
+                label: "Team collaboration",
+                icon: "font-awesome/fa-users"
+            }
+        ]
+    },
+}
+
+----------------------------------------
+
+TITLE: Example Response for Node Module Information - JSON
+DESCRIPTION: Example JSON response showing the structure of a node module object containing module name, version, and details about the nodes it provides. This example shows information for the 'node-red-node-suncalc' module.
+
+LANGUAGE: json
+CODE:
+{
+  "name": "node-red-node-suncalc",
+  "version": "0.0.6",
+  "nodes": [
+    {
+      "id": "node-red-node-suncalc/suncalc",
+      "name": "suncalc",
+      "types": [
+        "sunrise"
+      ],
+      "enabled": true,
+      "module": "node-red-node-suncalc",
+      "version": "0.0.6"
+    }
+  ]
+}
+
+----------------------------------------
+
+TITLE: Node-RED TypedInput Integration Example
+DESCRIPTION: Complete example showing how to integrate TypedInput in a Node-RED node with type field storage.
+
+LANGUAGE: html
+CODE:
+<div class="form-row">
+    <label>Example:</label>
+    <input type="text" id="node-input-myField">
+    <input type="hidden" id="node-input-myFieldType">
+</div>
+
+LANGUAGE: javascript
+CODE:
+RED.nodes.registerType('example', {
+    defaults: {
+        myField: { value: "" },
+        myFieldType: { value: "str" }
+    },
+    ...
+    oneditprepare: function () {
+        $("#node-input-myField").typedInput({
+            typeField: "#node-input-myFieldType"
+        });
+    }
+})
+
+----------------------------------------
+
+TITLE: Checking for Node-RED Node Updates via npm
+DESCRIPTION: Command to check for available updates for installed Node-RED nodes using npm in the user directory.
+
+LANGUAGE: bash
+CODE:
+npm outdated
+
+----------------------------------------
+
+TITLE: Retrieving Flow Configuration (v2) in Node-RED API
+DESCRIPTION: Example response for v2 of the GET /flows API endpoint. Returns a flow response object that includes the current revision identifier and an array of flow objects.
+
+LANGUAGE: json
+CODE:
+{
+    "rev": "abc-123",
+    "flows": [
+      {
+        "type": "tab",
+        "id": "396c2376.c693dc",
+        "label": "Sheet 1"
+      }
+    ]
+}
+
+----------------------------------------
+
+TITLE: Configuring PM2 Boot Persistence
+DESCRIPTION: Commands to save the PM2 process list and generate a startup script for automatic startup on system boot.
+
+LANGUAGE: bash
+CODE:
+pm2 save
+pm2 startup
+
+----------------------------------------
+
+TITLE: Retrieving Node Module Set Information Response - JSON
+DESCRIPTION: Example JSON response showing the structure of a node set object returned by the GET /nodes/:module/:set endpoint. Contains module metadata including ID, name, supported node types, enabled status, and version information.
+
+LANGUAGE: json
+CODE:
+{
+  "id": "node-red-node-suncalc/suncalc",
+  "name": "suncalc",
+  "types": [
+    "sunrise"
+  ],
+  "enabled": true,
+  "module": "node-red-node-suncalc",
+  "version": "0.0.6"
+}
+
+----------------------------------------
+
+TITLE: Async Message Handler with Error Handling
+DESCRIPTION: Example implementation of the new message handling pattern with async operations and error handling using an imaginary library.
+
+LANGUAGE: javascript
+CODE:
+this.on('input', function(msg, send, done) {
+    // do some work with msg
+    someImaginaryLibrary(msg, (err, result) => {
+        if (err) {
+            // Report back the error. This is equivalent to
+            //    node.error(err,msg)
+            // but with the timeout handling dealt with as well
+            done(err);
+        } else {
+            msg.payload = result;
+            send(msg);
+            done();
+        }
+    })
+})
+
+----------------------------------------
+
+TITLE: Enabling Projects in Node-RED Settings
+DESCRIPTION: This snippet shows how to enable the projects feature in Node-RED by modifying the settings.js file. It adds the editorTheme option with projects enabled set to true.
+
+LANGUAGE: javascript
+CODE:
+   editorTheme: {
+       projects: {
+           enabled: true
+       }
+   },
+
+----------------------------------------
+
+TITLE: Installing Node-RED on Raspberry Pi using Bash script
+DESCRIPTION: This command downloads and runs a script to install Node.js, npm, and Node-RED on a Raspberry Pi. The script can also be used to upgrade an existing installation.
+
+LANGUAGE: bash
+CODE:
+bash <(curl -sL https://raw.githubusercontent.com/node-red/linux-installers/master/deb/update-nodejs-and-nodered)
+
+----------------------------------------
+
+TITLE: Generating Access Token Response in Node-RED API (JSON)
+DESCRIPTION: This JSON snippet demonstrates the response structure when successfully obtaining an access token through the Node-RED API. It includes the access token, expiration time, and token type.
+
+LANGUAGE: json
+CODE:
+{
+  "access_token": "A_SECRET_TOKEN",
+  "expires_in":604800,
+  "token_type": "Bearer"
+}
+
+----------------------------------------
+
+TITLE: Implementing Context Store Callback Function in JavaScript
+DESCRIPTION: Example of the callback function structure for the Context Store API methods. This function is used in methods like get, set, and keys to handle asynchronous operations.
+
+LANGUAGE: javascript
+CODE:
+function callback(error, value1, value2, ... ) {
+
+}
+
+----------------------------------------
+
+TITLE: Setting Flows with Node-RED API v2 (JSON)
+DESCRIPTION: Example of setting flows using Node-RED API v2, which expects a flow response object including a revision number and flows array in the request body.
+
+LANGUAGE: json
+CODE:
+{
+    "rev": "abc-123",
+    "flows": [
+      {
+        "type": "tab",
+        "id": "396c2376.c693dc",
+        "label": "Sheet 1"
+      }
+    ]
+}
+
+----------------------------------------
+
+TITLE: Adding Machine Learning Dependencies to Debian-based Container
+DESCRIPTION: Dockerfile to extend the Debian-based Node-RED container with Python machine learning libraries including numpy, pandas, scikit-learn, and tensorflow.
+
+LANGUAGE: dockerfile
+CODE:
+FROM testing:node-red-build
+USER root
+RUN apt-get install -y python3-pip python3-numpy python3-pandas 
+RUN pip install scikit-learn tensorflow
+USER node-red
+
+----------------------------------------
+
+TITLE: Successful Response for Node Module Modification in Node-RED (JSON)
+DESCRIPTION: Example JSON response body for a successful node module modification. It includes the module name, version, and details about the nodes within the module, including their enabled and loaded status.
+
+LANGUAGE: json
+CODE:
+{
+  "name": "node-red-node-suncalc",
+  "version": "0.0.6",
+  "nodes": [
+    {
+      "id": "node-red-node-suncalc/suncalc",
+      "name": "suncalc",
+      "types": [
+        "sunrise"
+      ],
+      "enabled": true,
+      "loaded": true,
+      "module": "node-red-node-suncalc"
+    }
+  ]
+}
+
+----------------------------------------
+
+TITLE: Implementing Context Store Set Callback in JavaScript
+DESCRIPTION: Example of the callback function for the set method in the Context Store API. This function is called after storing values and handles any errors that occurred during the process.
+
+LANGUAGE: javascript
+CODE:
+function callback(error) {
+
+}
+
+----------------------------------------
+
+TITLE: Updating Global Flow Configuration in Node-RED
+DESCRIPTION: JSON structure for updating the global flow in Node-RED. Includes the 'global' ID and arrays for configs and subflows.
+
+LANGUAGE: json
+CODE:
+{
+  "id": "global",
+  "configs": [ ],
+  "subflows": [ ]
+}
+
+----------------------------------------
+
+TITLE: CompleteEvent Object Structure in Node-RED
+DESCRIPTION: This JSON structure represents the CompleteEvent object used in Node-RED messaging hooks. It contains information about the message, the node, and any error that occurred during processing.
+
+LANGUAGE: json
+CODE:
+{
+    "msg": "<message object>",
+    "node": {
+        "id": "<node-id>",
+        "node": "<node-object>"
+    },
+    "error": "<error passed to done, otherwise, undefined>"
+}
+
+----------------------------------------
+
+TITLE: Setting TreeList Data Method Example
+DESCRIPTION: Example of how to set data for a TreeList widget using jQuery method syntax.
+
+LANGUAGE: javascript
+CODE:
+$(".input").treeList('data',[{label:"Colours"}]);
+
+----------------------------------------
+
+TITLE: Showing Tab in Node-RED Sidebar
+DESCRIPTION: Demonstrates how to programmatically show a specific tab in the sidebar using its ID.
+
+LANGUAGE: javascript
+CODE:
+RED.sidebar.show("my-custom-tab")
+
+----------------------------------------
+
+TITLE: Retrieving Node-RED Settings Response Example
+DESCRIPTION: Example JSON response from the GET /settings endpoint showing runtime configuration including HTTP node root path, version number, and user information when authentication is enabled.
+
+LANGUAGE: json
+CODE:
+{
+  "httpNodeRoot": "/",
+  "version": "0.X.Y",
+  "user": {
+    "username": "admin",
+    "permissions": "*"
+  }
+}
+
+----------------------------------------
+
+TITLE: Running Node-RED with a custom flow file
+DESCRIPTION: This Grunt command demonstrates how to specify a custom flow file when running Node-RED in development mode.
+
+LANGUAGE: bash
+CODE:
+grunt dev --flowFile=my-flow-file.json
+
+----------------------------------------
+
+TITLE: SendEvent Object Structure in Node-RED
+DESCRIPTION: This JSON structure represents the SendEvent object used in Node-RED messaging hooks. It contains information about the message, source, destination, and whether the message should be cloned.
+
+LANGUAGE: json
+CODE:
+{
+    "msg": "<message object>",
+    "source": {
+        "id": "<node-id>",
+        "node": "<node-object>",
+        "port": "<index of port being sent on>"
+    },
+    "destination": {
+        "id": "<node-id>",
+        "node": undefined
+    },
+    "cloneMessage": "true|false"
+}
+
+----------------------------------------
+
+TITLE: Checking Tab Existence in Node-RED Sidebar
+DESCRIPTION: Shows how to check if a tab exists in the sidebar by its ID, returning a boolean value.
+
+LANGUAGE: javascript
+CODE:
+let debugExists = RED.sidebar.containsTab('my-custom-tab');
+
+----------------------------------------
+
+TITLE: Enabling/Disabling Node Module in Node-RED (JSON Request Body)
+DESCRIPTION: JSON structure for the request body to enable or disable a node module. The 'enabled' field is a boolean indicating whether to enable (true) or disable (false) the module.
+
+LANGUAGE: json
+CODE:
+{
+  "enabled": true
+}
+
+----------------------------------------
+
+TITLE: Configuring Editor Theme in Settings
+DESCRIPTION: JavaScript configuration to set the custom theme CSS file in the Node-RED settings.
+
+LANGUAGE: javascript
+CODE:
+editorTheme: {
+    page: {
+        // This must be the *absolute* path to the style.css file
+        css: "/absolute/path/to/my-custom-theme/style.css"
+    }
+}
+
+----------------------------------------
+
+TITLE: InstallEvent Object Structure in Node-RED
+DESCRIPTION: This JSON object represents the structure of an InstallEvent in Node-RED's Install Hooks API. It contains information about the module being installed.
+
+LANGUAGE: json
+CODE:
+{
+    "module": "<npm module name>",
+    "version": "<version to be installed>",
+    "url": "<optional url to install from>",
+    "dir": "<directory to run the install in>",
+    "isExisting": "<boolean> this is a module we already know about",
+    "isUpgrade": "<boolean> this is an upgrade rather than new install",
+    "args": [ "an array", "of the args", "we will pass to npm"]
+}
+
+----------------------------------------
+
+TITLE: Configuring Monaco Editor Theme
+DESCRIPTION: JavaScript configuration to set Monaco editor options including theme, font size, and other settings in the theme plugin.
+
+LANGUAGE: javascript
+CODE:
+RED.plugins.registerPlugin("my-custom-theme", {
+   type: "node-red-theme",
+   css: "style.css",
+   monacoOptions: {
+     theme: "vs-dark", // Monaco theme name
+     fontSize: 14,
+     fontLigatures: true,
+     fontFamily: "Cascadia Code, Fira Code, Consolas, 'Courier New', monospace",
+     minimap: { enabled: false }
+   }
+ })
+
+----------------------------------------
+
+TITLE: Cloning Node-RED repository from GitHub
+DESCRIPTION: This Git command clones the Node-RED source code repository from GitHub to the local machine.
+
+LANGUAGE: bash
+CODE:
+git clone https://github.com/node-red/node-red.git
+
+----------------------------------------
+
+TITLE: Registering Event Handler in Node-RED
+DESCRIPTION: Demonstrates how to register a new event handler for the 'nodes:add' event using RED.events.on(). This handler logs a message when a node is added to the workspace.
+
+LANGUAGE: javascript
+CODE:
+RED.events.on("nodes:add", function(node) {
+    console.log("A node has been added to the workspace!")
+})
+
+----------------------------------------
+
+TITLE: Implementing Asynchronous Operations with Promises in Node-RED
+DESCRIPTION: This example shows how to use JavaScript promises with the When.js library in Node-RED for handling asynchronous operations in the Storage API.
+
+LANGUAGE: javascript
+CODE:
+function getFlows() {
+    // create and return a promise
+    return when.promise(function(resolve,reject) {
+        // resolve - a function to be called with the successful result
+        // reject - a function to be called if an error occurs
+
+        // do some asynchronous work, with a callback on completion
+        doAsyncWork(function(err,result) {
+            if (err) {
+                reject(err);
+            } else {
+                resolve(result);
+            }
+        });
+    });
+}
+
+getFlows()
+    .then(function(result) {
+        // Called when getFlows completes successfully
+    })
+    .otherwise(function(err) {
+        // Called when getFlows hits an error
+    });
+
+----------------------------------------
+
+TITLE: Setting Custom Monaco Theme
+DESCRIPTION: JavaScript configuration to set a custom Monaco editor theme with specific colors and rules in the theme plugin.
+
+LANGUAGE: javascript
+CODE:
+RED.plugins.registerPlugin("my-custom-theme", {
+    monacoOptions: {
+      theme: {
+        "base": "vs-dark",
+        "inherit": true,
+        "colors": {
+          "editor.foreground": "#CCC",
+          "editor.background": "#434954",
+          "editor.selectionBackground": "#80000080",
+          "editor.lineHighlightBackground": "#80000040",
+          "editorCursor.foreground": "#7070FF",
+          "editorWhitespace.foreground": "#BFBFBF"
+        },      
+        "rules": [
+            {
+                "background": "434954",
+            },
+            {
+                "foreground": "aeaeae",
+                "fontStyle": "italic",
+                "token": "comment"
+            },
+            {
+                "foreground": "d8fa3c",
+                "token": "string"
+            },
+            {
+                "foreground": "d8fa3c",
+                "fontStyle": "bold",
+                "token": "constant"
+            },
+        ]
+      }
+    }
+})
+
+----------------------------------------
+
+TITLE: Automatically restarting Node-RED during development
+DESCRIPTION: This Grunt command builds and runs Node-RED, then watches for changes in the source code, automatically rebuilding and restarting as necessary.
+
+LANGUAGE: bash
+CODE:
+grunt dev
+
+----------------------------------------
+
+TITLE: Displaying Directory Listing in JavaScript
+DESCRIPTION: This snippet demonstrates the structure of a directory listing array returned by the getLibraryEntry function. It shows how subdirectories and files with metadata are represented.
+
+LANGUAGE: javascript
+CODE:
+[ 'directory1',
+  'directory2',
+  { fn: 'File-1.js', outputs: 3 },
+  { fn: 'File-2.js', outputs: 1 },
+  { fn: 'File-3.js', outputs: 2 }
+]
+
+----------------------------------------
+
+TITLE: Displaying a Plain Information Notification in JavaScript
+DESCRIPTION: This example shows how to display a simple information notification using RED.notify with a basic message.
+
+LANGUAGE: javascript
+CODE:
+RED.notify("Hello World");
+
+----------------------------------------
+
+TITLE: Configuring Mermaid Diagram Theme
+DESCRIPTION: JavaScript configuration to set the Mermaid diagram theme in the Node-RED theme plugin.
+
+LANGUAGE: javascript
+CODE:
+RED.plugins.registerPlugin("my-custom-theme", {
+   type: "node-red-theme",
+   css: "style.css",
+   mermaid: {
+     theme: "dark" //Mermaid theme name
+   }
+ })
+
+----------------------------------------
+
+TITLE: Asynchronous Message Sending in Node-RED Function
+DESCRIPTION: Shows how to send messages asynchronously using node.send().
+
+LANGUAGE: javascript
+CODE:
+doSomeAsyncWork(msg, function(result) {
+    msg.payload = result;
+    node.send(msg);
+});
+return;
+
+----------------------------------------
+
+TITLE: Installing Local Theme Plugin
+DESCRIPTION: Command to install the local theme plugin in the Node-RED user directory.
+
+LANGUAGE: bash
+CODE:
+npm install /path/to/my-custom-theme
+
+----------------------------------------
+
+TITLE: Implementing Async Children Loading in TreeList
+DESCRIPTION: Example showing how to implement asynchronous loading of child items using a callback function with jQuery's AJAX request.
+
+LANGUAGE: javascript
+CODE:
+children: function(done) {
+    $.getJSON('/some/url', function(result) {
+        done(result);
+    })
+}
+
+----------------------------------------
+
+TITLE: Node-RED Workspace Reordering Actions Table
+DESCRIPTION: Table showing the node reordering actions available in the workspace with their corresponding keyboard shortcuts.
+
+LANGUAGE: markdown
+CODE:
+Action | Key shortcut
+-------|--------
+`core:move-selection-forwards` | _none_
+`core:move-selection-backwards` | _none_
+`core:move-selection-to-front` | _none_
+`core:move-selection-to-back` | _none_
+
+----------------------------------------
+
+TITLE: Loading Monaco Theme from JSON File
+DESCRIPTION: JavaScript code to load a custom Monaco editor theme from a JSON file in the theme plugin.
+
+LANGUAGE: javascript
+CODE:
+RED.plugins.registerPlugin("my-custom-theme", {
+    monacoOptions: {
+      theme: require("./my-custom-theme-monaco-theme.json"),
+    }
+})
+
+----------------------------------------
+
+TITLE: Removing Custom Action in Node-RED Editor
+DESCRIPTION: Shows how to remove a previously registered action from the Node-RED editor.
+
+LANGUAGE: javascript
+CODE:
+RED.actions.remove("my-custom-tab:show-custom-tab")
+
+----------------------------------------
+
+TITLE: Emptying TreeList Content Example
+DESCRIPTION: Example showing how to remove all items from a TreeList widget.
+
+LANGUAGE: javascript
+CODE:
+$(".input").treeList('empty');
+
+----------------------------------------
+
+TITLE: Revoking Access Token - cURL Example
+DESCRIPTION: cURL command to revoke an active access token.
+
+LANGUAGE: bash
+CODE:
+curl --data 'token=A_SECRET_TOKEN' -H "Authorization: Bearer A_SECRET_TOKEN" http://localhost:1880/auth/revoke
+
+----------------------------------------
+
+TITLE: Obtaining Access Token - cURL Example
+DESCRIPTION: cURL command to obtain an access token using username and password credentials.
+
+LANGUAGE: bash
+CODE:
+curl http://localhost:1880/auth/token --data 'client_id=node-red-admin&grant_type=password&scope=*&username=admin&password=password'
+
+----------------------------------------
+
+TITLE: Removing Tab from Node-RED Sidebar
+DESCRIPTION: Shows how to remove a tab from the sidebar. This should be called in the onpaletteremove function if the tab was added in onpaletteadd.
+
+LANGUAGE: javascript
+CODE:
+RED.sidebar.removeTab("my-custom-tab");
+
+----------------------------------------
+
+TITLE: Node-RED Workspace Arrangement Actions Table
+DESCRIPTION: Table showing the alignment and distribution actions available in the Arrange menu along with their corresponding keyboard shortcuts.
+
+LANGUAGE: markdown
+CODE:
+Action | Key shortcut
+-------|--------
+`core:align-selection-to-grid` | _none_
+`core:align-selection-to-left` | `Alt-a l`
+`core:align-selection-to-right` | `Alt-a r`
+`core:align-selection-to-top` | `Alt-a t`
+`core:align-selection-to-bottom` | `Alt-a b`
+`core:align-selection-to-middle` | `Alt-a m`
+`core:align-selection-to-center` | `Alt-a c`
+`core:distribute-selection-horizontally` | `Alt-a h`
+`core:distribute-selection-vertically` | `Alt-a v`
+
+----------------------------------------
+
+TITLE: Setting SearchBox Count Display - JavaScript
+DESCRIPTION: Shows how to update the count label of a SearchBox widget to display search result statistics. The count can show total items or matching/total items ratio.
+
+LANGUAGE: javascript
+CODE:
+$(".input").searchBox('count', '120 / 300');
+
+----------------------------------------
+
+TITLE: Authentication Token Response
+DESCRIPTION: JSON response containing the access token after successful authentication.
+
+LANGUAGE: json
+CODE:
+{
+  "access_token": "A_SECRET_TOKEN",
+  "expires_in":604800,
+  "token_type": "Bearer"
+}
+
+----------------------------------------
+
+TITLE: Paste Selection from Internal Clipboard Action Reference
+DESCRIPTION: Action reference for pasting the selection from the internal clipboard in the Node-RED editor, including the action name and keyboard shortcut.
+
+LANGUAGE: markdown
+CODE:
+<table class="action-ref inline">
+ <tr><th colspan="2">Reference</th></tr>
+ <tr><td>Action</td><td><code>core:paste-selection-from-internal-clipboard</code></td></tr>
+ <tr><td>Key shortcut</td><td><code>Ctrl/⌘-v</code></td></tr>
+</table>
+
+----------------------------------------
+
+TITLE: Custom Monaco Theme JSON
+DESCRIPTION: JSON configuration for a custom Monaco editor theme, specifying colors and syntax highlighting rules.
+
+LANGUAGE: json
+CODE:
+{
+  "base": "vs-dark",
+  "inherit": true,
+  "colors": {
+    "editor.foreground": "#CCC",
+    "editor.background": "#434954",
+    "editor.selectionBackground": "#80000080",
+    "editor.lineHighlightBackground": "#80000040",
+    "editorCursor.foreground": "#7070FF",
+    "editorWhitespace.foreground": "#BFBFBF"
+  },      
+  "rules": [
+      {
+          "background": "434954",
+      },
+      {
+          "foreground": "aeaeae",
+          "fontStyle": "italic",
+          "token": "comment"
+      },
+      {
+          "foreground": "d8fa3c",
+          "token": "string"
+      },
+      {
+          "foreground": "d8fa3c",
+          "fontStyle": "bold",
+          "token": "constant"
+      },
+  ]
+}
+
+----------------------------------------
+
+TITLE: Installing Node-RED using Snap
+DESCRIPTION: Installation command for systems supporting Snap package manager.
+
+LANGUAGE: bash
+CODE:
+sudo snap install node-red
+
+----------------------------------------
+
+TITLE: Defining Action Reference for Context Tab in Node-RED Editor
+DESCRIPTION: This snippet defines the action reference for showing the context tab in the Node-RED editor, including the action name and key shortcut.
+
+LANGUAGE: markdown
+CODE:
+<table class="action-ref inline">
+ <tr><th colspan="2">Reference</th></tr>
+ <tr><td>Action</td><td><code>core:show-context-tab</code></td></tr>
+ <tr><td>Key shortcut</td><td><code>Ctrl/⌘-g x</code></td></tr>
+</table>
+
+----------------------------------------
+
+TITLE: Cloning Node-RED Repository
+DESCRIPTION: Command to clone the Node-RED repository from GitHub.
+
+LANGUAGE: bash
+CODE:
+git clone https://github.com/node-red/node-red
+
+----------------------------------------
+
+TITLE: Checking Authentication Response - Credentials Auth
+DESCRIPTION: JSON response schema when credential-based authentication is enabled, showing required login prompts.
+
+LANGUAGE: json
+CODE:
+{
+  "type": "credentials",
+  "prompts": [
+    {
+      "id": "username",
+      "type": "text",
+      "label": "Username"
+    },
+    {
+      "id": "password",
+      "type": "password",
+      "label": "Password"
+    }
+  ]
+}
+
+----------------------------------------
+
+TITLE: Checking Node.js and npm Versions in PowerShell
+DESCRIPTION: Command to verify the installed versions of Node.js and npm using PowerShell.
+
+LANGUAGE: powershell
+CODE:
+node --version; npm --version
+
+----------------------------------------
+
+TITLE: Accessing Environment Variables in JSONata Expressions
+DESCRIPTION: Shows how to access environment variables within JSONata expressions using the $env function
+
+LANGUAGE: javascript
+CODE:
+$env('ENV_VAR')
+
+----------------------------------------
+
+TITLE: Setting SearchBox Value - JavaScript
+DESCRIPTION: Shows how to programmatically set the value of a SearchBox widget instance.
+
+LANGUAGE: javascript
+CODE:
+$(".input").searchBox('value','hello');
+
+----------------------------------------
+
+TITLE: Installing Node Module from NPM Repository - JSON Request
+DESCRIPTION: Example JSON request body for installing a node module from the npm repository. The module field specifies the package name to install.
+
+LANGUAGE: json
+CODE:
+{
+  "module": "node-red-node-suncalc"
+}
+
+----------------------------------------
+
+TITLE: Installing Node-RED Globally with npm
+DESCRIPTION: Command to install Node-RED as a global npm package, adding the 'node-red' command to the system path.
+
+LANGUAGE: batch
+CODE:
+npm install -g --unsafe-perm node-red
+
+----------------------------------------
+
+TITLE: Environment Variable Access in Function Nodes
+DESCRIPTION: Demonstrates how to access environment variables within Function nodes using the env.get method
+
+LANGUAGE: javascript
+CODE:
+let foo = env.get("FOO");
+
+----------------------------------------
+
+TITLE: Basic AutoComplete Implementation
+DESCRIPTION: Demonstrates basic autocomplete functionality on an input element with synchronous search. Uses an array of animals to filter and match against the input value.
+
+LANGUAGE: html
+CODE:
+<input type="text" id="node-input-example1">
+
+LANGUAGE: javascript
+CODE:
+let animals = ["Aardvark","Alligator","Alpaca","Anaconda","Ant","Antelope",
+               "Carp","Cat","Caterpillar","Catfish","Cheetah","Chicken",
+               "Deer","Dinosaur","Dog","Dolphin","Donkey","Dove" ];
+
+$("#node-input-example1").autoComplete({
+    search: function(val) {
+        var matches = [];
+        animals.forEach(v => {
+            var i = v.toLowerCase().indexOf(val.toLowerCase());
+            if (i > -1) {
+                matches.push({
+                    value: v,
+                    label: v,
+                    i: i
+                })
+            }
+        });
+        matches.sort(function(A,B){return A.i-B.i})
+        return matches
+    }
+})
+
+----------------------------------------
+
+TITLE: Running Node-RED from Command Line
+DESCRIPTION: Simple command to start Node-RED from the Windows command prompt after installation.
+
+LANGUAGE: batch
+CODE:
+C:>node-red
+
+----------------------------------------
+
+TITLE: Adding a new property to a Node-RED node (JavaScript)
+DESCRIPTION: This snippet shows how to add a new 'prefix' property to a Node-RED node by modifying the defaults object in the node's HTML definition.
+
+LANGUAGE: javascript
+CODE:
+defaults: {
+    name: {value:""},
+    prefix: {value:""}
+},
+
+----------------------------------------
+
+TITLE: Status Object Structure in Node-RED Status Node
+DESCRIPTION: This snippet demonstrates the structure of the status object provided by the Status node when a node's status changes. It includes information about the status appearance and the source node that triggered the status change.
+
+LANGUAGE: json
+CODE:
+{
+    "status": {
+        "fill": "red",
+        "shape": "ring",
+        "text": "node-red:common.status.disconnected",
+        "source": {
+            "id": "27bbb5b1.d3eb3a",
+            "type": "mqtt out"
+        }
+    }
+}
+
+----------------------------------------
+
+TITLE: Adding Custom Action in Node-RED Editor
+DESCRIPTION: Demonstrates how to register a new custom action that shows a custom tab in the sidebar. The action name follows the pattern 'provider:action-name'.
+
+LANGUAGE: javascript
+CODE:
+RED.actions.add("my-custom-tab:show-custom-tab",function() {
+    RED.sidebar.show("my-custom-tab");
+});
+
+----------------------------------------
+
+TITLE: Modified Debian Dockerfile with Integrated Dependencies
+DESCRIPTION: Excerpt from Dockerfile.debian showing how to integrate Python dependencies directly into the base image build process.
+
+LANGUAGE: dockerfile
+CODE:
+COPY --from=build /usr/src/node-red/prod_node_modules ./node_modules
+
+# Chown, install devtools & Clean up
+RUN chown -R node-red:root /usr/src/node-red && \
+    apt-get update && apt-get install -y build-essential python-dev python3 \ 
+    python3-pip python3-numpy python3-pandas && \
+    pip install scikit-learn tensorflow && \
+    rm -r /tmp/*
+
+USER node-red
+
+----------------------------------------
+
+TITLE: Temperature Conversion Example
+DESCRIPTION: Sample message showing temperature conversion from Fahrenheit to Celsius using JSONata expressions.
+
+LANGUAGE: json
+CODE:
+{
+    "payload": {
+        "temperature": 90,
+        "temperature_c": 32.22222
+    }
+}
+
+----------------------------------------
+
+TITLE: Implementing preInstall Hook in Node-RED
+DESCRIPTION: This snippet demonstrates how to add a preInstall hook in Node-RED. The hook logs a message before installing a module and has access to the InstallEvent object.
+
+LANGUAGE: javascript
+CODE:
+RED.hooks.add("preInstall", (installEvent) => {
+    console.log(`About to install ${installEvent.module}@${installEvent.version}`);
+});
+
+----------------------------------------
+
+TITLE: Node-RED Version Compatibility Configuration
+DESCRIPTION: Example package.json configuration showing how to specify Node-RED version requirements for a node module.
+
+LANGUAGE: json
+CODE:
+"node-red"     : {
+    "version": ">=2.0.0",
+    "nodes": {
+        "sample": "sample/sample.js"
+    }
+}
+
+----------------------------------------
+
+TITLE: Node-RED Version Compatibility Table
+DESCRIPTION: A markdown table showing the minimum Node.js version requirements for different Node-RED versions.
+
+LANGUAGE: markdown
+CODE:
+Node-RED Version | Minimum Node.js Version\n---|---\n4.x | 18\n3.x | 14\n2.x | 12
+
+----------------------------------------
+
+TITLE: Basic Mustache Template Example
+DESCRIPTION: Simple example showing how to use Mustache templating to insert a payload value into text.
+
+LANGUAGE: mustache
+CODE:
+This is the payload: {{payload}} !
+
+----------------------------------------
+
+TITLE: Implementing postInstall Hook in Node-RED for Electron Environment
+DESCRIPTION: This snippet shows how to add a postInstall hook in Node-RED, specifically for an Electron environment. It runs a rebuild command after the module is installed.
+
+LANGUAGE: javascript
+CODE:
+RED.hooks.add("postInstall",  (installEvent, done) => {
+    child_process.exec("npm run rebuild " +  installEvent.module,
+        {cwd: installEvent.dir},
+        (err, stdout, stderr) => {
+            done();
+        }
+    );
+});
+
+----------------------------------------
+
+TITLE: Selecting Connected Nodes Action Reference
+DESCRIPTION: Action reference for selecting connected nodes in the Node-RED editor, including the action name and keyboard shortcut.
+
+LANGUAGE: markdown
+CODE:
+<table class="action-ref inline">
+ <tr><th colspan="2">Reference</th></tr>
+ <tr><td>Action</td><td><code>core:select-connected-nodes</code></td></tr>
+ <tr><td>Key shortcut</td><td><code>Alt-s c</code></td></tr>
+</table>
+
+----------------------------------------
+
+TITLE: Creating Form Row in Node Edit Dialog
+DESCRIPTION: This snippet illustrates how to create a typical form row in a node edit dialog, including a label with an icon and an input field.
+
+LANGUAGE: html
+CODE:
+<div class="form-row">
+    <label for="node-input-name"><i class="fa fa-tag"></i> Name</label>
+    <input type="text" id="node-input-name" placeholder="Name">
+</div>
+
+----------------------------------------
+
+TITLE: List Global Node Modules Command
+DESCRIPTION: Command to find the installation location of global Node.js modules.
+
+LANGUAGE: bash
+CODE:
+npm list -g --depth 0
+
+----------------------------------------
+
+TITLE: Mustache Array Loop Template
+DESCRIPTION: Example demonstrating how to iterate over an array in a Mustache template to generate an HTML list.
+
+LANGUAGE: mustache
+CODE:
+<ul>
+{{#payload}}
+  <li>{{.}}</li>
+{{/payload}}
+</ul>
+
+----------------------------------------
+
+TITLE: Implementing preUninstall Hook in Node-RED
+DESCRIPTION: This snippet demonstrates how to add a preUninstall hook in Node-RED. The hook logs a message before removing a module and has access to the UninstallEvent object.
+
+LANGUAGE: javascript
+CODE:
+RED.hooks.add("preUninstall", (uninstallEvent) => {
+    console.log(`About to remove ${uninstallEvent.module}`);
+});
+
+----------------------------------------
+
+TITLE: Advanced LED Control with Johnny-Five in Node-RED Flow
+DESCRIPTION: This Node-RED flow demonstrates more advanced control of an LED using Johnny-Five. It allows starting and stopping the LED blinking based on input messages, and uses context to maintain state and a single instance of the LED.
+
+LANGUAGE: json
+CODE:
+[{"id":"62f58834.9d0a78","type":"inject","name":"","topic":"","payload":"1","payloadType":"string","repeat":"","crontab":"","once":false,"x":226,"y":326,"z":"359a4b52.ca65b4","wires":[["ae84ad08.517b5"]]},{"id":"ae84ad08.517b5","type":"function","name":"1 = start flash, 0 = stop","func":"var five = context.global.jfive;\ncontext.led = context.led || new five.Led(13);\ncontext.switch = context.switch || 0;\ncontext.switch = msg.payload;\nconsole.log(typeof(context.switch));\nif (context.switch == 1) {\n    context.led.blink(500);\n}\nif (context.switch == 0) {\n    context.led.stop().off();\n}\nreturn msg;","outputs":1,"noerr":0,"x":447,"y":349,"z":"359a4b52.ca65b4","wires":[["df638a80.209c78"]]},{"id":"df638a80.209c78","type":"debug","name":"","active":true,"console":"false","complete":"false","x":645,"y":349,"z":"359a4b52.ca65b4","wires":[]},{"id":"d79bc51d.286438","type":"inject","name":"","topic":"","payload":"0","payloadType":"string","repeat":"","crontab":"","once":false,"x":224.4000244140625,"y":364.60003662109375,"z":"359a4b52.ca65b4","wires":[["ae84ad08.517b5"]]}]
+
+----------------------------------------
+
+TITLE: Loading Resources in Node-RED Editor HTML
+DESCRIPTION: Demonstrates how to reference and load resources in the Node-RED editor using relative URLs. This ensures proper resolution regardless of the editor's root path configuration.
+
+LANGUAGE: html
+CODE:
+<img src="resources/node-red-node-example/image.png" />
+<script src="resources/node-red-node-example/library.js">
+
+----------------------------------------
+
+TITLE: Setting the target Node-RED instance for administration
+DESCRIPTION: Command to set the target Node-RED instance that the node-red-admin tool will administer. This example sets the target to a remote Node-RED instance.
+
+LANGUAGE: bash
+CODE:
+node-red-admin target http://node-red.example.com/admin
+
+----------------------------------------
+
+TITLE: UninstallEvent Object Structure in Node-RED
+DESCRIPTION: This JSON object represents the structure of an UninstallEvent in Node-RED's Install Hooks API. It contains information about the module being uninstalled.
+
+LANGUAGE: json
+CODE:
+{
+    "module": "<npm module name>",
+    "dir": "<directory to run the remove in>",
+    "args": [ "an array", "of the args", "we will pass to npm"]
+}
+
+----------------------------------------
+
+TITLE: Template Node Environment Variable Syntax
+DESCRIPTION: Shows the syntax for accessing environment variables within Template nodes
+
+LANGUAGE: javascript
+CODE:
+My favourite colour is {{env.COLOUR}}.
+
+----------------------------------------
+
+TITLE: Upgrading Node-RED Nodes to Latest Version via npm
+DESCRIPTION: Command to install the latest version of a specific Node-RED node module using npm. Requires restarting Node-RED after installation.
+
+LANGUAGE: bash
+CODE:
+npm install <name-of-module>@latest
+
+----------------------------------------
+
+TITLE: Setting up PM2 for Automatic Node-RED Startup on EC2
+DESCRIPTION: This bash script installs PM2 and configures it to automatically start Node-RED when the EC2 instance boots. It globally installs PM2, starts Node-RED, saves the PM2 configuration, and sets up the startup script.
+
+LANGUAGE: bash
+CODE:
+sudo npm install -g --unsafe-perm pm2
+pm2 start `which node-red` -- -v
+pm2 save
+pm2 startup
+
+----------------------------------------
+
+TITLE: Selecting Theme Plugin in Settings
+DESCRIPTION: JavaScript configuration to select the custom theme plugin in the Node-RED settings file.
+
+LANGUAGE: javascript
+CODE:
+editorTheme: {
+    theme: "my-custom-theme",
+}
+
+----------------------------------------
+
+TITLE: Basic Node-RED Message Structure
+DESCRIPTION: Example of a basic Node-RED message object showing the default message ID and payload structure.
+
+LANGUAGE: json
+CODE:
+{
+    "_msgid": "12345",
+    "payload": "..."
+}
+
+----------------------------------------
+
+TITLE: Configuring OAuth Authentication with Twitter in Node-RED
+DESCRIPTION: Example configuration for enabling OAuth-based authentication using Twitter as the authentication provider for the Node-RED editor and admin API.
+
+LANGUAGE: javascript
+CODE:
+adminAuth: {
+    type:"strategy",
+    strategy: {
+        name: "twitter",
+        label: 'Sign in with Twitter',
+        icon:"fa-twitter",
+        strategy: require("passport-twitter").Strategy,
+        options: {
+            consumerKey: TWITTER_APP_CONSUMER_KEY,
+            consumerSecret: TWITTER_APP_CONSUMER_SECRET,
+            callbackURL: "http://example.com/auth/strategy/callback",
+            verify: function(token, tokenSecret, profile, done) {
+                done(null, profile);
+            }
+        },
+    },
+    users: [
+       { username: "knolleary",permissions: ["*"]}
+    ]
+}
+
+----------------------------------------
+
+TITLE: Installing Node.js and Node-RED on Ubuntu EC2 Instance
+DESCRIPTION: This bash script installs Node.js and Node-RED on an Ubuntu EC2 instance. It adds the NodeSource repository, installs Node.js and build essentials, and then globally installs Node-RED using npm.
+
+LANGUAGE: bash
+CODE:
+curl -sL https://deb.nodesource.com/setup_12.x | sudo -E bash -
+sudo apt-get install -y nodejs build-essential
+sudo npm install -g --unsafe-perm node-red
+
+----------------------------------------
+
+TITLE: Configuring Package.json for Theme Plugin
+DESCRIPTION: JSON configuration to be added to package.json file for the theme plugin, specifying the plugin file.
+
+LANGUAGE: json
+CODE:
+"node-red": {
+    "plugins": {
+        "my-theme": "theme.js"
+    }
+}
+
+----------------------------------------
+
+TITLE: Error Object Structure in Node-RED Catch Node
+DESCRIPTION: This snippet shows the structure of the error object provided by the Catch node when an error is caught. It includes details about the error message and the source node that reported the error.
+
+LANGUAGE: json
+CODE:
+{
+    "topic": ...,
+    "payload": ...,
+    "error": {
+        "message": "An error",
+        "source": {
+            "id": "2e25823d.fa3f7e",
+            "type": "function",
+            "name": "My Function",
+            "count": 1
+        }
+    }
+}
+
+----------------------------------------
+
+TITLE: Implementing Custom Authentication Tokens in Node-RED
+DESCRIPTION: Example of how to implement custom authentication token validation for the Node-RED admin API, allowing integration with external authentication systems.
+
+LANGUAGE: javascript
+CODE:
+adminAuth: {
+    ...
+    tokens: function(token) {
+        return new Promise(function(resolve, reject) {
+            // Do whatever work is needed to check token is valid
+            if (valid) {
+                // Resolve with the user object. It must contain
+                // properties 'username' and 'permissions'
+                var user = { username: 'admin', permissions: '*' };
+                resolve(user);
+            } else {
+                // Resolve with null as this user does not exist
+                resolve(null);
+            }
+        });
+    },
+    ...
+}
+
+----------------------------------------
+
+TITLE: Creating package.json for Node-RED on AWS Elastic Beanstalk
+DESCRIPTION: This package.json file configures a Node-RED application for deployment on AWS Elastic Beanstalk. It specifies the required dependencies, including node-red, aws-sdk, and node-red-contrib-storage-s3 for S3 storage integration.
+
+LANGUAGE: javascript
+CODE:
+{
+    "name": "demoapp",
+    "version": "1.0.0",
+    "description": "node-red demo app",
+    "main": "",
+    "scripts": {
+        "start": "./node_modules/.bin/node-red -s ./settings.js"
+    },
+    "engines": {
+        "node": "10.x"
+    },
+    "dependencies": {
+        "node-red": "1.1.x",
+        "aws-sdk": "2.4.x",
+        "node-red-contrib-storage-s3": "0.0.x",
+        "when": "3.7.x"
+    },
+    "author": "",
+    "license": "ISC"
+}
+
+----------------------------------------
+
+TITLE: Defining Action Reference for Zoom Out in HTML
+DESCRIPTION: This HTML snippet defines a table for the 'zoom out' action reference, including the action name and key shortcut.
+
+LANGUAGE: html
+CODE:
+<table class="action-ref">
+  <tr><th colspan="2">Reference</th></tr>
+  <tr><td>Action</td><td><code>core:zoom-out</code></td></tr>
+  <tr><td>Key shortcut</td><td><code>Ctrl/⌘--</code></td></tr>
+</table>
+
+----------------------------------------
+
+TITLE: TypedInput with Custom Options List
+DESCRIPTION: Example showing how to create a TypedInput with custom dropdown options.
+
+LANGUAGE: javascript
+CODE:
+$("#node-input-example4").typedInput({type:"fruit", types:[{
+    value: "fruit",
+    options: [
+        { value: "apple", label: "Apple"},
+        { value: "banana", label: "Banana"},
+        { value: "cherry", label: "Cherry"},
+    ]
+}]})
+
+----------------------------------------
+
+TITLE: Installing Node-RED on Android with Termux
+DESCRIPTION: Basic commands to install Node-RED and its dependencies using Termux package manager.
+
+LANGUAGE: bash
+CODE:
+apt update
+apt upgrade
+apt install coreutils nano nodejs
+npm i -g --unsafe-perm node-red
+node-red
+
+----------------------------------------
+
+TITLE: Configuring AWS Credentials for Elastic Beanstalk CLI
+DESCRIPTION: This snippet shows how to set up AWS credentials in a local file for use with the Elastic Beanstalk command-line interface. It includes the profile name, access key ID, and secret access key.
+
+LANGUAGE: ini
+CODE:
+[profile eb-cli]
+aws_access_key_id = key id
+aws_secret_access_key = access key
+
+----------------------------------------
+
+TITLE: Defining Action Reference for Toggle Navigator in HTML
+DESCRIPTION: This HTML snippet defines a table for the 'toggle navigator' action reference, including the action name and noting that there is no key shortcut.
+
+LANGUAGE: html
+CODE:
+<table class="action-ref">
+ <tr><th colspan="2">Reference</th></tr>
+ <tr><td>Action</td><td><code>core:toggle-navigator</code></td></tr>
+ <tr><td>Key shortcut</td><td><i>none</i></td></tr>
+</table>
+
+----------------------------------------
+
+TITLE: BeagleBone-Specific Nodes Installation
+DESCRIPTION: Command to install BeagleBone-specific nodes for GPIO access using npm.
+
+LANGUAGE: bash
+CODE:
+sudo npm install -g --unsafe-perm beaglebone-io johnny-five node-red-contrib-gpio
+
+----------------------------------------
+
+TITLE: Docker Compose File for Node-RED
+DESCRIPTION: Example Docker Compose file to run Node-RED with environment variables, port mapping, network, and volume configuration.
+
+LANGUAGE: yaml
+CODE:
+version: "3.7"
+
+services:
+  node-red:
+    image: nodered/node-red:latest
+    environment:
+      - TZ=Europe/Amsterdam
+    ports:
+      - "1880:1880"
+    networks:
+      - node-red-net
+    volumes:
+      - node-red-data:/data
+
+volumes:
+  node-red-data:
+
+networks:
+  node-red-net:
+
+----------------------------------------
+
+TITLE: Configuring TypedInput with Custom Types
+DESCRIPTION: Example demonstrating how to configure a TypedInput with specific allowed types.
+
+LANGUAGE: javascript
+CODE:
+$(".input").typedInput({
+    types: ["msg","str"]
+});
+
+----------------------------------------
+
+TITLE: Selecting Upstream Nodes Action Reference
+DESCRIPTION: Action reference for selecting upstream nodes in the Node-RED editor, including the action name and keyboard shortcut.
+
+LANGUAGE: markdown
+CODE:
+<table class="action-ref inline">
+ <tr><th colspan="2">Reference</th></tr>
+ <tr><td>Action</td><td><code>core:select-upstream-nodes</code></td></tr>
+ <tr><td>Key shortcut</td><td><code>Alt-s u</code></td></tr>
+</table>
+
+----------------------------------------
+
+TITLE: Switching to dev branch in Git
+DESCRIPTION: This Git command switches to the development branch of Node-RED, where all new development happens.
+
+LANGUAGE: bash
+CODE:
+git checkout dev
+
+----------------------------------------
+
+TITLE: Running Node-RED with Docker
+DESCRIPTION: Basic Docker command to run Node-RED container with port 1880 exposed for web access.
+
+LANGUAGE: bash
+CODE:
+docker run -it -p 1880:1880 --name mynodered nodered/node-red
+
+----------------------------------------
+
+TITLE: Initializing TypedInput with Default Type
+DESCRIPTION: Example showing how to initialize a TypedInput widget with a default type setting.
+
+LANGUAGE: javascript
+CODE:
+$(".input").typedInput({
+    default: "msg"
+});
+
+----------------------------------------
+
+TITLE: Selecting Downstream Nodes Action Reference
+DESCRIPTION: Action reference for selecting downstream nodes in the Node-RED editor, including the action name and keyboard shortcut.
+
+LANGUAGE: markdown
+CODE:
+<table class="action-ref inline">
+ <tr><th colspan="2">Reference</th></tr>
+ <tr><td>Action</td><td><code>core:select-downstream-nodes</code></td></tr>
+ <tr><td>Key shortcut</td><td><code>Alt-s d</code></td></tr>
+</table>
+
+----------------------------------------
+
+TITLE: Building Node-RED using Grunt
+DESCRIPTION: This Grunt command builds Node-RED from source, preparing it for execution.
+
+LANGUAGE: bash
+CODE:
+grunt build
+
+----------------------------------------
+
+TITLE: Running Custom Debian-based Node-RED Container
+DESCRIPTION: Docker command to run the custom built Debian-based Node-RED container with volume mounting and port mapping.
+
+LANGUAGE: bash
+CODE:
+$ docker run -d -p 1880:1880 -v node_red_data:/data --name myNRtest testing:node-red-build
+
+----------------------------------------
+
+TITLE: Copy Selection to Internal Clipboard Action Reference
+DESCRIPTION: Action reference for copying the selection to the internal clipboard in the Node-RED editor, including the action name and keyboard shortcut.
+
+LANGUAGE: markdown
+CODE:
+<table class="action-ref inline">
+ <tr><th colspan="2">Reference</th></tr>
+ <tr><td>Action</td><td><code>core:copy-selection-to-internal-clipboard</code></td></tr>
+ <tr><td>Key shortcut</td><td><code>Ctrl/⌘-c</code></td></tr>
+</table>
+
+----------------------------------------
+
+TITLE: Filtering EditableList Items
+DESCRIPTION: Example of implementing item filtering in EditableList to show/hide items based on custom criteria.
+
+LANGUAGE: javascript
+CODE:
+$("ol.list").editableList({
+    filter: function(data) {
+        return data.index%2 === 0
+    }
+});
+
+----------------------------------------
+
+TITLE: Node-RED Settings with Environment Variable
+DESCRIPTION: Example of using an environment variable in Node-RED settings.js file for credential secret.
+
+LANGUAGE: javascript
+CODE:
+module.exports = {
+  credentialSecret: process.env.NODE_RED_CREDENTIAL_SECRET
+}
+
+----------------------------------------
+
+TITLE: Installing Python Prerequisites in Alpine-based Node-RED Container
+DESCRIPTION: Dockerfile configuration to add Python machine learning libraries to the default Alpine-based Node-RED container. Includes installation of pip, numpy, pandas, and scikit-learn.
+
+LANGUAGE: dockerfile
+CODE:
+FROM nodered/node-red:latest
+USER root
+RUN apk add py3-pip py3-numpy py3-pandas py3-scikit-learn
+RUN pip install tensorflow
+USER node-red
+
+----------------------------------------
+
+TITLE: Defining YAML Front Matter for Node-RED Editor Documentation
+DESCRIPTION: This YAML snippet defines the metadata for a Node-RED editor documentation page. It specifies the layout, navigation slug, table of contents, and page title.
+
+LANGUAGE: yaml
+CODE:
+---
+layout: docs-editor-guide
+slug:
+  - url: /docs/user-guide/editor
+    label: editor
+  - type-editor
+toc: toc-editor-guide.html
+title: Editors
+---
+
+----------------------------------------
+
+TITLE: Export Flow Actions Reference Table
+DESCRIPTION: HTML table showing keyboard shortcuts and menu options for accessing the Export dialog in Node-RED
+
+LANGUAGE: html
+CODE:
+<table class="action-ref inline">
+ <tr><th colspan="2">Reference</th></tr>
+ <tr><td>Key shortcut</td><td><code>Ctrl/⌘-e</code></td></tr>
+ <tr><td>Menu option</td><td><code>Export</code></td></tr>
+ <tr><td>Action</td><td><code>core:show-export-dialog</code></td></tr>
+</table>
+
+----------------------------------------
+
+TITLE: Checking Node.js and npm Versions in CMD
+DESCRIPTION: Command to verify the installed versions of Node.js and npm using the Windows Command Prompt.
+
+LANGUAGE: batch
+CODE:
+node --version && npm --version
+
+----------------------------------------
+
+TITLE: Installing Windows Build Tools with Python
+DESCRIPTION: Command to install windows-build-tools with Python v2.7, exposing it for use in the system.
+
+LANGUAGE: batch
+CODE:
+npm install --global --production --add-python-to-path windows-build-tools
+
+----------------------------------------
+
+TITLE: Custom Buttons Configuration for EditableList
+DESCRIPTION: Example showing how to add custom buttons with icons and click handlers to the EditableList.
+
+LANGUAGE: javascript
+CODE:
+$("ol.list").editableList({
+    addItem: function(row, index, data) {
+        $(row).html("Item "+index);
+    }
+    buttons: [{
+        label: "with icon",
+        icon: "fa fa-star",
+        title: "my custom button",
+        click: function(evt) {
+            alert("button clicked");
+        }
+   }]
+});
+
+----------------------------------------
+
+TITLE: YAML Front Matter Configuration
+DESCRIPTION: YAML configuration block defining the document layout, navigation structure, and title for the Node-RED editor search documentation page.
+
+LANGUAGE: yaml
+CODE:
+---
+layout: docs-editor-guide
+slug:
+  - url: /docs/user-guide/editor
+    label: editor
+  - url: "/docs/user-guide/editor/workspace"
+    label: "workspace"
+  - search
+toc: toc-editor-guide.html
+title: Searching flows
+---
+
+----------------------------------------
+
+TITLE: Installing Windows Build Tools
+DESCRIPTION: Command to install the windows-build-tools module globally, enabling npm to compile binary components on Windows.
+
+LANGUAGE: batch
+CODE:
+npm install --global --production windows-build-tools
+
+----------------------------------------
+
+TITLE: Setting npm Global Cache Location in PowerShell
+DESCRIPTION: PowerShell commands to change the npm cache folder to a shared location accessible by all users.
+
+LANGUAGE: powershell
+CODE:
+mkdir $env:ALLUSERSPROFILE\npmglobal-cache
+npm config set cache $env:ALLUSERSPROFILE\npmglobal-cache --global
+
+----------------------------------------
+
+TITLE: Service Environment Variable Configuration
+DESCRIPTION: Example of setting environment variables in the Node-RED settings file when running as a service
+
+LANGUAGE: javascript
+CODE:
+process.env.FOO='World';
+
+----------------------------------------
+
+TITLE: Keyboard Shortcut Reference
+DESCRIPTION: HTML table showing the keyboard shortcut, menu option, and action reference for accessing the search functionality in Node-RED.
+
+LANGUAGE: html
+CODE:
+<table class="action-ref inline">
+ <tr><th colspan="2">Reference</th></tr>
+ <tr><td>Key shortcut</td><td><code>Ctrl/⌘-f</code></td></tr>
+ <tr><td>Menu option</td><td><code>Search flows</code></td></tr>
+ <tr><td>Action</td><td><code>core:search</code></td></tr>
+</table>
+
+----------------------------------------
+
+TITLE: Setting Node Icon in Node-RED
+DESCRIPTION: Shows how to specify a node's icon using either a static string or a function. The icon can be a stock icon, custom icon, or Font Awesome icon.
+
+LANGUAGE: javascript
+CODE:
+icon: "file.svg"
+
+----------------------------------------
+
+TITLE: Setting npm Global Package Location in PowerShell
+DESCRIPTION: PowerShell commands to change the global npm package installation location to a shared folder accessible by all users.
+
+LANGUAGE: powershell
+CODE:
+mkdir $env:ALLUSERSPROFILE\npmglobal
+npm config set prefix $env:ALLUSERSPROFILE\npmglobal
+
+----------------------------------------
+
+TITLE: Toggling Sidebar Visibility in Node-RED Editor
+DESCRIPTION: This HTML snippet provides a reference table for toggling the sidebar visibility in the Node-RED editor. It includes the key shortcut, menu option, and action command for showing or hiding the sidebar.
+
+LANGUAGE: html
+CODE:
+<table class="action-ref inline">
+ <tr><th colspan="2">Reference</th></tr>
+ <tr><td>Key shortcut</td><td><code>Ctrl/⌘-Space</code></td></tr>
+ <tr><td>Menu option</td><td><code>View -&gt; Show sidebar</code></td></tr>
+ <tr><td>Action</td><td><code>core:toggle-sidebar</code></td></tr>
+</table>
+
+----------------------------------------
+
+TITLE: Cut Selection to Internal Clipboard Action Reference
+DESCRIPTION: Action reference for cutting the selection to the internal clipboard in the Node-RED editor, including the action name and keyboard shortcut.
+
+LANGUAGE: markdown
+CODE:
+<table class="action-ref inline">
+ <tr><th colspan="2">Reference</th></tr>
+ <tr><td>Action</td><td><code>core:cut-selection-to-internal-clipboard</code></td></tr>
+ <tr><td>Key shortcut</td><td><code>Ctrl/⌘-x</code></td></tr>
+</table>
+
+----------------------------------------
+
+TITLE: Node Content Alignment in Node-RED
+DESCRIPTION: Demonstrates how to align node content (icon and label) to the right side.
+
+LANGUAGE: javascript
+CODE:
+align: 'right'
+
+----------------------------------------
+
+TITLE: Node-RED Service Management Commands
+DESCRIPTION: Commands for viewing logs, starting, stopping, and controlling auto-start behavior of Node-RED service.
+
+LANGUAGE: bash
+CODE:
+sudo journalctl -f -u node-red -o cat
+
+sudo service node-red stop
+
+sudo service node-red start
+
+sudo systemctl enable node-red.service
+
+sudo systemctl disable node-red.service
+
+----------------------------------------
+
+TITLE: HTML Palette Structure
+DESCRIPTION: HTML structure for displaying the palette component layout and toggle controls in the Node-RED editor
+
+LANGUAGE: html
+CODE:
+<div style="width: 180px" class="figure align-right">
+  <img src="../images/editor-palette.png" alt="Palette">
+  <p class="caption">Palette</p>
+</div>
+
+LANGUAGE: html
+CODE:
+<div  style="width: 64px"  class="figure align-left">
+  <img src="../images/editor-palette-toggle.png" alt="Palette toggle">
+  <p class="caption">Palette toggle</p>
+</div>
+
+----------------------------------------
+
+TITLE: HTML Template for Credential Input Fields
+DESCRIPTION: Shows the HTML markup required for creating credential input fields in the node's edit template, following Node-RED's element ID conventions.
+
+LANGUAGE: html
+CODE:
+<div class="form-row">
+    <label for="node-input-username"><i class="fa fa-tag"></i> Username</label>
+    <input type="text" id="node-input-username">
+</div>
+<div class="form-row">
+    <label for="node-input-password"><i class="fa fa-tag"></i> Password</label>
+    <input type="password" id="node-input-password">
+</div>
+
+----------------------------------------
+
+TITLE: System Update Commands for BeagleBone
+DESCRIPTION: Commands to update and upgrade the Debian system packages.
+
+LANGUAGE: bash
+CODE:
+sudo apt update && sudo apt full-upgrade
+
+----------------------------------------
+
+TITLE: Node Actions Reference Codes
+DESCRIPTION: Reference codes for showing/hiding node labels and enabling/disabling nodes in Node-RED editor
+
+LANGUAGE: plaintext
+CODE:
+core:show-selected-node-labels
+core:hide-selected-node-labels
+core:enable-selected-nodes
+core:disable-selected-nodes
+
+----------------------------------------
+
+TITLE: Basic Message Input Handler in Node-RED
+DESCRIPTION: Traditional way of handling input messages in Node-RED nodes using the 'input' event listener.
+
+LANGUAGE: javascript
+CODE:
+this.on('input', function(msg) {
+
+})
+
+----------------------------------------
+
+TITLE: Handling Credentials in Editor
+DESCRIPTION: Shows how to work with credentials in the node's editor context, including handling of password-type credentials.
+
+LANGUAGE: javascript
+CODE:
+oneditprepare: function() {
+    // this.credentials.username is set to the appropriate value
+    // this.credentials.password is not set
+    // this.credentials.has_password indicates if the property is present in the runtime
+    ...
+}
+
+----------------------------------------
+
+TITLE: Running Node-RED with command-line arguments
+DESCRIPTION: This npm command demonstrates how to pass command-line arguments to Node-RED when running it from source.
+
+LANGUAGE: bash
+CODE:
+npm start -- <args>
+
+----------------------------------------
+
+TITLE: Accessing Palette Manager Shortcut in Node-RED
+DESCRIPTION: Shows the keyboard shortcut, menu option, and action command to access the Palette Manager in Node-RED.
+
+LANGUAGE: markdown
+CODE:
+<table class="action-ref inline">
+ <tr><th colspan="2">Reference</th></tr>
+ <tr><td>Key shortcut</td><td><code>Ctrl/⌘-Shift-p</code></td></tr>
+ <tr><td>Menu option</td><td><code>Manage palette</code></td></tr>
+ <tr><td>Action</td><td><code>core:manage-palette</code></td></tr>
+</table>
+
+----------------------------------------
+
+TITLE: Node-RED Version Update Command
+DESCRIPTION: Command to update Node.js and Node-RED on Raspberry Pi systems using the provided script
+
+LANGUAGE: bash
+CODE:
+update-nodejs-and-nodered
+
+----------------------------------------
+
+TITLE: Defining Node Edit Dialog Template in HTML
+DESCRIPTION: This snippet shows how to define the basic structure of a node edit dialog using HTML. It demonstrates the proper use of script tags and data attributes.
+
+LANGUAGE: html
+CODE:
+<script type="text/html" data-template-name="node-type">
+    <!-- edit dialog content  -->
+</script>
+
+----------------------------------------
+
+TITLE: Credential Authentication Response JSON
+DESCRIPTION: Response format for credential-based authentication showing required login prompts including username and password fields.
+
+LANGUAGE: json
+CODE:
+{
+  "type": "credentials",
+  "prompts": [
+    {
+      "id": "username",
+      "type": "text",
+      "label": "Username"
+    },
+    {
+      "id": "password",
+      "type": "password",
+      "label": "Password"
+    }
+  ]
+}
+
+----------------------------------------
+
+TITLE: Setting Context in Node-RED Function Node
+DESCRIPTION: Demonstrates the new recommended way to set context values in Node-RED 0.13.0 using the set() method instead of direct property assignment.
+
+LANGUAGE: javascript
+CODE:
+context.set('foo', 1);
+
+----------------------------------------
+
+TITLE: Importing Node-RED Flow for Earthquake Data Processing
+DESCRIPTION: This JSON represents the complete Node-RED flow created in the tutorial. It can be imported into the Node-RED editor to recreate the flow for retrieving and processing earthquake data from the USGS website.
+
+LANGUAGE: json
+CODE:
+[{"id":"e36406f2.8ef798","type":"inject","z":"f03b57d5.e525f8","name":"","topic":"","payload":"","payloadType":"str","repeat":"300","crontab":"","once":false,"x":130,"y":900,"wires":[["c3c50023.3bbed"]]},{"id":"c3c50023.3bbed","type":"http request","z":"f03b57d5.e525f8","name":"Recent Quakes","method":"GET","url":"https://earthquake.usgs.gov/earthquakes/feed/v1.0/summary/significant_month.csv","tls":"","x":300,"y":900,"wires":[["8afc6cac.e0812"]]},{"id":"8afc6cac.e0812","type":"csv","z":"f03b57d5.e525f8","name":"","sep":",","hdrin":true,"hdrout":"","multi":"one","ret":"\\n","temp":"","x":470,"y":900,"wires":[["44779781.4190f8","6f0eb546.9e208c"]]},{"id":"44779781.4190f8","type":"debug","z":"f03b57d5.e525f8","name":"","active":true,"complete":false,"x":630,"y":900,"wires":[]},{"id":"6f0eb546.9e208c","type":"switch","z":"f03b57d5.e525f8","name":"","property":"payload.mag","propertyType":"msg","rules":[{"t":"gte","v":"7","vt":"num"}],"checkall":"true","outputs":1,"x":510,"y":960,"wires":[["d78d4aa8.8c8208"]]},{"id":"d78d4aa8.8c8208","type":"change","z":"f03b57d5.e525f8","name":"","rules":[{"t":"set","p":"payload","pt":"msg","to":"PANIC!","tot":"str"}],"action":"","property":"","from":"","to":"","reg":false,"x":650,"y":1020,"wires":[["72fddece.fac0d"]]},{"id":"72fddece.fac0d","type":"debug","z":"f03b57d5.e525f8","name":"","active":true,"complete":false,"x":750,"y":960,"wires":[]}]
+
+----------------------------------------
+
+TITLE: Accessing i18n Messages in Node-RED Runtime
+DESCRIPTION: Demonstrates how to use the RED._() function to access internationalized messages in the Node-RED runtime environment.
+
+LANGUAGE: javascript
+CODE:
+console.log(RED._("myNode.message1"));
+
+----------------------------------------
+
+TITLE: Error Response Format in JSON
+DESCRIPTION: Example of the JSON error response format returned by the API for 400 status codes. Shows the structure with code and message fields.
+
+LANGUAGE: json
+CODE:
+{
+  code: "module_already_loaded",
+  message: "Module already loaded"
+}
+
+----------------------------------------
+
+TITLE: Installing Web Nodes Package in Node-RED
+DESCRIPTION: Command to install the new package of nodes for popular web services in Node-RED. This package includes nodes for Delicious, Pinboard, Flickr, Dropbox, and Amazon S3.
+
+LANGUAGE: bash
+CODE:
+$ npm install node-red-node-web-nodes
+
+----------------------------------------
+
+TITLE: Configuring package.json for Node-RED Subflow Module
+DESCRIPTION: This JSON snippet shows the structure of a package.json file for a Node-RED subflow module. It includes essential fields such as name, version, description, and Node-RED specific configurations.
+
+LANGUAGE: json
+CODE:
+{
+  "name": "node-red-contrib-",
+  "version": "1.0.1",
+  "description": "",
+  "keywords": [],
+  "license": "ISC",
+  "node-red": {
+      "nodes": {
+          "test-subflow": "subflow.js"
+      },
+      "dependencies": [
+          "node-red-node-random"
+      ]
+  },
+  "dependencies": {
+      "node-red-node-random": "*"
+  }
+}
+
+----------------------------------------
+
+TITLE: Import Flow Actions Reference Table
+DESCRIPTION: HTML table showing keyboard shortcuts and menu options for accessing the Import dialog in Node-RED
+
+LANGUAGE: html
+CODE:
+<table class="action-ref inline">
+ <tr><th colspan="2">Reference</th></tr>
+ <tr><td>Key shortcut</td><td><code>Ctrl/⌘-i</code></td></tr>
+ <tr><td>Menu option</td><td><code>Import</code></td></tr>
+ <tr><td>Action</td><td><code>core:show-import-dialog</code></td></tr>
+</table>
+
+----------------------------------------
+
+TITLE: Node-RED Startup Output
+DESCRIPTION: Example of typical Node-RED startup console output showing version information, configuration paths, and server status.
+
+LANGUAGE: text
+CODE:
+$ node-red
+
+Welcome to Node-RED
+===================
+
+30 Jun 23:43:39 - [info] Node-RED version: v1.3.5
+30 Jun 23:43:39 - [info] Node.js  version: v14.7.2
+30 Jun 23:43:39 - [info] Darwin 19.6.0 x64 LE
+30 Jun 23:43:39 - [info] Loading palette nodes
+30 Jun 23:43:44 - [warn] rpi-gpio : Raspberry Pi specific node set inactive
+30 Jun 23:43:44 - [info] Settings file  : /Users/nol/.node-red/settings.js
+30 Jun 23:43:44 - [info] HTTP Static    : /Users/nol/node-red/web
+30 Jun 23:43:44 - [info] Context store  : 'default' [module=localfilesystem]
+30 Jun 23:43:44 - [info] User directory : /Users/nol/.node-red
+30 Jun 23:43:44 - [warn] Projects disabled : set editorTheme.projects.enabled=true to enable
+30 Jun 23:43:44 - [info] Creating new flows file : flows_noltop.json
+30 Jun 23:43:44 - [info] Starting flows
+30 Jun 23:43:44 - [info] Started flows
+30 Jun 23:43:44 - [info] Server now running at http://127.0.0.1:1880/red/
+
+----------------------------------------
+
+TITLE: Displaying Node-RED CLI Help
+DESCRIPTION: Shows the command-line help output for Node-RED, including available options and documentation reference.
+
+LANGUAGE: bash
+CODE:
+$ node red.js -?
+Usage: node red.js [-v] [-?] [--settings settings.js] [flows.json]
+
+Options:
+  -s, --settings FILE  use specified settings file
+  -v                   enable verbose output
+  -?, --help           show usage
+
+Documentation can be found at http://nodered.org
+
+----------------------------------------
+
+TITLE: Empty Authentication Response JSON
+DESCRIPTION: Response format when no authentication is active in the system.
+
+LANGUAGE: json
+CODE:
+{}
+
+----------------------------------------
+
+TITLE: Selecting All Nodes Action Reference
+DESCRIPTION: Action reference for selecting all nodes in the current flow of the Node-RED editor, including the action name, keyboard shortcut, and menu option.
+
+LANGUAGE: markdown
+CODE:
+<table class="action-ref inline">
+ <tr><th colspan="2">Reference</th></tr>
+ <tr><td>Key shortcut</td><td><code>Ctrl/⌘-a</code></td></tr>
+ <tr><td>Menu option</td><td><code>Edit -&gt; Select all</code></td></tr>
+ <tr><td>Action</td><td><code>core:select-all-nodes</code></td></tr>
+</table>
+
+----------------------------------------
+
+TITLE: Running Node-RED from source
+DESCRIPTION: This npm command starts Node-RED after it has been built from source.
+
+LANGUAGE: bash
+CODE:
+npm start
+
+----------------------------------------
+
+TITLE: Legacy Node-RED Embedding Configuration
+DESCRIPTION: Shows the old method of embedding Node-RED in a Node.js application using a single HTTP root configuration.
+
+LANGUAGE: javascript
+CODE:
+app.use(settings.httpRoot,RED.app);
+
+----------------------------------------
+
+TITLE: Retrieving Node-RED Runtime Diagnostics Response Example
+DESCRIPTION: Example JSON response from the GET /diagnostics endpoint showing comprehensive diagnostic information including internationalization settings, NodeJS details, operating system statistics, runtime configuration, and Node-RED specific settings.
+
+LANGUAGE: json
+CODE:
+{
+  "report": "diagnostics",
+  "scope": "basic",
+  "time": {
+    "utc": "Mon, 23 Jan 2023 20:15:08 GMT",
+    "local": "1/23/2023, 8:15:08 PM"
+  },
+  "intl": {
+    "locale": "en-US",
+    "timeZone": "UTC"
+  },
+  "nodejs": {
+    "version": "v16.16.0",
+    "arch": "x64",
+    "platform": "linux",
+    "memoryUsage": {
+      "rss": 106336256,
+      "heapTotal": 36225024,
+      "heapUsed": 33527912,
+      "external": 1905248,
+      "arrayBuffers": 145556
+    }
+  },
+  "os": {
+    "containerised": true,
+    "wsl": false,
+    "totalmem": 32841064448,
+    "freemem": 28394344448,
+    "arch": "x64",
+    "loadavg": [
+      1,
+      1.01,
+      0.89
+    ],
+    "platform": "linux",
+    "release": "5.15.85-1-MANJARO",
+    "type": "Linux",
+    "uptime": 5554.97,
+    "version": "#1 SMP PREEMPT Wed Dec 21 21:15:06 UTC 2022"
+  },
+  "runtime": {
+    "version": "3.0.2",
+    "isStarted": true,
+    "flows": {
+      "state": "start",
+      "started": true
+    },
+    "modules": {
+      "node-red": "3.0.2"
+    },
+    "settings": {
+      "available": true,
+      "apiMaxLength": "UNSET",
+      "disableEditor": false,
+      "contextStorage": {},
+      "debugMaxLength": 1000,
+      "editorTheme": {
+        "palette": {},
+        "projects": {
+          "enabled": false,
+          "workflow": {
+            "mode": "manual"
+          }
+        },
+        "codeEditor": {
+          "lib": "ace",
+          "options": {
+            "theme": "vs"
+          }
+        }
+      },
+      "flowFile": "flows.json",
+      "mqttReconnectTime": 15000,
+      "serialReconnectTime": 15000,
+      "socketReconnectTime": "UNSET",
+      "socketTimeout": "UNSET",
+      "tcpMsgQueueSize": "UNSET",
+      "inboundWebSocketTimeout": "UNSET",
+      "runtimeState": {
+        "enabled": false,
+        "ui": false
+      },
+      "adminAuth": "SET",
+      "httpAdminRoot": "/",
+      "httpAdminCors": "UNSET",
+      "httpNodeAuth": "UNSET",
+      "httpNodeRoot": "/",
+      "httpNodeCors": "UNSET",
+      "httpStatic": "UNSET",
+      "httpStaticRoot": "UNSET",
+      "httpStaticCors": "UNSET",
+      "uiHost": "SET",
+      "uiPort": "SET",
+      "userDir": "SET",
+      "nodesDir": "UNSET"
+    }
+  }
+}
+
+----------------------------------------
+
+TITLE: Defining Action Reference for Show User Settings in HTML
+DESCRIPTION: This HTML snippet defines a table for the 'show user settings' action reference, including the action name and key shortcut.
+
+LANGUAGE: html
+CODE:
+<table class="action-ref">
+ <tr><th colspan="2">Reference</th></tr>
+ <tr><td>Action</td><td><code>core:show-user-settings</code></td></tr>
+ <tr><td>Key shortcut</td><td><code>Ctrl/⌘-,</code></td></tr>
+</table>
+
+----------------------------------------
+
+TITLE: Testing TCP Echo Server with Telnet in Bash
+DESCRIPTION: Demonstrates how to test the TCP Echo server implementation using telnet. Connects to localhost on port 9001 and shows the server's response.
+
+LANGUAGE: bash
+CODE:
+$ telnet localhost 9001
+Trying 127.0.0.1...
+Connected to localhost.
+Escape character is '^]'.
+Hi There
+You said: Hi There
+
+----------------------------------------
+
+TITLE: Installing Node-RED dependencies with npm
+DESCRIPTION: This npm command installs all the dependencies required for Node-RED development.
+
+LANGUAGE: bash
+CODE:
+npm install
+
+----------------------------------------
+
+TITLE: Retrieving Flow Configuration (v1) in Node-RED API
+DESCRIPTION: Example response for v1 of the GET /flows API endpoint. Returns an array of node objects representing the active flow configuration.
+
+LANGUAGE: json
+CODE:
+[
+  {
+    "type": "tab",
+    "id": "396c2376.c693dc",
+    "label": "Sheet 1"
+  }
+]
+
+----------------------------------------
+
+TITLE: Defining Action Reference for Zoom Reset in HTML
+DESCRIPTION: This HTML snippet defines a table for the 'zoom reset' action reference, including the action name and key shortcut.
+
+LANGUAGE: html
+CODE:
+<table class="action-ref">
+  <tr><th colspan="2">Reference</th></tr>
+  <tr><td>Action</td><td><code>core:zoom-reset</code></td></tr>
+  <tr><td>Key shortcut</td><td><code>Ctrl/⌘-0</code></td></tr>
+</table>
+
+----------------------------------------
+
+TITLE: Initializing Survey Chart Visualization with JavaScript
+DESCRIPTION: Script that initializes and renders survey result charts using jQuery, D3.js, and custom chart rendering functions. It loads data from JSON files and creates histogram and treemap visualizations.
+
+LANGUAGE: javascript
+CODE:
+$(function() {
+    $.getJSON("data-2023.json", function(data) {
+        for (var id in data) {
+            if (data.hasOwnProperty(id)) {
+                var el = $("#"+id);
+                if (el.length) {
+                    var opts = data[id];
+                    opts.id = "#"+id;
+                    RED.chart.histogram(opts)
+                }
+            }
+        }
+    });
+    $.getJSON("comments.json", function(data) {
+        RED.chart.treeMap({id:"#comments-treemap",data:data})
+    })
+})
+
+----------------------------------------
+
+TITLE: GET Flow State Response Example - JSON
+DESCRIPTION: Example JSON response showing the runtime state of flows. The state field indicates whether flows are running (start) or stopped (stop). Response requires runtimeState to be enabled in settings.js.
+
+LANGUAGE: json
+CODE:
+{
+    "state": "stop"
+}
+
+----------------------------------------
+
+TITLE: Defining Action Reference for Zoom In in HTML
+DESCRIPTION: This HTML snippet defines a table for the 'zoom in' action reference, including the action name and key shortcut.
+
+LANGUAGE: html
+CODE:
+<table class="action-ref">
+  <tr><th colspan="2">Reference</th></tr>
+  <tr><td>Action</td><td><code>core:zoom-in</code></td></tr>
+  <tr><td>Key shortcut</td><td><code>Ctrl/⌘-=</code></td></tr>
+</table>
+
+----------------------------------------
+
+TITLE: Installing grunt-cli globally with npm
+DESCRIPTION: This command installs the grunt-cli npm module globally, which is a prerequisite for building Node-RED from source.
+
+LANGUAGE: bash
+CODE:
+sudo npm install -g grunt-cli
+
+----------------------------------------
+
+TITLE: Handling Slack Invite Form Submission - JavaScript/jQuery
+DESCRIPTION: JavaScript code that handles the Slack invite form submission using jQuery AJAX. Posts email to an AWS Lambda endpoint and handles various response scenarios including success and different error cases.
+
+LANGUAGE: javascript
+CODE:
+$('#go').click(function() {
+    $('.slackerr').text();
+    $('#go').attr('disabled',true);
+    $.ajax({
+        type: "POST",
+        url: 'https://gnh34zyze1.execute-api.eu-west-2.amazonaws.com/default/nodeREDSlackInviter',
+        data: {email:$('#e').val()},
+        success: function(data,status) {
+            $('#go').attr('disabled',false);
+            if (!data.ok) {
+                if (data.error === 'invalid_email') {
+                    $('.slackerr').text('Not a valid email address');
+                } else if (data.error === 'already_invited') {
+                    $('.slackerr').text('Email address already invited');
+                } else if (data.error === 'already_in_team') {
+                    $('.slackerr').text('Email address already in the team');
+                } else {
+                    $('.slackerr').text('Something unexpected happened: '+data.error);
+                }
+                console.log(data);
+            } else {
+                $('#e').val('')
+                $('.slackmsg').show();
+            }
+        }
+    });
+})
+
+----------------------------------------
+
+TITLE: Setting Flows with Inline Node Credentials (JSON)
+DESCRIPTION: Example of setting flows with inline node credentials in the request body, where credentials are included directly in the node object.
+
+LANGUAGE: json
+CODE:
+{
+    "rev": "abc-123",
+    "flows": [
+      {
+        "type": "tab",
+        "id": "396c2376.c693dc",
+        "label": "Sheet 1",
+        "credentials": {
+            "user": "my-username",
+            "pass": "my-password"
+        }
+      }
+    ]
+}
+
+----------------------------------------
+
+TITLE: Shortcut Reference Table
+DESCRIPTION: HTML table showing keyboard shortcuts and menu options for palette control
+
+LANGUAGE: html
+CODE:
+<table class="action-ref inline">
+ <tr><th colspan="2">Reference</th></tr>
+ <tr><td>Key shortcut</td><td><code>Ctrl/⌘-p</code></td></tr>
+ <tr><td>Menu option</td><td><code>View -&gt; Show Palette</code></td></tr>
+ <tr><td>Action</td><td><code>core:toggle-palette</code></td></tr>
+</table>
+
+----------------------------------------
+
+TITLE: Node-RED and Node.js Upgrade Commands
+DESCRIPTION: Commands to upgrade Node-RED and Node.js packages on BeagleBone.
+
+LANGUAGE: bash
+CODE:
+sudo apt update
+sudo apt upgrade nodejs bb-node-red-installer
+
+----------------------------------------
+
+TITLE: Styling Slack Invite Form - CSS
+DESCRIPTION: CSS styles for the Slack invitation form elements including input fields, buttons, and error messages. Defines dimensions, colors, and typography for form components.
+
+LANGUAGE: css
+CODE:
+.slack input {
+    border: 1px solid #999;
+    background: #fff;
+    color: #666;
+    padding: 8px 16px;
+    font-size: 20px;
+}
+.slack #e {
+    width: 370px;
+}
+.slack #go {
+    cursor: pointer;
+}
+.slackerr {
+    margin-top: 0;
+    font-size: 16px;
+    color: #f66;
+}
+
+----------------------------------------
+
+TITLE: Setting Flows with Separate Node Credentials (JSON)
+DESCRIPTION: Example of setting flows with separate node credentials in the request body, where credentials are provided in a separate top-level 'credentials' object.
+
+LANGUAGE: json
+CODE:
+{
+    "rev": "abc-123",
+    "flows": [
+      {
+        "type": "tab",
+        "id": "396c2376.c693dc",
+        "label": "Sheet 1"
+      }
+    ],
+    "credentials": {
+        "396c2376.c693dc": {
+            "user": "my-username",
+            "pass": "my-password"
+        }
+    }
+}
+
+----------------------------------------
+
+TITLE: Help Action Reference HTML Table
+DESCRIPTION: HTML table showing the action reference for showing the help tab, including the action code and keyboard shortcut.
+
+LANGUAGE: html
+CODE:
+<table class="action-ref inline">
+ <tr><th colspan="2">Reference</th></tr>
+ <tr><td>Action</td><td><code>core:show-help-tab</code></td></tr>
+ <tr><td>Key shortcut</td><td><code>Ctrl/⌘-g h</code></td></tr>
+</table>
+
+----------------------------------------
+
+TITLE: HTML Tutorial List Structure
+DESCRIPTION: HTML markup defining a list of tutorial links with preview cards. Each card contains a title and description of the tutorial content.
+
+LANGUAGE: html
+CODE:
+<div style="margin-top:40px">
+
+<div class="post-preview">
+  <a href="first-flow">
+    <div class="post-header">
+      <h2>Your first flow</h2>
+    </div>
+    <div class="post-content">
+    This tutorial introduces the Node-RED editor and creates a flow the demonstrates
+    the Inject, Debug and Function nodes.
+    </div>
+  </a>
+</div>
+
+<div class="post-preview">
+  <a href="second-flow">
+    <div class="post-header">
+      <h2>Your second flow</h2>
+    </div>
+    <div class="post-content">
+    This tutorial builds on the first tutorial to make a flow that
+    starts to bring in data from external sources to do something useful locally.
+    </div>
+  </a>
+</div>
+</div>
+
+----------------------------------------
+
+TITLE: Termux:Boot Autostart Script
+DESCRIPTION: Script to automatically start Node-RED when Android device boots using Termux:Boot application.
+
+LANGUAGE: shell
+CODE:
+#!/data/data/com.termux/files/usr/bin/sh
+termux-wake-lock
+node /data/data/com.termux/files/usr/bin/node-red
+
+----------------------------------------
+
+TITLE: Successful Response for Node-RED API v2 (JSON)
+DESCRIPTION: Example of a successful response when setting flows using Node-RED API v2, which returns the new revision number of the active flows.
+
+LANGUAGE: json
+CODE:
+{
+    "rev": "def-456"
+}
+
+----------------------------------------
+
+TITLE: Debug Tab Actions and Shortcuts
+DESCRIPTION: Core action codes and keyboard shortcuts for controlling the Debug sidebar functionality in Node-RED
+
+LANGUAGE: markdown
+CODE:
+core:show-debug-tab         Ctrl/⌘-g d\ncore:clear-debug-messages    Ctrl/⌘-Alt-l\ncore:activate-selected-debug-nodes\ncore:activate-all-debug-nodes\ncore:activate-all-flow-debug-nodes\ncore:deactivate-selected-debug-nodes\ncore:deactivate-all-debug-nodes\ncore:deactivate-all-flow-debug-nodes
+
+----------------------------------------
+
+TITLE: Logging and Setting Status in Node-RED Node (JavaScript)
+DESCRIPTION: This code shows various logging methods available in a Node-RED node, as well as how to set the node's status for display in the flow editor.
+
+LANGUAGE: javascript
+CODE:
+this.log("Something happened");
+this.warn("Something happened you should know about");
+this.error("Oh no, something bad happened");
+
+// Since Node-RED 0.17
+this.trace("Log some internal detail not needed for normal operation");
+this.debug("Log something more details for debugging the node's behaviour");
+
+this.status({fill:"red",shape:"ring",text:"disconnected"});
+
+----------------------------------------
+
+TITLE: Successful Response for Flow Update in Node-RED
+DESCRIPTION: JSON response returned upon successful flow update, containing the ID of the updated flow.
+
+LANGUAGE: json
+CODE:
+{"id":"5a04dce3.a5fb24"}
+
+----------------------------------------
+
+TITLE: Formatting Timestamp with JavaScript in Node-RED Function Node
+DESCRIPTION: This code snippet demonstrates how to use a Function node in Node-RED to convert a timestamp from milliseconds to a readable date string. It creates a Date object from the input payload, formats it as a string, and returns the modified message.
+
+LANGUAGE: javascript
+CODE:
+// Create a Date object from the payload
+var date = new Date(msg.payload);
+// Change the payload to be a formatted Date string
+msg.payload = date.toString();
+// Return the message so it can be sent on
+return msg;
+
+----------------------------------------
+
+TITLE: Installing Node-RED Dashboard
+DESCRIPTION: Commands to install the Node-RED dashboard module using npm.
+
+LANGUAGE: bash
+CODE:
+cd ~/.node-red
+npm i node-red-dashboard
+
+----------------------------------------
+
+TITLE: Registering Custom Settings for Node-RED Node (JavaScript)
+DESCRIPTION: This snippet illustrates how to register custom settings for a Node-RED node, making them available both in the runtime and optionally in the editor. It shows proper naming conventions and configuration.
+
+LANGUAGE: javascript
+CODE:
+RED.nodes.registerType("sample",SampleNode, {
+    settings: {
+        sampleNodeColour: {
+            value: "red",
+            exportable: true
+        }
+    }
+});
+
+----------------------------------------
+
+TITLE: Checking Authentication Response - No Auth
+DESCRIPTION: JSON response when no authentication is configured for the Node-RED admin API.
+
+LANGUAGE: json
+CODE:
+{}
+
+----------------------------------------
+
+TITLE: Example Flow File Path Structure
+DESCRIPTION: Demonstrates the file path structure for adding example flows to a Node-RED node package. The example shows how the filename corresponds to the menu entry in the library import menu.
+
+LANGUAGE: text
+CODE:
+examples\My Great Example.json
+
+----------------------------------------
+
+TITLE: Installing PM2 Process Manager
+DESCRIPTION: Command to globally install PM2 process manager using npm. Requires sudo privileges on Linux/OSX or Administrator access on Windows.
+
+LANGUAGE: bash
+CODE:
+sudo npm install -g pm2
+
+----------------------------------------
+
+TITLE: Node Button Configuration in Node-RED
+DESCRIPTION: Demonstrates how to configure an interactive button on a node with click handling and state management.
+
+LANGUAGE: javascript
+CODE:
+button: {
+    enabled: function() {
+        return !this.changed
+    },
+    visible: function() {
+        return this.hasButton
+    },
+    onclick: function() { }
+}
+
+----------------------------------------
+
+TITLE: Checking Authentication Scheme - cURL Example
+DESCRIPTION: cURL command to check the current authentication scheme.
+
+LANGUAGE: bash
+CODE:
+curl http://localhost:1880/auth/login
+
+----------------------------------------
+
+TITLE: Dynamic Label Style in Node-RED
+DESCRIPTION: Shows how to dynamically set the CSS style of a node label based on node properties.
+
+LANGUAGE: javascript
+CODE:
+labelStyle: function() {
+    return this.name?"node_label_italic":"";
+}
+
+----------------------------------------
+
+TITLE: Creating Multi-line Text Editor in HTML and JavaScript
+DESCRIPTION: This snippet demonstrates how to create a multi-line text editor using the Ace editor. It includes the HTML placeholder and JavaScript initialization.
+
+LANGUAGE: html
+CODE:
+<div style="height: 250px; min-height:150px;" class="node-text-editor" id="node-input-example-editor"></div>
+
+LANGUAGE: javascript
+CODE:
+this.editor = RED.editor.createEditor({
+   id: 'node-input-example-editor',
+   mode: 'ace/mode/text',
+   value: this.exampleText
+});
+
+----------------------------------------
+
+TITLE: Configuring User and Memory Settings in Node-RED Systemd Service
+DESCRIPTION: Configuration snippet for modifying the user, group, working directory and memory allocation in the Node-RED systemd service definition file.
+
+LANGUAGE: yaml
+CODE:
+[Service]
+Type=simple
+# Run as normal pi user - change to the user name you wish to run Node-RED as
+User=<your_user>
+Group=<your_user>
+WorkingDirectory=/home/<your_user>
+
+Environment="NODE_OPTIONS=--max_old_space_size=256"
+...
+
+----------------------------------------
+
+TITLE: Single Flow Configuration in Node-RED
+DESCRIPTION: Represents a single flow tab configuration including nodes, configs, and subflows.
+
+LANGUAGE: json
+CODE:
+{
+  "id": "1234",
+  "label": "Sheet1",
+  "nodes": [ ... ],
+  "configs": [ ... ],
+  "subflows": [ ... ]
+}
+
+----------------------------------------
+
+TITLE: Using Core Node-RED i18n Messages for Node Status
+DESCRIPTION: Demonstrates how to use core Node-RED internationalized messages for node status.
+
+LANGUAGE: javascript
+CODE:
+this.status({fill:"green",shape:"dot",text:"node-red:common.status.connected"});
+
+----------------------------------------
+
+TITLE: Handling Multi-line Text Editor in Node Lifecycle Functions
+DESCRIPTION: This snippet shows how to handle the multi-line text editor in the node's oneditsave and oneditcancel functions, including saving the value and cleaning up the editor.
+
+LANGUAGE: javascript
+CODE:
+oneditsave: function() {
+    this.exampleText = this.editor.getValue();
+    this.editor.destroy();
+    delete this.editor;
+},
+oneditcancel: function() {
+    this.editor.destroy();
+    delete this.editor;
+},
+
+----------------------------------------
+
+TITLE: Node Set Configuration in Node-RED
+DESCRIPTION: Defines a collection of node types provided by a single file within a Node Module.
+
+LANGUAGE: json
+CODE:
+{
+  "id": "node-module-name/node-set-name",
+  "name": "node-set-name",
+  "types": [ ... ],
+  "enabled": true,
+  "module": "node-module-name",
+  "version": "0.0.6"
+}
+
+----------------------------------------
+
+TITLE: Defining Node Package Structure in Node-RED
+DESCRIPTION: Demonstrates how to structure a Node-RED node package.json file to include custom nodes and their corresponding files.
+
+LANGUAGE: json
+CODE:
+"name": "my-node-module",
+"node-red": {
+    "myNode": "myNode/my-node.js"
+}
+
+----------------------------------------
+
+TITLE: Demonstrating Node-RED Module Structure for Resource Loading
+DESCRIPTION: Shows the directory structure of a Node-RED module that includes a 'resources' folder for storing additional files like images and JavaScript libraries.
+
+LANGUAGE: plaintext
+CODE:
+node-red-node-example
+ |- resources
+ |   |- image.png
+ |   \- library.js
+ |- example-node.js
+ |- example-node.html
+ \- package.json
+
+----------------------------------------
+
+TITLE: Setting Node Status with i18n Messages in Node-RED
+DESCRIPTION: Shows how to set a node's status using internationalized messages in Node-RED.
+
+LANGUAGE: javascript
+CODE:
+this.status({fill:"green",shape:"dot",text:"myNode.status.ready"});
+
+----------------------------------------
+
+TITLE: Implementing preDeliver Hook in Node-RED
+DESCRIPTION: This snippet shows how to add a preDeliver hook in Node-RED. It logs the destination node ID before delivering the message.
+
+LANGUAGE: javascript
+CODE:
+// Example preDeliver hook
+RED.hooks.add("preDeliver", (sendEvent) => {
+    console.log(`About to deliver to ${sendEvent.destination.id}`);
+});
+
+----------------------------------------
+
+TITLE: Adding Dependencies to Node-RED Module package.json (JSON)
+DESCRIPTION: This JSON configuration demonstrates how to add dependencies to a Node-RED subflow module's package.json file. It includes both the standard npm dependencies and Node-RED specific dependencies.
+
+LANGUAGE: json
+CODE:
+{
+    "name": "node-red-example-subflow",
+    ...
+    "node-red": {
+        "nodes": {
+            "example-node": "example.js"
+        },
+        "dependencies": [
+            "node-red-node-random"
+        ]
+    },
+    "dependencies": {
+        "node-red-node-random": "1.2.3"
+    }
+}
+
+----------------------------------------
+
+TITLE: Example Node-RED Module Directory Structure
+DESCRIPTION: Shows the typical directory layout for a Node-RED node package, including necessary files and folders.
+
+LANGUAGE: plaintext
+CODE:
+├── LICENSE
+├── README.md
+├── package.json
+├── examples
+    │   ├── example-1.json
+    │   └── example-2.json
+└── sample
+    ├── icons
+    │   └── my-icon.svg
+    ├── sample.html
+    └── sample.js
+
+----------------------------------------
+
+TITLE: Applying Multiple i18n Attributes to HTML in Node-RED Editor
+DESCRIPTION: Shows how to apply multiple internationalized attributes to an HTML element in the Node-RED editor.
+
+LANGUAGE: html
+CODE:
+<a href="#" data-i18n="[title]myNode.label.linkTitle;myNode.label.linkText"></a>
+
+----------------------------------------
+
+TITLE: Implementing postReceive Hook in Node-RED
+DESCRIPTION: This snippet shows how to add a postReceive hook in Node-RED. It logs the received message's payload after the message has been passed to the node's input handler.
+
+LANGUAGE: javascript
+CODE:
+// Example postReceive hook
+RED.hooks.add("postReceive", (receiveEvent) => {
+    console.log(`Message received: ${receiveEvent.msg.payload}`);
+});
+
+----------------------------------------
+
+TITLE: Setting Node Status in Node-RED (JavaScript)
+DESCRIPTION: Demonstrates how to set the status of a Node-RED node using the status function. The example shows setting disconnected (red ring) and connected (green dot) statuses.
+
+LANGUAGE: javascript
+CODE:
+this.status({fill:"red",shape:"ring",text:"disconnected"});
+
+this.status({fill:"green",shape:"dot",text:"connected"});
+
+----------------------------------------
+
+TITLE: Basic Node-RED Package.json Configuration
+DESCRIPTION: Example package.json configuration for a Node-RED node module, showing required fields including node-red entry point and keywords.
+
+LANGUAGE: json
+CODE:
+{
+    "name"         : "@myScope/node-red-sample",
+    "version"      : "0.0.1",
+    "description"  : "A sample node for node-red",
+    "dependencies": {
+    },
+    "keywords": [ "node-red" ],
+    "node-red"     : {
+        "nodes": {
+            "sample": "sample/sample.js"
+        }
+    }
+}
+
+----------------------------------------
+
+TITLE: Setting Input Placeholder with i18n in Node-RED Editor
+DESCRIPTION: Demonstrates how to set an input placeholder using internationalized messages in the Node-RED editor.
+
+LANGUAGE: html
+CODE:
+<input type="text" data-i18n="[placeholder]myNode.placeholder.foo">
+
+----------------------------------------
+
+TITLE: ReceiveEvent Object Structure in Node-RED
+DESCRIPTION: This JSON structure represents the ReceiveEvent object used in Node-RED messaging hooks. It contains information about the message and its destination.
+
+LANGUAGE: json
+CODE:
+{
+    "msg": "<message object>",
+    "destination": {
+        "id": "<node-id>",
+        "node": "<node-object>"
+    }
+}
+
+----------------------------------------
+
+TITLE: Adding an input field for a new property in Node-RED (HTML)
+DESCRIPTION: This HTML snippet demonstrates how to add an input field for the new 'prefix' property in the node's edit template.
+
+LANGUAGE: html
+CODE:
+<div class="form-row">
+    <label for="node-input-prefix"><i class="fa fa-tag"></i> Prefix</label>
+    <input type="text" id="node-input-prefix">
+</div>
+
+----------------------------------------
+
+TITLE: Registering a Subflow in Node-RED (JavaScript)
+DESCRIPTION: This code snippet demonstrates how to create a JavaScript wrapper for a Node-RED subflow module. It reads the subflow JSON from a file and registers it with Node-RED.
+
+LANGUAGE: javascript
+CODE:
+const fs = require("fs");
+const path = require("path");
+
+module.exports = function(RED) {
+    const subflowFile = path.join(__dirname,"subflow.json");
+    const subflowContents = fs.readFileSync(subflowFile);
+    const subflowJSON = JSON.parse(subflowContents);
+    RED.nodes.registerSubflow(subflowJSON);
+}
+
+----------------------------------------
+
+TITLE: Triggering SearchBox Change Event - JavaScript
+DESCRIPTION: Demonstrates how to programmatically trigger the change event on a SearchBox widget instance.
+
+LANGUAGE: javascript
+CODE:
+$(".input").searchBox('change');
+
+----------------------------------------
+
+TITLE: Structuring Message Payload in JSON (JavaScript)
+DESCRIPTION: Demonstrates structuring a message payload with multiple properties in JSON format. This approach keeps related data together but may require additional processing in nodes that expect to work directly with msg.payload.
+
+LANGUAGE: json
+CODE:
+{
+    "payload": {
+        "temperature": 123,
+        "humidity": 50,
+        "pressure": 900
+    }
+}
+
+----------------------------------------
+
+TITLE: Applying i18n Messages to HTML Elements in Node-RED Editor
+DESCRIPTION: Shows how to use the data-i18n attribute to apply internationalized messages to HTML elements in the Node-RED editor.
+
+LANGUAGE: html
+CODE:
+<span data-i18n="myNode.label.foo"></span>
+
+----------------------------------------
+
+TITLE: Structuring Subflow JSON for Node-RED Module (JSON)
+DESCRIPTION: This JSON structure represents the format required for a subflow definition in a Node-RED module. It includes the subflow definition node and a 'flow' property containing the subflow's internal nodes.
+
+LANGUAGE: json
+CODE:
+{
+    "id": "Subflow Definition Node",
+    ...
+    "flow": [
+       { "id": "Node 1", ... },
+       { "id": "Node 2", ... },
+       ...
+       { "id": "Node n", ... }
+    ]
+}
+
+----------------------------------------
+
+TITLE: Building Custom Theme CSS
+DESCRIPTION: Command to run the build-custom-theme script, generating the theme CSS file from the custom colors.scss file.
+
+LANGUAGE: bash
+CODE:
+node node-red/scripts/build-custom-theme.js \
+     --in ../my-custom-theme/colors.scss \
+     --out ../my-custom-theme/style.css
+
+----------------------------------------
+
+TITLE: Accessing Parent Flow Context in Node-RED Subflows
+DESCRIPTION: This code snippet shows how to access the context of a parent flow from within a subflow in Node-RED. It uses the $parent prefix to access the parent flow's context.
+
+LANGUAGE: javascript
+CODE:
+var colour = flow.get("$parent.colour");
+
+----------------------------------------
+
+TITLE: Creating a Message Catalog for Node-RED Internationalization
+DESCRIPTION: Shows the structure of a JSON message catalog file used for internationalization in Node-RED nodes.
+
+LANGUAGE: json
+CODE:
+{
+    "myNode" : {
+        "message1": "This is my first message",
+        "message2": "This is my second message"
+    }
+}
+
+----------------------------------------
+
+TITLE: Configuring package.json for Node-RED Module (JSON)
+DESCRIPTION: This JSON snippet shows how to configure the package.json file for a Node-RED subflow module. It includes the necessary 'node-red' section to specify the module's entry point.
+
+LANGUAGE: json
+CODE:
+{
+    "name": "node-red-example-subflow",
+    ...
+    "node-red": {
+        "nodes": {
+            "example-node": "example.js"
+        }
+    }
+}
+
+----------------------------------------
+
+TITLE: Blinking LED using Johnny-Five in Node-RED Function
+DESCRIPTION: This code snippet demonstrates how to use the Johnny-Five library within a Node-RED function to blink an LED connected to pin 13 on an Arduino board every 500ms.
+
+LANGUAGE: javascript
+CODE:
+var five = context.global.jfive;    // create a shorter alias
+var led = new five.Led(13);         // instantiate the led
+led.blink(500);                     // blink it every 500 ms
+
+----------------------------------------
+
+TITLE: HTML List Output Example
+DESCRIPTION: Example output generated from the Mustache array loop template when processing an array of names.
+
+LANGUAGE: html
+CODE:
+<ul>
+  <li>Nick</li>
+  <li>Dave</li>
+  <li>Claire</li>
+</ul>
+
+----------------------------------------
+
+TITLE: Configuring JSONata Expression in Change Node
+DESCRIPTION: Example showing how to use JSONata expressions in a Change node to merge temperature sensor data into flow context.
+
+LANGUAGE: jsonata
+CODE:
+$merge([$flowContext('rooms'),{$.topic:$.payload}])
+
+----------------------------------------
+
+TITLE: Registering Node Type with Credentials
+DESCRIPTION: Shows how to register a Node-RED node type with credential definitions using RED.nodes.registerType.
+
+LANGUAGE: javascript
+CODE:
+RED.nodes.registerType("my-node",MyNode,{
+    credentials: {
+        username: {type:"text"},
+        password: {type:"password"}
+    }
+});
+
+----------------------------------------
+
+TITLE: Importing Node-RED Flow JSON
+DESCRIPTION: This JSON represents the complete flow created in the tutorial. It includes an Inject node, a Function node for formatting the timestamp, and a Debug node. Users can import this JSON into their Node-RED editor to recreate the flow.
+
+LANGUAGE: json
+CODE:
+[{"id":"58ffae9d.a7005","type":"debug","name":"","active":true,"complete":false,"x":640,"y":200,"wires":[]},{"id":"17626462.e89d9c","type":"inject","name":"","topic":"","payload":"","repeat":"","once":false,"x":240,"y":200,"wires":[["2921667d.d6de9a"]]},{"id":"2921667d.d6de9a","type":"function","name":"Format timestamp","func":"// Create a Date object from the payload\nvar date = new Date(msg.payload);\n// Change the payload to be a formatted Date string\nmsg.payload = date.toString();\n// Return the message so it can be sent on\nreturn msg;","outputs":1,"x":440,"y":200,"wires":[["58ffae9d.a7005"]]}]
+
+----------------------------------------
+
+TITLE: Sending Multiple Messages from Node-RED Function
+DESCRIPTION: Illustrates how to send multiple messages from a single function output.
+
+LANGUAGE: javascript
+CODE:
+var msg1 = { payload:"first out of output 1" };
+var msg2 = { payload:"second out of output 1" };
+var msg3 = { payload:"third out of output 1" };
+var msg4 = { payload:"only message from output 2" };
+return [ [ msg1, msg2, msg3 ], msg4 ];
+
+----------------------------------------
+
+TITLE: External Modules Configuration
+DESCRIPTION: Example structure for configuring external module settings in Node-RED settings file.
+
+LANGUAGE: javascript
+CODE:
+{
+    "externalModules": {
+        "palette": {
+            "allowInstall": true,
+            "allowUpload": true
+        },
+        "autoInstall": true,
+        "autoInstallRetry": true
+    }
+}
+
+----------------------------------------
+
+TITLE: Accessing Environment Variables in Node-RED Function Node
+DESCRIPTION: Example showing how to access predefined environment variables within a Function node to get node name and flow name information.
+
+LANGUAGE: javascript
+CODE:
+const functionName = env.get("NR_NODE_NAME")
+const flowName = env.get("NR_FLOW_NAME")
+msg.payload = `I was sent by Function '${functionName}', on flow '${flowName}'`
+return msg
+
+----------------------------------------
+
+TITLE: Configuring HTTP Proxy in Node-RED Systemd Service
+DESCRIPTION: Configuration snippet for adding HTTP proxy settings to the Node-RED systemd service definition.
+
+LANGUAGE: yaml
+CODE:
+...
+Nice=5
+Environment="NODE_OPTIONS=--max-old-space-size=256"
+Environment="HTTP_PROXY=my-proxy-server-address"
+...
+
+----------------------------------------
+
+TITLE: Port Labels Configuration in Node-RED
+DESCRIPTION: Shows how to set static and dynamic labels for node input and output ports.
+
+LANGUAGE: javascript
+CODE:
+inputLabels: "parameter for input",
+outputLabels: ["stdout","stderr","rc"]
+
+----------------------------------------
+
+TITLE: Splitting Configuration JSON Structure
+DESCRIPTION: Runtime configuration file structure has been split from a single .config.json into multiple files for better organization and version control flexibility. This change requires updates to any backup scripts targeting the old .config.json file.
+
+LANGUAGE: json
+CODE:
+".config.json"
+
+----------------------------------------
+
+TITLE: Executing node-red-admin in Node-RED 1.1
+DESCRIPTION: Demonstrates how to run the newly integrated node-red-admin command-line tool in Node-RED 1.1. This tool can be used for various administrative tasks like hashing passwords for adminAuth.
+
+LANGUAGE: bash
+CODE:
+node-red admin
+
+----------------------------------------
+
+TITLE: Reloading Systemd Service Configuration
+DESCRIPTION: Commands for reloading the systemd daemon and restarting the Node-RED service after configuration changes.
+
+LANGUAGE: bash
+CODE:
+sudo systemctl daemon-reload
+node-red-stop
+node-red-start
+
+----------------------------------------
+
+TITLE: Dynamic Node Label Configuration in Node-RED
+DESCRIPTION: Example of setting a dynamic node label that uses either a custom name or falls back to a default value.
+
+LANGUAGE: javascript
+CODE:
+label: function() {
+    return this.name||"lower-case";
+}
+
+----------------------------------------
+
+TITLE: Introducing RED.hooks API Implementation
+DESCRIPTION: New RED.hooks API implementation for enabling pluggable message routing, supporting future features like flow debugging, distributed runtimes, and integrated testing.
+
+LANGUAGE: javascript
+CODE:
+"RED.hooks"
+
+----------------------------------------
+
+TITLE: Hashing Passwords with node-red-admin in Node-RED 1.1
+DESCRIPTION: Shows how to use the node-red-admin tool to hash passwords for use with adminAuth in Node-RED 1.1. This feature simplifies the process of generating secure password hashes.
+
+LANGUAGE: bash
+CODE:
+$ node-red admin hash-pw
+Password:
+$2b$08$sjxLvq8MmycyWJpxPLyweuw/WlYt1MX56eG5Q5nlyxJs2fASGm2jm
+
+----------------------------------------
+
+TITLE: Starting Node-RED with PM2
+DESCRIPTION: Command to start Node-RED using PM2 process manager with verbose output. Additional memory constraints can be specified for resource-limited devices.
+
+LANGUAGE: bash
+CODE:
+pm2 start /usr/bin/node-red -- -v
+
+----------------------------------------
+
+TITLE: Accessing Environment Variables in JSONata Expressions
+DESCRIPTION: The $env() function has been added to JSONata to allow access to environment variables from within expressions in Node-RED flows.
+
+LANGUAGE: javascript
+CODE:
+$env()
+
+----------------------------------------
+
+TITLE: Setting Node Background Color in Node-RED
+DESCRIPTION: Shows how to set the background color of a node using a hexadecimal color code.
+
+LANGUAGE: javascript
+CODE:
+color: "#a6bbcf"
+
+----------------------------------------
+
+TITLE: JavaScript Pass-by-Reference Example
+DESCRIPTION: Demonstrates how JavaScript handles object references, showing how modifications to one variable affect another when they reference the same object.
+
+LANGUAGE: javascript
+CODE:
+> let a = { payload: "hello" };
+> let b = a;
+> b.payload = "goodbye";
+> console.log(a)
+{ payload: 'goodbye' }
+
+----------------------------------------
+
+TITLE: Node.js Dependency Rebuild Command
+DESCRIPTION: Command for rebuilding Node-RED dependencies after upgrading Node.js version.
+
+LANGUAGE: bash
+CODE:
+npm rebuild
+
+----------------------------------------
+
+TITLE: YAML Parser Node Implementation
+DESCRIPTION: New YAML format parser node added to core functionality for processing YAML data streams.
+
+
+
+----------------------------------------
+
+TITLE: Message Packet Example - JavaScript String Handling
+DESCRIPTION: Example showing how the Split node handles streaming mode to realign message packets that are split across multiple messages.
+
+LANGUAGE: javascript
+CODE:
+"one\ntwo\nthr" "ee\nfour\n"
+
+----------------------------------------
+
+TITLE: Toggling LED Output in Node-RED Flow for Arduino
+DESCRIPTION: This Node-RED flow toggles an LED connected to pin 13 on an Arduino board every 0.5 seconds. It uses the Firmata protocol to communicate with the Arduino.
+
+LANGUAGE: json
+CODE:
+[{"id":"d7663aaf.47194","type":"arduino-board","device":""},{"id":"dae8234f.2517e","type":"inject","name":"0.5s tick","topic":"","payload":"","payloadType":"date","repeat":"0.5","crontab":"","once":false,"x":150,"y":100,"z":"359a4b52.ca65b4","wires":[["56a6f8f2.a95908"]]},{"id":"2db61802.d249e8","type":"arduino out","name":"","pin":"13","state":"OUTPUT","arduino":"d7663aaf.47194","x":570.5,"y":100,"z":"359a4b52.ca65b4","wires":[]},{"id":"56a6f8f2.a95908","type":"function","name":"Toggle output on input","func":"\n// If it does exist make it the inverse of what it was or else initialise it to false\n// (context variables persist between calls to the function)\ncontext.level = !context.level || false;\n\n// set the payload to the level and return\nmsg.payload = context.level;\nreturn msg;","outputs":1,"noerr":0,"x":358,"y":100,"z":"359a4b52.ca65b4","wires":[["2db61802.d249e8"]]}]
+
+----------------------------------------
+
+TITLE: Configuring Font Awesome Icon in Node-RED
+DESCRIPTION: Demonstrates how to specify a Font Awesome icon for a Node-RED node using the font-awesome prefix.
+
+LANGUAGE: javascript
+CODE:
+icon: "font-awesome/fa-automobile"
+
+----------------------------------------
+
+TITLE: Function Node Close Event Handler
+DESCRIPTION: Event handler registration for cleanup operations when a Function node is stopped
+
+LANGUAGE: javascript
+CODE:
+node.on('close',function() { })
+
+----------------------------------------
+
+TITLE: Transforming Data with JSONata in Change Node
+DESCRIPTION: Example of using JSONata expression in a Change node to convert temperature from Fahrenheit to Celsius. JSONata provides lightweight query and transformation capabilities for JSON data.
+
+LANGUAGE: javascript
+CODE:
+(payload - 32) * 5/9
+
+----------------------------------------
+
+TITLE: Copying Colors SCSS File
+DESCRIPTION: Commands to create a custom theme directory and copy the colors.scss file from the Node-RED repository.
+
+LANGUAGE: bash
+CODE:
+mkdir my-custom-theme
+cp node-red/packages/node_modules/@node-red/editor-client/src/sass/colors.scss my-custom-theme
+
+----------------------------------------
+
+TITLE: Node-RED Browser URL Pattern
+DESCRIPTION: Example of the new URL format that allows direct linking to specific flows or subflows in the editor
+
+LANGUAGE: url
+CODE:
+http://localhost:1880/flow/[flow-id]
+
+----------------------------------------
+
+TITLE: New Message Handler with Send and Done Callbacks
+DESCRIPTION: New Node-RED 1.0 message handling pattern that includes send and done callback functions for better message tracking and completion handling.
+
+LANGUAGE: javascript
+CODE:
+this.on('input', function(msg, send, done) {
+
+})
+
+----------------------------------------
+
+TITLE: Defining Page Layout and Metadata in Markdown
+DESCRIPTION: This code snippet defines the layout, table of contents, title, and slug for the documentation page using YAML front matter in Markdown.
+
+LANGUAGE: markdown
+CODE:
+---
+layout: docs-api
+toc: toc-api-ui.html
+title: Editor APIs
+slug: "ui"
+---
+
+----------------------------------------
+
+TITLE: Getting Context in Node-RED Function Node
+DESCRIPTION: Shows how to retrieve context values using the new get() method introduced in Node-RED 0.13.0.
+
+LANGUAGE: javascript
+CODE:
+let value = context.get('foo');
+
+----------------------------------------
+
+TITLE: Node-RED 1.0 Non-Cloning Send
+DESCRIPTION: Demonstrates the new optional parameter in Node-RED 1.0 Function nodes to disable automatic message cloning when needed for performance reasons.
+
+LANGUAGE: javascript
+CODE:
+node.send(msg, false);
+
+----------------------------------------
+
+TITLE: Updating Global Node-RED Installation
+DESCRIPTION: Command to update an existing global installation of Node-RED to the latest version using npm.
+
+LANGUAGE: bash
+CODE:
+sudo npm update -g node-red
+
+----------------------------------------
+
+TITLE: Function Node Multiple Send Example
+DESCRIPTION: Shows a problematic pattern in Node-RED Function nodes where the same message object is modified and sent multiple times, potentially causing race conditions in async operations.
+
+LANGUAGE: javascript
+CODE:
+msg.topic = "A";
+msg.payload = "1";
+node.send(msg);
+
+msg.topic = "B";
+msg.payload = "2";
+node.send(msg);
+
+----------------------------------------
+
+TITLE: Removing Hook Handler in Node-RED
+DESCRIPTION: Shows how to remove all hooks with a specific label using RED.hooks.remove(). This example removes all hooks with the 'my-hooks' label.
+
+LANGUAGE: javascript
+CODE:
+RED.hooks.remove("*.my-hooks");
+
+----------------------------------------
+
+TITLE: Specifying Custom User Directory
+DESCRIPTION: Command line argument to specify a custom directory for Node-RED user data storage.
+
+LANGUAGE: bash
+CODE:
+node red.js --userDir /var/node-red/data
+
+----------------------------------------
+
+TITLE: Configuring Synchronous Message Delivery in Node-RED
+DESCRIPTION: Configuration setting to maintain synchronous message delivery behavior in Node-RED 1.0. This is a temporary solution to help transition existing flows that depend on synchronous message routing.
+
+LANGUAGE: javascript
+CODE:
+    runtimeSyncDelivery: true
+
+----------------------------------------
+
+TITLE: Node Module Configuration in Node-RED
+DESCRIPTION: Represents a collection of Node Sets provided by an npm package with version information.
+
+LANGUAGE: json
+CODE:
+{
+  "name": "node-module-name",
+  "version": "0.0.6",
+  "nodes": [ ... ]
+}
+
+----------------------------------------
+
+TITLE: Installing Node-RED via NPM
+DESCRIPTION: Command to install Node-RED packages and update to the latest version.
+
+LANGUAGE: bash
+CODE:
+npm update
+
+----------------------------------------
+
+TITLE: YAML Blog Post Configuration
+DESCRIPTION: YAML front matter configuration for the blog post defining layout, title and author
+
+LANGUAGE: yaml
+CODE:
+---
+layout: blog
+title: Version 0.18 released
+author: nick
+---
+
+----------------------------------------
+
+TITLE: Defining Subflow Configuration in Node-RED
+DESCRIPTION: Represents the configuration of a subflow including input/output nodes, wires, and contained nodes.
+
+LANGUAGE: json
+CODE:
+{
+  "id": "6115be82.9eea4",
+  "type": "subflow",
+  "name": "Subflow 1",
+  "info": "",
+  "in": [{
+    "x": 60,
+    "y": 40,
+    "wires": [{
+      "id": "1830cc4e.e7cf34"
+    }]
+  }],
+  "out": [{
+    "x": 320,
+    "y": 40,
+    "wires": [{
+      "id": "1830cc4e.e7cf34",
+      "port": 0
+    }]
+  }],
+  "configs": [ ... ],
+  "nodes": [ ... ]
+}
+
+----------------------------------------
+
+TITLE: HTTPRequest URL Template Example
+DESCRIPTION: Demonstrates the new mustache-style template syntax for dynamic URL construction in the HTTPRequest node.
+
+LANGUAGE: javascript
+CODE:
+{
+    topic: "foo",
+    user: "fred"
+}
+
+----------------------------------------
+
+TITLE: Node-RED Installation Commands
+DESCRIPTION: Commands for downloading or installing Node-RED via npm
+
+LANGUAGE: bash
+CODE:
+npm install node-red
+
+----------------------------------------
+
+TITLE: Legacy HTTP Endpoint Registration in Node-RED
+DESCRIPTION: Example of the deprecated method for registering HTTP endpoints using RED.app. This approach is now replaced with RED.httpAdmin and RED.httpNode.
+
+LANGUAGE: javascript
+CODE:
+RED.app.post("/inject/:id", function(req,res) {
+
+----------------------------------------
+
+TITLE: Installing Node-RED Globally with NPM
+DESCRIPTION: Command to perform a global installation of Node-RED using npm. This installation method adds the node-red command to the system path.
+
+LANGUAGE: bash
+CODE:
+sudo npm install -g node-red
+
+----------------------------------------
+
+TITLE: Node Set Response from Node-RED API (JSON)
+DESCRIPTION: Example JSON response from the Node-RED API after modifying a node set. It includes the node set's ID, name, types, enabled status, and module name.
+
+LANGUAGE: json
+CODE:
+{
+  "id": "node-red-node-suncalc/suncalc",
+  "name": "suncalc",
+  "types": [
+    "sunrise"
+  ],
+  "enabled": false,
+  "module": "node-red-node-suncalc"
+}
+
+----------------------------------------
+
+TITLE: Running Node-RED with Custom Settings File in JavaScript
+DESCRIPTION: Demonstrates how to start Node-RED with a custom settings file using command-line arguments. This allows users to specify settings outside the installation directory.
+
+LANGUAGE: bash
+CODE:
+$ node red.js --settings /home/nol/.node-red/settings.js
+
+----------------------------------------
+
+TITLE: Installing Powermate Node via NPM
+DESCRIPTION: Command to install the Griffin Powermate node contribution package for Node-RED.
+
+LANGUAGE: bash
+CODE:
+npm install node-red-contrib-powermate
+
+----------------------------------------
+
+TITLE: Enabling a Node Set in Node-RED API (JSON)
+DESCRIPTION: JSON payload for enabling a node set in the Node-RED API. The 'enabled' field is set to true to enable the specified node set.
+
+LANGUAGE: json
+CODE:
+{
+  "enabled": true
+}
+
+----------------------------------------
+
+TITLE: Node-RED Configuration Options Example
+DESCRIPTION: Example configuration properties for Node-RED 0.4.0 showing new options for user directory, nodes directory, and HTTP static file serving.
+
+LANGUAGE: javascript
+CODE:
+{
+  "userDir": "/path/to/user/data",
+  "nodesDir": "/path/to/custom/nodes",
+  "httpStatic": "/path/to/static/files",
+  "httpRoot": "/editor",
+  "httpAuth": "username:password"
+}
+
+----------------------------------------
+
+TITLE: Cloning the Node-RED Website Repository
+DESCRIPTION: This command clones the Node-RED website repository to your local machine. Replace {your-github} with your GitHub username.
+
+LANGUAGE: shell
+CODE:
+git clone https://github.com/{your-github}/node-red.github.io
+
+----------------------------------------
+
+TITLE: Success Response for Node-RED Flow Creation
+DESCRIPTION: JSON response returned upon successful flow creation, containing the newly assigned flow ID.
+
+LANGUAGE: json
+CODE:
+{"id":"5a04dce3.a5fb24"}
+
+----------------------------------------
+
+TITLE: Loading D3.js Library for Data Visualization
+DESCRIPTION: Loads the D3.js library version 3 from an external CDN to enable data visualization on the page.
+
+LANGUAGE: HTML
+CODE:
+<script src="//d3js.org/d3.v3.min.js" charset="utf-8"></script>
+
+----------------------------------------
+
+TITLE: Node-RED Page Layout Configuration
+DESCRIPTION: YAML front matter configuration for the about page layout
+
+LANGUAGE: yaml
+CODE:
+---
+layout: about-single
+title: About
+---
+
+----------------------------------------
+
+TITLE: Initializing Charts with jQuery and JSON Data
+DESCRIPTION: Uses jQuery to load JSON data and initialize charts when the document is ready. It creates histogram charts for various survey questions and a treemap for comment categories.
+
+LANGUAGE: JavaScript
+CODE:
+$(function() {
+    $.getJSON("data.json", function(data) {
+        for (var id in data) {
+            if (data.hasOwnProperty(id)) {
+                var el = $("#"+id);
+                if (el.length) {
+                    var opts = data[id];
+                    opts.id = "#"+id;
+                    RED.chart.histogram(opts)
+                }
+            }
+        }
+    });
+    $.getJSON("comments.json", function(data) {
+        RED.chart.treeMap({id:"#comments-treemap",data:data})
+    })
+})
+
+----------------------------------------
+
+TITLE: Survey Chart CSS Styling
+DESCRIPTION: CSS styles for formatting and displaying survey charts, including bar charts, legends, labels, and treemap visualizations. Defines colors, layouts, and interactive hover effects.
+
+LANGUAGE: css
+CODE:
+.chart {
+    padding: 10px 0 20px;
+}
+.chart h4 {
+    margin: 2px 0 20px;
+}
+.chart ol {
+    list-style-type: none;
+    margin: 0;
+    padding: 0;
+}
+.chart ol li {
+    margin-bottom: 2px;
+}
+/* Additional styles omitted for brevity */
+
+----------------------------------------
+
+TITLE: Node-RED Admin API Endpoints Table
+DESCRIPTION: Markdown table listing all available administrative API endpoints with their HTTP methods and descriptions. Covers authentication, flow management, runtime settings, and node management endpoints.
+
+LANGUAGE: markdown
+CODE:
+Endpoint                                                   | Description
+------------------------------------------------------------|-------------------------
+[<span class="method">GET</span>/auth/login](get/auth/login)               | Get the active authentication scheme
+[<span class="method">POST</span>/auth/token](post/auth/token)             | Exchange credentials for access token
+[<span class="method">POST</span>/auth/revoke](post/auth/revoke)           | Revoke an access token
+[<span class="method">GET</span>/settings](get/settings)                   | Get the runtime settings
+[<span class="method">GET</span>/diagnostics](get/diagnostics)             | Get the runtime diagnostics
+[<span class="method">GET</span>/flows](get/flows)                         | Get the active flow configuration
+[<span class="method">GET</span>/flows/state](get/flows/state)             | Get the active flow's runtime state
+[<span class="method">POST</span>/flows](post/flows)                       | Set the active flow configuration
+[<span class="method">POST</span>/flows/state](post/flows/state)           | Set the active flow's runtime state
+[<span class="method">POST</span>/flow](post/flow)                         | Add a flow to the active configuration
+[<span class="method">GET</span>/flow/:id](get/flow)                       | Get an individual flow configuration
+[<span class="method">PUT</span>/flow/:id](put/flow)                       | Update an individual flow configuration
+[<span class="method">DELETE</span>/flow/:id](delete/flow)                 | Delete an individual flow configuration
+[<span class="method">GET</span>/nodes](get/nodes)                         | Get a list of the installed nodes
+[<span class="method">POST</span>/nodes](post/nodes)                       | Install a new node module
+[<span class="method">GET</span>/nodes/:module](get/nodes/module)          | Get a node module's information
+[<span class="method">PUT</span>/nodes/:module](put/nodes/module)          | Enable/Disable a node module
+[<span class="method">DELETE</span>/nodes/:module](delete/nodes/module)    | Remove a node module
+[<span class="method">GET</span>/nodes/:module/:set](get/nodes/module/set) | Get a node module set information
+[<span class="method">PUT</span>/nodes/:module/:set](put/nodes/module/set) | Enable/Disable a node set
+
+----------------------------------------
+
+TITLE: Setting Up and Running Jekyll for Node-RED Website
+DESCRIPTION: These commands install dependencies and start the Jekyll server to preview the Node-RED website locally. Run these commands in the repository directory.
+
+LANGUAGE: shell
+CODE:
+cd node-red.github.io
+bundle install
+bundle exec jekyll serve -w
+
+----------------------------------------
+
+TITLE: HTTP DELETE Flow Request
+DESCRIPTION: Makes an HTTP DELETE request to remove a specific flow configuration. Requires flows.write permission and authentication token if enabled.
+
+LANGUAGE: http
+CODE:
+DELETE /flow/:id
+Authorization: Bearer [token]
+
+----------------------------------------
+
+TITLE: Node-RED Citation Information
+DESCRIPTION: Structured citation information for academic references to the Node-RED project
+
+LANGUAGE: markdown
+CODE:
+-----|----
+**Name** | `Node-RED`
+**Author** | `OpenJS Foundation & Contributors`
+**URL** |  If you are citing the project in general, use the project website URL - `https://nodered.org`. <br/>If you are citing a particular version, use either the website, or find the [release page on GitHub](https://github.com/node-red/node-red/releases) for the version you are citing.
+
+----------------------------------------
+
+TITLE: Markdown Front Matter Configuration
+DESCRIPTION: YAML front matter configuration for the contributing page, defining layout, title and slug.
+
+LANGUAGE: yaml
+CODE:
+---
+layout: about-single
+title: Contributing to Node-RED
+slug: contributing
+---
+
+----------------------------------------
+
+TITLE: Markdown Code Block Example
+DESCRIPTION: Example showing how to format code blocks in forum posts using backticks
+
+LANGUAGE: markdown
+CODE:
+```\nyour code or flow here\n```
+
+----------------------------------------
+
+TITLE: Template Node Environment Variable Access
+DESCRIPTION: Example of accessing environment variables within the Template node using mustache-style syntax.
+
+LANGUAGE: javascript
+CODE:
+My favourite colour is {{env.COLOUR}}.
+
+----------------------------------------
+
+TITLE: Setting File Working Directory for Node-RED File Nodes
+DESCRIPTION: This snippet demonstrates how to set the fileWorkingDirectory setting in Node-RED 2.0. This setting defines the working directory used by File nodes to resolve relative paths, providing more control over file operations.
+
+LANGUAGE: javascript
+CODE:
+fileWorkingDirectory: "/path/to/working/directory"
+
+----------------------------------------
+
+TITLE: Modified Change Node Property Access
+DESCRIPTION: Example showing the new syntax for accessing nested message properties in Change nodes in Node-RED 1.3.
+
+LANGUAGE: javascript
+CODE:
+flow.rooms[msg.topic] = msg.payload
+
+----------------------------------------
+
+TITLE: Embedding Speaker Deck Presentation in HTML
+DESCRIPTION: This snippet shows how to embed a Speaker Deck presentation into an HTML page using an asynchronous script tag. It specifies the presentation ID, aspect ratio, and source URL for the embedding.
+
+LANGUAGE: html
+CODE:
+<script async class="speakerdeck-embed" data-id="df4c972d06664bbe97b2e66897eba5c4" data-ratio="1.77777777777778" src="//speakerdeck.com/assets/embed.js"></script>
+
+----------------------------------------
+
+TITLE: Overriding Individual Settings in Node-RED 1.1
+DESCRIPTION: Demonstrates how to override individual settings using the new -D option in Node-RED 1.1. This example shows how to temporarily change the logging level.
+
+LANGUAGE: bash
+CODE:
+node-red -D logging.console.level=trace
+
+----------------------------------------
+
+TITLE: Message Cloning in Function Node
+DESCRIPTION: In Node-RED 1.0, the Function node now automatically clones all messages passed to node.send() as part of the asynchronous messaging changes. This ensures message integrity when handling asynchronous operations.
+
+LANGUAGE: javascript
+CODE:
+node.send(msg)
+
+----------------------------------------
+
+TITLE: Environment Variable Reference in Function Node
+DESCRIPTION: Example of accessing environment variables within a Function node using the env.get() method. This can be used to access both process-wide and subflow-specific environment variables.
+
+LANGUAGE: javascript
+CODE:
+env.get('ENV_VAR_NAME')
+
+----------------------------------------
+
+TITLE: Accessing Parent Flow Context in Subflow
+DESCRIPTION: Example of accessing parent flow context from within a subflow using the $parent prefix. If a flow has a context value 'foo', it can be accessed in a subflow using flow.get("$parent.foo").
+
+LANGUAGE: javascript
+CODE:
+flow.get("$parent.foo");
+
+----------------------------------------
+
+TITLE: Split Node Output - JavaScript String Array
+DESCRIPTION: Example output after Split node processes the streaming data into properly aligned messages.
+
+LANGUAGE: javascript
+CODE:
+"one" "two" "three" "four"
+
+----------------------------------------
+
+TITLE: Change Node Property Access Syntax
+DESCRIPTION: Updated syntax for accessing object properties in Change node, supporting array indices and quoted property names.
+
+LANGUAGE: javascript
+CODE:
+msg.payload[1].name
+msg.payload["another property"]
+
+----------------------------------------
+
+TITLE: Accessing HTTP Cookies in Node-RED
+DESCRIPTION: Access HTTP cookies from request object and set/clear cookies in response using the HTTP In and Response nodes. Cookies can be accessed via msg.req.cookies and set using msg.cookies property.
+
+LANGUAGE: javascript
+CODE:
+msg.req.cookies  // access incoming cookies
+msg.cookies     // set outgoing cookies
+
+----------------------------------------
+
+TITLE: Installing Required Node Packages
+DESCRIPTION: NPM package names for nodes that have been moved to separate packages and require manual installation.
+
+LANGUAGE: javascript
+CODE:
+"node-red-node-irc"
+"node-red-node-arduino"
+"node-red-node-redis"
+"node-red-node-mongodb"
+
+----------------------------------------
+
+TITLE: Configuring HTTP Node Middleware in Node-RED
+DESCRIPTION: Example configuration setting to add Express middleware function for HTTP In nodes, useful for implementing authentication schemes.
+
+LANGUAGE: javascript
+CODE:
+"httpNodeMiddleware"
+
+----------------------------------------
+
+TITLE: Function Node Logging Operations
+DESCRIPTION: New logging functions available in Function nodes to log messages at different severity levels and trigger error handling
+
+LANGUAGE: javascript
+CODE:
+node.log("something something logging");
+node.warn("this is a warning");
+node.error("something went wrong",msg);
+
+----------------------------------------
+
+TITLE: Checking RPi.GPIO Library Version
+DESCRIPTION: Command to check the installed version of the RPi.GPIO library on a Raspberry Pi. The expected output should be version 0.5.8 or higher for full functionality of the GPIO nodes.
+
+LANGUAGE: bash
+CODE:
+<node-red install dir>/nodes/core/hardware/nrgpio ver 0
+
+----------------------------------------
+
+TITLE: Updating Raspberry Pi for GPIO Node Support
+DESCRIPTION: Commands to update the Raspberry Pi and install required dependencies for the GPIO nodes to function properly. This ensures the correct version of the RPi.GPIO library is installed.
+
+LANGUAGE: bash
+CODE:
+sudo apt-get update
+sudo apt-get install python-dev python-rpi.gpio
+
+----------------------------------------
+
+TITLE: Updated Node-RED Embedding Configuration
+DESCRIPTION: Demonstrates the new method for embedding Node-RED using separate admin and node HTTP roots.
+
+LANGUAGE: javascript
+CODE:
+app.use(settings.httpAdminRoot,RED.httpAdmin);
+app.use(settings.httpNodeRoot,RED.httpNode);
+
+----------------------------------------
+
+TITLE: Implementing TCP Echo Server in Node-RED
+DESCRIPTION: Shows a Node-RED flow configuration for a TCP Echo server. This flow listens on port 9001, echoes back any received message with a prefix.
+
+LANGUAGE: json
+CODE:
+[{"id":"6534336a.9acbcc","type":"tcp in","server":"server","host":"","port":"9001","datamode":"stream","datatype":"buffer","newline":"","topic":"","name":"","base64":false,"x":80,"y":140,"z":"e1c9f85b.1e3608","wires":[["2f63c46b.d09c3c"]]},{"id":"c5d83ebc.3a27c","type":"tcp out","host":"","port":"","beserver":"reply","base64":false,"name":"","x":320,"y":140,"z":"e1c9f85b.1e3608","wires":[]},{"id":"2f63c46b.d09c3c","type":"function","name":"","func":"msg.payload = \"You said: \"+msg.payload.toString();\n\nreturn msg;","outputs":1,"x":200,"y":140,"z":"e1c9f85b.1e3608","wires":[["c5d83ebc.3a27c"]]}]
+
+----------------------------------------
+
+TITLE: Apache License 2.0 Boilerplate Notice
+DESCRIPTION: Standard boilerplate notice text to be included when applying the Apache License to a work. This template includes placeholders for copyright year and owner information.
+
+LANGUAGE: text
+CODE:
+Copyright [yyyy] [name of copyright owner]
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+
+----------------------------------------
+
+TITLE: Building Custom Debian-based Node-RED Container
+DESCRIPTION: Shell commands to clone the Node-RED Docker repository and build a custom Debian-based container.
+
+LANGUAGE: bash
+CODE:
+$ git clone https://github.com/node-red/node-red-docker.git
+$ cd node-red-docker/docker-custom
+$ ./docker-debian.sh
+
+----------------------------------------
+
+TITLE: Disabling Node-RED autostart on Raspberry Pi boot
+DESCRIPTION: This command disables the Node-RED service from automatically starting when the Raspberry Pi is turned on or rebooted.
+
+LANGUAGE: bash
+CODE:
+sudo systemctl disable nodered.service
+
+----------------------------------------
+
+TITLE: Enabling Node-RED autostart on Raspberry Pi boot
+DESCRIPTION: This command enables the Node-RED service to automatically start when the Raspberry Pi is turned on or rebooted.
+
+LANGUAGE: bash
+CODE:
+sudo systemctl enable nodered.service

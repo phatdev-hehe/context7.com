@@ -1,0 +1,902 @@
+TITLE: Cloning Bazel Repository
+DESCRIPTION: Command to clone the Bazel Git repository from GitHub.
+
+LANGUAGE: bash
+CODE:
+git clone https://github.com/bazelbuild/bazel.git
+
+----------------------------------------
+
+TITLE: Building Bazel on Linux/macOS
+DESCRIPTION: Commands to build Bazel from source on Linux or macOS systems using Bash.
+
+LANGUAGE: bash
+CODE:
+cd bazel
+bazel build //src:bazel
+
+----------------------------------------
+
+TITLE: Building Bazel on Windows
+DESCRIPTION: Commands to build Bazel from source on Windows systems using Command Prompt.
+
+LANGUAGE: bash
+CODE:
+cd bazel
+bazel --output_user_root=c:\tmp build //src:bazel.exe
+
+----------------------------------------
+
+TITLE: Configuring Bazel for Debugging
+DESCRIPTION: Bazel configuration settings for enabling debug mode for both C++ and Java builds.
+
+LANGUAGE: bash
+CODE:
+build:debug -c dbg
+build:debug --javacopt="-g"
+build:debug --copt="-g"
+build:debug --strip="never"
+
+----------------------------------------
+
+TITLE: Implementing Custom Provider in Skylark
+DESCRIPTION: Demonstrates how to create and use a custom provider in a Rust library rule implementation. Shows provider declaration, construction, and access patterns.
+
+LANGUAGE: python
+CODE:
+# rust.bzl
+
+# Introduces a provider. `rust_provider` is now both a function
+# that can be used to construct the provider instance,
+# and a "symbol" that can be used to access it.
+rust_provider = provider()
+
+def _impl(ctx):
+  # `rust_provider` is used as struct-like constructor
+  # it accepts the same arguments as a standard `struct` function
+  rust = rust_provider(defines = "-DFOO", ...)
+  # return value of rule implementation function
+  # is just a list of providers; their "names" are specified
+  # by their constructors, see below
+  return [ctx.provider(files = ...), rust]
+rust_library = rule(implementation = _impl,
+  # Optional declaration; the rule MUST provide all the
+  # providers in this list
+  providers = [rust_provider])
+
+----------------------------------------
+
+TITLE: Accessing Provider Example in Skylark
+DESCRIPTION: Shows how to access a previously defined provider from another rule implementation. Demonstrates provider loading and value retrieval.
+
+LANGUAGE: python
+CODE:
+# Example of how to access the provider
+
+load(":rust.bzl", "rust_provider")
+
+def _impl(ctx):
+  dep = ctx.attr.deps[0] # Target object
+  # `rust_provider` is used as a key to access a particular
+  # provider
+  defines = dep[rust_provider].defines ...
+
+----------------------------------------
+
+TITLE: Native Provider Implementation in Java
+DESCRIPTION: Example of how to implement a native provider in Java using annotations. Shows field definitions, documentation, and builder pattern implementation.
+
+LANGUAGE: java
+CODE:
+@SkylarkProvider(builder = Builder.class)
+// A class with this annotation can be used as provider declaration
+class rustProvider implements TransitiveInfoProvider {
+  @SkylarkProviderField(doc = ...)
+  // Skylark name is 'defines'
+  String getDefines() { ... }
+
+  @SkylarkProviderField(doc = ...)
+  // Skylark name is 'transitive_deps'
+  NestedSet<Artifact> getTransitiveDeps() { ... }
+
+  @SkylarkProviderField(doc = ...)
+  // Not allowed, the set of types exposed to Skylark is restricted
+  DottedVersion getVersion() { ... }
+
+  // Automatically used to provide an implementation for
+  // construction function.
+  static class Builder {
+    // a setter for 'defines' field, based on name.
+    void setDefines(String defines) { ... }
+    // a setter for 'transitive_deps' field, based on name.
+    void setTransitiveDeps(...) {...}
+    rustProvider build() { ... }
+  }
+}
+
+----------------------------------------
+
+TITLE: Handling Non-Iterable Select Statements in Python
+DESCRIPTION: Demonstrates improved error messaging for attempting to iterate over a 'select' statement, which is not iterable. The suggested output provides more context and a link to relevant documentation.
+
+LANGUAGE: python
+CODE:
+my_obj = select({
+    ":something": [1],
+    "other": [2],
+})
+t = [x for x in my_obj]
+
+----------------------------------------
+
+TITLE: Handling Syntax Errors in Python List Comprehensions
+DESCRIPTION: Shows an improved error message for a syntax error in a list comprehension. The suggested output pinpoints the exact location of the error and provides a clearer explanation.
+
+LANGUAGE: python
+CODE:
+t = [x for x in]
+
+----------------------------------------
+
+TITLE: Handling Invalid Keyword Arguments in Bazel's glob Function
+DESCRIPTION: Illustrates an enhanced error message for using an invalid keyword argument in Bazel's glob function. The suggestion includes a possible correction and a link to relevant documentation.
+
+LANGUAGE: python
+CODE:
+glob(["*.cc"], excludes = ["foo.cc"])
+
+----------------------------------------
+
+TITLE: Implementing Parameterized Aspects in Skylark - Proposal #1
+DESCRIPTION: Example implementation showing how to declare aspect parameters, parameter extractors, and parameter-dependent attributes using explicit parameter declarations. This approach requires declaring all possible parameter values upfront to limit parameter space.
+
+LANGUAGE: python
+CODE:
+SUPPORTED_API_VERSIONS = ["1","2","3"]
+
+def _py_aspect_attrs(api_version):
+    if api_version = "1":
+        return { '_protoc' : attr.label(default = "//tools/protoc:v1") }
+    else if api_version == "2":
+....
+
+def _py_aspect_impl(target, ctx, params):
+    if params.api_version == "1": ....
+py_proto_aspect = aspect(implementation = _py_aspect_impl,
+    params = { 'api_version' : set(SUPPORTED_API_VERSIONS) },
+    attr_aspects = ['deps'],
+    attrs = _py_aspect_attrs,
+)
+
+def _py_proto_library_parameter_extractor(py_api_version, some_other_attr):
+    return { 'api_version' : str(py_api_version), }
+py_proto_library = rule(implementation = _py_proto_library_impl,
+    attrs = {
+        'py_api_version' : attr.int()
+        'deps': attr.label_list(aspect = py_proto_aspect,
+                aspect_parameter_extractor = _py_proto_library_parameter_extractor,
+        ),
+        'some_other_attr' : attr.string(),
+    }
+)
+
+----------------------------------------
+
+TITLE: Implementing Parameterized Aspects in Skylark - Proposal #2
+DESCRIPTION: Alternative implementation using aspect's explicit attributes as parameters. This approach requires all aspect explicit attributes to have values declaration and supports computed defaults for implicit attributes.
+
+LANGUAGE: python
+CODE:
+SUPPORTED_API_VERSIONS = ["1","2","3"]
+
+def _py_aspect_protoc(attr_map):
+    if attr_map.api_version = "1":
+        return Label("//tools/protoc:v1")
+      else if attr_map.api_version "2":
+        ...
+
+def _py_aspect_impl(target, ctx):
+    if ctx.attrs.api_version == "1": ....
+
+py_proto_aspect = aspect(implementation = _py_aspect_impl,
+    attr_aspects = ['deps'],
+    attrs = {
+        '_protoc' : attr.label(default = _py_aspect_protoc)
+        'api_version' : attr.string(values = SUPPORTED_API_VERSIONS)
+    }
+)
+
+def _py_proto_library_parameter_extractor(py_api_version, some_other_attr):
+    return { 'api_version' : str(py_api_version), }
+py_proto_library = rule(implementation = _py_proto_library_impl,
+    attrs = {
+        'py_api_version' : attr.int()
+        'deps': attr.label_list(aspect = py_proto_aspect,
+                aspect_parameter_extractor = _py_proto_library_parameter_extractor,
+        ),
+        'some_other_attr' : attr.string(),
+    }
+)
+
+----------------------------------------
+
+TITLE: Java Setup Macro Example in Skylark
+DESCRIPTION: A Skylark macro that sets up Java-related repositories and bindings in Bazel's WORKSPACE file. It creates a local repository for JDK and establishes bindings for various Java targets.
+
+LANGUAGE: python
+CODE:
+def setup_java():
+  native.new_local_repository(name = "jdk-local", path = "/usr/share/java/jdk8", build_file = "jdk.BUILD")
+  for target in ["jni_header", "jni_md_header", "langtools", "bootclasspath", "extdir", "toolchain", "jdk", "java", "javac", "jar"]:
+    native.bind(name=target, actual="@%s//:%s" % (name, target))
+  native.bind(name="jni_md_header-linux", actual="@%s//:jni_md_header" % name)
+  native.bind(name="jni_md_header-darwin", actual="@%s//:jni_md_header" % name)
+
+----------------------------------------
+
+TITLE: JDK Repository Rule Definition in Skylark
+DESCRIPTION: Definition of a custom repository rule for JDK configuration in Bazel. Specifies implementation function and attributes for Java home and version.
+
+LANGUAGE: python
+CODE:
+jdk_repository = repository_rule(
+  implementation = my_impl,
+  attrs = {
+     "java_home": attr.string(mandatory=False),
+     "java_version": attr.string(default="1.8"),
+  }
+
+----------------------------------------
+
+TITLE: Implementing Bread Library Rule in Skylark
+DESCRIPTION: Example implementation of a Skylark rule that transpiles to Java and invokes native compilation. It demonstrates using declared providers to interact with native Java compilation.
+
+LANGUAGE: python
+CODE:
+def _bread_library_impl(ctx):
+    bread_sources = [f for src in ctx.attrs.src for f in src.files]
+    generated_java_files = _invoke_bread_transpiler(ctx, bread_sources)
+    java_deps = [target[lang.java.provider] for target in ctx.attrs.deps]
+    java_p = lang.java.compile(ctx,
+                srcs = generated_java_files,
+                deps = java_deps,
+                ...)
+    return [java_p, ...]
+
+----------------------------------------
+
+TITLE: Implementing Scala Library Rule in Skylark
+DESCRIPTION: Example implementation of a Skylark rule that compiles directly to JVM bytecode. It shows how to construct and return a Java provider with transitive dependency information.
+
+LANGUAGE: python
+CODE:
+def _scala_library_impl(ctx):
+    dep_jars = [dep[java.lang.provider].jar for dep in ctx.attrs.deps]
+    jar_output = ctx.new_file(...)
+    ... construct compilation actions ...
+    transitive_p = lang.java.transitive(
+                      [dep[java.lang.provider] for dep in ctx.attrs.deps])
+    java_p = lang.java.provider(
+                transitive_p,
+                jar = jar_output,
+                transitive_jars =
+                    transitive_p.transitive_jars | set(jar_output),
+                    ... whatever other information is needed ...)
+    return [java_p, ...]
+
+----------------------------------------
+
+TITLE: Building Bazel Chocolatey Package in PowerShell
+DESCRIPTION: This PowerShell command builds the Bazel Chocolatey package. It uses the build.ps1 script with specified version and mode parameters. The result is a .nupkg file in the chocolatey directory.
+
+LANGUAGE: powershell
+CODE:
+pushd scripts/packages/chocolatey
+  ./build.ps1 -version 0.3.2 -mode local
+popd
+
+----------------------------------------
+
+TITLE: Releasing Bazel Chocolatey Package in PowerShell
+DESCRIPTION: These PowerShell commands build, test, and push the Bazel Chocolatey package for release. It includes building the package, running tests, and pushing to the Chocolatey repository if tests pass.
+
+LANGUAGE: powershell
+CODE:
+./build.ps1 -version <version> -isRelease
+./test.ps1 -version <version>
+# if the test.ps1 passes
+choco push bazel.x.y.z.nupkg --source https://chocolatey.org/
+
+----------------------------------------
+
+TITLE: Testing Bazel Installation with Scoop Commands
+DESCRIPTION: A sequence of Scoop commands to test the Bazel package installation and functionality. This includes uninstalling any existing Bazel installation, installing the updated package, and verifying the installation through version check and basic commands.
+
+LANGUAGE: bash
+CODE:
+scoop uninstall bazel
+scoop install bazel
+bazel version
+bazel something_else
+
+----------------------------------------
+
+TITLE: Adding Git Remote for Scoop Fork
+DESCRIPTION: Git command to add a remote repository for your personal fork of the scoop-main repository, necessary for submitting package updates through pull requests.
+
+LANGUAGE: bash
+CODE:
+git remote add mine FORK_URL
+
+----------------------------------------
+
+TITLE: Demonstrating Markdown Line Wrapping
+DESCRIPTION: This snippet shows how to wrap lines at 80 characters in Markdown for better readability, with an exception for long links or code snippets that should start on a new line.
+
+LANGUAGE: markdown
+CODE:
+Where possible, use Markdown instead of HTML in your files. Follow the
+[GitHub Markdown Syntax Guide](https://guides.github.com/features/mastering-markdown/#syntax)
+for recommended Markdown style.
+
+----------------------------------------
+
+TITLE: Specifying Language for Code Blocks in Markdown
+DESCRIPTION: This snippet demonstrates how to specify the language of a code block in Markdown, which is useful for syntax highlighting and readability.
+
+LANGUAGE: markdown
+CODE:
+```shell
+...
+```
+
+----------------------------------------
+
+TITLE: Executing gcc to get include paths in Skylark
+DESCRIPTION: Executes gcc with the -v flag to dump the built-in include directories. This is part of the proposed repository context methods for C++ toolchain detection.
+
+LANGUAGE: skylark
+CODE:
+execute(["gcc", "-v"])
+
+----------------------------------------
+
+TITLE: Writing files in Skylark remote repository
+DESCRIPTION: Proposed method to write files in the remote repository context, used for generating BUILD and CROSSTOOL files.
+
+LANGUAGE: skylark
+CODE:
+file(path, content)
+
+----------------------------------------
+
+TITLE: Using templates in Skylark remote repository
+DESCRIPTION: Proposed method to use template files for generating configuration files, similar to template_action in Bazel rules.
+
+LANGUAGE: skylark
+CODE:
+template(path, label, variables)
+
+----------------------------------------
+
+TITLE: Error Message Example for Conflicting Repository Definitions
+DESCRIPTION: Example error output when conflicting repository definitions are found in different WORKSPACE files.
+
+LANGUAGE: text
+CODE:
+ERROR: Conflicting definitions of 'foo': bazel-external/y/WORKSPACE:2 repository(name = 'foo' version = '1')
+  requested by bazel-external/x/WORKSPACE:2 repository(name = 'y')
+  requested by WORKSPACE:3 repository(name = 'x')
+vs. bazel-external/a/WORKSPACE:2 repository(name = 'foo' version = '2')
+  requested by WORKSPACE:2 repository(name = 'a')
+
+----------------------------------------
+
+TITLE: Diamond Dependency Error Example
+DESCRIPTION: Example error output when conflicting versions are found in a diamond dependency pattern.
+
+LANGUAGE: text
+CODE:
+ERROR: Conflicting definitions of 'foo': bazel-external/x/WORKSPACE:2 repository(name = 'foo' version = '2')
+  requested by WORKSPACE:2 repository(name = 'x')
+vs. bazel-external/z/WORKSPACE:2 repository(name = 'foo' version = '1')
+  requested by bazel-external/y/WORKSPACE:2 repository(name = 'z')
+  requested by WORKSPACE:3 repository(name = 'y')
+
+----------------------------------------
+
+TITLE: BUILD File Example with Potential Version Conflicts
+DESCRIPTION: Example BUILD file showing how different targets might use different versions of the same dependency.
+
+LANGUAGE: bzl
+CODE:
+cc_library(
+    name = "bar",
+    deps = ["@x//:dep"],  # using @foo version 2
+)
+
+cc_library(
+    name = "baz",
+    deps = ["@y//:dep"],  # using @foo version 1
+)
+
+----------------------------------------
+
+TITLE: Implementing Bazel Configuration Script Interface in Python
+DESCRIPTION: Example of a configuration interface using Skylark-like Python syntax to define configuration parameters and methods for tool setup in Bazel. Defines structure for name, autodetect method, generate method, and load method.
+
+LANGUAGE: python
+CODE:
+configuration(
+	name,              # name of the tools package to configure
+	autodetect_method, # the auto detection method
+	generate_method,   # the actual package generation
+	load_method,       # A method to load the attributes presented
+	                   #            to the user from the package
+	attrs = {          # List of attributes this script propose
+		"jdk_path": String,
+		"__some_other_path": String,  # not user-settable
+		"jdk_version": Integer,
+	})
+
+----------------------------------------
+
+TITLE: Implementing Bazel Configuration Methods in Python
+DESCRIPTION: Example implementation of configuration methods including autodetect_method for detecting JDK paths, generate_method for creating BUILD files, and load_method for loading package attributes.
+
+LANGUAGE: python
+CODE:
+def autodetect_method(env, attrs):
+  if not attrs.java_version:  # If not given in the command line nor loaded
+    attrs.java_version = 8
+  if not attrs.jdk_path:
+    if env.has("JDK_HOME"):
+      attrs.jdk_path = env.get("JDK_HOME")
+    elif env.os = "darwin":
+      attrs.jdk_path = system("/usr/libexec/java_home -v 1." + attrs.java_version + "+")
+    else:
+      attrs.jdk_path = basename(basename(readlink(env.path.find(java))))
+    if not attrs.jdk_path:
+      fail("Could not find JDK home, please set it with `bazel init java:jdk_path=/path/to/jdk`")
+   attrs.__some_other_path = first(glob(["/usr/bin/java", "/usr/local/bin/java"]))
+
+def generate_method(attrs):
+  scratch_file("BUILD.jdk", """
+Content of the jdk BUILD file.
+""")
+  local_repository(name = "jdk", path = attrs.jdk_path, build_file = "BUILD.jdk")
+  bind("@jdk//jdk", "jdk")  
+  java_toolchain(name = "toolchain", source = attrs.java_version, target = attrs.java_version)
+  install_target(__BAZEL_REPOSITORY__, __BAZEL_VERSION__, "//src/java_tools/buildjar:JavaBuilder_deploy.jar")
+  install_target(__BAZEL_REPOSITORY__, __BAZEL_VERSION__, "//src/java_tools/buildjar:JavaBuilder_deploy.jar")
+  copy("https://ijar_url", "ijar")
+
+def load_method(attrs, query):
+  java_toolchain = query.getOne(kind("java_toolchain", "..."))
+  if java_toolchain:
+    attrs.jdk_version = max(java_toolchain.source, java_toolchain.target)
+  jdk = query.getOne(attr("name", "jdk", kind("local_repository", "...")))
+  if jdk:
+    attrs.jdk_path = jdk.path
+
+----------------------------------------
+
+TITLE: Basic Style Definitions in CSS
+DESCRIPTION: CSS styles defining padding, background colors, and status indicators for the roadmap document
+
+LANGUAGE: css
+CODE:
+.padbottom { padding-bottom: 10px; }
+.etabox {
+  background: #EFEFEF;
+  color: #38761D;
+  font-size: 15px;
+  font-weight: bold;
+  display: inline;
+  padding: 6px;
+  margin-right: 10px;
+}
+
+----------------------------------------
+
+TITLE: Bazel Platform Build Command
+DESCRIPTION: Example command showing how to build a target for a specific platform using Bazel
+
+LANGUAGE: shell
+CODE:
+$ bazel build //a:foo_lang_rule --platforms=//platforms:mac
+
+----------------------------------------
+
+TITLE: Multiplatform Build Configuration Example
+DESCRIPTION: BUILD file example demonstrating how to configure builds for multiple platforms without flags
+
+LANGUAGE: shell
+CODE:
+$ cat a/BUILD
+cc_binary(name = "app_for_linux", platforms = ["//platforms:linux"])
+cc_binary(name = "app_for_mac", platforms = ["//platforms:mac"])
+
+$ bazel build //a:all # No command line flags!
+
+----------------------------------------
+
+TITLE: Styling Coverage Status Indicators in CSS
+DESCRIPTION: CSS styles for formatting coverage implementation status indicators in green (done), yellow (in progress) and red (not started).
+
+LANGUAGE: css
+CODE:
+.padbottom { padding-bottom: 10px; }
+.donestatus {
+  color: #00D000;
+  font-weight: bold;
+  padding-left: 10px;
+}
+.inprogressstatus {
+  color: #D0D000;
+  font-weight: bold;
+  padding-left: 10px;
+}
+.notstartedstatus {
+  color: #D00000;
+  font-weight: bold;
+  padding-left: 10px;
+}
+
+----------------------------------------
+
+TITLE: Markdown Page Front Matter
+DESCRIPTION: YAML front matter defining the page layout and title for the coverage roadmap document.
+
+LANGUAGE: yaml
+CODE:
+---
+layout: contribute
+title: Bazel Code Coverage Roadmap
+---
+
+----------------------------------------
+
+TITLE: Styling Status Indicators in CSS
+DESCRIPTION: CSS styles defining color-coded status indicators for different development stages (done, in progress, not started) used in the roadmap display.
+
+LANGUAGE: css
+CODE:
+.padbottom { padding-bottom: 10px; }
+.donestatus {
+  color: #00D000;
+  font-weight: bold;
+  padding-left: 10px;
+}
+.inprogressstatus {
+  color: #D0D000;
+  font-weight: bold;
+  padding-left: 10px;
+}
+.notstartedstatus {
+  color: #D00000;
+  font-weight: bold;
+  padding-left: 10px;
+}
+
+----------------------------------------
+
+TITLE: Markdown Page Layout Configuration
+DESCRIPTION: YAML front matter configuration for the page layout and title.
+
+LANGUAGE: markdown
+CODE:
+---
+layout: contribute
+title: Bazel C++ Rules Roadmap
+---
+
+----------------------------------------
+
+TITLE: Example Multiplatform Build in Bazel
+DESCRIPTION: Example showing how to define platform-specific targets in a BUILD file and build them without command line flags.
+
+LANGUAGE: bash
+CODE:
+$ cat a/BUILD
+cc_binary(name = "app_for_linux", platforms = ["//platforms:linux"])
+cc_binary(name = "app_for_mac", platforms = ["//platforms:mac"])
+
+$ bazel build //a:all # No command line flags!
+
+----------------------------------------
+
+TITLE: Styling Roadmap Status Indicators in HTML/CSS
+DESCRIPTION: CSS styles for formatting the roadmap, including status indicators, ETA boxes, and other visual elements.
+
+LANGUAGE: html
+CODE:
+<style>
+  .padbottom { padding-bottom: 10px; }
+  .etabox {
+    background: #EFEFEF;
+    color: #38761D;
+    font-size: 15px;
+    font-weight: bold;
+    display: inline;
+    padding: 6px;
+    margin-right: 10px;
+  }
+  .donestatus {
+    color: #00D000;
+    font-weight: bold;
+    padding-left: 10px;
+  }
+  .inprogressstatus {
+    color: #D0D000;
+    font-weight: bold;
+    padding-left: 10px;
+  }
+  .notstartedstatus {
+    color: #D00000;
+    font-weight: bold;
+    padding-left: 10px;
+  }
+</style>
+
+----------------------------------------
+
+TITLE: CSS Styling for Roadmap Status Indicators
+DESCRIPTION: CSS styles defining the visual appearance of status indicators and layout elements used in the roadmap document
+
+LANGUAGE: css
+CODE:
+.padbottom { padding-bottom: 10px; }
+.etabox {
+  background: #EFEFEF;
+  color: #38761D;
+  font-size: 15px;
+  font-weight: bold;
+  display: inline;
+  padding: 6px;
+  margin-right: 10px;
+}
+.donestatus {
+  color: #00D000;
+  font-weight: bold;
+  padding-left: 10px;
+}
+.droppedstatus {
+  color: #D00000;
+  font-weight: bold;
+  padding-left: 10px;
+}
+.inprogressstatus {
+  color: #D0D000;
+  font-weight: bold;
+  padding-left: 10px;
+}
+
+----------------------------------------
+
+TITLE: Styling Roadmap Status Indicators in CSS
+DESCRIPTION: CSS styles defining the visual appearance of roadmap status indicators, ETA boxes, and padding elements used throughout the documentation.
+
+LANGUAGE: css
+CODE:
+.padbottom { padding-bottom: 10px; }
+.etabox {
+  background: #EFEFEF;
+  color: #38761D;
+  font-size: 15px;
+  font-weight: bold;
+  display: inline;
+  padding: 6px;
+  margin-right: 10px;
+}
+.donestatus {
+  color: #00D000;
+  font-weight: bold;
+  padding-left: 10px;
+}
+.inprogressstatus {
+  color: #D0D000;
+  font-weight: bold;
+  padding-left: 10px;
+}
+.notstartedstatus {
+  color: #D00000;
+  font-weight: bold;
+  padding-left: 10px;
+}
+
+----------------------------------------
+
+TITLE: Bazel-Styled 404 Error Output in HTML/Markdown
+DESCRIPTION: A pre-formatted code block that simulates a Bazel build command failure, styled to show a 404 error in a way familiar to Bazel users. Uses HTML styling for color-coded error and info messages.
+
+LANGUAGE: html
+CODE:
+<pre>
+$ bazel build :what-you-were-looking-for
+...............
+<b><span style="color: red;">ERROR</span></b>: no such page ':what-you-were-looking-for': BUILD file not found on package path.
+<b><span style="color: green;">INFO</span></b>: Elapsed time: 0.567s
+</pre>
+
+----------------------------------------
+
+TITLE: Searching Files with Regular Expressions in Bazel Search
+DESCRIPTION: Examples of how to search for specific files using either escaped periods or quoted strings in Bazel's search interface. Both approaches prevent the period from being interpreted as a regex metacharacter.
+
+LANGUAGE: regex
+CODE:
+foo\.java
+"foo.java"
+
+----------------------------------------
+
+TITLE: Markdown Front Matter for Release Notes Page
+DESCRIPTION: YAML front matter defining the page layout and title for the release notes documentation page.
+
+LANGUAGE: markdown
+CODE:
+---
+layout: contribute
+title: Release notes
+---
+
+----------------------------------------
+
+TITLE: Structuring Bazel Community Experts Page in HTML
+DESCRIPTION: This HTML snippet outlines the structure of the Bazel Community Experts page, including hero section, expert profiles, and contact information. It uses Bootstrap classes for responsive layout and styling.
+
+LANGUAGE: HTML
+CODE:
+<div class="home">
+  <div class="landing-section hero">
+    <div class="container">
+      <div class="row">
+        <div class="col-sm-8">
+          <p class="hero-tagline">{Fast, Correct} - Choose two</p>
+          <h1 class="hero-title">Bazel Community Experts</h1>
+        </div>
+        <div class="col-sm-4 hidden-xs">
+          <img src="images/bazel-icon.svg" title="Bazel" alt="Bazel logo" class="logo-md img-responsive">
+        </div>
+        <p class="hero-tagline-sub">Companies who have provided significant contributions to the Bazel community and can help with your project</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- Expert profiles sections -->
+  <div class="landing-section experts">
+    <!-- ... Expert profile content ... -->
+  </div>
+
+  <div class="beta">
+    <div class="container">
+      <div class="row">
+        <div class="col-sm-12">
+          <p>
+            <b>Would like to be on this list? </b><br>
+            If you are interested in being listed as a community expert, please contact <a href="mailto:bazel-experts@bazel.build">bazel-experts@bazel.build</a>.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+----------------------------------------
+
+TITLE: Default Bazel Environment Configuration
+DESCRIPTION: Default configuration in global Bazel rc-file for backward compatibility, specifying essential environment variables like PATH, LD_LIBRARY_PATH, and TMPDIR for both build and test actions.
+
+LANGUAGE: bazel
+CODE:
+build --action_env=PATH
+build --action_env=LD_LIBRARY_PATH
+build --action_env=TMPDIR
+build --test_env=PATH
+build --test_env=LD_LIBRARY_PATH
+
+----------------------------------------
+
+TITLE: Using Zipper to Package Runfiles for Python on Windows
+DESCRIPTION: Examples of using the enhanced zipper tool to package Python runfiles into a zip archive with custom internal paths. This allows for creating the necessary directory structure and __init__.py files.
+
+LANGUAGE: bash
+CODE:
+$ zipper cC x.zip a/b/lib.py                  # Add file a/b/lib.py
+$ zipper cC x.zip a/b/__init__.py=            # Add an empty file at a/b/__init__.py
+$ zipper cC x.zip a/b/main.py=foo/bar/bin.py  # Add file foo/bar/bin.py as a/b/main.py
+
+----------------------------------------
+
+TITLE: Running Python Binaries on Windows
+DESCRIPTION: Demonstrates how to execute the generated Python binary zip file on Windows, either directly or by explicitly invoking Python.
+
+LANGUAGE: bash
+CODE:
+$ ./bazel-bin/foo/bar/bin
+$ python ./bazel-bin/foo/bar/bin
+
+----------------------------------------
+
+TITLE: Checking for Derived Directory in Bazel Compilation Script
+DESCRIPTION: Modification to the compile.sh script to check for the existence of a 'derived' directory containing pre-generated protoc output. If not present, it falls back to using the PROTOC environment variable.
+
+LANGUAGE: shell
+CODE:
+if [ -d "derived" ]; then
+  # Use pre-generated files from the derived directory
+else
+  # Generate needed output using $PROTOC
+  $PROTOC ...
+fi
+
+----------------------------------------
+
+TITLE: Defining Repository Rule with Environment Variables in Python
+DESCRIPTION: Example showing how to create a repository rule that depends on specific environment variables FOO and BAR. Changes to these variables will trigger repository refetch.
+
+LANGUAGE: python
+CODE:
+my_repo = repository_rule(impl = _impl, environ = ["FOO", "BAR"])
+
+----------------------------------------
+
+TITLE: Configuring and Using Label-Keyed String Dictionary in Bazel
+DESCRIPTION: Example showing how to use the new label-keyed string dictionary type for defining configuration flags, setting values, and using them in build rules. Demonstrates flag_rule definition, config_setting usage, and rule transitions.
+
+LANGUAGE: starlark
+CODE:
+flag_rule(
+    name = "beep",
+    values = ["boop", "bop", "bump"],
+    default = "bump"
+)
+
+config_setting(
+    name = "beep#boop",
+    flag_values = {
+        ":beep": "boop"
+    }
+)
+
+transition_rule(
+    name = "configuration",
+    deps = [
+      ":lib"
+    ],
+    sets_flags = {
+      ":beep": "boop"
+    }
+)
+
+library_rule(
+    name = "lib"
+    deps = select({
+      ":beep#boop": [":boop_dep"],
+      "//conditions:default": [":other_dep"]
+    })
+)
+
+----------------------------------------
+
+TITLE: Defining OptionsParsed Message Structure in Protocol Buffers
+DESCRIPTION: Protocol buffer message definition showing the current structure for parsed options in the Build Event Protocol, including startup options and command line options.
+
+LANGUAGE: proto
+CODE:
+message OptionsParsed {
+  repeated string startup_options = 1;
+  repeated string explicit_startup_options = 2;
+  repeated string cmd_line = 3;
+  repeated string explicit_cmd_line = 4;
+  blaze.invocation_policy.InvocationPolicy invocation_policy = 5;
+}
+
+----------------------------------------
+
+TITLE: Adding Metadata Tag for Incompatible Change Flag in Java
+DESCRIPTION: This code snippet shows how to add the required metadata tag for an incompatible change flag in Java. The tag is necessary for flags whose names start with 'incompatible_'.
+
+LANGUAGE: java
+CODE:
+      metadataTags = {OptionMetadataTag.INCOMPATIBLE_CHANGE},

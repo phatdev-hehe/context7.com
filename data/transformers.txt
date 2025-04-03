@@ -1,0 +1,1336 @@
+TITLE: Computing Text Embeddings with WebGPU in Transformers.js
+DESCRIPTION: This snippet demonstrates how to create a feature-extraction pipeline using WebGPU acceleration in Transformers.js. It computes embeddings for given text inputs using a pre-trained model.
+
+LANGUAGE: javascript
+CODE:
+import { pipeline } from "@huggingface/transformers";
+
+// Create a feature-extraction pipeline
+const extractor = await pipeline(
+  "feature-extraction",
+  "mixedbread-ai/mxbai-embed-xsmall-v1",
+  { device: "webgpu" },
+);
+
+// Compute embeddings
+const texts = ["Hello world!", "This is an example sentence."];
+const embeddings = await extractor(texts, { pooling: "mean", normalize: true });
+console.log(embeddings.tolist());
+// [
+//   [-0.016986183822155, 0.03228696808218956, -0.0013630966423079371, ... ],
+//   [0.09050482511520386, 0.07207386940717697, 0.05762749910354614, ... ],
+// ]
+
+----------------------------------------
+
+TITLE: Full Example of Florence-2 Image Captioning with Transformers.js
+DESCRIPTION: This comprehensive example demonstrates loading the Florence-2 model, processor, and tokenizer, preparing vision and text inputs, generating text based on an image, and post-processing the result. It showcases the complete workflow for image captioning using Florence-2.
+
+LANGUAGE: javascript
+CODE:
+import {
+  Florence2ForConditionalGeneration,
+  AutoProcessor,
+  AutoTokenizer,
+  RawImage,
+} from "@huggingface/transformers";
+
+// Load model, processor, and tokenizer
+const model_id = "onnx-community/Florence-2-base-ft";
+const model = await Florence2ForConditionalGeneration.from_pretrained(
+  model_id,
+  {
+    dtype: {
+      embed_tokens: "fp16",
+      vision_encoder: "fp16",
+      encoder_model: "q4",
+      decoder_model_merged: "q4",
+    },
+    device: "webgpu",
+  },
+);
+const processor = await AutoProcessor.from_pretrained(model_id);
+const tokenizer = await AutoTokenizer.from_pretrained(model_id);
+
+// Load image and prepare vision inputs
+const url = "https://huggingface.co/datasets/huggingface/documentation-images/resolve/main/transformers/tasks/car.jpg";
+const image = await RawImage.fromURL(url);
+const vision_inputs = await processor(image);
+
+// Specify task and prepare text inputs
+const task = "<MORE_DETAILED_CAPTION>";
+const prompts = processor.construct_prompts(task);
+const text_inputs = tokenizer(prompts);
+
+// Generate text
+const generated_ids = await model.generate({
+  ...text_inputs,
+  ...vision_inputs,
+  max_new_tokens: 100,
+});
+
+// Decode generated text
+const generated_text = tokenizer.batch_decode(generated_ids, {
+  skip_special_tokens: false,
+})[0];
+
+// Post-process the generated text
+const result = processor.post_process_generation(
+  generated_text,
+  task,
+  image.size,
+);
+console.log(result);
+// { '<MORE_DETAILED_CAPTION>': 'A green car is parked in front of a tan building. The building has a brown door and two brown windows. The car is a two door and the door is closed. The green car has black tires.' }
+
+----------------------------------------
+
+TITLE: Performing Image Classification with WebGPU in Transformers.js
+DESCRIPTION: This snippet illustrates how to use WebGPU acceleration for image classification in Transformers.js. It creates a pipeline using the MobileNetV4 model to classify an image from a URL.
+
+LANGUAGE: javascript
+CODE:
+import { pipeline } from "@huggingface/transformers";
+
+// Create image classification pipeline
+const classifier = await pipeline(
+  "image-classification",
+  "onnx-community/mobilenetv4_conv_small.e2400_r224_in1k",
+  { device: "webgpu" },
+);
+
+// Classify an image from a URL
+const url = "https://huggingface.co/datasets/Xenova/transformers.js-docs/resolve/main/tiger.jpg";
+const output = await classifier(url);
+console.log(output);
+// [
+//   { label: 'tiger, Panthera tigris', score: 0.6149784922599792 },
+//   { label: 'tiger cat', score: 0.30281734466552734 },
+//   { label: 'tabby, tabby cat', score: 0.0019135422771796584 },
+//   { label: 'lynx, catamount', score: 0.0012161266058683395 },
+//   { label: 'Egyptian cat', score: 0.0011465961579233408 }
+// ]
+
+----------------------------------------
+
+TITLE: Performing Automatic Speech Recognition with WebGPU in Transformers.js
+DESCRIPTION: This example shows how to use WebGPU acceleration for automatic speech recognition in Transformers.js. It creates a pipeline using the OpenAI Whisper model to transcribe audio from a URL.
+
+LANGUAGE: javascript
+CODE:
+import { pipeline } from "@huggingface/transformers";
+
+// Create automatic speech recognition pipeline
+const transcriber = await pipeline(
+  "automatic-speech-recognition",
+  "onnx-community/whisper-tiny.en",
+  { device: "webgpu" },
+);
+
+// Transcribe audio from a URL
+const url = "https://huggingface.co/datasets/Xenova/transformers.js-docs/resolve/main/jfk.wav";
+const output = await transcriber(url);
+console.log(output);
+// { text: ' And so my fellow Americans ask not what your country can do for you, ask what you can do for your country.' }
+
+----------------------------------------
+
+TITLE: Running Qwen2.5-0.5B-Instruct in 4-bit Quantization with Transformers.js
+DESCRIPTION: This snippet demonstrates how to create a text generation pipeline using the Qwen2.5-0.5B-Instruct model with 4-bit quantization. It sets up the pipeline, defines a list of messages, and generates a response.
+
+LANGUAGE: javascript
+CODE:
+import { pipeline } from "@huggingface/transformers";
+
+// Create a text generation pipeline
+const generator = await pipeline(
+  "text-generation",
+  "onnx-community/Qwen2.5-0.5B-Instruct",
+  { dtype: "q4", device: "webgpu" },
+);
+
+// Define the list of messages
+const messages = [
+  { role: "system", content: "You are a helpful assistant." },
+  { role: "user", content: "Tell me a funny joke." },
+];
+
+// Generate a response
+const output = await generator(messages, { max_new_tokens: 128 });
+console.log(output[0].generated_text.at(-1).content);
+
+----------------------------------------
+
+TITLE: Running Florence-2 with Per-module Dtypes in Transformers.js
+DESCRIPTION: This example shows how to use Florence-2 model with per-module dtype selection. It demonstrates setting different dtypes for various components of the model, allowing for fine-grained control over quantization.
+
+LANGUAGE: javascript
+CODE:
+import { Florence2ForConditionalGeneration } from "@huggingface/transformers";
+
+const model = await Florence2ForConditionalGeneration.from_pretrained(
+  "onnx-community/Florence-2-base-ft",
+  {
+    dtype: {
+      embed_tokens: "fp16",
+      vision_encoder: "fp16",
+      encoder_model: "q4",
+      decoder_model_merged: "q4",
+    },
+    device: "webgpu",
+  },
+);
+
+----------------------------------------
+
+TITLE: Streaming Text Generation Pipeline
+DESCRIPTION: Implements a streaming text generation pipeline with a chat model and custom text streamer.
+
+LANGUAGE: javascript
+CODE:
+import { pipeline, TextStreamer } from "@huggingface/transformers";
+
+const generator = await pipeline(
+  "text-generation",
+  "onnx-community/Qwen2.5-Coder-0.5B-Instruct",
+  { dtype: "q4" },
+);
+
+const messages = [
+  { role: "system", content: "You are a helpful assistant." },
+  { role: "user", content:  "Write a quick sort algorithm." },
+];
+
+const streamer = new TextStreamer(generator.tokenizer, {
+  skip_prompt: true,
+})
+
+const result = await generator(messages, { max_new_tokens: 512, do_sample: false, streamer });
+
+----------------------------------------
+
+TITLE: Multilingual Translation Pipeline
+DESCRIPTION: Implements a translation pipeline supporting multiple languages with source and target language specification.
+
+LANGUAGE: javascript
+CODE:
+const translator = await pipeline('translation', 'Xenova/nllb-200-distilled-600M');
+
+const result = await translator('I like to walk my dog.', {
+    src_lang: 'eng_Latn',
+    tgt_lang: 'ell_Grek'
+});
+
+const result2 = await translator(result[0].translation_text, {
+    src_lang: 'ell_Grek',
+    tgt_lang: 'eng_Latn'
+});
+
+----------------------------------------
+
+TITLE: Speech Recognition Pipeline with Whisper Model
+DESCRIPTION: Implements an automatic speech recognition pipeline using the Whisper model to transcribe audio.
+
+LANGUAGE: javascript
+CODE:
+const transcriber = await pipeline('automatic-speech-recognition', 'Xenova/whisper-small.en');
+
+const result = await transcriber('https://huggingface.co/datasets/Narsil/asr_dummy/resolve/main/mlk.flac');
+// {text: ' I have a dream that one day this nation will rise up and live out the true meaning of its creed.'}
+
+----------------------------------------
+
+TITLE: Loading and Processing Audio File for Whisper Model
+DESCRIPTION: Fetches a WAV file, converts it to the required format (32-bit float, 16kHz sample rate), and handles multi-channel audio by merging channels if necessary.
+
+LANGUAGE: javascript
+CODE:
+// Load audio data
+let url = 'https://huggingface.co/datasets/Xenova/transformers.js-docs/resolve/main/jfk.wav';
+let buffer = Buffer.from(await fetch(url).then(x => x.arrayBuffer()))
+
+// Read .wav file and convert it to required format
+let wav = new wavefile.WaveFile(buffer);
+wav.toBitDepth('32f'); // Pipeline expects input as a Float32Array
+wav.toSampleRate(16000); // Whisper expects audio with a sampling rate of 16000
+let audioData = wav.getSamples();
+if (Array.isArray(audioData)) {
+  if (audioData.length > 1) {
+    const SCALING_FACTOR = Math.sqrt(2);
+
+    // Merge channels (into first channel to save memory)
+    for (let i = 0; i < audioData[0].length; ++i) {
+      audioData[0][i] = SCALING_FACTOR * (audioData[0][i] + audioData[1][i]) / 2;
+    }
+  }
+
+  // Select first channel
+  audioData = audioData[0];
+}
+
+----------------------------------------
+
+TITLE: Basic Pipeline Usage Example - Python vs JavaScript
+DESCRIPTION: Comparison showing how to use the pipeline API for sentiment analysis in both Python and JavaScript
+
+LANGUAGE: python
+CODE:
+from transformers import pipeline
+
+# Allocate a pipeline for sentiment-analysis
+pipe = pipeline('sentiment-analysis')
+
+out = pipe('I love transformers!')
+# [{'label': 'POSITIVE', 'score': 0.999806941}]
+
+LANGUAGE: javascript
+CODE:
+import { pipeline } from '@huggingface/transformers';
+
+// Allocate a pipeline for sentiment-analysis
+const pipe = await pipeline('sentiment-analysis');
+
+const out = await pipe('I love transformers!');
+// [{'label': 'POSITIVE', 'score': 0.999817686}]
+
+----------------------------------------
+
+TITLE: Using Custom Models with Transformers.js
+DESCRIPTION: Examples showing how to use custom models, enable WebGPU acceleration, and configure quantization
+
+LANGUAGE: javascript
+CODE:
+// Use a different model for sentiment-analysis
+const pipe = await pipeline('sentiment-analysis', 'Xenova/bert-base-multilingual-uncased-sentiment');
+
+LANGUAGE: javascript
+CODE:
+// Run the model on WebGPU
+const pipe = await pipeline('sentiment-analysis', 'Xenova/distilbert-base-uncased-finetuned-sst-2-english', {
+  device: 'webgpu',
+});
+
+LANGUAGE: javascript
+CODE:
+// Run the model at 4-bit quantization
+const pipe = await pipeline('sentiment-analysis', 'Xenova/distilbert-base-uncased-finetuned-sst-2-english', {
+  dtype: 'q4',
+});
+
+----------------------------------------
+
+TITLE: Creating Object Detection Pipeline with Transformers.js
+DESCRIPTION: Sets up an object detection pipeline using the Transformers.js library, loading a pre-trained model for object detection.
+
+LANGUAGE: javascript
+CODE:
+status.textContent = "Loading model...";
+
+const detector = await pipeline("object-detection", "Xenova/detr-resnet-50");
+
+status.textContent = "Ready";
+
+----------------------------------------
+
+TITLE: Running Object Detection Model in JavaScript
+DESCRIPTION: Defines the detect function that runs the object detection model on the uploaded image and processes the output.
+
+LANGUAGE: javascript
+CODE:
+async function detect(img) {
+  status.textContent = "Analysing...";
+  const output = await detector(img.src, {
+    threshold: 0.5,
+    percentage: true,
+  });
+  status.textContent = "";
+  console.log("output", output);
+  output.forEach(renderBox);
+}
+
+----------------------------------------
+
+TITLE: Text Generation Pipeline with Custom Parameters
+DESCRIPTION: Creates a text generation pipeline with specific generation parameters for creative text generation.
+
+LANGUAGE: javascript
+CODE:
+const poet = await pipeline('text2text-generation', 'Xenova/LaMini-Flan-T5-783M');
+const result = await poet('Write me a love poem about cheese.', {
+    max_new_tokens: 200,
+    temperature: 0.9,
+    repetition_penalty: 2.0,
+    no_repeat_ngram_size: 3,
+});
+
+----------------------------------------
+
+TITLE: Loading Private Model Tokenizer in Transformers.js
+DESCRIPTION: Demonstrates how to load and use a tokenizer from a gated repository (Llama-2) using Transformers.js. The code shows importing the tokenizer, encoding text, and logging the results.
+
+LANGUAGE: javascript
+CODE:
+import { AutoTokenizer } from '@huggingface/transformers';
+
+// Load tokenizer for a gated repository.
+const tokenizer = await AutoTokenizer.from_pretrained('meta-llama/Llama-2-7b-hf');
+
+// Encode text.
+const text = 'Hello world!';
+const encoded = tokenizer.encode(text);
+console.log(encoded);
+
+----------------------------------------
+
+TITLE: Creating Speech Recognition Pipeline with Transformers.js
+DESCRIPTION: Initializes a speech recognition pipeline using the Whisper model from Transformers.js.
+
+LANGUAGE: javascript
+CODE:
+let transcriber = await pipeline('automatic-speech-recognition', 'Xenova/whisper-tiny.en');
+
+----------------------------------------
+
+TITLE: Executing Speech Recognition and Measuring Performance
+DESCRIPTION: Runs the speech recognition model on the processed audio data and measures the execution time.
+
+LANGUAGE: javascript
+CODE:
+let start = performance.now();
+let output = await transcriber(audioData);
+let end = performance.now();
+console.log(`Execution duration: ${(end - start) / 1000} seconds`);
+console.log(output);
+
+----------------------------------------
+
+TITLE: Initializing Sentiment Analysis Pipeline in JavaScript
+DESCRIPTION: Creates a basic sentiment analysis pipeline using the default pretrained model.
+
+LANGUAGE: javascript
+CODE:
+import { pipeline } from '@huggingface/transformers';
+
+const classifier = await pipeline('sentiment-analysis');
+
+----------------------------------------
+
+TITLE: Feature Extraction Pipeline with Custom Options
+DESCRIPTION: Creates a feature extraction pipeline with specific model configuration options.
+
+LANGUAGE: javascript
+CODE:
+const pipe = await pipeline('feature-extraction', 'Xenova/all-MiniLM-L6-v2', {
+    dtype: "fp32",
+});
+
+----------------------------------------
+
+TITLE: Implementing Translation Pipeline Worker
+DESCRIPTION: Web Worker implementation for handling ML translation tasks using a singleton pattern.
+
+LANGUAGE: javascript
+CODE:
+import { pipeline, TextStreamer } from '@huggingface/transformers';
+
+class MyTranslationPipeline {
+  static task = 'translation';
+  static model = 'Xenova/nllb-200-distilled-600M';
+  static instance = null;
+
+  static async getInstance(progress_callback = null) {
+    this.instance ??= pipeline(this.task, this.model, { progress_callback });
+    return this.instance;
+  }
+}
+
+----------------------------------------
+
+TITLE: Implementing Web Worker for ML Processing
+DESCRIPTION: Web Worker implementation for handling ML tasks using the Transformers.js pipeline in a separate thread.
+
+LANGUAGE: javascript
+CODE:
+import { pipeline, env } from "@huggingface/transformers";
+
+env.allowLocalModels = false;
+
+class PipelineSingleton {
+    static task = 'text-classification';
+    static model = 'Xenova/distilbert-base-uncased-finetuned-sst-2-english';
+    static instance = null;
+
+    static async getInstance(progress_callback = null) {
+        if (this.instance === null) {
+            this.instance = pipeline(this.task, this.model, { progress_callback });
+        }
+        return this.instance;
+    }
+}
+
+self.addEventListener('message', async (event) => {
+    let classifier = await PipelineSingleton.getInstance(x => {
+        self.postMessage(x);
+    });
+
+    let output = await classifier(event.data.text);
+
+    self.postMessage({
+        status: 'complete',
+        output: output,
+    });
+});
+
+----------------------------------------
+
+TITLE: Rendering Bounding Boxes for Detected Objects in JavaScript
+DESCRIPTION: Implements the renderBox function to draw bounding boxes and labels around detected objects in the image.
+
+LANGUAGE: javascript
+CODE:
+function renderBox({ box, label }) {
+  const { xmax, xmin, ymax, ymin } = box;
+
+  // Generate a random color for the box
+  const color = "#" + Math.floor(Math.random() * 0xffffff).toString(16).padStart(6, 0);
+
+  // Draw the box
+  const boxElement = document.createElement("div");
+  boxElement.className = "bounding-box";
+  Object.assign(boxElement.style, {
+    borderColor: color,
+    left: 100 * xmin + "%",
+    top: 100 * ymin + "%",
+    width: 100 * (xmax - xmin) + "%",
+    height: 100 * (ymax - ymin) + "%",
+  });
+
+  // Draw the label
+  const labelElement = document.createElement("span");
+  labelElement.textContent = label;
+  labelElement.className = "bounding-box-label";
+  labelElement.style.backgroundColor = color;
+
+  boxElement.appendChild(labelElement);
+  imageContainer.appendChild(boxElement);
+}
+
+----------------------------------------
+
+TITLE: Configuring Worker Message Handling
+DESCRIPTION: Implementation of web worker message handling for translation pipeline.
+
+LANGUAGE: javascript
+CODE:
+self.addEventListener('message', async (event) => {
+  const translator = await MyTranslationPipeline.getInstance(x => {
+      self.postMessage(x);
+  });
+
+  const streamer = new TextStreamer(translator.tokenizer, {
+      skip_prompt: true,
+      skip_special_tokens: true,
+      callback_function: function (text) {
+          self.postMessage({
+              status: 'update',
+              output: text
+          });
+      }
+  });
+
+  const output = await translator(event.data.text, {
+      tgt_lang: event.data.tgt_lang,
+      src_lang: event.data.src_lang,
+      streamer,
+  });
+
+  self.postMessage({
+      status: 'complete',
+      output,
+  });
+});
+
+----------------------------------------
+
+TITLE: ESM Classification Pipeline Implementation
+DESCRIPTION: Implementation of the classification pipeline class using ESM imports and singleton pattern.
+
+LANGUAGE: javascript
+CODE:
+import { pipeline, env } from '@huggingface/transformers';
+
+class MyClassificationPipeline {
+  static task = 'text-classification';
+  static model = 'Xenova/distilbert-base-uncased-finetuned-sst-2-english';
+  static instance = null;
+
+  static async getInstance(progress_callback = null) {
+    if (this.instance === null) {
+      // NOTE: Uncomment this to change the cache directory
+      // env.cacheDir = './.cache';
+
+      this.instance = pipeline(this.task, this.model, { progress_callback });
+    }
+
+    return this.instance;
+  }
+}
+
+----------------------------------------
+
+TITLE: HTTP Server Implementation
+DESCRIPTION: Creation of an HTTP server that handles classification requests using the pipeline.
+
+LANGUAGE: javascript
+CODE:
+const server = http.createServer();
+const hostname = '127.0.0.1';
+const port = 3000;
+
+server.on('request', async (req, res) => {
+  const parsedUrl = url.parse(req.url);
+  const { text } = querystring.parse(parsedUrl.query);
+  res.setHeader('Content-Type', 'application/json');
+
+  let response;
+  if (parsedUrl.pathname === '/classify' && text) {
+    const classifier = await MyClassificationPipeline.getInstance();
+    response = await classifier(text);
+    res.statusCode = 200;
+  } else {
+    response = { 'error': 'Bad request' }
+    res.statusCode = 400;
+  }
+
+  res.end(JSON.stringify(response));
+});
+
+server.listen(port, hostname, () => {
+  console.log(`Server running at http://${hostname}:${port}/`);
+});
+
+----------------------------------------
+
+TITLE: CommonJS Classification Pipeline Implementation
+DESCRIPTION: Implementation of the classification pipeline class using dynamic imports for CommonJS compatibility.
+
+LANGUAGE: javascript
+CODE:
+class MyClassificationPipeline {
+  static task = 'text-classification';
+  static model = 'Xenova/distilbert-base-uncased-finetuned-sst-2-english';
+  static instance = null;
+
+  static async getInstance(progress_callback = null) {
+    if (this.instance === null) {
+      // Dynamically import the Transformers.js library
+      let { pipeline, env } = await import('@huggingface/transformers');
+
+      // NOTE: Uncomment this to change the cache directory
+      // env.cacheDir = './.cache';
+
+      this.instance = pipeline(this.task, this.model, { progress_callback });
+    }
+
+    return this.instance;
+  }
+}
+
+----------------------------------------
+
+TITLE: Custom Model Pipeline for Movie Reviews
+DESCRIPTION: Creates a sentiment analysis pipeline using a specific model for movie review rating prediction.
+
+LANGUAGE: javascript
+CODE:
+const reviewer = await pipeline('sentiment-analysis', 'Xenova/bert-base-multilingual-uncased-sentiment');
+
+const result = await reviewer('The Shawshank Redemption is a true masterpiece of cinema.');
+// [{label: '5 stars', score: 0.8167929649353027}]
+
+----------------------------------------
+
+TITLE: Creating Next.js Client Component UI
+DESCRIPTION: React component implementation for the client-side UI with Web Worker integration and state management.
+
+LANGUAGE: jsx
+CODE:
+'use client'
+
+import { useState, useEffect, useRef, useCallback } from 'react'
+
+export default function Home() {
+  const [result, setResult] = useState(null);
+  const [ready, setReady] = useState(null);
+  const worker = useRef(null);
+
+  useEffect(() => {
+    if (!worker.current) {
+      worker.current = new Worker(new URL('./worker.js', import.meta.url), {
+        type: 'module'
+      });
+    }
+
+    const onMessageReceived = (e) => {
+      switch (e.data.status) {
+        case 'initiate':
+          setReady(false);
+          break;
+        case 'ready':
+          setReady(true);
+          break;
+        case 'complete':
+          setResult(e.data.output[0])
+          break;
+      }
+    };
+
+    worker.current.addEventListener('message', onMessageReceived);
+    return () => worker.current.removeEventListener('message', onMessageReceived);
+  });
+
+  const classify = useCallback((text) => {
+    if (worker.current) {
+      worker.current.postMessage({ text });
+    }
+  }, []);
+
+  return (
+    <main className="flex min-h-screen flex-col items-center justify-center p-12">
+      <h1 className="text-5xl font-bold mb-2 text-center">Transformers.js</h1>
+      <h2 className="text-2xl mb-4 text-center">Next.js template</h2>
+
+      <input
+        className="w-full max-w-xs p-2 border border-gray-300 rounded mb-4"
+        type="text"
+        placeholder="Enter text here"
+        onInput={e => {
+            classify(e.target.value);
+        }}
+      />
+
+      {ready !== null && (
+        <pre className="bg-gray-100 p-2 rounded">
+          { (!ready || !result) ? 'Loading...' : JSON.stringify(result, null, 2) }
+        </pre>
+      )}
+    </main>
+  )
+}
+
+----------------------------------------
+
+TITLE: Using Transformers.js via CDN
+DESCRIPTION: Example of importing Transformers.js library via CDN in vanilla JavaScript using ES Modules
+
+LANGUAGE: html
+CODE:
+<script type="module">
+    import { pipeline } from 'https://cdn.jsdelivr.net/npm/@huggingface/transformers@3.4.2';
+</script>
+
+----------------------------------------
+
+TITLE: Creating React Language Selector Component
+DESCRIPTION: React component for selecting source and target languages for translation.
+
+LANGUAGE: jsx
+CODE:
+const LANGUAGES = {
+  "Acehnese (Arabic script)": "ace_Arab",
+  "Acehnese (Latin script)": "ace_Latn",
+  "Afrikaans": "afr_Latn",
+  "Zulu": "zul_Latn",
+}
+
+export default function LanguageSelector({ type, onChange, defaultLanguage }) {
+  return (
+    <div className='language-selector'>
+      <label>{type}: </label>
+      <select onChange={onChange} defaultValue={defaultLanguage}>
+        {Object.entries(LANGUAGES).map(([key, value]) => {
+          return <option key={key} value={value}>{key}</option>
+        })}
+      </select>
+    </div>
+  )
+}
+
+----------------------------------------
+
+TITLE: Setting Access Token Programmatically in Transformers.js
+DESCRIPTION: Example of setting the Hugging Face access token programmatically through environment variables in Node.js code.
+
+LANGUAGE: javascript
+CODE:
+// Set access token (NB: Keep this private!)
+process.env.HF_TOKEN = 'hf_...';
+
+// ... rest of your code
+
+----------------------------------------
+
+TITLE: Creating match_images Function in SQL for Supabase
+DESCRIPTION: SQL function to match images based on vector similarity. It takes query embedding, match threshold, and match count as parameters and returns relevant image information.
+
+LANGUAGE: sql
+CODE:
+-- https://supabase.com/blog/openai-embeddings-postgres-vector
+create or replace function match_images (
+    query_embedding vector(512),
+    match_threshold float,
+    match_count int
+)
+returns table (
+    photo_id text,
+    photo_url text,
+    photo_image_url text,
+    photo_width int,
+    photo_height int,
+    photo_aspect_ratio float,
+    photo_description text,
+    ai_description text,
+    blur_hash text,
+    similarity float
+)
+language sql stable
+as $$
+select
+    photo_id,
+    photo_url,
+    photo_image_url,
+    photo_width,
+    photo_height,
+    photo_aspect_ratio,
+    photo_description,
+    ai_description,
+    blur_hash,
+    1 - (image_embedding <=> query_embedding) as similarity
+from images
+where 1 - (image_embedding <=> query_embedding) > match_threshold
+order by similarity desc
+limit match_count;
+$$;
+
+----------------------------------------
+
+TITLE: Setting up HTML Structure for Object Detection App
+DESCRIPTION: Creates the basic HTML structure for the object detection application, including an upload button, image container, and status message area.
+
+LANGUAGE: html
+CODE:
+<main class="container">
+  <label class="custom-file-upload">
+    <input id="file-upload" type="file" accept="image/*" />
+    <img class="upload-icon" src="https://huggingface.co/datasets/Xenova/transformers.js-docs/resolve/main/upload-icon.png" />
+    Upload image
+  </label>
+  <div id="image-container"></div>
+  <p id="status"></p>
+</main>
+
+----------------------------------------
+
+TITLE: Running Script with Access Token via Command Line
+DESCRIPTION: Shows how to run a Node.js script with the HF_TOKEN environment variable set via command line to authenticate access to private models.
+
+LANGUAGE: bash
+CODE:
+HF_TOKEN=hf_... node tests/llama.js
+
+----------------------------------------
+
+TITLE: Initializing Transformers.js and DOM Elements in JavaScript
+DESCRIPTION: Imports the Transformers.js library, sets up environment variables, and creates references to DOM elements for the object detection app.
+
+LANGUAGE: javascript
+CODE:
+import { pipeline, env } from "https://cdn.jsdelivr.net/npm/@huggingface/transformers";
+
+env.allowLocalModels = false;
+
+const fileUpload = document.getElementById("file-upload");
+const imageContainer = document.getElementById("image-container");
+const status = document.getElementById("status");
+
+----------------------------------------
+
+TITLE: Implementing Progress Bar Component
+DESCRIPTION: React component for displaying model download progress.
+
+LANGUAGE: jsx
+CODE:
+export default function Progress({ text, percentage }) {
+  percentage = percentage ?? 0;
+  return (
+    <div className="progress-container">
+      <div className='progress-bar' style={{ 'width': `${percentage}%` }}>
+        {text} ({`${percentage.toFixed(2)}%`})
+      </div>
+    </div>
+  );
+}
+
+----------------------------------------
+
+TITLE: Using Sentiment Analysis Pipeline with Single Input
+DESCRIPTION: Demonstrates using the sentiment analysis pipeline with a single text input.
+
+LANGUAGE: javascript
+CODE:
+const result = await classifier('I love transformers!');
+// [{'label': 'POSITIVE', 'score': 0.9998}]
+
+----------------------------------------
+
+TITLE: Using Sentiment Analysis Pipeline with Multiple Inputs
+DESCRIPTION: Shows how to process multiple text inputs using the sentiment analysis pipeline.
+
+LANGUAGE: javascript
+CODE:
+const result = await classifier(['I love transformers!', 'I hate transformers!']);
+// [{'label': 'POSITIVE', 'score': 0.9998}, {'label': 'NEGATIVE', 'score': 0.9982}]
+
+----------------------------------------
+
+TITLE: Styling Bounding Boxes and Labels with CSS
+DESCRIPTION: Adds CSS styles for the bounding boxes and labels used to highlight detected objects in the image.
+
+LANGUAGE: css
+CODE:
+.bounding-box {
+    position: absolute;
+    box-sizing: border-box;
+    border-width: 2px;
+    border-style: solid;
+}
+
+.bounding-box-label {
+    color: white;
+    position: absolute;
+    font-size: 12px;
+    margin-top: -16px;
+    margin-left: -2px;
+    padding: 1px;
+}
+
+----------------------------------------
+
+TITLE: Loading Custom Models from Local Directory in Python
+DESCRIPTION: This snippet shows how to load a custom model and tokenizer from a local directory using the Transformers library. It uses the AutoTokenizer and AutoModel classes to load the components.
+
+LANGUAGE: python
+CODE:
+from transformers import AutoTokenizer, AutoModel
+
+tokenizer = AutoTokenizer.from_pretrained("./my_model")
+model = AutoModel.from_pretrained("./my_model")
+
+----------------------------------------
+
+TITLE: Loading Custom Models from Hugging Face Hub in Python
+DESCRIPTION: This snippet demonstrates how to load a custom model and tokenizer from the Hugging Face Hub using the Transformers library. It specifies a model identifier and uses the AutoTokenizer and AutoModel classes.
+
+LANGUAGE: python
+CODE:
+from transformers import AutoTokenizer, AutoModel
+
+tokenizer = AutoTokenizer.from_pretrained("username/my_model")
+model = AutoModel.from_pretrained("username/my_model")
+
+----------------------------------------
+
+TITLE: Custom Configuration Settings
+DESCRIPTION: Example showing how to customize model paths and environment settings
+
+LANGUAGE: javascript
+CODE:
+import { env } from '@huggingface/transformers';
+
+// Specify a custom location for models (defaults to '/models/')
+env.localModelPath = '/path/to/models/';
+
+// Disable the loading of remote models from the Hugging Face Hub:
+env.allowRemoteModels = false;
+
+// Set location of .wasm files. Defaults to use a CDN.
+env.backends.onnx.wasm.wasmPaths = '/path/to/files/';
+
+----------------------------------------
+
+TITLE: Importing Modules for Audio Processing in Node.js
+DESCRIPTION: Import statements for the necessary modules to process audio and use Transformers.js in a Node.js environment.
+
+LANGUAGE: javascript
+CODE:
+import { pipeline } from '@huggingface/transformers';
+import wavefile from 'wavefile';
+
+----------------------------------------
+
+TITLE: Styling the Object Detection App with CSS
+DESCRIPTION: Applies CSS styles to the object detection application, including layout, button styling, and image container positioning.
+
+LANGUAGE: css
+CODE:
+html,
+body {
+    font-family: Arial, Helvetica, sans-serif;
+}
+
+.container {
+    margin: 40px auto;
+    width: max(50vw, 400px);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+}
+
+.custom-file-upload {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    border: 2px solid black;
+    padding: 8px 16px;
+    cursor: pointer;
+    border-radius: 6px;
+}
+
+#file-upload {
+    display: none;
+}
+
+.upload-icon {
+    width: 30px;
+}
+
+#image-container {
+    width: 100%;
+    margin-top: 20px;
+    position: relative;
+}
+
+#image-container>img {
+    width: 100%;
+}
+
+----------------------------------------
+
+TITLE: Handling Image Upload in JavaScript
+DESCRIPTION: Implements an event listener for image file uploads, reading the file and displaying it in the application.
+
+LANGUAGE: javascript
+CODE:
+fileUpload.addEventListener("change", function (e) {
+  const file = e.target.files[0];
+  if (!file) {
+    return;
+  }
+
+  const reader = new FileReader();
+
+  // Set up a callback when the file is loaded
+  reader.onload = function (e2) {
+    imageContainer.innerHTML = "";
+    const image = document.createElement("img");
+    image.src = e2.target.result;
+    imageContainer.appendChild(image);
+    detect(image); // Uncomment this line to run the model
+  };
+  reader.readAsDataURL(file);
+});
+
+----------------------------------------
+
+TITLE: Configuring Next.js Webpack Settings
+DESCRIPTION: Webpack configuration in next.config.js to handle node-specific modules and optimize bundling for browser or server deployment.
+
+LANGUAGE: javascript
+CODE:
+/** @type {import('next').NextConfig} */
+const nextConfig = {
+    output: 'export',
+    webpack: (config) => {
+        config.resolve.alias = {
+            ...config.resolve.alias,
+            "sharp$": false,
+            "onnxruntime-node$": false,
+        }
+        return config;
+    },
+}
+
+module.exports = nextConfig
+
+----------------------------------------
+
+TITLE: Adding Vector Column for Image Embeddings in SQL
+DESCRIPTION: SQL command to add a new vector column with a dimension of 512 to the images table for storing image embeddings.
+
+LANGUAGE: sql
+CODE:
+-- Add a new vector column with a dimension of 512
+alter table images add column image_embedding vector(512);
+
+----------------------------------------
+
+TITLE: Updating Database with Image Embeddings using Node.js
+DESCRIPTION: Bash command to run a Node.js script that updates the database with image embeddings. It requires Supabase URL and secret key as environment variables.
+
+LANGUAGE: bash
+CODE:
+SUPABASE_URL=your-project-url \
+SUPABASE_SECRET_KEY=your-secret-key \
+node scripts/update-database.mjs
+
+----------------------------------------
+
+TITLE: Installing Transformers.js via NPM
+DESCRIPTION: Command to install the Transformers.js library using NPM package manager
+
+LANGUAGE: bash
+CODE:
+npm i @huggingface/transformers
+
+----------------------------------------
+
+TITLE: ESM Imports Setup
+DESCRIPTION: Required imports for the ESM version of the application.
+
+LANGUAGE: javascript
+CODE:
+import http from 'http';
+import querystring from 'querystring';
+import url from 'url';
+
+----------------------------------------
+
+TITLE: Configuring Package.json for ESM
+DESCRIPTION: JSON configuration to enable ECMAScript modules in the project.
+
+LANGUAGE: json
+CODE:
+{
+  ...
+  "type": "module",
+  ...
+}
+
+----------------------------------------
+
+TITLE: CommonJS Imports Setup
+DESCRIPTION: Required imports for the CommonJS version of the application.
+
+LANGUAGE: javascript
+CODE:
+const http = require('http');
+const querystring = require('querystring');
+const url = require('url');
+
+----------------------------------------
+
+TITLE: Installing Dependencies for Node.js Audio Processing
+DESCRIPTION: Commands to initialize a Node.js project and install the required dependencies for audio processing and Transformers.js.
+
+LANGUAGE: bash
+CODE:
+npm init -y
+npm i @huggingface/transformers
+npm i wavefile
+
+----------------------------------------
+
+TITLE: Installing Dependencies with NPM
+DESCRIPTION: Commands to initialize a new Node.js project and install the Transformers.js package.
+
+LANGUAGE: bash
+CODE:
+npm init -y
+npm i @huggingface/transformers
+
+----------------------------------------
+
+TITLE: Adding Database Policy for Public Access in SQL
+DESCRIPTION: SQL command to create a policy allowing public select access to the images table in Supabase.
+
+LANGUAGE: sql
+CODE:
+create policy "policy_name"
+on public.images
+for select using (
+    true
+);
+
+----------------------------------------
+
+TITLE: Initializing Next.js Project with create-next-app
+DESCRIPTION: Command to create a new Next.js application using create-next-app with specific configuration options.
+
+LANGUAGE: bash
+CODE:
+npx create-next-app@latest
+
+----------------------------------------
+
+TITLE: Starting the Application
+DESCRIPTION: Command to launch the Electron application
+
+LANGUAGE: bash
+CODE:
+npm run start
+
+----------------------------------------
+
+TITLE: Installing Dependencies
+DESCRIPTION: Command to install all necessary npm dependencies for the project.
+
+LANGUAGE: bash
+CODE:
+npm install
+
+----------------------------------------
+
+TITLE: Building the Project
+DESCRIPTION: Command to build the extension project for deployment.
+
+LANGUAGE: bash
+CODE:
+npm run build
+
+----------------------------------------
+
+TITLE: Installing Transformers.js Electron Project
+DESCRIPTION: Commands to clone the repository and navigate to the electron example directory
+
+LANGUAGE: bash
+CODE:
+git clone https://github.com/huggingface/transformers.js.git
+cd transformers.js/examples/electron/
+
+----------------------------------------
+
+TITLE: Installing Dependencies
+DESCRIPTION: Command to install required npm dependencies for the Electron application
+
+LANGUAGE: bash
+CODE:
+npm install
+
+----------------------------------------
+
+TITLE: Cloning Repository and Entering Project Directory
+DESCRIPTION: Commands to clone the Transformers.js repository and navigate to the extension example directory.
+
+LANGUAGE: bash
+CODE:
+git clone https://github.com/huggingface/transformers.js.git
+cd transformers.js/examples/extension/
+
+----------------------------------------
+
+TITLE: Running Development Server with npm
+DESCRIPTION: Bash command to start the development server using npm.
+
+LANGUAGE: bash
+CODE:
+npm run dev
+
+----------------------------------------
+
+TITLE: Starting Next.js Development Server
+DESCRIPTION: Commands to run the Next.js development server using npm, yarn, or pnpm package managers. This starts the local development environment for the Next.js application.
+
+LANGUAGE: bash
+CODE:
+npm run dev
+# or
+yarn dev
+# or
+pnpm dev
+
+----------------------------------------
+
+TITLE: Starting Next.js Development Server
+DESCRIPTION: Commands to start the Next.js development server using different package managers (npm, yarn, or pnpm). The server will run on localhost:3000 with hot-reload enabled.
+
+LANGUAGE: bash
+CODE:
+npm run dev
+# or
+yarn dev
+# or
+pnpm dev
+
+----------------------------------------
+
+TITLE: Listing Official Vite Plugins for React
+DESCRIPTION: This snippet lists two official Vite plugins available for React projects. It includes links to their GitHub repositories and mentions the technologies they use for Fast Refresh.
+
+LANGUAGE: Markdown
+CODE:
+- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react/README.md) uses [Babel](https://babeljs.io/) for Fast Refresh
+- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
+
+----------------------------------------
+
+TITLE: Configuring React Plugins for Vite
+DESCRIPTION: Lists the two official Vite plugins available for React integration: plugin-react using Babel and plugin-react-swc using SWC compiler for Fast Refresh functionality.
+
+LANGUAGE: markdown
+CODE:
+- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react/README.md) uses [Babel](https://babeljs.io/) for Fast Refresh
+- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
+
+----------------------------------------
+
+TITLE: Listing Official Vite Plugins for React
+DESCRIPTION: This snippet lists two official Vite plugins available for React projects. It includes links to their respective GitHub repositories and mentions the underlying technologies used for Fast Refresh.
+
+LANGUAGE: Markdown
+CODE:
+- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react/README.md) uses [Babel](https://babeljs.io/) for Fast Refresh
+- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
+
+----------------------------------------
+
+TITLE: Listing Official Vite Plugins for React
+DESCRIPTION: This snippet lists two official Vite plugins available for React projects. The first uses Babel for Fast Refresh, while the second uses SWC.
+
+LANGUAGE: Markdown
+CODE:
+- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react/README.md) uses [Babel](https://babeljs.io/) for Fast Refresh
+- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
+
+----------------------------------------
+
+TITLE: Plugin Configuration Options for React + Vite
+DESCRIPTION: Lists the two official plugin options available for React with Vite: plugin-react using Babel and plugin-react-swc using SWC, both supporting Fast Refresh functionality.
+
+LANGUAGE: markdown
+CODE:
+- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react/README.md) uses [Babel](https://babeljs.io/) for Fast Refresh
+- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
+
+----------------------------------------
+
+TITLE: Project Dependencies List in Markdown
+DESCRIPTION: Lists the official Vite plugins available for React, including plugin-react using Babel and plugin-react-swc using SWC for Fast Refresh functionality.
+
+LANGUAGE: markdown
+CODE:
+- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react/README.md) uses [Babel](https://babeljs.io/) for Fast Refresh
+- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
+
+----------------------------------------
+
+TITLE: Specifying Python Dependencies for Transformers Project
+DESCRIPTION: Defines the exact versions of required Python packages including PyTorch-based transformers, ONNX runtime and tools, and utility libraries. Includes a specific Git commit reference for the optimum package from Hugging Face.
+
+LANGUAGE: plaintext
+CODE:
+transformers[torch]==4.49.0
+onnxruntime==1.20.1
+optimum@git+https://github.com/huggingface/optimum.git@b04feaea78cda58d79b8da67dca3fd0c4ab33435
+onnx==1.17.0
+tqdm==4.67.1
+onnxslim==0.1.48

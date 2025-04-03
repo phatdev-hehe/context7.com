@@ -1,0 +1,611 @@
+TITLE: Adding Authentication Requirements to Controllers
+DESCRIPTION: Ruby code for requiring authentication in controllers. This before_action ensures that users must be authenticated before accessing controller actions.
+
+LANGUAGE: ruby
+CODE:
+before_action :authenticate_user!
+
+----------------------------------------
+
+TITLE: Checking User Authentication Status
+DESCRIPTION: Ruby helper method to check if a user is currently signed in. This can be used in controllers and views to conditionally display content based on authentication status.
+
+LANGUAGE: ruby
+CODE:
+user_signed_in?
+
+----------------------------------------
+
+TITLE: Accessing Current User in Devise
+DESCRIPTION: Ruby helper method to access the currently signed-in user. This provides access to the user model and its attributes throughout the application.
+
+LANGUAGE: ruby
+CODE:
+current_user
+
+----------------------------------------
+
+TITLE: Installing Devise with Bundler in Rails
+DESCRIPTION: Command to add the Devise gem to your Rails application using Bundler. This is the first step in setting up Devise authentication.
+
+LANGUAGE: sh
+CODE:
+bundle add devise
+
+----------------------------------------
+
+TITLE: Running Devise Installation Generator
+DESCRIPTION: Console command to generate the initial Devise configuration files. This creates the necessary initializer and sets up the foundation for Devise in your Rails app.
+
+LANGUAGE: console
+CODE:
+rails generate devise:install
+
+----------------------------------------
+
+TITLE: Generating Devise Model
+DESCRIPTION: Console command to generate a Devise-enabled model. This command creates a model (if it doesn't exist) and configures it with default Devise modules and routes.
+
+LANGUAGE: console
+CODE:
+rails generate devise MODEL
+
+----------------------------------------
+
+TITLE: Setting Up Multiple Authentication Models in Devise
+DESCRIPTION: Complete example showing how to configure a separate Admin model with Devise authentication. Includes database migration, model configuration, routes setup, and controller/view helper methods.
+
+LANGUAGE: ruby
+CODE:
+# Create a migration with the required fields
+create_table :admins do |t|
+  t.string :email
+  t.string :encrypted_password
+  t.timestamps null: false
+end
+
+# Inside your Admin model
+devise :database_authenticatable, :timeoutable
+
+# Inside your routes
+devise_for :admins
+
+# Inside your protected controller
+before_action :authenticate_admin!
+
+# Inside your controllers and views
+admin_signed_in?
+current_admin
+admin_session
+
+----------------------------------------
+
+TITLE: Configuring OmniAuth Provider in Devise
+DESCRIPTION: Configuration snippet for integrating OmniAuth with Devise to enable third-party authentication. This example shows how to set up GitHub as an authentication provider with specific scope permissions.
+
+LANGUAGE: ruby
+CODE:
+config.omniauth :github, 'APP_ID', 'APP_SECRET', scope: 'user,public_repo'
+
+----------------------------------------
+
+TITLE: Basic Strong Parameters Configuration for Devise
+DESCRIPTION: Ruby code for configuring strong parameters in the ApplicationController. This example permits an additional username parameter for the sign_up action.
+
+LANGUAGE: ruby
+CODE:
+class ApplicationController < ActionController::Base
+  before_action :configure_permitted_parameters, if: :devise_controller?
+
+  protected
+
+  def configure_permitted_parameters
+    devise_parameter_sanitizer.permit(:sign_up, keys: [:username])
+  end
+end
+
+----------------------------------------
+
+TITLE: Enabling HTTP Basic Authentication in Devise for Rails API Mode
+DESCRIPTION: Configuration to enable HTTP Basic Authentication in Devise for API-only applications. This provides a way to authenticate API requests without relying on browser cookies.
+
+LANGUAGE: ruby
+CODE:
+config.http_authenticatable = [:database]
+
+----------------------------------------
+
+TITLE: Configuring Devise for Hotwire/Turbo Integration
+DESCRIPTION: Configuration options for integrating Devise with Hotwire/Turbo by setting appropriate HTTP status codes for error responses and redirects to match Turbo's expected behavior.
+
+LANGUAGE: ruby
+CODE:
+Devise.setup do |config|
+  # ...
+  # When using Devise with Hotwire/Turbo, the http status for error responses
+  # and some redirects must match the following. The default in Devise for existing
+  # apps is `200 OK` and `302 Found` respectively, but new apps are generated with
+  # these new defaults that match Hotwire/Turbo behavior.
+  # Note: These might become the new default in future versions of Devise.
+  config.responder.error_status = :unprocessable_entity
+  config.responder.redirect_status = :see_other
+end
+
+----------------------------------------
+
+TITLE: Configuring Mailer URL Options for Devise
+DESCRIPTION: Ruby configuration for setting up default URL options for Devise mailer in development environment. This is needed for proper generation of links in emails sent by Devise.
+
+LANGUAGE: ruby
+CODE:
+config.action_mailer.default_url_options = { host: 'localhost', port: 3000 }
+
+----------------------------------------
+
+TITLE: Configuring Devise Model Options
+DESCRIPTION: Ruby code for configuring Devise modules with custom options in a model. This example sets the stretches option which affects the cost of the hashing algorithm.
+
+LANGUAGE: ruby
+CODE:
+devise :database_authenticatable, :registerable, :confirmable, :recoverable, stretches: 13
+
+----------------------------------------
+
+TITLE: Setting Default Root Route for Devise
+DESCRIPTION: Ruby route configuration for setting the root path. Devise will redirect to this path after successful authentication if no specific scope root is defined.
+
+LANGUAGE: ruby
+CODE:
+root to: 'home#index'
+
+----------------------------------------
+
+TITLE: Configuring Production Log Level for Security with Devise
+DESCRIPTION: Configuration to change the Rails production logger level to reduce the risk of password reset tokens being leaked in logs. This helps protect sensitive authentication data.
+
+LANGUAGE: ruby
+CODE:
+config.log_level = :warn
+
+----------------------------------------
+
+TITLE: Integrating Devise with Active Job for Background Email Delivery
+DESCRIPTION: Method override to send Devise notification emails through Active Job for background processing. This allows Devise emails to use your existing queue infrastructure.
+
+LANGUAGE: ruby
+CODE:
+def send_devise_notification(notification, *args)
+  devise_mailer.send(notification, self, *args).deliver_later
+end
+
+----------------------------------------
+
+TITLE: Configuring Nested Attributes in Devise Parameters
+DESCRIPTION: Ruby code for configuring complex nested attributes in Devise strong parameters. This example shows how to permit nested address attributes in the sign_up action.
+
+LANGUAGE: ruby
+CODE:
+class ApplicationController < ActionController::Base
+  before_action :configure_permitted_parameters, if: :devise_controller?
+
+  protected
+
+  def configure_permitted_parameters
+    devise_parameter_sanitizer.permit(:sign_up, keys: [:first_name, :last_name, address_attributes: [:country, :state, :city, :area, :postal_code]])
+  end
+end
+
+----------------------------------------
+
+TITLE: Customizing Devise Routes with Path and Path Names
+DESCRIPTION: Configuration for customizing Devise routes using the devise_for method, including changing path prefixes and path names for better I18n support or URL structure.
+
+LANGUAGE: ruby
+CODE:
+devise_for :users, path: 'auth', path_names: { sign_in: 'login', sign_out: 'logout', password: 'secret', confirmation: 'verification', unlock: 'unblock', registration: 'register', sign_up: 'cmon_let_me_in' }
+
+----------------------------------------
+
+TITLE: Creating Custom Routes with devise_scope
+DESCRIPTION: Example of using devise_scope to create custom routes that map to Devise controllers, allowing for deeper route customization while maintaining Devise's scope awareness.
+
+LANGUAGE: ruby
+CODE:
+devise_scope :user do
+  get 'sign_in', to: 'devise/sessions#new'
+end
+
+----------------------------------------
+
+TITLE: Custom Devise Sessions Controller Implementation
+DESCRIPTION: Example of a custom Sessions controller that inherits from Devise's SessionsController. The commented code shows various action methods that can be overridden.
+
+LANGUAGE: ruby
+CODE:
+class Users::SessionsController < Devise::SessionsController
+  # GET /resource/sign_in
+  # def new
+  #   super
+  # end
+  ...
+end
+
+----------------------------------------
+
+TITLE: Overriding Devise Controller Action
+DESCRIPTION: Example showing how to completely override a Devise controller action by implementing a new method in a custom controller that replaces the original functionality.
+
+LANGUAGE: ruby
+CODE:
+class Users::SessionsController < Devise::SessionsController
+  def create
+    # custom sign-in code
+  end
+end
+
+----------------------------------------
+
+TITLE: Extending Devise Controller Action with Additional Behavior
+DESCRIPTION: Example demonstrating how to extend a Devise controller action with additional behavior while maintaining the original functionality, useful for triggering background jobs or logging events.
+
+LANGUAGE: ruby
+CODE:
+class Users::SessionsController < Devise::SessionsController
+  def create
+    super do |resource|
+      BackgroundWorker.trigger(resource)
+    end
+  end
+end
+
+----------------------------------------
+
+TITLE: Generating Devise Views
+DESCRIPTION: Console command to generate Devise views for customization. This copies all Devise views into your application for modification.
+
+LANGUAGE: console
+CODE:
+rails generate devise:views
+
+----------------------------------------
+
+TITLE: Generating Custom Devise Controllers Using Rails Generator
+DESCRIPTION: Command to generate custom Devise controllers for a specific scope, such as 'users', which creates controller files in app/controllers/users/.
+
+LANGUAGE: console
+CODE:
+rails generate devise:controllers [scope]
+
+----------------------------------------
+
+TITLE: Configuring Router to Use Custom Devise Controller
+DESCRIPTION: Code snippet showing how to configure the Rails router to use a custom controller for Devise, specifically routing sessions through a custom controller.
+
+LANGUAGE: ruby
+CODE:
+devise_for :users, controllers: { sessions: 'users/sessions' }
+
+----------------------------------------
+
+TITLE: Custom Parameter Sanitizer for Devise
+DESCRIPTION: Ruby code for creating a custom parameter sanitizer class for a Devise model. This allows for model-specific parameter sanitization logic.
+
+LANGUAGE: ruby
+CODE:
+class User::ParameterSanitizer < Devise::ParameterSanitizer
+  def initialize(*)
+    super
+    permit(:sign_up, keys: [:username, :email])
+  end
+end
+
+----------------------------------------
+
+TITLE: Using Custom Parameter Sanitizer in Controllers
+DESCRIPTION: Ruby code for configuring controllers to use a custom parameter sanitizer. This method overrides the default sanitizer for a specific model.
+
+LANGUAGE: ruby
+CODE:
+class ApplicationController < ActionController::Base
+  protected
+
+  def devise_parameter_sanitizer
+    if resource_class == User
+      User::ParameterSanitizer.new(User, :user, params)
+    else
+      super # Use the default one
+    end
+  end
+end
+
+----------------------------------------
+
+TITLE: Custom Sign-in Parameters with Block Syntax
+DESCRIPTION: Ruby code for customizing permitted parameters for sign_in using block syntax. This allows for more complex parameter sanitization logic.
+
+LANGUAGE: ruby
+CODE:
+def configure_permitted_parameters
+  devise_parameter_sanitizer.permit(:sign_in) do |user_params|
+    user_params.permit(:username, :email)
+  end
+end
+
+----------------------------------------
+
+TITLE: Configuring Array Parameters in Devise
+DESCRIPTION: Ruby code for permitting array parameters in Devise. This example shows how to handle role checkboxes that are submitted as an array.
+
+LANGUAGE: ruby
+CODE:
+def configure_permitted_parameters
+  devise_parameter_sanitizer.permit(:sign_up) do |user_params|
+    user_params.permit({ roles: [] }, :email, :password, :password_confirmation)
+  end
+end
+
+----------------------------------------
+
+TITLE: Configuring I18n Flash Messages for Devise
+DESCRIPTION: YAML configuration for customizing Devise's I18n flash messages for successful sign-in, showing the basic structure for internationalization files.
+
+LANGUAGE: yaml
+CODE:
+en:
+  devise:
+    sessions:
+      signed_in: 'Signed in successfully.'
+
+----------------------------------------
+
+TITLE: Resource-Specific I18n Messages in Devise
+DESCRIPTION: YAML configuration demonstrating how to create distinct I18n messages for different Devise resources, such as users and admins, using the singular name given in routes.
+
+LANGUAGE: yaml
+CODE:
+en:
+  devise:
+    sessions:
+      user:
+        signed_in: 'Welcome user, you are signed in.'
+      admin:
+        signed_in: 'Hello admin!'
+
+----------------------------------------
+
+TITLE: Customizing Devise Mailer Subjects with I18n
+DESCRIPTION: YAML configuration for customizing the subject lines of emails sent by Devise, including both general subjects and resource-specific subjects.
+
+LANGUAGE: yaml
+CODE:
+en:
+  devise:
+    mailer:
+      confirmation_instructions:
+        subject: 'Hello everybody!'
+        user_subject: 'Hello User! Please confirm your email'
+      reset_password_instructions:
+        subject: 'Reset instructions'
+
+----------------------------------------
+
+TITLE: Including Devise Integration Test Helpers
+DESCRIPTION: Code showing how to include Devise integration test helpers in Rails integration tests to authenticate users during test execution.
+
+LANGUAGE: ruby
+CODE:
+class PostsTests < ActionDispatch::IntegrationTest
+  include Devise::Test::IntegrationHelpers
+end
+
+----------------------------------------
+
+TITLE: Using Devise Sign In and Sign Out Helpers in Integration Tests
+DESCRIPTION: Examples of using sign_in and sign_out helpers in integration tests to authenticate and deauthenticate users, with support for different scopes.
+
+LANGUAGE: ruby
+CODE:
+sign_in users(:bob)
+sign_in users(:bob), scope: :admin
+
+sign_out :user
+
+----------------------------------------
+
+TITLE: Configuring RSpec to Include Devise Test Helpers
+DESCRIPTION: Configuration for including Devise test helpers in RSpec for controller and view tests, typically placed in a support file or spec helper.
+
+LANGUAGE: ruby
+CODE:
+RSpec.configure do |config|
+  config.include Devise::Test::ControllerHelpers, type: :controller
+  config.include Devise::Test::ControllerHelpers, type: :view
+end
+
+----------------------------------------
+
+TITLE: Using Devise Sign In Helper in Controller Tests
+DESCRIPTION: Examples of using the sign_in helper in controller tests to authenticate a user, with options for specifying the authentication scope.
+
+LANGUAGE: ruby
+CODE:
+sign_in @user
+sign_in @user, scope: :admin
+
+----------------------------------------
+
+TITLE: Testing Devise Controllers with Explicit Mapping
+DESCRIPTION: Example of testing Devise controllers by setting the devise.mapping environment variable to specify which mapping should be used before a request.
+
+LANGUAGE: ruby
+CODE:
+test 'GET new' do
+  # Mimic the router behavior of setting the Devise scope through the env.
+  @request.env['devise.mapping'] = Devise.mappings[:user]
+
+  # Use the sign_in helper to sign in a fixture `User` record.
+  sign_in users(:alice)
+
+  get :new
+
+  # assert something
+end
+
+----------------------------------------
+
+TITLE: Including Devise Controller Test Helpers in Rails >= 5
+DESCRIPTION: Ruby code showing how to include Devise test helpers in controller tests for Rails version 5 and above, using the IntegrationHelpers module.
+
+LANGUAGE: ruby
+CODE:
+class PostsControllerTest < ActionController::TestCase
+  include Devise::Test::IntegrationHelpers # Rails >= 5
+end
+
+----------------------------------------
+
+TITLE: Including Devise Controller Test Helpers in Rails < 5
+DESCRIPTION: Ruby code showing how to include Devise test helpers in controller tests for Rails versions prior to 5, using the ControllerHelpers module.
+
+LANGUAGE: ruby
+CODE:
+class PostsControllerTest < ActionController::TestCase
+  include Devise::Test::ControllerHelpers # Rails < 5
+end
+
+----------------------------------------
+
+TITLE: Configuring RSpec to Include Devise Integration Helpers for Feature Specs
+DESCRIPTION: Configuration for including Devise integration test helpers in RSpec feature tests, making authentication methods available in feature specs.
+
+LANGUAGE: ruby
+CODE:
+RSpec.configure do |config|
+  config.include Devise::Test::IntegrationHelpers, type: :feature
+end
+
+----------------------------------------
+
+TITLE: Fixing Middleware Order for Devise Testing in Rails API Mode
+DESCRIPTION: Configuration to adjust the middleware stack order in the test environment when using Devise with Rails API mode. This solves issues with integration test helpers like sign_in.
+
+LANGUAGE: ruby
+CODE:
+Rails.application.config.middleware.insert_before Warden::Manager, ActionDispatch::Cookies
+Rails.application.config.middleware.insert_before Warden::Manager, ActionDispatch::Session::CookieStore
+
+----------------------------------------
+
+TITLE: Required devise_for Configuration When Using Custom Routes
+DESCRIPTION: Minimal devise_for configuration required to maintain helper methods like current_user when using custom routes, skipping the standard routes but keeping the helper functionality.
+
+LANGUAGE: ruby
+CODE:
+devise_for :users, skip: :all
+
+----------------------------------------
+
+TITLE: Generating Specific Devise View Modules
+DESCRIPTION: Console command to generate only specific Devise view sets. This allows for targeted customization of only needed views.
+
+LANGUAGE: console
+CODE:
+rails generate devise:views -v registrations confirmations
+
+----------------------------------------
+
+TITLE: Generating Scoped Devise Views
+DESCRIPTION: Console command to generate scoped Devise views for a specific model. This allows for different views for different Devise models.
+
+LANGUAGE: console
+CODE:
+rails generate devise:views users
+
+----------------------------------------
+
+TITLE: Accessing User Session in Devise
+DESCRIPTION: Ruby helper method to access the session for the authenticated user scope. This provides access to session data specific to the current user.
+
+LANGUAGE: ruby
+CODE:
+user_session
+
+----------------------------------------
+
+TITLE: Testing Devise with ActiveRecord ORM
+DESCRIPTION: Command for running Devise test suite with the default ActiveRecord ORM configuration. This outputs the Devise.orm value being used for the tests.
+
+LANGUAGE: bash
+CODE:
+DEVISE_ORM=mongoid bin/test
+
+==> Devise.orm = :mongoid
+
+----------------------------------------
+
+TITLE: Using Bundle Gemfile for Specific Rails Version Testing
+DESCRIPTION: Commands to run tests on a specific Ruby version and Rails version using the BUNDLE_GEMFILE environment variable to select the appropriate gemfile.
+
+LANGUAGE: bash
+CODE:
+rbenv shell 3.0.0 # or rvm use 3.0.0
+BUNDLE_GEMFILE=gemfiles/Gemfile-rails-6-0 bundle install
+BUNDLE_GEMFILE=gemfiles/Gemfile-rails-6-0 bin/test
+
+----------------------------------------
+
+TITLE: Combining Gemfile and ORM Options for Testing
+DESCRIPTION: Commands to run tests with both a specific Rails version and Mongoid ORM by combining the BUNDLE_GEMFILE and DEVISE_ORM environment variables.
+
+LANGUAGE: bash
+CODE:
+BUNDLE_GEMFILE=gemfiles/Gemfile-rails-6-0 bundle install
+BUNDLE_GEMFILE=gemfiles/Gemfile-rails-6-0 DEVISE_ORM=mongoid bin/test
+
+----------------------------------------
+
+TITLE: Running Devise Tests with Mini Test
+DESCRIPTION: Commands for running the full test suite, tests for a specific file, or a specific test by line number using Mini Test framework.
+
+LANGUAGE: bash
+CODE:
+bin/test
+
+LANGUAGE: bash
+CODE:
+bin/test test/models/trackable_test.rb
+
+LANGUAGE: bash
+CODE:
+bin/test test/models/trackable_test.rb:16
+
+----------------------------------------
+
+TITLE: Showing Previous Secret Key Finding Order in Ruby
+DESCRIPTION: Code snippet illustrating the previous order used by Devise to find a secret key before the change to always use application.secret_key_base.
+
+LANGUAGE: ruby
+CODE:
+app.credentials.secret_key_base > app.secrets.secret_key_base > application.config.secret_key_base > application.secret_key_base
+
+----------------------------------------
+
+TITLE: Comparing Password Length Validation Methods in Ruby
+DESCRIPTION: Code snippets showing the change in password length validation from using a range-based approach to using proc-based minimum and maximum values, allowing runtime override of password_length.
+
+LANGUAGE: ruby
+CODE:
+validates_length_of :password, within: password_length, allow_blank: true
+
+LANGUAGE: ruby
+CODE:
+validates_length_of :password, minimum: proc { password_length.min }, maximum: proc { password_length.max }, allow_blank: true
+
+----------------------------------------
+
+TITLE: Using Devise Models Configuration Method in Ruby
+DESCRIPTION: Reference to the Devise::Models.config method that can be used when adding new settings to provide class and instance level fallbacks for configuration options.
+
+LANGUAGE: markdown
+CODE:
+[`Devise::Models.config`](https://github.com/heartcombo/devise/blob/245b1f9de0b3386b7913e14b60ea24f43b77feb0/lib/devise/models.rb#L13-L50)

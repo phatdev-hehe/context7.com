@@ -25,7 +25,13 @@ const f = async (input, { responseType = "json", delayMs = 3000 } = {}) => {
           version.totalTokens,
           version.totalSnippets,
           version.lastUpdate,
-          version.state.toUpperCase(),
+          `<img src='${
+            {
+              finalized: "icons/completed-icon.svg",
+              initial: "icons/processing-icon.svg",
+              error: "icons/error-icon.svg",
+            }[version.state]
+          }'/>`,
         ]),
       },
     })
@@ -45,7 +51,7 @@ const f = async (input, { responseType = "json", delayMs = 3000 } = {}) => {
         `${settings.project}/llm.txt?tokens=999999999999999999999999999999999`,
         {
           responseType: "text",
-          delayMs: 20000,
+          delayMs: 30000,
         }
       )
     );

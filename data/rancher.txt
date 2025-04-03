@@ -1,0 +1,2574 @@
+TITLE: Installing Rancher with Self-Signed Certificates
+DESCRIPTION: Installs Rancher using Helm with Rancher-generated self-signed certificates.
+
+LANGUAGE: bash
+CODE:
+helm install rancher rancher-latest/rancher \
+  --namespace cattle-system \
+  --set hostname=rancher.my.org
+
+----------------------------------------
+
+TITLE: Installing Rancher with Let's Encrypt
+DESCRIPTION: Installs Rancher using Helm with Let's Encrypt issued certificates.
+
+LANGUAGE: bash
+CODE:
+helm install rancher rancher-latest/rancher \
+  --namespace cattle-system \
+  --set hostname=rancher.my.org \
+  --set ingress.tls.source=letsEncrypt \
+  --set letsEncrypt.email=me@example.org
+
+----------------------------------------
+
+TITLE: Installing Rancher with Existing Certificates
+DESCRIPTION: Installs Rancher using Helm with existing certificates stored as Kubernetes secrets.
+
+LANGUAGE: bash
+CODE:
+helm install rancher rancher-latest/rancher \
+  --namespace cattle-system \
+  --set hostname=rancher.my.org \
+  --set ingress.tls.source=secret
+
+----------------------------------------
+
+TITLE: Installing Rancher with Private CA Certificates
+DESCRIPTION: Installs Rancher using Helm with certificates signed by a private Certificate Authority.
+
+LANGUAGE: bash
+CODE:
+helm install rancher rancher-latest/rancher \
+  --namespace cattle-system \
+  --set hostname=rancher.my.org \
+  --set ingress.tls.source=secret \
+  --set privateCA=true
+
+----------------------------------------
+
+TITLE: Running Rancher Container with Docker
+DESCRIPTION: Quick start command to run Rancher container with Docker. Sets up the container with automatic restart policy and exposes ports 80 and 443 with privileged access.
+
+LANGUAGE: docker
+CODE:
+sudo docker run -d --restart=unless-stopped -p 80:80 -p 443:443 --privileged rancher/rancher
+
+----------------------------------------
+
+TITLE: Adding Rancher Helm Chart Repository
+DESCRIPTION: Adds the Rancher Helm chart repository to install Rancher server.
+
+LANGUAGE: bash
+CODE:
+helm repo add rancher-latest https://releases.rancher.com/server-charts/latest
+
+----------------------------------------
+
+TITLE: Checking Rancher Deployment Status
+DESCRIPTION: Retrieves the current status of the Rancher deployment, showing desired and available replicas.
+
+LANGUAGE: bash
+CODE:
+kubectl -n cattle-system get deploy rancher
+
+----------------------------------------
+
+TITLE: Creating Kubernetes Namespace for Rancher
+DESCRIPTION: Creates the cattle-system namespace where Rancher resources will be installed.
+
+LANGUAGE: bash
+CODE:
+kubectl create namespace cattle-system
+
+----------------------------------------
+
+TITLE: Verifying Rancher Deployment
+DESCRIPTION: Checks the status of the Rancher deployment to ensure it has rolled out successfully.
+
+LANGUAGE: bash
+CODE:
+kubectl -n cattle-system rollout status deploy/rancher
+
+----------------------------------------
+
+TITLE: Generating Rancher Dashboard URL with Bootstrap Password
+DESCRIPTION: Command to generate a complete URL for initial Rancher dashboard access, combining the hostname with the decoded bootstrap password from the cattle-system namespace.
+
+LANGUAGE: bash
+CODE:
+echo https://{{ .Values.hostname }}/dashboard/?setup=$(kubectl get secret --namespace cattle-system bootstrap-secret -o go-template='{{ "{{" }}.data.bootstrapPassword|base64decode{{ "}}" }}')
+
+----------------------------------------
+
+TITLE: Deploying Custom Rancher Image with Helm
+DESCRIPTION: Helm command to deploy a custom Rancher image by specifying the custom repository and tag using rancherImage and rancherImageTag parameters.
+
+LANGUAGE: shell
+CODE:
+helm upgrade --install rancher/rancher \
+  --namespace cattle-system \
+  --create-namespace \
+  --set rancherImage="my-test-repo/image" \
+  --set rancherImageTag="dev-tag"
+
+----------------------------------------
+
+TITLE: Retrieving Rancher Bootstrap Password
+DESCRIPTION: Command to extract and decode the bootstrap password from the bootstrap-secret in the cattle-system namespace.
+
+LANGUAGE: bash
+CODE:
+kubectl get secret --namespace cattle-system bootstrap-secret -o go-template='{{ "{{" }}.data.bootstrapPassword|base64decode{{ "}}" }}{{ "{{" }} "\n" {{ "}}" }}'
+
+----------------------------------------
+
+TITLE: Configuring EKS Cluster in Rancher
+DESCRIPTION: YAML configuration for setting up an EKS cluster in Rancher. Includes various cluster settings, node group configuration, and networking options.
+
+LANGUAGE: yaml
+CODE:
+eksClusterConfig:
+  imported: false
+  kmsKey: ""
+  kubernetesVersion: "1.26"
+  loggingTypes: []
+  nodeGroups:
+  - desiredSize: 3
+    diskSize: 50
+    ec2SshKey: ""
+    gpu: false
+    imageId: ""
+    instanceType: t3.medium
+    labels: {}
+    maxSize: 10
+    minSize: 1
+    nodeRole: ""
+    nodegroupName: ""
+    requestSpotInstances: false
+    resourceTags: {}
+    spotInstanceTypes: []
+    subnets: []
+    tags: {}
+    userData: ""
+    version: "1.26"
+  privateAccess: false
+  publicAccess: true
+  publicAccessSources: []
+  region: us-east-2
+  secretsEncryption: false
+  securityGroups:
+  -
+  serviceRole: ""
+  subnets:
+  -
+  -
+  tags: {}
+
+----------------------------------------
+
+TITLE: Configuring GKE Cluster in Rancher
+DESCRIPTION: YAML configuration for setting up a GKE cluster in Rancher. Includes cluster addons, network settings, node pool configuration, and various GKE-specific options.
+
+LANGUAGE: yaml
+CODE:
+gkeClusterConfig:
+  clusterAddons:
+    horizontalPodAutoscaling: true
+    httpLoadBalancing: true
+    networkPolicyConfig: false
+  clusterIpv4Cidr: ""
+  enableKubernetesAlpha: false
+  horizontalPodAutoscaling: true
+  httpLoadBalancing: true
+  ipAllocationPolicy:
+    clusterIpv4Cidr: ""
+    clusterIpv4CidrBlock: null
+    clusterSecondaryRangeName: null
+    createSubnetwork: false
+    nodeIpv4CidrBlock: null
+    servicesIpv4CidrBlock: null
+    servicesSecondaryRangeName: null
+    subnetworkName: null
+    useIpAliases: true
+  kubernetesVersion: 1.26.8-gke.200
+  labels: {}
+  locations: []
+  loggingService: logging.googleapis.com/kubernetes
+  maintenanceWindow: ""
+  masterAuthorizedNetworks:
+    enabled: false
+  monitoringService: monitoring.googleapis.com/kubernetes
+  network: default
+  networkPolicyConfig: false
+  networkPolicyEnabled: false
+  nodePools:
+  - autoscaling:
+      enabled: false
+      maxNodeCount: null
+      minNodeCount: null
+    config:
+      diskSizeGb: 100
+      diskType: pd-standard
+      imageType: COS_CONTAINERD
+      labels: {}
+      localSsdCount: 0
+      machineType: n1-standard-2
+      oauthScopes:
+      - https://www.googleapis.com/auth/devstorage.read_only
+      - https://www.googleapis.com/auth/logging.write
+      - https://www.googleapis.com/auth/monitoring
+      - https://www.googleapis.com/auth/servicecontrol
+      - https://www.googleapis.com/auth/service.management.readonly
+      - https://www.googleapis.com/auth/trace.append
+      preemptible: false
+      tags: null
+      taints: null
+    initialNodeCount: 3
+    isNew: true
+    management:
+      autoRepair: true
+      autoUpgrade: true
+    maxPodsConstraint: 110
+    name: markus-automation
+  privateClusterConfig:
+    enablePrivateEndpoint: false
+    enablePrivateNodes: false
+    masterIpv4CidrBlock: null
+  projectID: ""
+  region: ""
+  subnetwork: default
+  zone: us-central1-c
+
+----------------------------------------
+
+TITLE: Python Package Requirements Definition
+DESCRIPTION: Lists required Python packages and their versions for the Rancher project. Includes core dependencies like Flask, testing frameworks (pytest), networking libraries (websocket-client, requests), and security packages (PyJWT, cryptography).
+
+LANGUAGE: plaintext
+CODE:
+git+https://github.com/rancher/client-python.git@1ecfc3e6a300f5f336da4e4416c46c50d544fd77
+websocket-client==0.56.0
+PyJWT==2.4.0
+
+flask==2.2.5
+pytest==6.2.5
+pytest-repeat==0.8.0
+pytest-xdist==2.0.0
+pytest-timeout==2.1.0
+pyyaml==6.0.1
+netaddr==0.8.0
+requests==2.31.0
+kubernetes==12.0.1
+jinja2>=2.10
+cryptography==42.0.4
+werkzeug==3.0.3
+
+----------------------------------------
+
+TITLE: Python Package Requirements
+DESCRIPTION: Defines the exact versions of Python packages required for the Rancher project. Includes testing dependencies (pytest), cloud services (boto3, kubernetes), security (cryptography, paramiko), and utility libraries (PyYAML, Jinja2).
+
+LANGUAGE: plaintext
+CODE:
+pytest==6.2.5
+pytest-repeat==0.8.0
+pytest-xdist==2.0.0
+boto3==1.21.46
+cryptography==42.0.4
+flake8==3.5.0
+invoke==1.2.0
+Jinja2==3.1.3
+kubernetes==12.0.1
+paramiko==3.4.0
+python-digitalocean==1.13.2
+PyYAML==6.0.1
+packaging==23.1
+
+----------------------------------------
+
+TITLE: Python Requirements Specification
+DESCRIPTION: Detailed list of Python package dependencies with specific version requirements. Includes packages for cloud infrastructure (boto3, kubernetes), testing (pytest and related packages), security (cryptography, PyJWT), and various utility libraries. The dependencies are pinned to specific versions for compatibility and security.
+
+LANGUAGE: text
+CODE:
+git+https://github.com/rancher/client-python.git@master#egg=client-python
+boto3==1.21.46
+cryptography==42.0.4
+flake8==3.5.0
+invoke==1.2.0
+Jinja2==3.1.3
+kubernetes==12.0.1
+netaddr==0.8.0
+paramiko==3.4.0
+PyJWT==2.4.0
+pytest==6.2.5
+pytest-repeat==0.8.0
+pytest-xdist==2.0.0
+pytest-html==3.2.0
+pytest-ordering>=0.6
+python-digitalocean==1.13.2
+python-terraform==0.10.1
+PyYAML==6.0.1
+requests==2.31.0
+rsa==4.7.2
+websocket-client==0.57.0
+semver==2.13.0
+packaging==23.1
+pluggy==1.2.0
+
+----------------------------------------
+
+TITLE: Configuring Test Parameters for Rancher Backup Restore Operator
+DESCRIPTION: YAML configuration for setting up test parameters including Rancher host details, backup restore inputs, provisioning inputs, AWS EC2 configurations, and SSH path. This configuration is required to run the Backup Restore Operator tests.
+
+LANGUAGE: yaml
+CODE:
+rancher: 
+  host: ""
+  adminToken: ""
+  insecure: true/false
+  cleanup: true/false
+  clusterName: ""
+  
+backupRestoreInput:
+  backupName: ""
+  s3BucketName: ""
+  s3FolderName: ""
+  s3Region: ""
+  s3Endpoint: ""
+  volumeName: "" # Optional
+  credentialSecretNamespace: ""
+  prune: true/false
+  resourceSetName: ""
+  accessKey: ""
+  secretKey: ""
+
+provisioningInput:
+  rke1KubernetesVersion:
+    - ""
+  rke2KubernetesVersion:
+    - ""
+  k3sKubernetesVersion:
+    - ""
+  nodeProviders:
+    - ""
+
+awsEC2Configs:
+  region: ""
+  awsSecretAccessKey: ""
+  awsAccessKeyID: ""
+  awsEC2Config:
+    - instanceType: ""
+      awsRegionAZ: ""
+      awsAMI: ""
+      awsSecurityGroups: [""]
+      awsSSHKeyName: ""
+      awsCICDInstanceTag: ""
+      awsIAMProfile: ""
+      awsUser: ""
+      volumeSize: # int
+      roles: ["", "", ""] # etcd, controlplane, and worker are the options
+
+sshPath:
+  sshPath: ""
+
+----------------------------------------
+
+TITLE: Configuring Kubernetes Upgrade Tests in YAML
+DESCRIPTION: Configuration structure for running Kubernetes and pre/post upgrade workload tests. Defines cluster settings, security policies, and feature flags along with Kubernetes version specifications for different distributions.
+
+LANGUAGE: yaml
+CODE:
+upgradeInput:
+  clusters:
+    - name: ""                      # Cluster name that is already provisioned in Rancher
+      psact: ""                     # Values are rancher-privileged, rancher-restricted or rancher-baseline
+      enabledFeatures:
+        chart: false                # Boolean, pre/post upgrade checks, default is false
+        ingress: false              # Boolean, pre/post upgrade checks, default is false
+      provisioningInput:            # See the [Hosted Provider Provisioning](hosted/README.md)
+        rke1KubernetesVersion: [""]
+        rke2KubernetesVersion: [""]
+        k3sKubernetesVersion: [""]
+
+
+----------------------------------------
+
+TITLE: Building Local Rancher Container Image
+DESCRIPTION: Uses docker buildx to create a local container image for testing changes. Supports building for the current architecture or cross-building for different architectures using the ARCH variable.
+
+LANGUAGE: shell
+CODE:
+REPO="localhost:5000/my-test-repo/image" TAG="tag" make quick
+
+----------------------------------------
+
+TITLE: Configuring Rancher Snapshot Tests in YAML
+DESCRIPTION: Configuration file structure for Rancher snapshot tests, including cluster settings, upgrade parameters, and restore options. Defines rancher server connection details and snapshot-specific parameters like kubernetes version, concurrency values, and role replacements.
+
+LANGUAGE: yaml
+CODE:
+rancher:
+  host: "rancher_server_address"
+  adminToken: "rancher_admin_token"
+  clusterName: "cluster_to_run_tests_on"
+  insecure: true/optional
+  cleanup: false/optional
+snapshotInput:
+  upgradeKubernetesVersion: ""        # If left blank, the default version in Rancher will be used.
+  snapshotRestore: "all"              # Options include none, kubernetesVersion, all. Option 'none' means that only the etcd will be restored.
+  controlPlaneConcurrencyValue: "15%"
+  workerConcurrencyValue: "20%"
+  controlPlaneUnavailableValue: "1"
+  workerUnavailableValue: "10%"
+  recurringRestores: 1                # By default, this is set to 1 if this field is not included in the config.
+  replaceRoles:                       # If selected, S3 must be properly configured on the cluster. This test is specific to S3 etcd snapshots.
+    etcd: false
+    controlplane: false
+    worker: false
+
+----------------------------------------
+
+TITLE: Cross-Building Rancher Container Image
+DESCRIPTION: Example of cross-building a Rancher container image for a specific architecture (amd64) using docker buildx.
+
+LANGUAGE: shell
+CODE:
+REPO="localhost:5000/my-test-repo/image" \
+  TAG="tag" \
+  ARCH="amd64" \
+  make quick
+
+----------------------------------------
+
+TITLE: Configuring AWS Cloud Credentials for Rancher
+DESCRIPTION: YAML configuration for setting up AWS cloud credentials in Rancher. Includes secretKey, accessKey, and defaultRegion.
+
+LANGUAGE: yaml
+CODE:
+awsCredentials:
+  secretKey: "",
+  accessKey: "",
+  defaultRegion: ""
+
+----------------------------------------
+
+TITLE: Configuring Azure Cloud Credentials for Rancher
+DESCRIPTION: YAML configuration for setting up Azure cloud credentials in Rancher. Includes clientId, clientSecret, subscriptionId, and environment.
+
+LANGUAGE: yaml
+CODE:
+azureCredentials:
+  clientId: "",
+  clientSecret: "",
+  subscriptionId: "",
+  environment: "AzurePublicCloud"
+
+----------------------------------------
+
+TITLE: Configuring Google Cloud Credentials for Rancher
+DESCRIPTION: YAML configuration for setting up Google cloud credentials in Rancher. Includes an encoded JSON authentication object with various fields.
+
+LANGUAGE: yaml
+CODE:
+googleCredentials:
+  authEncodedJson: |-
+    {
+      "type": "",
+      "project_id": "",
+      "private_key_id": "",
+      "private_key": "",
+      "client_email": "",
+      "client_id": "",
+      "auth_uri": "https://accounts.google.com/o/oauth2/auth",
+      "token_uri": "https://oauth2.googleapis.com/token",
+      "auth_provider_x509_cert_url": "https://www.googleapis.com/oauth2/v1/certs",
+      "client_x509_cert_url": ""
+    }
+
+----------------------------------------
+
+TITLE: AWS Node Configuration for RKE2
+DESCRIPTION: Machine configuration for AWS EC2 instances including roles, AMI selection, and network settings.
+
+LANGUAGE: yaml
+CODE:
+awsMachineConfigs:
+  region: "us-east-2"                         #required
+  awsMachineConfig:
+  - roles: ["etcd","controlplane","worker"]   #required
+    ami: ""                                   #required
+    instanceType: "t3a.medium"                
+    sshUser: "ubuntu"                         #required
+    vpcId: ""                                 #required
+    volumeType: "gp2"                         
+    zone: "a"                                 #required
+    retries: "5"                              
+    rootSize: "60"                            
+    securityGroup: [""]
+
+----------------------------------------
+
+TITLE: Configuring AWS K3S Machine in YAML
+DESCRIPTION: Defines the AWS-specific machine configuration for K3S provisioning, including instance details, networking, and storage options.
+
+LANGUAGE: yaml
+CODE:
+awsMachineConfigs:
+  region: "us-east-2"                         #required
+  awsMachineConfig:
+  - roles: ["etcd","controlplane","worker"]   #required
+    ami: ""                                   #required
+    instanceType: "t3a.medium"                
+    sshUser: "ubuntu"                         #required
+    vpcId: ""                                 #required
+    volumeType: "gp2"                         
+    zone: "a"                                 #required
+    retries: "5"                              
+    rootSize: "60"                            
+    securityGroup: [""] 
+
+----------------------------------------
+
+TITLE: Defining K3S Provisioning Input in YAML
+DESCRIPTION: Specifies the provisioning input for K3S tests, including machine pools, Kubernetes versions, providers, CNI, and other cluster configuration options.
+
+LANGUAGE: yaml
+CODE:
+provisioningInput:
+  machinePools:                                              
+  - machinePoolConfig:                       #required(dynamic only) (at least 1 of each role must be true accross all machinePoolConfigs)
+      etcd: true                             #required(dynamic only) (at least 1 role etcd, controlplane, worker must be true)
+      controlplane: true
+      worker: true
+      quantity: 1
+      drainBeforeDelete: true
+      hostnameLengthLimit: 29
+      nodeStartupTimeout: "600s"
+      unhealthyNodeTimeout: "300s"
+      maxUnhealthy: "2"
+      unhealthyRange: "2-4"
+  - machinePoolConfig:
+      worker: true
+      quantity: 2
+      drainBeforeDelete: true
+  - machinePoolConfig:
+      worker: true
+      quantity: 1
+  k3sKubernetesVersion: ["v1.27.6+k3s1"]     #required (at least 1)
+  providers: ["aws"]                         #required (at least 1) linode,aws,do,harvester,vsphere,azure,google
+  cni: ["calico"]                            #required (at least 1)
+  nodeProviders: ["ec2"]                     #required(custom clusters only)
+  hardened: false
+  psact: ""                                  #either rancher-privileged|rancher-restricted|rancher-baseline
+  clusterSSHTests: ["CheckCPU", "NodeReboot", "AuditLog"]
+  etcd:
+    disableSnapshot: false
+    snapshotScheduleCron: "0 */5 * * *"
+    snapshotRetain: 3
+    s3:
+      bucket: ""
+      endpoint: "s3.us-east-2.amazonaws.com"
+      endpointCA: ""
+      folder: ""
+      region: "us-east-2"
+      skipSSLVerify: true
+
+----------------------------------------
+
+TITLE: Creating Python Virtual Environment for Rancher Testing
+DESCRIPTION: Creates and activates a Python 3.11 virtual environment for running Rancher integration tests.
+
+LANGUAGE: bash
+CODE:
+python3.11 -m venv .venv && source .venv/bin/activate
+
+----------------------------------------
+
+TITLE: Configuring RKE1 Cluster Template Provisioning YAML
+DESCRIPTION: YAML configuration file for RKE1 cluster template provisioning tests. Specifies Rancher connection details, provisioning inputs including Kubernetes versions and CNI options, and AWS EC2 instance configuration parameters.
+
+LANGUAGE: yaml
+CODE:
+rancher:                                   
+  host: ""                                  #required
+  adminToken: ""                            #required
+  clusterName: ""                           
+
+provisioningInput:
+  RKE1KubernetesVersions: ["<Your preferred Version>"]    #optional. if empty, latest version is considered.
+  cni: ["calico"]                                  #optional, if empty, calico is considered.
+  providers: ["aws"]                           #required (at least 1)                    
+
+amazonec2Config:
+    accessKey: ""
+    secretKey: ""
+    ami: "ami-0e6577a75723c81f8"
+    blockDurationMinutes: "0"
+    encryptEbsVolume: false
+    endpoint: ""
+    httpEndpoint: "enabled"
+    httpTokens: "optional"
+    iamInstanceProfile: ""
+    insecureTransport: false
+    instanceType: "t3.xlarge"
+    keypairName: ""
+    kmsKey: ""
+    monitoring: false
+    privateAddressOnly: false
+    region: "us-east-2"
+    requestSpotInstance: false
+    retries: "5"
+    rootSize: "100"
+    securityGroup: []
+    securityGroupReadonly: false
+    sessionToken: ""
+    spotPrice: "0.50"
+    sshKeyContents: ""
+    sshUser: "ubuntu"
+    subnetId: ""
+    tags: ""
+    type: "amazonec2Config"
+    useEbsOptimizedInstance: false
+    usePrivateAddress: false
+    userdata: ""
+    volumeType: "gp2"
+    vpcId: "vpc-bfccf4d7"
+    zone: "a"
+
+----------------------------------------
+
+TITLE: Installing Python Test Dependencies
+DESCRIPTION: Installs required Python packages for running integration tests including the test requirements and tox test runner.
+
+LANGUAGE: bash
+CODE:
+pip install -r requirements.txt
+pip install tox
+
+----------------------------------------
+
+TITLE: Configuring Rancher Prime Test Settings in YAML
+DESCRIPTION: YAML configuration block that defines essential settings for Rancher Prime testing, including host details, admin token, brand information, Prime status, version specifications, and registry settings. Required for running Prime test suites.
+
+LANGUAGE: yaml
+CODE:
+rancher: 
+  host: "rancher_server_address"
+  adminToken: "rancher_admin_token"
+  ...
+prime:
+  brand: "<name of brand>"
+  isPrime: false  #boolean, default is false
+  rancherVersion: "<version_or_commit_of_rancher>"
+  registry: "<name of registry>
+
+----------------------------------------
+
+TITLE: Starting Local Rancher Instance
+DESCRIPTION: Launches a local Rancher instance for testing using make command.
+
+LANGUAGE: bash
+CODE:
+make run
+
+----------------------------------------
+
+TITLE: Configuring HA Settings for Rancher Release Upgrade Testing in YAML
+DESCRIPTION: This YAML snippet defines the HA configuration options for Rancher release upgrade testing. It includes settings for host, chart versions, RKE version, image tags, Helm repo, and other deployment options.
+
+LANGUAGE: yaml
+CODE:
+ha:
+  host: "" # String, needs to be URL
+  chartVersion: "" # String without any prefix, no v in front of version
+  chartVersionToUpgrade: "" # String without any prefix, no v in front of version
+  rkeVersion: "" # String with prefix v 
+  imageTag: "" # String with prefix v 
+  imageTagToUpgrade: "" # String with prefix v 
+  helmRepo: "" # String
+  certOption: "" # String
+  insecure: false # String
+  cleanup: false  # String, default is true
+
+----------------------------------------
+
+TITLE: Running Integration Tests with Pytest
+DESCRIPTION: Examples of running specific tests or test files using pytest, showing different filtering options.
+
+LANGUAGE: bash
+CODE:
+pytest -k test_user_cant_delete_self
+pytest tests/integration/suite/test_auth_proxy.py
+
+----------------------------------------
+
+TITLE: Defining Cluster Configurations for Rancher Release Upgrade Testing in YAML
+DESCRIPTION: This YAML snippet outlines the cluster configuration structure for Rancher release upgrade testing. It includes settings for RKE1, RKE2, K3s, and hosted clusters, specifying providers, Kubernetes versions, CNI options, and enabled features.
+
+LANGUAGE: yaml
+CODE:
+clusters:
+  rke1:
+    nodeProvider:
+      - provider: "" # Name of the provider
+        kubernetesVersion: "vMYVERSION" # String with prefix v, as UI shows
+        kubernetesVersionToUpgrade: "vMYVERSION" # String with prefix v, as UI shows
+        image: "" # String
+        sshUser: "" # String
+        cni: ["calico"] # Slice of strings, options can be found in provisioning configuration
+        enabledFeatures:
+          chart: false # Boolean, pre/post upgrade checks, default is false
+          ingress: false # Boolean, pre/post upgrade checks, default is false
+    # This is a slice of structs, elements are expandable
+    custom:
+      - provider: "" # Name of the provider
+        kubernetesVersion: "vMYVERSION" # String with prefix v, as UI shows
+        kubernetesVersionToUpgrade: "vMYVERSION" # String with prefix v, as UI shows
+        image: "" # String
+        sshUser: "" # String
+        cni: ["calico"] # Slice of strings, options can be found in provisioning configuration
+        enabledFeatures:
+          chart: false # Boolean, pre/post upgrade checks, default is false
+          ingress: false # Boolean, pre/post upgrade checks, default is false
+    # This is a slice of structs, elements are expandable
+  rke2:
+    nodeProvider:
+      - provider: "" # Name of the provider
+        kubernetesVersion: "vMYVERSION" # String with prefix v, as UI shows
+        kubernetesVersionToUpgrade: "vMYVERSION" # String with prefix v, as UI shows
+        image: "" # String
+        sshUser: "" # String
+        cni: ["calico"] # Slice of strings, options can be found in provisioning configuration
+        enabledFeatures:
+          chart: false # Boolean, pre/post upgrade checks, default is false
+          ingress: false # Boolean, pre/post upgrade checks, default is false
+      - provider: "aws"
+        kubernetesVersion: "vMYVERSION" # String with prefix v, as UI shows
+        kubernetesVersionToUpgrade: "vMYVERSION" # String with prefix v, as UI shows
+        image: "" # String
+        sshUser: "ubuntu"
+        cni: ["calico"]
+        enabledFeatures:
+          chart: false # Boolean, pre/post upgrade checks, default is false
+          ingress: false # Boolean, pre/post upgrade checks, default is false
+    # This is a slice of structs, elements are expandable
+    custom:
+      - provider: "" # Name of the provider
+        kubernetesVersion: "vMYVERSION" # String with prefix v, as UI shows
+        kubernetesVersionToUpgrade: "vMYVERSION" # String with prefix v, as UI shows
+        image: "" # String
+        sshUser: "" # String
+        cni: ["calico"] # Slice of strings, options can be found in provisioning configuration
+        enabledFeatures:
+          chart: false # Boolean, pre/post upgrade checks, default is false
+          ingress: false # Boolean, pre/post upgrade checks, default is false
+    # This is a slice of structs, elements are expandable
+  k3s:
+    nodeProvider:
+      - provider: "" # Name of the provider
+        kubernetesVersion: "vMYVERSION" # String with prefix v, as UI shows
+        kubernetesVersionToUpgrade: "vMYVERSION" # String with prefix v, as UI shows
+        image: "" # String
+        sshUser: "" # String
+        cni: ["calico"] # Slice of strings, options can be found in provisioning configuration
+        enabledFeatures:
+          chart: false # Boolean, pre/post upgrade checks, default is false
+          ingress: false # Boolean, pre/post upgrade checks, default is false
+    # This is a slice of structs, elements are expandable
+      - provider: "" # Name of the provider
+        kubernetesVersion: "vMYVERSION" # String with prefix v, as UI shows
+        kubernetesVersionToUpgrade: "vMYVERSION" # String with prefix v, as UI shows
+        image: "" # String
+        sshUser: "" # String
+        cni: ["calico"] # Slice of strings, options can be found in provisioning configuration
+        enabledFeatures:
+          chart: false # Boolean, pre/post upgrade checks, default is false
+          ingress: false # Boolean, pre/post upgrade checks, default is false
+    # This is a slice of structs, elements are expandable
+    custom:
+      - provider: "" # Name of the provider
+        kubernetesVersion: "vMYVERSION" # String with prefix v, as UI shows
+        kubernetesVersionToUpgrade: "vMYVERSION" # String with prefix v, as UI shows
+        image: "" # String
+        sshUser: "" # String
+        cni: ["calico"] # Slice of strings, options can be found in provisioning configuration
+        enabledFeatures:
+          chart: false # Boolean, pre/post upgrade checks, default is false
+          ingress: false # Boolean, pre/post upgrade checks, default is false
+    # This is a slice of structs, elements are expandable
+  hosted:
+    - provider: "" # Name of the provider
+      kubernetesVersion: "MYVERSION" # String without prefix v, as UI shows
+      kubernetesVersionToUpgrade: "MYVERSION" # String without prefix v, as UI shows
+      enabledFeatures:
+         chart: false # Boolean, pre/post upgrade checks, default is false
+         ingress: false # Boolean, pre/post upgrade checks, default is false
+    - provider: "" # Name of the provider
+      kubernetesVersion: "MYVERSION" # String without prefix v, as UI shows
+      kubernetesVersionToUpgrade: "MYVERSION" # String without prefix v, as UI shows
+      enabledFeatures:
+         chart: false # Boolean, pre/post upgrade checks, default is false
+         ingress: false # Boolean, pre/post upgrade checks, default is false
+    - provider: "" # Name of the provider
+      kubernetesVersion: "MYVERSION" # String without prefix v, as UI shows
+      kubernetesVersionToUpgrade: "MYVERSION" # String without prefix v, as UI shows
+      enabledFeatures:
+         chart: false # Boolean, pre/post upgrade checks, default is false
+         ingress: false # Boolean, pre/post upgrade checks, default is false
+    # This is a slice of structs, elements are expandable
+
+----------------------------------------
+
+TITLE: Configuring Corral and Provisioning Settings for Rancher Airgap Tests in YAML
+DESCRIPTION: This YAML configuration sets up Corral for running airgap package tests in Rancher. It includes settings for Corral Rancher HA, provisioning inputs like CNI and Kubernetes versions, registry configuration, Corral packages, and various other parameters needed for the test environment.
+
+LANGUAGE: yaml
+CODE:
+corralRancherHA:
+  name: rancherha # this is the name of your aigap corral package if it hasn't been created beforehand
+provisioningInput:
+  cni:
+  - calico
+  # For the kubernetes versions please set it to what is appropriate for that release check
+  k3sKubernetesVersion:
+  - v1.23
+  - v1.24
+  - v1.25
+  rke1KubernetesVersion:
+  - v1.23
+  - v1.24
+  - v1.25
+  rke2KubernetesVersion:
+  - v1.25
+  - v1.24
+  - v1.23
+registries:
+  existingNoAuthRegistry: <value> # only set this if the registry was created beforehand just do `corral vars <corral> registry_fqdn` to get the registry hostname 
+corralPackages:
+  corralPackageImages:
+    airgapCustomCluster: dist/aws-rancher-custom-cluster-true
+    rancherHA: dist/aws-aws-registry-standalone-rke2-rancher-airgap-calico-true-2.15.1-1.8.0 # the name of the corral rancher is configurable with config entry above
+    ...
+  hasDebug: <bool, default=false>
+  hasCleanup: <bool, default=true>
+  hasSetCorralSSHKeys: <bool, default=false> # If you are creating the airgap rancher instance in the same test run, please set this to true so then the air gap cluster can communicate with the rancher instance. If the rancher instance was created beforehand this boolean is ignored.
+corralConfigs:
+  corralConfigUser: <string, default="jenkauto">
+  corralConfigVars:
+    <var1>: <string, "val1"> # for now only aws is supported, so use the appropriate aws vars
+    bastion_ip: <val> # if the air gap rancher instance is created beforehand (not in the same job) set this to the registry public IP, otherwise it is automatically done in the job.
+    corral_private_key: <val> # only set this if you have created the airgap rancher instance beforehand. By doing `corral vars <corral> corral_private_key`
+    corral_public_key: <val> # only set this if you have created the airgap rancher instance beforehand. By doing `corral vars <corral> corral_private_key`
+    registry_cert: <val> # cert for the registry
+    registry_key: <val>  # key for the registry
+    ...
+  corralSSHPath: <string, optional, mostly for local testing>
+
+----------------------------------------
+
+TITLE: Rancher Project Directory Structure
+DESCRIPTION: Shows the file organization structure for KEv2 tests within the Rancher project, specifically for the AKS controller implementation.
+
+LANGUAGE: plaintext
+CODE:
+rancher/rancher
+-> pkg/controllers/management/aks
+     -> aks_cluster_handler.go
+     -> aks_cluster_handler_test.go
+     -> tests/
+          -> test1.yaml
+          -> test2.json
+
+----------------------------------------
+
+TITLE: Cloning Rancher Repository
+DESCRIPTION: Commands for cloning and navigating to the Rancher repository.
+
+LANGUAGE: bash
+CODE:
+Git clone rancher/rancher
+cd rancher
+
+----------------------------------------
+
+TITLE: Running Individual Provider Tests
+DESCRIPTION: Commands for running tests for specific cloud providers (AKS, EKS, GKE) separately.
+
+LANGUAGE: bash
+CODE:
+go test -v ./pkg/controllers/management/aks
+go test -v ./pkg/controllers/management/eks
+go test -v ./pkg/controllers/management/gke
+
+----------------------------------------
+
+TITLE: Adding a New Value to build.yaml
+DESCRIPTION: Example of adding a new configuration value to the build.yaml file, which serves as the single source of truth for build variables.
+
+LANGUAGE: yaml
+CODE:
+webhookVersion: 2.0.6+up0.3.6-rc1
+
+----------------------------------------
+
+TITLE: Running All Provider Tests
+DESCRIPTION: Command for running tests for all cloud providers simultaneously.
+
+LANGUAGE: bash
+CODE:
+go test -v ./pkg/controllers/management/aks ./pkg/controllers/management/eks ./pkg/controllers/management/gke
+
+----------------------------------------
+
+TITLE: Updating export-config Script
+DESCRIPTION: Example of updating the export-config script to export the newly added configuration value as an environment variable.
+
+LANGUAGE: bash
+CODE:
+CATTLE_RANCHER_WEBHOOK_VERSION=$(yq -e '.webhookVersion' "$file")
+export CATTLE_RANCHER_WEBHOOK_VERSION
+
+----------------------------------------
+
+TITLE: Generating Test Coverage Report
+DESCRIPTION: Commands for generating and viewing test coverage reports in HTML format.
+
+LANGUAGE: bash
+CODE:
+go test (or alias command) -coverprofile=coverage.out
+go tool cover -html=coverage.out
+
+----------------------------------------
+
+TITLE: Referencing Configuration in Dockerfile
+DESCRIPTION: Example of capturing a configuration value as an ARG and ENV in a Dockerfile.
+
+LANGUAGE: dockerfile
+CODE:
+ARG CATTLE_FLEET_VERSION
+ENV CATTLE_FLEET_VERSION=$CATTLE_FLEET_VERSION
+
+----------------------------------------
+
+TITLE: Starting Local Kubernetes Server with envtest
+DESCRIPTION: Code to initialize and start a local Kubernetes server for testing.
+
+LANGUAGE: go
+CODE:
+testEnv = &envtest.Environment{}
+restCfg, err := testEnv.Start()
+
+----------------------------------------
+
+TITLE: Referencing Configuration in Go Code
+DESCRIPTION: Example of referencing a configuration value in Go code using the generated constants file.
+
+LANGUAGE: go
+CODE:
+NewSetting("shell-image", buildconfig.DefaultShellVersion)
+
+----------------------------------------
+
+TITLE: Creating CRDs for Testing
+DESCRIPTION: Code to create Custom Resource Definitions (CRDs) in the test environment.
+
+LANGUAGE: go
+CODE:
+factory, err := crd.NewFactoryFromClient(restCfg)
+err = factory.BatchCreateCRDs(ctx,
+crd.CRD{
+    SchemaObject: <CRD struct>,
+    NonNamespace: <true/false>,
+})
+
+----------------------------------------
+
+TITLE: Starting Controller Factory
+DESCRIPTION: Code to create and start a controller factory for specific resources.
+
+LANGUAGE: go
+CODE:
+controllerFactory := wranglerContext.ControllerFactory.ForResourceKind(schema.GroupVersionResource{
+    Group: "management.cattle.io",
+    Version: "v3",
+    Resource: "features",
+}, "Feature", false)
+err := controllerFactory.Start(ctx, 1)
+
+----------------------------------------
+
+TITLE: Starting Resource Caches
+DESCRIPTION: Code to create and start resource caches for controller dependencies.
+
+LANGUAGE: go
+CODE:
+_, err := wranglerContext.ControllerFactory.SharedCacheFactory().ForKind(schema.GroupVersionKind{
+	Group:   "management.cattle.io",
+	Version: "v3",
+	Kind:    "NodeDriver",
+})
+err = wranglerContext.ControllerFactory.SharedCacheFactory().StartGVK(s.ctx, schema.GroupVersionKind{
+	Group:   "management.cattle.io",
+	Version: "v3",
+	Kind:    "NodeDriver",
+})
+
+----------------------------------------
+
+TITLE: Configuring Rancher Test Environment for RKE1 Cluster Migration in YAML
+DESCRIPTION: This YAML configuration sets up the test environment for verifying role bindings when moving an RKE1 cluster to a new workspace in Rancher. It specifies the Rancher server address, admin token, and target RKE1 cluster name.
+
+LANGUAGE: yaml
+CODE:
+rancher: 
+  host: "rancher_server_address"
+  adminToken: "rancher_admin_token"
+  insecure: True #optional
+  cleanup: True #optional
+  clusterName: "RKE1_cluster_name"
+
+----------------------------------------
+
+TITLE: Configuring Rancher for Fleet Integration Tests in YAML
+DESCRIPTION: This YAML configuration sets up the necessary parameters for running Fleet integration tests in Rancher. It includes the Rancher server address, admin token, and cluster name.
+
+LANGUAGE: yaml
+CODE:
+rancher:
+  host: "rancher_server_address"
+  adminToken: "rancher_admin_token"
+  cleanup: false
+  insecure: true/optional
+  cleanup: false/optional
+  clusterName: "your-cluster-name"
+
+----------------------------------------
+
+TITLE: Configuring Dynamic GitRepo Deployment for Fleet Tests in YAML
+DESCRIPTION: This YAML configuration sets up a dynamic GitRepo deployment for Fleet integration tests. It specifies the metadata and spec for the GitRepo, including the repository URL, branch, and paths to scan.
+
+LANGUAGE: yaml
+CODE:
+gitRepo:
+  metadata:
+    name: "dynamic-test-1"
+    namespace: "fleet-default"
+  spec:
+    repo: https://github.com/rancher/fleet-examples
+    branch: master
+    paths:
+    - simple
+    imageScanCommit:
+      authorName: ""
+      authorEmail: ""
+
+----------------------------------------
+
+TITLE: Configuring Rancher Test Environment in YAML
+DESCRIPTION: YAML configuration for setting up the Rancher test environment, including server address, admin token, cluster name, and optional parameters.
+
+LANGUAGE: yaml
+CODE:
+rancher:
+  host: "rancher_server_address"
+  adminToken: "rancher_admin_token"
+  clusterName: "cluster_to_run_tests_on"
+  insecure: true/optional
+  cleanup: false/optional
+
+----------------------------------------
+
+TITLE: Configuring AKS Cluster in Rancher
+DESCRIPTION: YAML configuration for setting up an AKS cluster in Rancher. Includes Kubernetes version, network plugin, node pool configuration, and resource settings.
+
+LANGUAGE: yaml
+CODE:
+aksClusterConfig:
+  dnsPrefix: ""
+  kubernetesVersion: "1.26.6"
+  linuxAdminUsername: "azureuser"
+  loadBalancerSku: "Standard"
+  networkPlugin: "kubenet"
+  nodePools:
+  - availabilityZones:
+    - "1"
+    - "2"
+    - "3"
+    enableAutoScaling: false
+    maxPods: 110
+    maxCount: 10
+    minCount: 3
+    mode: "System"
+    name: "agentpool"
+    nodeCount: 3
+    osDiskSizeGB: 128
+    osDiskType: "Managed"
+    osType: "Linux"
+    vmSize: "Standard_DS2_v2"
+  resourceGroup: ""
+  resourceLocation: ""
+  tags: {}
+
+----------------------------------------
+
+TITLE: Running Snapshot Restore Tests with Go Test
+DESCRIPTION: Bash commands for executing snapshot restore tests using gotestsum, specifying packages, output format, and test filters.
+
+LANGUAGE: bash
+CODE:
+gotestsum --format standard-verbose --packages=github.com/rancher/rancher/tests/v2/validation/snapshot --junitfile results.xml -- -timeout=60m -tags=validation -v -run "TestSnapshotRestoreWithFleetTestSuite/TestFleetThenSnapshotRestore"
+
+gotestsum --format standard-verbose --packages=github.com/rancher/rancher/tests/v2/validation/snapshot --junitfile results.xml -- -timeout=60m -tags=validation -v -run "TestSnapshotRestoreWithFleetTestSuite/TestSnapshotThenFleetRestore"
+
+----------------------------------------
+
+TITLE: Configuring Fleet for Airgap Deployment in YAML
+DESCRIPTION: This YAML configuration snippet outlines the necessary settings for running Fleet in an airgap environment. It includes provisioning inputs, registry settings, Corral package configurations, and various other parameters required for the airgap setup.
+
+LANGUAGE: yaml
+CODE:
+provisioningInput:
+  # For the cni and kubernetes versions please leave blank unless you'd like to specifically test a version. Defaults to latest k8s version and calico. 
+  cni:
+  - calico
+  rke2KubernetesVersion:
+  - v1.xx.xx
+registries:
+  existingNoAuthRegistry: <value> # only set this if the registry was created beforehand just do `corral vars <corral> registry_fqdn` to get the registry hostname 
+corralPackages:
+  corralPackageImages:
+    airgapCustomCluster: .../dist/aws-rancher-custom-cluster-true
+    rancherHA: .../dist/aws-aws-registry-standalone-rke2-rancher-airgap-calico-true-2.15.1-1.11.0 # the name of the corral rancher is configurable with config entry above
+    ...
+  hasDebug: <bool, default=false>
+  hasCleanup: <bool, default=true>
+  hasSetCorralSSHKeys: <bool, default=false> # If you are creating the airgap rancher instance in the same test run, please set this to true so then the air gap cluster can communicate with the rancher instance. If the rancher instance was created beforehand this boolean is ignored.
+corralConfigs:
+  corralConfigUser: <string, default="jenkauto">
+  corralConfigVars:
+    <var1>: <string, "val1"> # for now only aws is supported, so use the appropriate aws vars
+    bastion_ip: <val> # if the air gap rancher instance is created beforehand (not in the same job) set this to the registry public IP, otherwise it is automatically done in the job.
+    corral_private_key: <val> # only set this if you have created the airgap rancher instance beforehand. By doing `corral vars <corral> corral_private_key`
+    corral_public_key: <val> # only set this if you have created the airgap rancher instance beforehand. By doing `corral vars <corral> corral_private_key`
+    registry_cert: <val> # cert for the registry
+    registry_key: <val>  # key for the registry
+    ...
+
+----------------------------------------
+
+TITLE: Digital Ocean Credentials Configuration
+DESCRIPTION: Configuration for Digital Ocean cloud credentials requiring access token.
+
+LANGUAGE: yaml
+CODE:
+digitalOceanCredentials:
+  accessToken": ""                    #required
+
+----------------------------------------
+
+TITLE: Advanced Cluster Agent Configuration
+DESCRIPTION: Advanced settings for customizing cluster and fleet agent deployments including resource requirements, tolerations, and node affinity.
+
+LANGUAGE: yaml
+CODE:
+advancedOptions:
+  clusterAgent:
+    appendTolerations:
+    - key: "Testkey"
+      value: "testValue"
+      effect: "NoSchedule"
+    overrideResourceRequirements:
+      limits:
+        cpu: "750m"
+        memory: "500Mi"
+      requests:
+        cpu: "250m"
+        memory: "250Mi"
+
+----------------------------------------
+
+TITLE: Configuring Rancher Test Environment in YAML
+DESCRIPTION: Basic configuration required to set up the test environment including Rancher server details and cluster information
+
+LANGUAGE: yaml
+CODE:
+rancher:
+  host: "rancher_server_address"
+  adminToken: "rancher_admin_token"
+  clusterName: "cluster_to_run_tests_on"
+  insecure: true/optional
+  cleanup: false/optional
+
+----------------------------------------
+
+TITLE: Node Pool Configuration for Replacement Tests
+DESCRIPTION: Defines node pool configuration for both RKE1 and RKE2/K3s clusters, specifying roles and quantities for etcd, controlplane, and worker nodes
+
+LANGUAGE: yaml
+CODE:
+provisioningInput:
+  providers: [""]     # Specify to vsphere if you have a Windows node in your cluster
+  nodePools:          # nodePools is specific for RKE1 clusters.
+  - nodeRoles:
+      etcd: true
+      quantity: 3
+  - nodeRoles:
+      controlplane: true
+      quantity: 2
+  - nodeRoles:
+      worker: true
+      quantity: 3
+  machinePools:       # machinePools is specific for RKE2/K3s clusters.
+  - machinePoolConfig:
+      etcd: true
+      quantity: 3
+  - machinePoolConfig:
+      controlplane: true
+      quantity: 2
+  - machinePoolConfig:
+      worker: true
+      quantity: 3
+
+----------------------------------------
+
+TITLE: Dynamic Scaling Configuration
+DESCRIPTION: Configuration for dynamic scaling tests across different node providers including EC2, AKS, EKS, and GKE node pools
+
+LANGUAGE: yaml
+CODE:
+provisioningInput:        # Optional block, only use if using vsphere
+  providers: [""]         # Specify to vsphere if you have a Windows node in your cluster
+scalingInput:
+  nodeProvider: "ec2"
+  nodePools:
+    nodeRoles:
+      worker: true
+      quantity: 2
+  machinePools:
+    nodeRoles:
+      etcd: true
+      quantity: 1
+  aksNodePool:
+    nodeCount: 3
+  eksNodePool:
+    desiredSize: 6
+  gkeNodePool:
+    initialNodeCount: 3
+
+----------------------------------------
+
+TITLE: Configuring Rancher JSON Settings for Network Tests
+DESCRIPTION: This JSON snippet shows the configuration settings required in the config file for running network tests in the Rancher project. It includes server address, admin token, cluster name, and optional insecure and cleanup flags.
+
+LANGUAGE: json
+CODE:
+{
+  "rancher": { 
+    "host": "rancher_server_address",
+    "adminToken": "rancher_admin_token",
+    "clusterName": "cluster_to_run_tests_on",
+    "insecure": true,
+    "cleanup": false
+  }
+}
+
+----------------------------------------
+
+TITLE: Configuring Rancher CLI Test Settings in YAML
+DESCRIPTION: YAML configuration block specifying essential settings for Rancher CLI tests including host address, admin token, insecure mode, and CLI enablement flag.
+
+LANGUAGE: yaml
+CODE:
+rancher:
+  host: "rancher_server_address"
+  adminToken: "rancher_admin_token"
+  insecure: true/optional
+  rancherCLI: true
+
+----------------------------------------
+
+TITLE: Installing envtest Setup Tool in Go
+DESCRIPTION: Command to install the setup-envtest tool required for running controller integration tests.
+
+LANGUAGE: bash
+CODE:
+go install sigs.k8s.io/controller-runtime/tools/setup-envtest@latest
+
+----------------------------------------
+
+TITLE: Executing Rancher CLI Tests with Go Test
+DESCRIPTION: Command for running CLI validation tests using gotestsum with specific test parameters, timeouts, and build tags.
+
+LANGUAGE: bash
+CODE:
+gotestsum --format standard-verbose --packages=github.com/rancher/rancher/tests/v2/validation/cli --junitfile results.xml -- -timeout=60m -tags=validation -v -run "TestCLITestSuite$"
+
+----------------------------------------
+
+TITLE: Setting Up Kubebuilder Assets Environment
+DESCRIPTION: Command to export KUBEBUILDER_ASSETS environment variable pointing to envtest installation.
+
+LANGUAGE: bash
+CODE:
+export KUBEBUILDER_ASSETS=$(setup-envtest use -p path)
+
+----------------------------------------
+
+TITLE: Configuring Rancher Test Environment in JSON
+DESCRIPTION: JSON configuration for setting up the Rancher test environment. Includes host, admin token, insecure flag, cleanup option, and cluster name for running tests.
+
+LANGUAGE: json
+CODE:
+{
+  "rancher": { 
+    "host": "<rancher-server-host>",
+    "adminToken": "<rancher-admin-token>",
+    "insecure": true,
+    "cleanup": false,
+    "clusterName": "<cluster-to-run-test>"
+  }
+}
+
+----------------------------------------
+
+TITLE: Creating Wrangler Context
+DESCRIPTION: Code to create a new Wrangler context for controller testing.
+
+LANGUAGE: go
+CODE:
+wranglerContext, err := wrangler.NewContext(ctx, nil, restCfg)
+
+----------------------------------------
+
+TITLE: Base Cloud Provider Configuration Variables
+DESCRIPTION: Default configuration variables for base cloud provider setup including OS version and Docker installation settings
+
+LANGUAGE: bash
+CODE:
+OS_VERSION defaults to 'ubuntu-16.04', Used to select which image to use
+DOCKER_VERSION defaults to '1.12.6', Used to select image to use if DOCKER_INSTALLED is 'true'
+DOCKER_INSTALLED defaults to 'true', When false, base image is used for OS_VERSION, and docker version DOCKER_VERSION is installed
+
+----------------------------------------
+
+TITLE: Digital Ocean Environment Variables
+DESCRIPTION: Required environment variables for Digital Ocean cloud provider integration
+
+LANGUAGE: bash
+CODE:
+DO_ACCESS_KEY no default, your DO access key
+
+----------------------------------------
+
+TITLE: AWS Environment Variables
+DESCRIPTION: Required and optional environment variables for AWS cloud provider integration including access keys, instance configuration, and networking settings
+
+LANGUAGE: bash
+CODE:
+AWS_ACCESS_KEY_ID no default, your AWS access key id
+AWS_SECRET_ACCESS_KEY no default, your AWS secret access key
+AWS_SSH_KEY_NAME no default, the filename of the private key, e.i. jenkins-rke-validation.pem
+AWS_CICD_INSTANCE_TAG defaults to 'rancher-validation', Tags the instance with CICD=AWS_CICD_INSTANCE_TAG
+AWS_INSTANCE_TYPE defaults to 't3a.medium', selects the instance type and size
+AWS_REGION no default, the region for your ec2 instances
+AWS_SUBNET no default, the subnet for your ec2 instances
+AWS_VPC no default, the VPC for your ec2 instances
+AWS_SG no default, the SG for your ec2 instances
+AWS_ZONE no default, the zone for your ec2 instances
+AWS_IAM_PROFILE no default, the IAM profile for your ec2 instances
+
+----------------------------------------
+
+TITLE: Azure Environment Variables
+DESCRIPTION: Required environment variables for Azure cloud provider integration including subscription, client, and tenant IDs
+
+LANGUAGE: bash
+CODE:
+AZURE_SUBSCRIPTION_ID no default, your Azure subscription id
+AZURE_CLIENT_ID no default, your app / client id
+AZURE_CLIENT_SECRET no default, your app / client secret
+AZURE_TENANT_ID no default your Azure tenant id, for use with Azure cloud provider
+
+----------------------------------------
+
+TITLE: Configuring Rancher RBAC Test Environment
+DESCRIPTION: Basic configuration for running RBAC tests in Rancher. Specifies the host server, admin token, target cluster, and optional settings for insecure connections and cleanup.
+
+LANGUAGE: json
+CODE:
+{
+  "rancher": { 
+    "host": "rancher_server_address",
+    "adminToken": "rancher_admin_token",
+    "clusterName": "cluster_to_run_tests_on",
+    "insecure": true,
+    "cleanup": false
+  }
+}
+
+----------------------------------------
+
+TITLE: AWS Node Reboot Implementation
+DESCRIPTION: Python code snippet showing AWS node reboot implementation with wait states, currently commented out due to Issue 316
+
+LANGUAGE: python
+CODE:
+if wait_for_ready:
+    nodes = self.wait_for_nodes_state(nodes)
+    # hack for instances
+    # self.reboot_nodes(nodes)
+    # time.sleep(5)
+    # nodes = self.wait_for_nodes_state(nodes)
+    for node in nodes:
+        node.ready_node()
+return nodes
+
+----------------------------------------
+
+TITLE: Configuring Rancher YAML for TestRbacOpaqueSecretTestSuite
+DESCRIPTION: YAML configuration for the TestRbacOpaqueSecretTestSuite. It specifies the Rancher server address, admin token, cluster name, and optional settings for insecure connections and cleanup.
+
+LANGUAGE: yaml
+CODE:
+rancher: 
+  host: "rancher_server_address"
+  adminToken: "rancher_admin_token"
+  insecure: True #optional
+  cleanup: True #optional
+  clusterName: "cluster_name"
+
+----------------------------------------
+
+TITLE: Exporting Environment Variables for Local Rancher Validation Setup
+DESCRIPTION: This snippet shows the necessary environment variables to be exported for running Rancher validation tests locally. It includes debug mode, OS version, Docker version, cloud provider, and AWS credentials.
+
+LANGUAGE: bash
+CODE:
+DEBUG=[true|false]  to see the output while running
+OS_VERSION=[ubuntu-16.04|rhel-7.4]
+DOCKER_VERSION=[latest|17.03|1.13.1|1.12.6]
+CLOUD_PROVIDER=AWS
+AWS_SSH_KEY_NAME=aws_cert.pem
+AWS_ACCESS_KEY_ID=your AWS access key id
+AWS_SECRET_ACCESS_KEY=your AWS secret jet
+
+----------------------------------------
+
+TITLE: Configuring Rancher YAML for TestRbacRegistrySecretTestSuite
+DESCRIPTION: YAML configuration for the TestRbacRegistrySecretTestSuite. It includes Rancher server settings and additional registry input parameters such as registry name, username, and password.
+
+LANGUAGE: yaml
+CODE:
+rancher: 
+  host: "rancher_server_address"
+  adminToken: "rancher_admin_token"
+  insecure: True #optional
+  cleanup: True #optional
+  clusterName: "cluster_name"
+registryInput: 
+  name: "registry_name"
+  registryUsername: "registry_username" 
+  registryPassword: "registry_password"
+
+----------------------------------------
+
+TITLE: Exporting Environment Variables for Containerized Rancher Validation
+DESCRIPTION: This snippet demonstrates the environment variables required for running Rancher validation tests in a container. It includes OS version, Docker version, Kubernetes and RKE versions, cloud provider, and AWS credentials.
+
+LANGUAGE: bash
+CODE:
+OS_VERSION=[ubuntu-16.04|rhel-7.4]
+DOCKER_VERSION=[latest|17.03|1.13.1|1.12.6]
+KUBECTL_VERSION=
+RKE_VERSION=
+CLOUD_PROVIDER=AWS
+AWS_SSH_KEY_NAME=aws_cert.pem
+AWS_ACCESS_KEY_ID=
+AWS_SECRET_ACCESS_KEY=
+
+----------------------------------------
+
+TITLE: Configuring Rancher Test Environment in YAML
+DESCRIPTION: YAML configuration block that specifies the required settings for running the Configmaps RBAC test suite. Includes server address, admin token, and cluster settings.
+
+LANGUAGE: yaml
+CODE:
+rancher: 
+  host: "rancher_server_address"
+  adminToken: "rancher_admin_token"
+  insecure: True  #optional
+  cleanup: True #optional
+  clusterName: "cluster_name"
+
+----------------------------------------
+
+TITLE: RKE Template Reference Table in Markdown
+DESCRIPTION: This snippet provides a markdown table that serves as a reference for RKE template fields. It includes field names and their descriptions, which are used in the build_rke_template function.
+
+LANGUAGE: markdown
+CODE:
+| TEMPLATE_FIELD_NAME      | Description                                   |
+| ------------------------ |:---------------------------------------------:|
+| ip_address_N             | Replaced with node N's IP Address             |
+| dns_hostname_N           | Replaced with node N's FQDN                   |
+| ssh_user_N               | Replaced with node N's ssh user               |
+| ssh_key_N                | Replaced with node N's actual private key     |
+| ssh_key_path_N           | Replaced with node N's path to ssh key        |
+| internal_address_N       | Replaced with node N's private IP Address     |
+| k8_rancher_image         | Used to determine k8s images used in services |
+| network_plugin           | Used to determine rke network plugin          |
+| master_ssh_key_path      | Replaced by path of the master ssh for tests  |
+
+----------------------------------------
+
+TITLE: Configuring Rancher Test Environment in YAML
+DESCRIPTION: YAML configuration required for setting up ClusterRoleTemplateBinding tests. Specifies the Rancher server details, admin token, and target cluster information needed for test execution.
+
+LANGUAGE: yaml
+CODE:
+rancher: 
+  host: "rancher_server_address"
+  adminToken: "rancher_admin_token"
+  insecure: True
+  cleanup: True
+  clusterName: "downstream_cluster_name"
+
+----------------------------------------
+
+TITLE: Test Method Naming Convention Example
+DESCRIPTION: Demonstrates the format for naming test methods in the Rancher client testing framework. The naming pattern follows test_{resource_name}_[with_{field}]_{operation}[_{order_number}] with required and optional components.
+
+LANGUAGE: markdown
+CODE:
+test_{resource_name}_[with_{field}]_{operation}[_{order_number}]
+
+----------------------------------------
+
+TITLE: Configuring Rancher RBAC Test Environment Settings
+DESCRIPTION: YAML configuration required for running cluster_role_test.go and project_role_test.go test suites. Specifies the Rancher server connection details, authentication token, and target cluster information.
+
+LANGUAGE: yaml
+CODE:
+rancher:
+  host: "rancher_server_address"
+  adminToken: "rancher_admin_token"
+  insecure: True #optional
+  cleanup: True #optional
+  clusterName: "downstream_cluster_name"
+
+----------------------------------------
+
+TITLE: Resource Cleanup with remove_resource Fixture in Python
+DESCRIPTION: Demonstrates how to use the remove_resource fixture to automatically clean up created resources after test completion. The fixture handles resource deletion regardless of test success or failure.
+
+LANGUAGE: python
+CODE:
+def test_wl_rbac_project_member(remove_resource):
+    ...
+    workload = p_client.create_workload(name=name, containers=con, namespaceId=ns.id)
+    remove_resource(workload)
+    ...
+
+----------------------------------------
+
+TITLE: Configuring Rancher API Access in YAML
+DESCRIPTION: Creates a configuration file 'steveapi.yaml' with Rancher host and admin token information for API access.
+
+LANGUAGE: yaml
+CODE:
+rancher:
+    host: localhost:8444
+    adminToken: token-XXX:YYY
+
+----------------------------------------
+
+TITLE: Running Steve API Integration Tests in Go
+DESCRIPTION: Executes the integration tests for the Steve API using Go's testing framework.
+
+LANGUAGE: shell
+CODE:
+go test -count=1 -v -run TestSteveLocal
+
+----------------------------------------
+
+TITLE: Configuring RANCHER_CORRAL_CONFIG Package
+DESCRIPTION: YAML configuration for building Rancher with registry support using Corral packages. Specifies Kubernetes, Docker, Rancher and cert-manager versions.
+
+LANGUAGE: yaml
+CODE:
+manifest:
+  name: rancher-registry
+  description: rancher-registry
+  variables:
+    registry_auth:
+      default: enabled
+templates:
+  - aws/cluster_nodes
+  - aws/registry_nodes
+  - registry-standalone
+  - rke2
+  - rancher
+variables:
+  cni:
+    - calico
+  kubernetes_version:
+    - v1.23.10+rke2r1
+    - v1.24.4+rke2r1
+  registry_auth:
+    - global
+  docker_compose_version:
+    - 2.15.1
+  rancher_version:
+    - 2.7.0
+  cert_manager_version:
+    - 1.11.0
+
+----------------------------------------
+
+TITLE: Generating API Example Table in Markdown
+DESCRIPTION: Runs integration tests and updates the markdown table with API examples using a provided script.
+
+LANGUAGE: shell
+CODE:
+go test -count=1 -v ./tests/v2/integration/steveapi/ -run TestSteveLocal
+
+cd ./tests/v2/integration/steveapi/
+./make-table.sh
+
+----------------------------------------
+
+TITLE: Configuring REGISTRIES_CORRAL_CONFIG Package
+DESCRIPTION: YAML configuration for standalone registry nodes using Corral packages. Defines registry authentication modes and component versions.
+
+LANGUAGE: yaml
+CODE:
+manifest:
+  name: registry
+  description: registry
+  variables:
+    registry_auth:
+      default: enabled
+templates:
+  - aws/registry_nodes
+  - registry-standalone
+variables:
+  registry_auth:
+    - global
+    - enabled
+    - disabled
+    - ecr
+  docker_compose_version:
+    - 2.15.1
+  rancher_version:
+    - 2.7.0
+  cert_manager_version:
+    - 1.11.0
+
+----------------------------------------
+
+TITLE: Decoding Debug Data in Bash
+DESCRIPTION: Command pipeline to decode base64 encoded and gzipped debug data into readable JSON format using base64, gzip, and jq tools.
+
+LANGUAGE: bash
+CODE:
+echo 'blob' | base64 --decode | gzip -d | jq -r
+
+----------------------------------------
+
+TITLE: Configuring Proxy Settings for Rancher Provisioning Tests in YAML
+DESCRIPTION: This snippet shows how to set up proxy-related environment variables for both RKE1 and RKE2 provisioning tests. It includes settings for HTTPS_PROXY, HTTP_PROXY, and NO_PROXY.
+
+LANGUAGE: yaml
+CODE:
+provisioningInput:
+  agentEnvVars:
+  - name: HTTPS_PROXY
+    value: #proxy server internal ip address:port
+  - name: HTTP_PROXY
+    value: #proxy server internal ip address:port
+  - name: NO_PROXY
+    value: localhost,127.0.0.1,0.0.0.0,10.0.0.0/8,172.16.0.0/12,cattle-system.svc
+  agentEnvVarsRKE1:
+  - name: HTTPS_PROXY
+    value: #proxy server internal ip address:port
+  - name: HTTP_PROXY
+    value: #proxy server internal ip address:port
+  - name: NO_PROXY
+    value: localhost,127.0.0.1,0.0.0.0,10.0.0.0/8,172.16.0.0/12,cattle-system.svc
+
+----------------------------------------
+
+TITLE: Formatting Pod Logs in Bash
+DESCRIPTION: Command pipeline to decode base64 encoded and gzipped pod logs, with additional processing to convert literal newline strings into actual newlines.
+
+LANGUAGE: bash
+CODE:
+echo 'podlogblob' | base64 --decode | gzip -d | sed -e 's/SnewlineG/\n/g'
+
+----------------------------------------
+
+TITLE: Configuring K3S Provisioning Test Flags in YAML
+DESCRIPTION: Defines flags to determine which static table tests are run. The 'Long' flag runs all tests, while 'Short' runs a subset.
+
+LANGUAGE: yaml
+CODE:
+flags:
+  desiredflags: "Long"   #required (static tests only)
+
+----------------------------------------
+
+TITLE: Running Custom v2prov Tests with RKE2 in Rancher
+DESCRIPTION: This command demonstrates how to run a specific v2prov integration test (Operation Custom EncryptionKeyRotation) using RKE2 distribution in Rancher. It utilizes environment variables to customize the test execution.
+
+LANGUAGE: bash
+CODE:
+V2PROV_TEST_RUN_REGEX=Test_Operation_Custom_EncryptionKeyRotation V2PROV_TEST_DIST=rke2 make provisioning-tests
+
+----------------------------------------
+
+TITLE: Configuring Test Flags for Rancher Import Provisioning
+DESCRIPTION: YAML configuration for setting test flags to determine which static table tests are run. The 'desiredflags' field is required and can be set to 'Long' for running all tests or 'Short' for a subset.
+
+LANGUAGE: yaml
+CODE:
+flags:
+  desiredflags: "Long"   #required (static tests only)
+
+----------------------------------------
+
+TITLE: Setting Rancher Test URL Environment Variable
+DESCRIPTION: Exports the CATTLE_TEST_URL environment variable with the address of the local Rancher instance.
+
+LANGUAGE: bash
+CODE:
+export CATTLE_TEST_URL=https://172.17.0.2:8443
+
+----------------------------------------
+
+TITLE: Configuring Rancher RKE2 Cluster Test in YAML
+DESCRIPTION: YAML configuration for setting up hostname truncation tests in Rancher. Includes settings for rancher host, machine pools, AWS credentials, and machine configuration.
+
+LANGUAGE: yaml
+CODE:
+rancher:                                   
+  host: ""                                  #required
+  adminToken: ""                            #required
+  clusterName: ""                           
+
+provisioningInput:
+  machinePools:                             
+  - nodeRoles:                              #required (at least 1)
+      etcd: true                            #required (at least 1 controlplane & etcd & worker)                            
+      quantity: 1
+  - nodeRoles:
+      controlplane: true
+      quantity: 1
+  - nodeRoles:
+      worker: true
+      quantity: 1
+  rke2KubernetesVersion: ["v1.27.6+rke2r1"] #required (at least 1)
+  cni: ["calico"]                           #required (at least 1)
+  providers: ["aws"]                        #required (at least 1)
+
+awsCredentials:                            
+  secretKey: "",                            #required                                               
+  accessKey: "",                            #required                          
+  defaultRegion: ""                         #required                      
+
+awsMachineConfig:                                   
+  region: "us-east-2"                       
+  ami: ""                                   #required                      
+  instanceType: "t3a.medium"                #required                
+  sshUser: "ubuntu"                         #required                        
+  vpcId: ""                                 #required                               
+  volumeType: "gp2"                         #required                        
+  zone: "a"                                 #required                          
+  retries: "5"                              #required
+  rootSize: "60"                            #required
+  securityGroup: [""]                       #required
+
+----------------------------------------
+
+TITLE: Rancher Cloud Provider Migration Configuration
+DESCRIPTION: Configuration for migrating cloud provider from in-tree to out-of-tree. Specifies Rancher host details, authentication, and cluster settings.
+
+LANGUAGE: yaml
+CODE:
+rancher:
+  host: <your_host>
+  adminToken: <your_token>
+  insecure: true/false
+  cleanup: false/true
+  clusterName: "<your_cluster_name>"
+
+
+----------------------------------------
+
+TITLE: Running Rancher Test Command
+DESCRIPTION: Command line instruction for running the hostname truncation test using gotestsum with specific test parameters and build tags.
+
+LANGUAGE: bash
+CODE:
+gotestsum --format standard-verbose --packages=github.com/rancher/rancher/tests/v2/validation/provisioning/hostnametruncation --junitfile results.xml -- -timeout=120m -tags=validation -v -run "TestProvisioningHostnameTruncationTestSuite/TestProvisioningRKE2ClusterTruncation"
+
+----------------------------------------
+
+TITLE: Rancher Cloud Provider Version Upgrade Settings
+DESCRIPTION: Configuration for enabling chart upgrades in cloud provider installations. Used to set up upgradeable CPI/CSI charts for testing version upgrades.
+
+LANGUAGE: yaml
+CODE:
+chartUpgrade:
+  isUpgradable: true
+
+----------------------------------------
+
+TITLE: Configuring Rancher Test Environment in YAML
+DESCRIPTION: YAML configuration for setting up the Rancher test environment. Specifies the Rancher server address, admin token, cluster name, and optional settings for insecure connections and cleanup.
+
+LANGUAGE: yaml
+CODE:
+rancher: 
+  host: "rancher_server_address"
+  adminToken: "rancher_admin_token"
+  insecure: True #optional
+  cleanup: True #optional
+  clusterName: "downstream_cluster_name"
+
+----------------------------------------
+
+TITLE: Running Rancher Snapshot Test Commands
+DESCRIPTION: Collection of gotestsum commands for executing different types of snapshot tests including ETCD restore, K8s upgrade, upgrade strategy, S3 restore, and Windows cluster tests.
+
+LANGUAGE: bash
+CODE:
+gotestsum --format standard-verbose --packages=github.com/rancher/rancher/tests/v2/validation/snapshot --junitfile results.xml -- -timeout=60m -tags=validation -v -run "TestSnapshotRestoreETCDOnlyTestSuite/TestSnapshotRestoreETCDOnly"
+
+----------------------------------------
+
+TITLE: Configuring Rancher YAML for Steve/Vai Tests
+DESCRIPTION: This YAML configuration sets up the necessary parameters for connecting to a Rancher server and running Steve/Vai tests. It includes the server address, admin token, and optional settings for insecure connections and cleanup.
+
+LANGUAGE: yaml
+CODE:
+rancher: 
+  host: "rancher_server_address"
+  adminToken: "rancher_admin_token"
+  insecure: True # optional
+  cleanup: True # optional
+  clusterName: "local" # can just be checked against local
+
+----------------------------------------
+
+TITLE: Configuring Rancher Shell Test Environment in YAML
+DESCRIPTION: YAML configuration block for setting up Rancher shell testing environment. Includes host address, admin token, optional insecure and cleanup flags, and shell image version specification.
+
+LANGUAGE: yaml
+CODE:
+rancher:
+  host: "rancher_server_address" 
+  adminToken: "rancher_admin_token"
+  insecure: true/optional
+  cleanup: true/optional
+  shellImage : "rancher/shell:<Version>"
+
+----------------------------------------
+
+TITLE: Configuring Corral Standalone Tests in YAML
+DESCRIPTION: YAML configuration for Corral standalone tests that defines package images, debug settings, cleanup behavior, and user configurations. The configuration includes package image references, debug flags, cleanup settings, custom repository URL, user prefix, and variable definitions required for test execution.
+
+LANGUAGE: yaml
+CODE:
+corralPackages:
+  corralPackageImages:
+    <nameOfPackage1>: <public corral image to deploy "ghcr.io/rancherlabs/corral/$pkg:latest>
+    ...
+  hasDebug: <bool, default=false>
+  hasCleanup: <bool, default=true>
+  hasCustomRepo: <string, suggeseted=https://github.com/rancherlabs/corral-packages.git>
+
+corralConfigs:
+  corralConfigUser: <string, default="jenkauto">
+  corralConfigVars:
+    <var1>: <string, "val1">
+    ...
+  corralSSHPath: <string, optional, mostly for local testing>
+
+----------------------------------------
+
+TITLE: Configuring Rancher Test Settings in YAML
+DESCRIPTION: YAML configuration for specifying Rancher server details and test cluster information. This includes the Rancher host address, admin token, target cluster name, and optional settings for insecure connections and cleanup.
+
+LANGUAGE: yaml
+CODE:
+rancher:
+  host: "rancher_server_address"
+  adminToken: "rancher_admin_token"
+  clusterName: "cluster_to_run_tests_on"
+  insecure: true/optional
+  cleanup: true/optional
+
+----------------------------------------
+
+TITLE: Running E2E Tests for Rancher Project Using Bash
+DESCRIPTION: This command executes the end-to-end tests for the Rancher project. It requires a valid Kubernetes configuration file and runs the tests with verbose output. The tests assume at least one running Kubernetes cluster is available.
+
+LANGUAGE: bash
+CODE:
+TEST_CLUSTER_MGR_CONFIG=~/.kube/config TEST_CLUSTER_CONFIG=~/.kube/config go test -check.vv -v .
+
+----------------------------------------
+
+TITLE: Main Configuration File Structure
+DESCRIPTION: Java configuration file defining AWS credentials, Corral configs, registry settings and provisioning inputs for the test environment.
+
+LANGUAGE: java
+CODE:
+awsCredentials:
+  accessKey: <REDACTED>
+  defaultRegion: us-east-2
+  secretKey: <REDACTED>
+awsEC2Config:
+  awsAMI: <REDACTED>
+  awsAccessKeyID: <REDACTED>
+  awsCICDInstanceTag: rancher-validation
+  awsIAMProfile: ""
+  awsRegionAZ: ""
+  awsSSHKeyName: <REDACTED>
+  awsSecretAccessKey: <REDACTED>
+  awsSecurityGroups:
+  - <REDACTED>
+  awsUser: ubuntu
+  instanceType: t3a.xlarge
+  region: us-east-2
+  volumeSize: 50
+
+----------------------------------------
+
+TITLE: Running Full Chart CI Tests with Live Cluster
+DESCRIPTION: Executes complete CI testing of Rancher charts against a live Kubernetes cluster using the ci script.
+
+LANGUAGE: bash
+CODE:
+./scripts/charts/ci
+
+----------------------------------------
+
+TITLE: Configuring Test Flags for RKE2 Provisioning
+DESCRIPTION: Configuration for determining which static table tests to run, with options for Long or Short test sets.
+
+LANGUAGE: yaml
+CODE:
+flags:
+  desiredflags: "Long"
+
+----------------------------------------
+
+TITLE: Advanced Cluster Configuration Options
+DESCRIPTION: Advanced settings for cluster and fleet agent customization including resource requirements and node affinity.
+
+LANGUAGE: yaml
+CODE:
+advancedOptions:
+  clusterAgent: # change this to fleetAgent for fleet agent
+    appendTolerations:
+    - key: "Testkey"
+      value: "testValue"
+      effect: "NoSchedule"
+    overrideResourceRequirements:
+      limits:
+        cpu: "750m"
+        memory: "500Mi"
+      requests:
+        cpu: "250m"
+        memory: "250Mi"
+      overrideAffinity:
+        nodeAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+            - preference:
+                matchExpressions:
+                  - key: "cattle.io/cluster-agent"
+                    operator: "In"
+                    values:
+                      - "true"
+              weight: 1
+
+----------------------------------------
+
+TITLE: Basic Flags Configuration in YAML
+DESCRIPTION: Configuration for determining which static table tests to run. The desiredflags parameter can be set to 'Long' for full tests or 'Short' for a subset.
+
+LANGUAGE: yaml
+CODE:
+flags:
+  desiredflags: "Long"
+
+----------------------------------------
+
+TITLE: Provisioning Input Configuration
+DESCRIPTION: Core configuration for RKE1 tests including node pools, Kubernetes version, CNI, providers, and optional PSACT settings.
+
+LANGUAGE: yaml
+CODE:
+provisioningInput:
+  nodePools:
+  - nodeRoles:
+      etcd: true
+      controlplane: true
+      worker: true
+      quantity: 1
+  - nodeRoles:
+      worker: true
+      drainBeforeDelete: true
+      quantity: 2
+  rke1KubernetesVersion: ["v1.28.10-rancher1-1"]
+  cni: ["calico"]
+  providers: ["linode", "aws", "do", "harvester", "vsphere", "azure"]
+  cloudProvider: ""
+  nodeProviders: ["ec2"]
+  psact: ""
+  criDockerd: false
+
+----------------------------------------
+
+TITLE: Cloud Provider Chart Upgrade Configuration
+DESCRIPTION: Configuration for enabling chart upgrades in cloud provider testing scenarios.
+
+LANGUAGE: yaml
+CODE:
+chartUpgrade:
+  isUpgradable: true
+
+----------------------------------------
+
+TITLE: Test Method Name Examples
+DESCRIPTION: Concrete examples of test method names following the established naming convention, showing various combinations of resource names, fields, operations, and order numbers.
+
+LANGUAGE: markdown
+CODE:
+test_deployment()
+test_deployment_update()
+test_deployment_update_2()
+test_deployment_with_secret_create()
+test_deployment_with_secret_update()
+
+----------------------------------------
+
+TITLE: Configuring Custom K3S Cluster in YAML
+DESCRIPTION: Specifies the configuration for custom K3S clusters using AWS EC2 instances, including instance types, AMIs, security groups, and roles.
+
+LANGUAGE: yaml
+CODE:
+  awsEC2Configs:
+  region: "us-east-2"
+  awsSecretAccessKey: ""
+  awsAccessKeyID: ""
+  awsEC2Config:
+    - instanceType: "t3a.medium"
+      awsRegionAZ: ""
+      awsAMI: ""
+      awsSecurityGroups: [""]
+      awsSSHKeyName: ""
+      awsCICDInstanceTag: "rancher-validation"
+      awsIAMProfile: ""
+      awsUser: "ubuntu"
+      volumeSize: 50
+      roles: ["etcd", "controlplane"]
+    - instanceType: "t3a.medium"
+      awsRegionAZ: ""
+      awsAMI: ""
+      awsSecurityGroups: [""]
+      awsSSHKeyName: ""
+      awsCICDInstanceTag: "rancher-validation"
+      awsIAMProfile: ""
+      awsUser: "ubuntu"
+      volumeSize: 50
+      roles: ["worker"]
+    - instanceType: "t3a.xlarge"
+      awsAMI: ""
+      awsSecurityGroups: [""]
+      awsSSHKeyName: ""
+      awsCICDInstanceTag: "rancher-validation"
+      awsUser: "Administrator"
+      volumeSize: 50
+      roles: ["windows"]
+
+----------------------------------------
+
+TITLE: Configuring K3S Template Test in YAML
+DESCRIPTION: Defines the configuration for running K3S template tests, including the Git repository details and template provider.
+
+LANGUAGE: yaml
+CODE:
+templateTest:
+  repo:
+    metadata:
+      name: "demo"
+    spec:
+      gitRepo: "https://github.com/<forked repo>/cluster-template-examples.git"
+      gitBranch: main
+      insecureSkipTLSVerify: true
+  templateProvider: "aws"
+  templateName: "cluster-template"
+
+----------------------------------------
+
+TITLE: Configuring Advanced K3S Cluster Options in YAML
+DESCRIPTION: Specifies advanced options for K3S clusters, including cluster agent and fleet agent customization with resource requirements, node affinity, and tolerations.
+
+LANGUAGE: yaml
+CODE:
+advancedOptions:
+  clusterAgent: # change this to fleetAgent for fleet agent
+    appendTolerations:
+    - key: "Testkey"
+      value: "testValue"
+      effect: "NoSchedule"
+    overrideResourceRequirements:
+      limits:
+        cpu: "750m"
+        memory: "500Mi"
+      requests:
+        cpu: "250m"
+        memory: "250Mi"
+      overrideAffinity:
+        nodeAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+            - preference:
+                matchExpressions:
+                  - key: "cattle.io/cluster-agent"
+                    operator: "In"
+                    values:
+                      - "true"
+              weight: 1
+
+----------------------------------------
+
+TITLE: Configuring Corral Input for Rancher Import Provisioning
+DESCRIPTION: YAML configuration for Corral input, including corralConfigVars for AWS settings, SSH path, and corral package images. The 'k3sToImport' package is required and must point to a valid package path.
+
+LANGUAGE: yaml
+CODE:
+corralConfigs:
+    corralConfigVars:
+        agent_count: 0
+        aws_access_key: "your_key"
+        aws_ami: "your_ami"
+        aws_hostname_prefix: autoimport
+        aws_region: us-west-1
+        aws_route53_zone: "your_zone"
+        aws_secret_key: "your_secret_key"
+        aws_security_group: "your_security_group"
+        aws_ssh_user: "your_user"
+        aws_subnet: "your_subnet"
+        aws_volume_size: 50
+        aws_volume_type: gp3
+        hostname: "your_hostname(should match the prefix + route_53 zone)"
+        aws_vpc: "your_vpc"
+        instance_type: t3a.medium
+        # kubernetes_version: not supported with suggested package
+        node_count: 3
+        server_count: 3
+
+    corralSSHPath: "/root/go/src/github.com/rancher/rancher/tests/v2/validation/.ssh/<your_ssh_key>"
+corralPackages:
+    corralPackageImages:
+        # NOTE: k3sToImport is the **Required** package name. It can point to any path, as long as the package name is k3sToImport.
+        k3sToImport: /root/go/src/github.com/rancherlabs/corral-packages/dist/aws-k3s-v1.26.8-k3s1
+
+----------------------------------------
+
+TITLE: Running EKS Provisioning Test in Go
+DESCRIPTION: Command to run the EKS cluster provisioning test using Go. Uses gotestsum for test execution and reporting.
+
+LANGUAGE: bash
+CODE:
+gotestsum --format standard-verbose --packages=github.com/rancher/rancher/tests/v2/validation/provisioning/hosted --junitfile results.xml -- -timeout=60m -tags=validation -v -run "TestHostedEKSClusterProvisioningTestSuite/TestProvisioningHostedEKS"
+
+----------------------------------------
+
+TITLE: Running AKS Provisioning Test in Go
+DESCRIPTION: Command to run the AKS cluster provisioning test using Go. Uses gotestsum for test execution and reporting.
+
+LANGUAGE: bash
+CODE:
+gotestsum --format standard-verbose --packages=github.com/rancher/rancher/tests/v2/validation/provisioning/hosted --junitfile results.xml -- -timeout=60m -tags=validation -v -run "TestHostedAKSClusterProvisioningTestSuite/TestProvisioningHostedAKS"
+
+----------------------------------------
+
+TITLE: Running GKE Provisioning Test in Go
+DESCRIPTION: Command to run the GKE cluster provisioning test using Go. Uses gotestsum for test execution and reporting.
+
+LANGUAGE: bash
+CODE:
+gotestsum --format standard-verbose --packages=github.com/rancher/rancher/tests/v2/validation/provisioning/hosted --junitfile results.xml -- -timeout=60m -tags=validation -v -run "TestHostedGKEClusterProvisioningTestSuite/TestProvisioningHostedGKE"
+
+----------------------------------------
+
+TITLE: Configuring Basic Rancher Test Environment in YAML
+DESCRIPTION: Basic YAML configuration for setting up Rancher provisioning tests. Includes essential parameters like host address, admin token, and cleanup settings.
+
+LANGUAGE: yaml
+CODE:
+rancher:
+  host: "rancher_server_address"
+  adminToken: "rancher_admin_token"
+  cleanup: false
+  insecure: true/optional
+  cleanup: false/optional
+
+----------------------------------------
+
+TITLE: Configuring Rancher Test Environment in YAML
+DESCRIPTION: YAML configuration for setting up Rancher test environment. Specifies the Rancher server address, admin token, and cluster settings. Optional parameters include insecure mode and cleanup flags.
+
+LANGUAGE: yaml
+CODE:
+rancher: 
+  host: "rancher_server_address"
+  adminToken: "rancher_admin_token"
+  insecure: True #optional
+  cleanup: True #optional
+  clusterName: "downstream_cluster_name"
+
+----------------------------------------
+
+TITLE: Configuring Rancher and StackState Test Environment
+DESCRIPTION: YAML configuration for setting up test environment parameters including Rancher server details, cluster information, and StackState credentials. This configuration is required for running integration tests between Rancher and StackState.
+
+LANGUAGE: yaml
+CODE:
+rancher: 
+  host: "rancher_server_address"
+  adminToken: "rancher_admin_token"
+  insecure: True #optional
+  cleanup: True #optional
+  clusterName: "downstream_cluster_name"
+
+stackstateConfigs: 
+  url: "stackstate_ui_server_address"
+  serviceToken: "stackstate_user_service_token"
+  clusterApiKey: "stackstate_cluster_apikey"
+  upgradeVersion: "Stackstate_agent_version" #optional
+
+----------------------------------------
+
+TITLE: Running AD GUID Unmigration Script in Bash
+DESCRIPTION: Command line usage for executing the AD GUID unmigration utility via Rancher Agent. Supports dry-run mode and option to delete missing users. Requires Rancher Agent image as input parameter.
+
+LANGUAGE: bash
+CODE:
+./ad-guid-unmigration.sh <AGENT IMAGE> [--dry-run] [--delete-missing]
+
+----------------------------------------
+
+TITLE: Configuring Rancher KDM Test in YAML
+DESCRIPTION: A YAML configuration example for the 'TestChangeKDMurl' test in Rancher's KDM module. It includes settings for the Rancher server URL, API token, cluster name, and insecure connection option.
+
+LANGUAGE: yaml
+CODE:
+rancher:
+  host: "rancher_server_url"
+  adminToken: "bearer_api_token"
+  clusterName: "local"
+  insecure: true
+
+----------------------------------------
+
+TITLE: Configuring Rancher Cluster Deletion Settings
+DESCRIPTION: YAML configuration for setting up Rancher cluster deletion tests. Specifies the Rancher server address, admin token, target cluster name, and optional parameters for insecure connections and cleanup.
+
+LANGUAGE: yaml
+CODE:
+rancher:
+  host: "rancher_server_address"
+  adminToken: "rancher_admin_token"
+  clusterName: "cluster_to_run_tests_on"
+  insecure: true/optional
+  cleanup: false/optional
+
+----------------------------------------
+
+TITLE: Running RKE1 Cluster Template Provisioning Tests
+DESCRIPTION: Command for executing the RKE1 cluster template provisioning tests using gotestsum with specific test parameters and build tags.
+
+LANGUAGE: shell
+CODE:
+gotestsum --format standard-verbose --packages=github.com/rancher/rancher/tests/v2/validation/provisioning/clustertemplates --junitfile results.xml -- -timeout=120m -tags=validation -v -run "TestClusterTemplateRKE1ProvisioningTestSuite/TestProvisioningRKE1ClusterWithClusterTemplate"
+
+----------------------------------------
+
+TITLE: Configuring Rancher Test Environment in YAML
+DESCRIPTION: Basic configuration settings required for setting up the certificate rotation test environment. Includes server address, admin token, cluster name, and optional parameters for insecure connections and cleanup.
+
+LANGUAGE: yaml
+CODE:
+rancher:
+  host: "rancher_server_address"
+  adminToken: "rancher_admin_token"
+  clusterName: "cluster_to_run_tests_on"
+  insecure: true/optional
+  cleanup: false/optional
+
+----------------------------------------
+
+TITLE: Defining Test Cluster Node Pools in YAML
+DESCRIPTION: Standard cluster configuration with three node pools: one control plane node, one etcd node, and one worker node. This represents the typical testing setup.
+
+LANGUAGE: yaml
+CODE:
+{
+  {
+    ControlPlane: true,
+    Quantity:     1,
+  },
+  {
+    Etcd:     true,
+    Quantity: 1,
+  },
+  {
+    Worker:   true,
+    Quantity: 1,
+  },
+}
+
+----------------------------------------
+
+TITLE: Executing Certificate Rotation Tests with Go
+DESCRIPTION: Command for running the certificate rotation tests using gotestsum with specific parameters and build tags for validation testing.
+
+LANGUAGE: bash
+CODE:
+gotestsum --format standard-verbose --packages=github.com/rancher/rancher/tests/v2/validation/certrotation --junitfile results.xml -- -timeout=60m -tags=validation -v -run "TestCertRotation/TestCertRotation"
+
+----------------------------------------
+
+TITLE: Configuring Rancher Test Environment in JSON
+DESCRIPTION: JSON configuration for setting up the Rancher test environment. It includes settings for the Rancher server address, admin token, insecure mode, cleanup option, and admin password.
+
+LANGUAGE: json
+CODE:
+{
+  "rancher": { 
+    "host": "rancher_server_address",
+    "adminToken": "rancher_admin_token",
+    "insecure": true,
+    "cleanup": false,
+    "adminPassword": "<adminPassword>"
+  }
+}
+
+----------------------------------------
+
+TITLE: Configuring Rancher Settings for ETCD Backup Tests in JSON
+DESCRIPTION: This JSON snippet demonstrates how to configure the necessary settings for running ETCD backup tests in a Rancher environment. It includes parameters for the Rancher server address, admin token, target cluster, and optional settings for insecure connections and cleanup.
+
+LANGUAGE: json
+CODE:
+{
+  "rancher": { 
+    "host": "rancher_server_address",
+    "adminToken": "rancher_admin_token",
+    "clusterName": "cluster_to_run_tests_on",
+    "insecure": true,
+    "cleanup": false
+  }
+}
+
+----------------------------------------
+
+TITLE: Configuring Rancher Settings for RBAC PSA Test Suite
+DESCRIPTION: JSON configuration block specifying Rancher server details required for running the RBAC PSA Test Suite. Includes host address, admin token, target cluster name, and optional insecure and cleanup flags.
+
+LANGUAGE: json
+CODE:
+{
+  "rancher": { 
+    "host": "rancher_server_address",
+    "adminToken": "rancher_admin_token",
+    "clusterName": "cluster_to_run_tests_on",
+    "insecure": true,
+    "cleanup": false
+  }
+}
+
+----------------------------------------
+
+TITLE: Verifying Keybase Identity with JSON Signature Data
+DESCRIPTION: JSON object containing cryptographic signature data used to verify the link between GitHub and Keybase accounts. Includes key information, service binding details, and signature metadata.
+
+LANGUAGE: json
+CODE:
+{
+  "body": {
+    "key": {
+      "eldest_kid": "01208358649f8a0961727af7cad37b772f01d0158cabe5475be08226a2bc00d2176d0a",
+      "fingerprint": "7ace6fb60dc4e26c4c6f344dc9df50bdac351da9",
+      "host": "keybase.io",
+      "key_id": "c9df50bdac351da9",
+      "kid": "010195274cdf339669e41a38d3439a161ebf7d5dc4d7cb3cedaefcef3515c85c8b2f0a",
+      "uid": "01b937b34ac988003e7eccf9d986f719",
+      "username": "rancher"
+    },
+    "service": {
+      "name": "github",
+      "username": "rancher"
+    },
+    "type": "web_service_binding",
+    "version": 1
+  },
+  "ctime": 1644337278,
+  "expire_in": 157680000,
+  "prev": "c1ca2429497f33d213cd9ea8322a1469a975d862eebdf71f9211614dc9bcb08f",
+  "seqno": 27,
+  "tag": "signature"
+}
+
+----------------------------------------
+
+TITLE: Configuring Rancher Test Environment in YAML
+DESCRIPTION: This YAML configuration snippet sets up the necessary parameters for running Global Role Binding Status Field tests in Rancher. It includes the Rancher server address, admin token, security settings, cleanup option, and target cluster name.
+
+LANGUAGE: yaml
+CODE:
+rancher: 
+  host: "rancher_server_address"
+  adminToken: "rancher_admin_token"
+  insecure: True #optional
+  cleanup: True #optional
+  clusterName: "cluster_name"
+
+----------------------------------------
+
+TITLE: Keybase CLI Verification Command
+DESCRIPTION: Command line instruction for looking up and verifying the Keybase identity using the Keybase CLI tool.
+
+LANGUAGE: bash
+CODE:
+# look me up
+keybase id rancher
+
+----------------------------------------
+
+TITLE: Configuring Test Environment for Rancher Global Roles V2
+DESCRIPTION: YAML configuration file for setting up test environment parameters including Rancher server details, cluster provisioning settings, AWS credentials, and machine configurations. This configuration is required for running Global Roles V2 tests and includes settings for different Kubernetes versions, CNI options, and cloud provider specifications.
+
+LANGUAGE: yaml
+CODE:
+rancher:
+  host: "rancher_server_address"
+  adminToken: "rancher_admin_token"
+  insecure: True #optional
+  cleanup: True #optional
+  clusterName: "downstream_cluster_name"
+provisioningInput:
+ machinePools:
+ - machinePoolConfig:                    
+     etcd: true                            
+     controlplane: true
+     worker: true
+     quantity: 1
+ nodePools:
+ - nodeRoles:
+     etcd: true
+     controlplane: true
+     worker: true
+     quantity: 1
+ rke1KubernetesVersion:
+   - "v1.28.10-rancher1-1"
+ rke2KubernetesVersion:
+   - "v1.28.10+rke2r1"
+ k3sKubernetesVersion:
+   - "v1.28.10+k3s1"
+ cni:
+   - "calico"
+ providers:
+   - "aws"
+ nodeProviders:
+   - "ec2"
+awsCredentials:
+ accessKey: "<Your Access Key>"
+ secretKey: "<Your Secret Key>"
+ defaultRegion: "us-east-2"
+ 
+awsMachineConfig:
+ region: "us-east-2"
+ instanceType: "t3a.xlarge"
+ sshUser: "ubuntu"
+ vpcId: ""
+ volumeType: "gp2"
+ zone: "a"
+ retries: 5
+ rootSize: 50
+ securityGroup:
+   - "rancher-nodes"
+ 
+awsEC2Configs:
+ region: "us-east-2"
+ awsAccessKeyID: "<Your Access Key>"
+ awsSecretAccessKey: "<Your Secret Key>"
+ awsEC2Config:
+   - instanceType: "t3a.xlarge"
+     awsRegionAZ: ""
+     awsAMI: "<AMI>"
+     awsSecurityGroups: ["sg-0e753fd5550206e55"]
+     awsSSHKeyName: "<Your ssh key>"
+     awsCICDInstanceTag: "rancher-validation"
+     awsIAMProfile: "EngineeringUsersUS"
+     awsUser: "ubuntu"
+     volumeSize: 50
+     roles: ["etcd", "controlplane", "worker"]
+     isWindows: false
+sshPath:
+ sshPath: "<Your ssh path>"
+
+----------------------------------------
+
+TITLE: Configuring Rancher Test Environment in YAML
+DESCRIPTION: YAML configuration block for setting up Rancher test environment parameters including server address, admin token, and cluster settings. Optional parameters include insecure mode and cleanup flags.
+
+LANGUAGE: yaml
+CODE:
+rancher: 
+  host: "rancher_server_address"
+  adminToken: "rancher_admin_token"
+  insecure: True #optional
+  cleanup: True #optional
+  clusterName: "cluster_name"
+
+----------------------------------------
+
+TITLE: Configuring RBAC Test Input Parameters
+DESCRIPTION: Configuration for RBAC dynamic input tests, specifying user role, username, and password. Supports roles: cluster-owner, cluster-member, project-owner, and project-member.
+
+LANGUAGE: json
+CODE:
+rbacInput:
+  role: "cluster-owner"
+  username: "<userID>"
+  password: "<password>"
+
+----------------------------------------
+
+TITLE: Apache 2.0 License Header Comment Block
+DESCRIPTION: Standard comment block containing the Apache 2.0 license header used in Rancher Labs source files. Includes copyright notice, license reference, and basic terms of use.
+
+LANGUAGE: text
+CODE:
+/*
+Copyright YEAR Rancher Labs, Inc.
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+*/

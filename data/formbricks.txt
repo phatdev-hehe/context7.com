@@ -1,0 +1,4633 @@
+TITLE: Core Module Structure in Formbricks
+DESCRIPTION: Shows the typical directory structure for feature modules in the codebase, including components, business logic, types, server actions, and API routes.
+
+LANGUAGE: plaintext
+CODE:
+modules/
+└── feature-name/
+   ├── components/ # Feature-specific components
+   ├── lib/ # Business logic and utilities
+   ├── types/ # TypeScript types
+   ├── actions.ts # Server actions
+   └── route.ts # API routes (if needed)
+
+----------------------------------------
+
+TITLE: Visualizing Formbricks System Architecture with Mermaid Diagram
+DESCRIPTION: A mermaid graph diagram illustrating the complete system architecture of the Formbricks platform. It shows the relationships between different user types, client applications, the core Next.js server, and storage components. The diagram uses color coding to differentiate between system components and includes directional arrows to indicate data flow.
+
+LANGUAGE: mermaid
+CODE:
+graph TD
+    subgraph Users
+        MU[Mobile User]
+        WU[Web User]
+        LSU[Link Survey User]
+        AD[Admin]
+    end
+
+    subgraph Client Applications
+        MA[Mobile App\niOS/Android SDK]
+        SW[Survey Widget\nJavaScript SDK]
+    end
+
+    subgraph Formbricks Platform
+        NS[Next.js Server\nAPI Routes + SSR\nBusiness Logic]
+
+        subgraph Storage
+            DB[(PostgreSQL\nSurveys & Data)]
+            RC[(Redis\nPerformance Cache)]
+            FS[File Storage\nUploads]
+        end
+    end
+
+    MU --> |Uses| MA
+    WU --> |Interacts| SW
+    LSU --> |Direct Access| NS
+    AD --> |Manages| NS
+
+    MA --> |REST API| NS
+    SW --> |REST API| NS
+
+    NS --> |Cache Data| RC
+    NS --> |Read/Write| DB
+    NS --> |File Upload| FS
+
+    style DB fill:#00C4B8,color:#ffffff
+    style RC fill:#00C4B8,color:#ffffff
+    style FS fill:#00C4B8,color:#ffffff
+    style NS fill:#0D9373,color:#ffffff
+    style MA fill:#07C983,color:#ffffff
+    style SW fill:#07C983,color:#ffffff
+
+    classDef user fill:#666,color:#fff,stroke:#333
+    class MU,WU,LSU,AD user
+
+----------------------------------------
+
+TITLE: Visualizing Entity Relationships with Mermaid Diagram for Formbricks Database
+DESCRIPTION: This diagram illustrates the core entities and their relationships in the Formbricks database, showing the connections between organizations, projects, environments, surveys, contacts, users, teams, and other key components of the system. It visualizes the multi-tenancy and data isolation architecture.
+
+LANGUAGE: mermaid
+CODE:
+erDiagram
+    Organization ||--o{ Project : "has many"
+    Organization ||--o{ Membership : "has many"
+    Organization ||--o{ Team : "has many"
+    Organization ||--o{ Invite : "sends"
+
+    Project ||--o{ Environment : "has two"
+    Project ||--o{ Language : "supports"
+    Project ||--o{ ProjectTeam : "has"
+
+    Environment ||--o{ Survey : "contains"
+    Environment ||--o{ Contact : "tracks"
+    Environment ||--o{ ActionClass : "defines"
+    Environment ||--o{ ApiKey : "has"
+    Environment ||--o{ Integration : "configures"
+
+    Survey ||--o{ Response : "receives"
+    Survey ||--o{ Display : "tracks"
+    Survey ||--o{ SurveyTrigger : "configured by"
+    Survey ||--o{ SurveyAttributeFilter : "filtered by"
+    Survey ||--o{ SurveyLanguage : "translated to"
+
+    Contact ||--o{ Response : "provides"
+    Contact ||--o{ Display : "sees"
+    Contact ||--o{ ContactAttribute : "has"
+
+    User ||--o{ Membership : "belongs to"
+    User ||--o{ Account : "has"
+    User ||--o{ TeamUser : "member of"
+
+    Team ||--o{ TeamUser : "includes"
+    Team ||--o{ ProjectTeam : "has access to"
+
+    Response ||--o{ ResponseNote : "has"
+    Response ||--o{ TagsOnResponses : "tagged with"
+
+    Tag ||--o{ TagsOnResponses : "applied to"
+
+    ActionClass ||--o{ SurveyTrigger : "triggers"
+
+    ContactAttributeKey ||--o{ ContactAttribute : "defines"
+    ContactAttributeKey ||--o{ SurveyAttributeFilter : "used in"
+
+----------------------------------------
+
+TITLE: Installing Formbricks SDK with npm for React.js
+DESCRIPTION: Command to install the Formbricks SDK and its peer dependency zod using npm for React.js applications.
+
+LANGUAGE: javascript
+CODE:
+npm install @formbricks/js zod
+
+----------------------------------------
+
+TITLE: UI Component Structure in Formbricks
+DESCRIPTION: Outlines the standard directory structure for UI components, showing the main component implementation, Storybook stories, and sub-components organization.
+
+LANGUAGE: plaintext
+CODE:
+modules/ui/components/
+└── component-name/
+   ├── index.tsx # Main component implementation
+   ├── stories.tsx # Storybook stories
+   └── components/ # Sub-components (if needed)
+
+----------------------------------------
+
+TITLE: Visualizing Formbricks Cluster Architecture with Mermaid
+DESCRIPTION: This diagram illustrates the complete architecture of a Formbricks cluster setup, showing the relationship between load balancers, Formbricks instances, and the data storage layer (PostgreSQL, Redis, and S3).
+
+LANGUAGE: mermaid
+CODE:
+graph TD
+    subgraph Load Balancer
+        LB[Load Balancer/Ingress]
+    end
+
+    subgraph Formbricks Cluster
+        FB1[Formbricks Instance 1]
+        FB2[Formbricks Instance 2]
+        FB3[Formbricks Instance n]
+    end
+
+    subgraph Data Storage
+        subgraph PostgreSQL HA
+            PSQL_P[(PostgreSQL Primary)]
+            PSQL_R[(PostgreSQL Replica)]
+        end
+
+        subgraph Redis Cluster
+            RC_P[(Redis Primary)]
+            RC_R[(Redis Replica)]
+        end
+
+        S3[S3 Compatible Storage]
+    end
+
+    %% Connections
+    LB --> FB1
+    LB --> FB2
+    LB --> FB3
+
+    FB1 --> PSQL_P
+    FB2 --> PSQL_P
+    FB3 --> PSQL_P
+    PSQL_P --> PSQL_R
+
+    FB1 --> RC_P
+    FB2 --> RC_P
+    FB3 --> RC_P
+    RC_P --> RC_R
+
+    FB1 --> S3
+    FB2 --> S3
+    FB3 --> S3
+
+    style PSQL_P fill:#00C4B8,color:#ffffff
+    style PSQL_R fill:#00C4B8,color:#ffffff
+    style RC_P fill:#FF6B6B,color:#ffffff
+    style RC_R fill:#FF6B6B,color:#ffffff
+    style S3 fill:#FFA94D,color:#ffffff
+    style FB1,FB2,FB3 fill:#0D9373,color:#ffffff
+    style LB fill:#4C6EF5,color:#ffffff
+
+----------------------------------------
+
+TITLE: Implementing Complete Docs Feedback Widget with Formbricks in React/TSX
+DESCRIPTION: A complete React component implementing a docs feedback widget that collects Yes/No responses and optional text feedback. It submits partial responses to Formbricks API when a user selects yes/no, then allows for additional text feedback which updates the previous response.
+
+LANGUAGE: tsx
+CODE:
+import { Button } from "@/modules/ui/components/Button";
+import { Popover, PopoverContent, PopoverTrigger } from "@/modules/ui/popover";
+import { useRouter } from "next/router";
+import { useState } from "react";
+import {
+  handleFeedbackSubmit,
+  updateFeedback,
+} from "../../lib/handleFeedbackSubmit";
+
+export const DocsFeedback = () => {
+  const router = useRouter();
+  const [isOpen, setIsOpen] = useState(false);
+  const [sharedFeedback, setSharedFeedback] = useState(false);
+  const [responseId, setResponseId] = useState(null);
+  const [freeText, setFreeText] = useState("");
+
+  if (
+    !process.env.NEXT_PUBLIC_FORMBRICKS_COM_DOCS_FEEDBACK_SURVEY_ID ||
+    !process.env.NEXT_PUBLIC_FORMBRICKS_COM_API_HOST ||
+    !process.env.NEXT_PUBLIC_FORMBRICKS_COM_ENVIRONMENT_ID
+  ) {
+    return null;
+  }
+
+  return (
+    <div className="mt-6 inline-flex cursor-default items-center rounded-md border border-slate-200 bg-white p-4 text-slate-800 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300">
+      {!sharedFeedback ? (
+        <div>
+          Was this page helpful?
+          <Popover open={isOpen} onOpenChange={setIsOpen}>
+            <div className="ml-4 inline-flex space-x-3">
+              {["Yes 👍", " No 👎"].map((option) => (
+                <PopoverTrigger
+                  className="rounded border border-slate-200 bg-slate-50 px-4 py-2 text-slate-900 hover:bg-slate-100 hover:text-slate-600 focus:outline-none focus:ring-2 focus:ring-neutral-900 focus:ring-offset-1 dark:border-slate-700 dark:bg-slate-700 dark:text-slate-300 dark:hover:bg-slate-600 dark:hover:text-slate-300"
+                  onClick={async () => {
+                    const id = await handleFeedbackSubmit(
+                      option,
+                      router.asPath
+                    );
+                    setResponseId(id);
+                  }}
+                >
+                  {option}
+                </PopoverTrigger>
+              ))}
+            </div>
+            <PopoverContent className="border-slate-300 bg-white dark:border-slate-500 dark:bg-slate-700">
+              <form>
+                <textarea
+                  value={freeText}
+                  onChange={(e) => setFreeText(e.target.value)}
+                  placeholder="Please explain why..."
+                  className="focus:border-brand-dark focus:ring-brand-dark mb-2 w-full rounded-md bg-white text-sm text-slate-900 dark:bg-slate-600 dark:text-slate-200 dark:placeholder:text-slate-200"
+                />
+                <div className="text-right">
+                  <Button
+                    type="submit"
+                    variant="primary"
+                    onClick={(e) => {
+                      e.preventDefault();
+                      updateFeedback(freeText, responseId);
+                      setIsOpen(false);
+                      setFreeText("");
+                      setSharedFeedback(true);
+                    }}
+                  >
+                    Send
+                  </Button>
+                </div>
+              </form>
+            </PopoverContent>
+          </Popover>
+        </div>
+      ) : (
+        <div>Thanks a lot, boss! 🤝</div>
+      )}
+    </div>
+  );
+
+----------------------------------------
+
+TITLE: Defining Standard API Error Response Interface in TypeScript
+DESCRIPTION: This TypeScript interface defines the standard structure for API error responses in Formbricks. It includes properties for error code, message, HTTP status, URL, optional details, and response message.
+
+LANGUAGE: typescript
+CODE:
+export interface ApiErrorResponse {
+code:
+| "not_found"
+| "gone"
+| "bad_request"
+| "internal_server_error"
+| "unauthorized"
+| "method_not_allowed"
+| "not_authenticated"
+| "forbidden"
+| "network_error";
+message: string;
+status: number;
+url: URL;
+details?: Record<string, string | string[] | number | number[] | boolean | boolean[]>;
+responseMessage?: string;
+}
+
+----------------------------------------
+
+TITLE: Creating Formbricks Provider for Next.js App Directory
+DESCRIPTION: Client-side component for integrating Formbricks in a Next.js app using the App Directory structure. It initializes the SDK and registers route changes.
+
+LANGUAGE: typescript
+CODE:
+"use client";
+
+import { usePathname, useSearchParams } from "next/navigation";
+import { useEffect } from "react";
+import formbricks from "@formbricks/js";
+
+export default function FormbricksProvider() {
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+
+  useEffect(() => {
+    formbricks.setup({
+      environmentId: "<environment-id>",
+      appUrl: "<app-url>",
+    });
+  }, []);
+
+  useEffect(() => {
+    formbricks?.registerRouteChange();
+  }, [pathname, searchParams]);
+
+  return null;
+}
+
+----------------------------------------
+
+TITLE: Feature Module Example in Formbricks
+DESCRIPTION: Provides a concrete example of a survey feature module with its components, editor, business logic, and type definitions showing how a real feature is organized.
+
+LANGUAGE: plaintext
+CODE:
+modules/survey/
+├── components/
+│ ├── question-form-input/
+│ └── template-list/
+├── editor/
+│ └── components/
+├── lib/
+│ └── utils.ts
+└── types/
+└── index.ts
+
+----------------------------------------
+
+TITLE: Implementing API Endpoint Error Handling in TypeScript
+DESCRIPTION: This code snippet demonstrates the standard pattern for handling errors in API endpoints. It implements authentication verification, data fetching, and proper error responses including specific handling for DatabaseError types.
+
+LANGUAGE: typescript
+CODE:
+export const GET = async (request: Request) => {
+try {
+const authentication = await authenticateRequest(request);
+if (!authentication) return responses.notAuthenticatedResponse();
+const data = await fetchData(authentication.environmentId!);
+return responses.successResponse(data);
+} catch (error) {
+if (error instanceof DatabaseError) {
+return responses.badRequestResponse(error.message);
+}
+throw error;
+}
+};
+
+----------------------------------------
+
+TITLE: Testing Error Scenarios with Jest in TypeScript
+DESCRIPTION: This code demonstrates how to test error handling scenarios using Jest. It verifies that the fetchEnvironmentState function correctly returns error information when encountering a network error, following the standardized error structure.
+
+LANGUAGE: typescript
+CODE:
+describe("fetchEnvironmentState()", () => {
+test("returns err(...) on network error", async () => {
+const mockNetworkError = {
+code: "network_error",
+message: "Timeout",
+responseMessage: "Network fail",
+};
+const result = await fetchEnvironmentState();
+expect(result.ok).toBe(false);
+if (!result.ok) {
+expect(result.error.code).toBe(mockNetworkError.code);
+expect(result.error.message).toBe(mockNetworkError.message);
+}
+});
+});
+
+----------------------------------------
+
+TITLE: Organizing Unit Tests with Vitest in TypeScript
+DESCRIPTION: Standard structure for organizing unit tests using Vitest's describe and it blocks to clearly arrange test cases in a hierarchical manner. This pattern enhances readability and organization of test suites.
+
+LANGUAGE: typescript
+CODE:
+import { describe, expect, it } from "vitest";
+
+describe("ComponentName or FeatureName", () => {
+  describe("functionName or scenario", () => {
+    it("should describe expected behavior", () => {
+      // test implementation
+    });
+  });
+});
+
+----------------------------------------
+
+TITLE: Configuring Basic SMTP Environment Variables for Formbricks
+DESCRIPTION: The basic SMTP configuration requires setting the sender email address, display name, SMTP host, port, username and password. These environment variables enable core email functionality in a self-hosted Formbricks instance.
+
+LANGUAGE: bash
+CODE:
+# Basic SMTP Configuration
+MAIL_FROM=noreply@yourdomain.com
+MAIL_FROM_NAME=Formbricks
+SMTP_HOST=smtp.yourprovider.com
+SMTP_PORT=587
+SMTP_USER=your_username
+SMTP_PASSWORD=your_password
+
+----------------------------------------
+
+TITLE: Setting Multiple Custom Attributes at Once in Formbricks
+DESCRIPTION: This code shows how to set multiple custom attributes simultaneously by passing an object to the setAttributes function. This is more efficient than setting attributes individually when multiple values need to be updated.
+
+LANGUAGE: javascript
+CODE:
+formbricks.setAttributes({
+  attribute_key_1: "attribute_value_1",
+  attribute_key_2: "attribute_value_2",
+});
+
+----------------------------------------
+
+TITLE: Implementing Client-Side Error Handling in TypeScript
+DESCRIPTION: This snippet shows the recommended approach for client-side error handling, including result checking, error logging, and user feedback via toast notifications. It demonstrates the pattern of early returns for error cases.
+
+LANGUAGE: typescript
+CODE:
+const handleOperation = async () => {
+const result = await performAction();
+if (!result.ok) {
+logger.error(`Operation failed: ${result.error.message}`);
+toast.error("Operation failed. Please try again.");
+return;
+}
+// Process successful result
+processResult(result.data);
+};
+
+----------------------------------------
+
+TITLE: Creating a New Feature Module Structure
+DESCRIPTION: Template for creating a new feature module in the Formbricks codebase. This structure includes directories for components, business logic, TypeScript types, server actions, and API routes.
+
+LANGUAGE: plaintext
+CODE:
+modules/
+└── your-feature/
+    ├── components/    # React components
+    ├── lib/           # Business logic
+    ├── types/         # TypeScript types
+    ├── actions.ts     # Server actions
+    └── route.ts       # API routes
+
+----------------------------------------
+
+TITLE: Rendering UI Components for Formbricks Feedback Widget
+DESCRIPTION: The UI implementation of the docs feedback widget, including conditional rendering between feedback collection and thank you states. Features Tailwind CSS styling, Popover components, and form handling for user inputs.
+
+LANGUAGE: tsx
+CODE:
+return (
+    <div className="mt-6 inline-flex cursor-default items-center rounded-md border border-slate-200 bg-white p-4 text-slate-800 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300">
+      {!sharedFeedback ? ( // displays Feedback buttons or Thank You message
+        <div>
+          Was this page helpful?
+          <Popover open={isOpen} onOpenChange={setIsOpen}>
+            <div className="ml-4 inline-flex space-x-3">
+              {["Yes 👍", " No 👎"].map((option) => ( // Popup Trigger is a button as well. This is a workaround to open the same form but send a different response to the API
+                <PopoverTrigger
+                  className="rounded border border-slate-200 bg-slate-50 px-4 py-2 text-slate-900 hover:bg-slate-100 hover:text-slate-600 focus:outline-none focus:ring-2 focus:ring-neutral-900 focus:ring-offset-1 dark:border-slate-700 dark:bg-slate-700 dark:text-slate-300 dark:hover:bg-slate-600 dark:hover:text-slate-300"
+                  onClick={async () => {
+                    const id = await handleFeedbackSubmit(option, router.asPath); // handleFeedbackSubmit sends the Yes / No choice as well as the current URL to Formbricks and returns the responseId
+                    setResponseId(id); // add responseId to local state so we can use it if user decides to add more feedback in free text field
+                  }}>
+                  {option} // "Yes 👍" or "No 👎" - they have to be identical with the choices in the survey on app.formbricks.com for it to work (!)
+                </PopoverTrigger>
+              ))}
+            </div>
+            <PopoverContent className="border-slate-300 bg-white dark:border-slate-500 dark:bg-slate-700">
+              <form> // Form to handle additional feedback by user
+                <textarea
+                  value={freeText}
+                  onChange={(e) => setFreeText(e.target.value)}
+                  placeholder="Please explain why..."
+                  className="focus:border-brand-dark focus:ring-brand-dark mb-2 w-full rounded-md bg-white text-sm text-slate-900 dark:bg-slate-600 dark:text-slate-200 dark:placeholder:text-slate-200"
+                />
+                <div className="text-right">
+                  <Button
+                    type="submit"
+                    variant="primary"
+                    onClick={(e) => {
+                      e.preventDefault(); // prevent page from reloading (default HTML behaviour)
+                      updateFeedback(freeText, responseId); // update initial Yes / No response with free text feedback
+                      setIsOpen(false); // close Popover
+                      setFreeText(""); // remove feedback from free text field local state
+                      setSharedFeedback(true); // display Thank You message
+                    }}>
+                    Send
+                  </Button>
+                </div>
+              </form>
+            </PopoverContent>
+          </Popover>
+        </div>
+      ) : (
+        <div>Thanks a lot, boss! 🤝</div> // Thank You message
+      )}
+    </div>
+  );
+
+----------------------------------------
+
+TITLE: Initializing Formbricks in JavaScript Application
+DESCRIPTION: Code to import and set up the Formbricks widget in a JavaScript application. It initializes the Formbricks client with an environment ID and application URL, ensuring it only runs in browser environments.
+
+LANGUAGE: javascript
+CODE:
+import formbricks from "@formbricks/js";
+
+if (typeof window !== "undefined") {
+  formbricks.setup({
+    environmentId: "your-environment-id",
+    appUrl: "https://app.formbricks.com",
+  });
+}
+
+----------------------------------------
+
+TITLE: Configuring Docker Environment Variables for Formbricks
+DESCRIPTION: A sample docker-compose.yml configuration that includes all necessary environment variables for Formbricks deployment. This template shows both required and optional variables with comments explaining their purpose and usage.
+
+LANGUAGE: yaml
+CODE:
+version: "3.3"
+x-environment: &environment
+  environment:
+    # The url of your Formbricks instance used in the admin panel
+    WEBAPP_URL:
+
+    # Required for next-auth. Should be the same as WEBAPP_URL
+    NEXTAUTH_URL:
+
+    # PostgreSQL DB for Formbricks to connect to
+    DATABASE_URL: "postgresql://postgres:postgres@postgres:5432/formbricks?schema=public"
+
+    # NextJS Auth
+    # @see: https://next-auth.js.org/configuration/options#nextauth_secret
+    # You can use: `openssl rand -hex 32` to generate one
+    NEXTAUTH_SECRET:
+
+    # PostgreSQL password
+    POSTGRES_PASSWORD: postgres
+
+    # Email Configuration
+    MAIL_FROM:
+    MAIL_FROM_NAME:
+    SMTP_HOST:
+    SMTP_PORT:
+    SMTP_SECURE_ENABLED:
+    SMTP_USER:
+    SMTP_PASSWORD:
+
+    # Uncomment the below and set it to 1 to disable Email Verification for new signups
+    # EMAIL_VERIFICATION_DISABLED:
+
+    # Uncomment the below and set it to 1 to disable Password Reset
+    # PASSWORD_RESET_DISABLED:
+
+    # Uncomment the below and set it to 1 to disable Signups
+    # SIGNUP_DISABLED:
+
+    # Uncomment the below and set it to 1 to disable loging in with email
+    # EMAIL_AUTH_DISABLED:
+
+    # Uncomment the below and set it to 1 to disable Invites
+    # INVITE_DISABLED:
+
+    # Uncomment the below and set a value to have your own Privacy Page URL on the signup & login page
+    # PRIVACY_URL:
+
+    # Uncomment the below and set a value to have your own Terms Page URL on the auth and the surveys page
+    # TERMS_URL:
+
+    # Uncomment the below and set a value to have your own Imprint Page URL on the auth and the surveys page
+    # IMPRINT_URL:
+
+    # Uncomment the below and set to 1 if you want to enable GitHub OAuth
+    # GITHUB_AUTH_ENABLED:
+    # GITHUB_ID:
+    # GITHUB_SECRET:
+
+    # Uncomment the below and set to 1 if you want to enable Google OAuth
+    # GOOGLE_AUTH_ENABLED:
+    # GOOGLE_CLIENT_ID:
+    # GOOGLE_CLIENT_SECRET:
+
+----------------------------------------
+
+TITLE: Installing Formbricks with One-Click Shell Script on Ubuntu
+DESCRIPTION: This command downloads the Formbricks installation script from GitHub, makes it executable, and runs it to install a complete Formbricks instance with Docker, Postgres DB, and SSL certificate via Traefik. The script automates the entire setup process for Ubuntu servers.
+
+LANGUAGE: bash
+CODE:
+curl -fsSL https://raw.githubusercontent.com/formbricks/formbricks/main/docker/formbricks.sh -o formbricks.sh && chmod +x formbricks.sh && ./formbricks.sh install
+
+----------------------------------------
+
+TITLE: Structuring Server Actions for Mutations in Next.js
+DESCRIPTION: Structure for implementing Server Actions in dedicated action.ts files. These actions serve as entry points for mutations and delegate to service layers that handle Prisma operations and business logic.
+
+LANGUAGE: typescript
+CODE:
+// action.ts
+'use server';
+
+import { someService } from "@/services/someService";
+
+export async function performAction(formData: FormData) {
+  // Extract data from the form
+  const data = {
+    field1: formData.get("field1"),
+    field2: formData.get("field2"),
+  };
+  
+  // Delegate to service layer
+  return await someService.performOperation(data);
+}
+
+----------------------------------------
+
+TITLE: Implementing Data Fetching in Next.js Page Components
+DESCRIPTION: Example of implementing server-side data fetching directly in page.tsx components using async function components. This approach leverages the App Router's default Server Components to fetch data during server-side rendering.
+
+LANGUAGE: typescript
+CODE:
+async function Page() {
+  // Server-side data fetching directly in the component
+  const data = await fetchSomeData();
+  
+  return (
+    <YourComponent data={data} />
+  );
+}
+
+----------------------------------------
+
+TITLE: Error Handling Implementation in Formbricks
+DESCRIPTION: The ErrorHandler class used for standardized error handling across the Formbricks project. It provides a singleton instance for centralized error management with optional custom error handling capabilities.
+
+LANGUAGE: typescript
+CODE:
+export class ErrorHandler {
+  private static instance: ErrorHandler | null;
+  private handleError: (error: unknown) => void;
+  public customized = false;
+  public static initialized = false;
+
+  private constructor(errorHandler?: (error: unknown) => void) {
+    if (errorHandler) {
+      this.handleError = errorHandler;
+      this.customized = true;
+    } else {
+      this.handleError = (error) => {
+        Logger.getInstance().error(JSON.stringify(error));
+      };
+    }
+  }
+
+  // ... additional methods
+}
+
+----------------------------------------
+
+TITLE: Configuring Prettier for Formbricks Project
+DESCRIPTION: The standard Prettier configuration used across the Formbricks project. It specifies formatting rules including line width, quotes style, trailing commas, and import ordering to ensure consistency across the codebase.
+
+LANGUAGE: javascript
+CODE:
+module.exports = {
+  bracketSpacing: true,
+  bracketSameLine: true,
+  singleQuote: false,
+  jsxSingleQuote: false,
+  trailingComma: "es5",
+  semi: true,
+  printWidth: 110,
+  arrowParens: "always",
+  importOrder: [
+    // Mocks must be at the top as they contain vi.mock calls
+    "(.*)/__mocks__/(.*)",
+    "server-only",
+    "<THIRD_PARTY_MODULES>",
+    "^@formbricks/(.*)$",
+    "^~/(.*)$",
+    "^[./]",
+  ],
+  importOrderSeparation: false,
+  importOrderSortSpecifiers: true,
+};
+
+----------------------------------------
+
+TITLE: Defining TypeScript Enums with PascalCase Names and UPPER_SNAKE_CASE Values
+DESCRIPTION: Example of properly naming enums in TypeScript using PascalCase for the enum name and UPPER_SNAKE_CASE for enum values. This example defines ProjectFeatureKeys with three values representing different service tiers.
+
+LANGUAGE: typescript
+CODE:
+enum ProjectFeatureKeys {
+  FREE = "free",
+  STARTUP = "startup",
+  SCALE = "scale"
+}
+
+----------------------------------------
+
+TITLE: ESLint Configuration for React Applications in Formbricks
+DESCRIPTION: This ESLint configuration extends Vercel's style guide and is used for React applications in the Formbricks project. It includes Node.js, TypeScript, browser, React, and Next.js specific rules.
+
+LANGUAGE: javascript
+CODE:
+extends: [
+"@vercel/style-guide/eslint/node",
+"@vercel/style-guide/eslint/typescript",
+"@vercel/style-guide/eslint/browser",
+"@vercel/style-guide/eslint/react",
+"@vercel/style-guide/eslint/next"
+]
+
+----------------------------------------
+
+TITLE: Initializing Formbricks in a JavaScript Application
+DESCRIPTION: Code snippet demonstrating how to import and setup the Formbricks library in a JavaScript/TypeScript application. The setup requires an environment ID and app URL, and includes a check to ensure the code only runs in browser environments.
+
+LANGUAGE: javascript
+CODE:
+import formbricks from "@formbricks/js";
+
+if (typeof window !== "undefined") {
+  formbricks.setup({
+    environmentId: "your-environment-id",
+    appUrl: "https://app.formbricks.com",
+  });
+}
+
+----------------------------------------
+
+TITLE: ESLint Configuration for Next.js Applications in Formbricks
+DESCRIPTION: This ESLint configuration extends Vercel's style guide and is used for Next.js applications in the Formbricks project. It includes Node.js, TypeScript, browser, React, and Next.js specific rules.
+
+LANGUAGE: javascript
+CODE:
+extends: [
+"@vercel/style-guide/eslint/node",
+"@vercel/style-guide/eslint/typescript",
+"@vercel/style-guide/eslint/browser",
+"@vercel/style-guide/eslint/react",
+"@vercel/style-guide/eslint/next"
+]
+
+----------------------------------------
+
+TITLE: Structuring a Feature Module in Formbricks
+DESCRIPTION: Example of the standard directory structure for organizing feature modules in the Formbricks codebase. This shows how modules are organized with insights and contacts as example features.
+
+LANGUAGE: plaintext
+CODE:
+modules/
+└── ee/
+├── insights/
+│ ├── components/
+│ ├── experience/
+│ └── types/
+└── contacts/
+├── segments/
+└── components/
+
+----------------------------------------
+
+TITLE: Backing up PostgreSQL Database for Formbricks v3.2 Migration
+DESCRIPTION: Command to create a backup of the Formbricks database before upgrading to v3.2. This uses pg_dump to create a custom-format backup file with a timestamp in the filename.
+
+LANGUAGE: bash
+CODE:
+docker exec formbricks-postgres-1 pg_dump -Fc -U postgres -d formbricks > formbricks_pre_v3.2_$(date +%Y%m%d_%H%M%S).dump
+
+----------------------------------------
+
+TITLE: PUT Endpoint Definition for Survey Update in FormBricks OpenAPI
+DESCRIPTION: Defines the OpenAPI specification for updating an existing survey via the PUT /api/v1/management/surveys/{surveyId} endpoint. This endpoint allows clients to modify an existing survey by its ID.
+
+LANGUAGE: openapi
+CODE:
+openapi: put /api/v1/management/surveys/{surveyId}
+
+----------------------------------------
+
+TITLE: Configuring Vitest for Test Coverage in TypeScript
+DESCRIPTION: Vitest configuration setup that excludes certain directories, configures test setup files, and sets up code coverage reporting. This configuration specifies the coverage provider and various report formats.
+
+LANGUAGE: typescript
+CODE:
+test: {
+exclude: ['playwright/', 'node_modules/'],
+setupFiles: ['../../packages/lib/vitestSetup.ts'],
+coverage: {
+provider: 'v8',
+reporter: ['text', 'html', 'lcov'],
+reportsDirectory: './coverage',
+},
+}
+
+----------------------------------------
+
+TITLE: JSDoc Comment Standard for Formbricks
+DESCRIPTION: Example of the JSDoc comment standard required for public APIs and complex functions in the Formbricks project. It documents parameters, return types, and function purpose for improved code readability.
+
+LANGUAGE: typescript
+CODE:
+/**
+ * Creates a new user
+ * @param {string} name - User's name
+ * @returns {Promise<User>} The created user object
+ */
+function createUser(name: string): Promise<User> {
+  // implementation
+}
+
+----------------------------------------
+
+TITLE: Initializing Formbricks in a React Native Application
+DESCRIPTION: Example of how to import and initialize the Formbricks widget in a React Native main component. Requires replacing 'your-environment-id' with the actual environment ID from Formbricks Configuration.
+
+LANGUAGE: javascript
+CODE:
+import Formbricks, { track } from "@formbricks/react-native";
+
+export default function App() {
+  return (
+    <View>
+      {/* Your app code */}
+      <Formbricks appUrl="https://app.formbricks.com" environmentId="your-environment-id" />
+    </View>
+  );
+}
+
+----------------------------------------
+
+TITLE: Logging Out Users from Formbricks
+DESCRIPTION: This snippet demonstrates how to log a user out of Formbricks when they log out of your application. This prevents user activity from being incorrectly associated with the wrong user profile.
+
+LANGUAGE: javascript
+CODE:
+formbricks.logout();
+
+----------------------------------------
+
+TITLE: Documenting Complex Functions with JSDoc in TypeScript
+DESCRIPTION: Example of properly documented TypeScript function using JSDoc comments, including parameter descriptions, return types, and potential exceptions.
+
+LANGUAGE: typescript
+CODE:
+/**
+Creates a new user and initializes their preferences
+@param {string} name - User's full name
+@param {UserOptions} options - Configuration options for user creation
+@returns {Promise<User>} The created user object
+@throws {ValidationError} If name is invalid
+*/
+async function createUser(name: string, options: UserOptions): Promise<User> {
+  // implementation
+}
+
+----------------------------------------
+
+TITLE: Configuring Environment Variables for FusionAuth OIDC in Formbricks
+DESCRIPTION: This snippet demonstrates the environment variables required to integrate FusionAuth as an OpenID Connect provider with Formbricks. It includes client credentials, issuer URL, display name, and signing algorithm specifications needed for proper OIDC authentication.
+
+LANGUAGE: yml
+CODE:
+OIDC_CLIENT_ID=59cada54-56d4-4aa8-a5e7-5823bbe0e5b7
+OIDC_CLIENT_SECRET=4f4dwP0ZoOAqMW8fM9290A7uIS3E8Xg29xe1umhlB_s
+OIDC_ISSUER=http://localhost:9011 
+OIDC_DISPLAY_NAME=FusionAuth
+OIDC_SIGNING_ALGORITHM=HS256
+
+----------------------------------------
+
+TITLE: Tracking Events with Formbricks SDK in Android
+DESCRIPTION: Demonstrates how to track user events with the Formbricks SDK. This example shows tracking a button click event which can be modified to track different actions.
+
+LANGUAGE: kotlin
+CODE:
+Formbricks.track("click_demo_button")
+
+----------------------------------------
+
+TITLE: Test Lifecycle Hooks for Test Independence in Vitest
+DESCRIPTION: Implementation of beforeEach and afterEach hooks to ensure test independence by resetting modules and mocks between test runs. This prevents test state leakage and helps maintain isolated test cases.
+
+LANGUAGE: typescript
+CODE:
+beforeEach(() => {
+  vi.resetModules();
+  vi.resetAllMocks();
+});
+
+afterEach(() => {
+  vi.clearAllMocks();
+});
+
+----------------------------------------
+
+TITLE: Visualizing SAML Authentication Flow with Mermaid Sequence Diagram
+DESCRIPTION: This Mermaid sequence diagram illustrates the complete SAML authentication flow between the user, Formbricks (as the Service Provider), BoxyHQ Jackson (SAML connection manager), and Okta (as the Identity Provider). It shows the entire authentication process from login initiation to successful access.
+
+LANGUAGE: mermaid
+CODE:
+sequenceDiagram
+    participant U as User
+    participant FB as Formbricks (SP)
+    participant BHQ as BoxyHQ Jackson
+    participant OK as Okta (IdP)
+
+    Note over FB,BHQ: (Setup phase, done beforehand)<br/>1. Admin configures SAML metadata in Formbricks<br/>2. BoxyHQ stores & manages SAML connection details
+
+    U->>FB: Clicks "Continue with SAML SSO"
+    FB->>BHQ: Request SAML connection details
+    BHQ->>FB: Returns SAML configuration (IdP info)
+    FB->>OK: Redirect user to Okta (SAML Auth Request)
+    OK->>U: Prompts user for credentials
+    U->>OK: Submits credentials
+    OK->>FB: Sends SAML Assertion (Callback URL)
+    FB->>BHQ: Validates assertion & extracts user info
+    BHQ->>FB: Returns validated user data
+    FB->>U: Logs user into Formbricks
+
+----------------------------------------
+
+TITLE: Configuring Environment Variables for Microsoft Entra ID SSO in Formbricks
+DESCRIPTION: Example environment variables configuration for connecting Formbricks to Microsoft Entra ID for Single Sign-On. These variables should be added to your environment file or passed to your Formbricks container. The client secret must be wrapped in double quotes to prevent issues with special characters.
+
+LANGUAGE: yml
+CODE:
+AZUREAD_CLIENT_ID=a25cadbd-f049-4690-ada3-56a163a72f4c
+AZUREAD_TENANT_ID=2746c29a-a3a6-4ea1-8762-37816d4b7885
+AZUREAD_CLIENT_SECRET="THis~iS4faKe.53CreTvALu3"
+
+----------------------------------------
+
+TITLE: Generating Secret Keys for Formbricks
+DESCRIPTION: Commands to generate and set random secure keys for encryption, authentication, and cron functionality using BSD sed syntax for macOS.
+
+LANGUAGE: bash
+CODE:
+sed -i '' '/^ENCRYPTION_KEY=/s|.*|ENCRYPTION_KEY='$(openssl rand -hex 32)'|' .env
+sed -i '' '/^NEXTAUTH_SECRET=/s|.*|NEXTAUTH_SECRET='$(openssl rand -hex 32)'|' .env
+sed -i '' '/^CRON_SECRET=/s|.*|CRON_SECRET='$(openssl rand -hex 32)'|' .env
+
+----------------------------------------
+
+TITLE: VS Code Recommended Settings for Formbricks Development
+DESCRIPTION: Recommended VS Code settings for Formbricks development. These settings enable automatic formatting on save, configure ESLint integration, and specify the TypeScript SDK path for consistent development experience.
+
+LANGUAGE: json
+CODE:
+{
+  "editor.formatOnSave": true,
+  "editor.defaultFormatter": "esbenp.prettier-vscode",
+  "editor.codeActionsOnSave": {
+    "source.fixAll.eslint": true
+  },
+  "typescript.tsdk": "node_modules/typescript/lib"
+}
+
+----------------------------------------
+
+TITLE: Defining GET API Endpoint for Attribute Classes in YAML
+DESCRIPTION: OpenAPI specification for the GET endpoint that retrieves attribute classes from the Formbricks management API. This endpoint is defined with path parameters and response schemas.
+
+LANGUAGE: yaml
+CODE:
+openapi: get /api/v1/management/attribute-classes
+
+----------------------------------------
+
+TITLE: Prettier Configuration for Formbricks Codebase
+DESCRIPTION: This configuration defines the Prettier formatting rules for the Formbricks codebase. It specifies settings for bracket spacing, quotes, comma style, semicolons, and other formatting preferences.
+
+LANGUAGE: javascript
+CODE:
+{
+bracketSpacing: true,
+bracketSameLine: true,
+singleQuote: false,
+jsxSingleQuote: false,
+trailingComma: "es5",
+semi: true,
+printWidth: 110,
+arrowParens: "always"
+}
+
+----------------------------------------
+
+TITLE: Setting Notion OAuth Environment Variables for Self-Hosted Formbricks
+DESCRIPTION: These environment variables must be configured in a self-hosted Formbricks instance to enable Notion integration. They include the OAuth Client ID and Client Secret obtained from the Notion integration setup.
+
+LANGUAGE: plaintext
+CODE:
+NOTION_OAUTH_CLIENT_ID - OAuth Client ID
+NOTION_OAUTH_CLIENT_SECRET - OAuth Client Secret
+
+----------------------------------------
+
+TITLE: Defining PUT Endpoint for Updating Form Responses in OpenAPI
+DESCRIPTION: OpenAPI specification defining the endpoint for updating form responses. The endpoint accepts PUT requests to /api/v1/management/responses/{responseId} where responseId is the identifier of the response to be updated.
+
+LANGUAGE: yaml
+CODE:
+openapi: put /api/v1/management/responses/{responseId}
+
+----------------------------------------
+
+TITLE: OpenAPI Specification for Formbricks POST Webhook Endpoint
+DESCRIPTION: This YAML snippet defines the OpenAPI specification for creating a webhook endpoint in the Formbricks API. It specifies the route '/api/v1/webhooks' with POST method.
+
+LANGUAGE: yaml
+CODE:
+openapi: post /api/v1/webhooks
+
+----------------------------------------
+
+TITLE: OpenAPI Specification for Getting Survey Response by ID
+DESCRIPTION: OpenAPI specification for the GET endpoint that retrieves a survey response by its ID. The endpoint is defined with path parameter 'responseId' and requires authentication via a bearer token.
+
+LANGUAGE: yaml
+CODE:
+openapi: get /api/v1/management/responses/{responseId}
+
+----------------------------------------
+
+TITLE: Backing up PostgreSQL Database for Formbricks v3.1 Migration
+DESCRIPTION: Command to create a backup of the Formbricks database before upgrading to v3.1. This uses pg_dump to create a custom-format backup file with a timestamp in the filename.
+
+LANGUAGE: bash
+CODE:
+docker exec formbricks-postgres-1 pg_dump -Fc -U postgres -d formbricks > formbricks_pre_v3.1_$(date +%Y%m%d_%H%M%S).dump
+
+----------------------------------------
+
+TITLE: TypeScript Configuration for Formbricks
+DESCRIPTION: The TypeScript configuration used in Formbricks projects, extending from a base configuration. It enables strict type checking, resolving JSON modules, and isolated modules while specifying files to include in compilation.
+
+LANGUAGE: json
+CODE:
+{
+  "compilerOptions": {
+    "allowImportingTsExtensions": true,
+    "isolatedModules": true,
+    "noEmit": true,
+    "resolveJsonModule": true,
+    "strict": true
+  },
+  "extends": "@formbricks/config-typescript/js-library.json",
+  "include": ["src", "package.json"]
+}
+
+----------------------------------------
+
+TITLE: Defining OpenAPI POST Endpoint for Action Classes in Formbricks
+DESCRIPTION: OpenAPI specification for the POST endpoint that handles action class creation in Formbricks management API. This endpoint is defined with a path of /api/v1/management/action-classes.
+
+LANGUAGE: openapi
+CODE:
+openapi: post /api/v1/management/action-classes
+
+----------------------------------------
+
+TITLE: OpenAPI Specification for GET Contacts Endpoint in Formbricks
+DESCRIPTION: This YAML snippet defines the OpenAPI specification for the GET /api/v1/management/contacts endpoint in Formbricks API. It specifies the path for retrieving contacts from the management API.
+
+LANGUAGE: yaml
+CODE:
+openapi: get /api/v1/management/contacts
+
+----------------------------------------
+
+TITLE: OpenAPI GET Endpoint Specification for Contact Retrieval in YAML
+DESCRIPTION: OpenAPI specification that defines the endpoint for retrieving a specific contact by ID from the Formbricks management API. The specification indicates this is a GET request requiring authentication and specifies the response schema.
+
+LANGUAGE: yaml
+CODE:
+openapi: get /api/v1/management/contacts/{contactId}
+
+----------------------------------------
+
+TITLE: Configuring Single Domain Environment Variables in Formbricks
+DESCRIPTION: Sets up the essential environment variables for a single domain configuration in Formbricks. This includes WEBAPP_URL and NEXTAUTH_URL which must be identical and include the full URL with protocol.
+
+LANGUAGE: bash
+CODE:
+WEBAPP_URL=https://formbricks.example.com
+NEXTAUTH_URL=https://formbricks.example.com
+
+----------------------------------------
+
+TITLE: Pre-commit Hooks Configuration with lint-staged
+DESCRIPTION: Configuration for pre-commit hooks using lint-staged to automatically format and lint code before committing. It applies different formatting rules based on file types and locations within the project structure.
+
+LANGUAGE: json
+CODE:
+{
+  "lint-staged": {
+    "(apps|packages)/**/*.{js,ts,jsx,tsx}": [
+      "prettier --write",
+      "eslint --fix"
+    ],
+    "*.json": [
+      "prettier --write"
+    ],
+    "packages/database/schema.prisma": [
+      "prisma format"
+    ]
+  }
+}
+
+----------------------------------------
+
+TITLE: OpenAPI GET Endpoint for Contact Attributes in Formbricks Management API
+DESCRIPTION: OpenAPI specification for the GET /api/v1/management/contact-attributes endpoint. This endpoint retrieves contact attributes within the Formbricks management API.
+
+LANGUAGE: yaml
+CODE:
+openapi: get /api/v1/management/contact-attributes
+
+----------------------------------------
+
+TITLE: API Endpoint Definition for Creating Surveys in Formbricks
+DESCRIPTION: OpenAPI definition for the POST /api/v1/management/surveys endpoint that creates a new survey. This shows the API path, method, and structure for interacting with the Formbricks survey creation system.
+
+LANGUAGE: openapi
+CODE:
+openapi: post /api/v1/management/surveys
+
+----------------------------------------
+
+TITLE: Defining GET /health Endpoint in OpenAPI
+DESCRIPTION: OpenAPI specification for a health check endpoint that returns system status information. This endpoint allows clients to verify if the API service is operational.
+
+LANGUAGE: openapi
+CODE:
+openapi: get /health
+
+----------------------------------------
+
+TITLE: Embedding Formbricks Survey in Web Page with iframe
+DESCRIPTION: HTML code snippet for embedding a Formbricks survey into a web page using an iframe. The code creates a responsive container that adapts to the page size and ensures the survey is properly displayed within the container.
+
+LANGUAGE: html
+CODE:
+<div style="position: relative; height:100vh; max-height:100vh; overflow:auto;">
+  <iframe
+    src="https://app.formbricks.com/s/<your-surveyId>"
+    frameborder="0"
+    style="position: absolute; left:0; top:0; width:100%; height:100%; border:0;"
+  >
+  </iframe>
+</div>
+
+----------------------------------------
+
+TITLE: Configuring Prometheus Integration in Formbricks
+DESCRIPTION: Environment variables required to enable and configure the Prometheus metrics exporter in Formbricks, which collects and exposes metrics in Prometheus format.
+
+LANGUAGE: env
+CODE:
+PROMETHEUS_ENABLED=1
+PROMETHEUS_EXPORTER_PORT=9464  # Optional, defaults to 9464
+
+----------------------------------------
+
+TITLE: Configuring Optional SMTP Settings for Formbricks
+DESCRIPTION: Additional optional SMTP settings for controlling TLS security, authentication requirements, and CA verification. These settings allow for more fine-grained control over the email server connection security.
+
+LANGUAGE: bash
+CODE:
+# Enable SMTP_SECURE_ENABLED for TLS (port 465)
+SMTP_SECURE_ENABLED=0
+
+# If set to 0, the server won't require authentication
+SMTP_AUTHENTICATED=1
+
+# If set to 0, the server will accept connections without requiring
+# authorization from the list of supplied CAs (default is 1)
+SMTP_REJECT_UNAUTHORIZED_TLS=0
+
+----------------------------------------
+
+TITLE: Test Directory Structure for Features
+DESCRIPTION: Recommended directory structure for organizing tests in the Formbricks codebase, showing how test files should be organized alongside the code they test.
+
+LANGUAGE: plaintext
+CODE:
+feature/
+├── tests/ # Test directory (if grouping tests)
+├── components/ # Feature components
+└── lib/ # Business logic
+
+----------------------------------------
+
+TITLE: Running Data Migration to v2.0
+DESCRIPTION: Executes the data migration process to upgrade the database schema to v2.0. Pulls the migration image and runs it with the proper environment variables to connect to the Postgres database.
+
+LANGUAGE: bash
+CODE:
+docker pull ghcr.io/formbricks/data-migrations:v2.0.3 && \
+docker run --rm \
+  --network=formbricks_default \
+  -e DATABASE_URL="postgresql://postgres:postgres@postgres:5432/formbricks?schema=public" \
+  -e UPGRADE_TO_VERSION="v2.0" \
+  ghcr.io/formbricks/data-migrations:v2.0.3
+
+----------------------------------------
+
+TITLE: Adding Formbricks Helm Repository for Kubernetes Deployment
+DESCRIPTION: Commands to add the Formbricks Helm repository to your Helm installation. This is the first step for deploying Formbricks on Kubernetes using the official Helm chart.
+
+LANGUAGE: sh
+CODE:
+helm repo add formbricks https://raw.githubusercontent.com/formbricks/formbricks/main/helm-chart
+helm repo update
+
+----------------------------------------
+
+TITLE: Prefilling Multi Select Questions in Formbricks
+DESCRIPTION: Example URL for prefilling a multi-select (checkbox) question with multiple options. The query parameter uses the question ID as the key and comma-separated, URL-encoded option texts as the value.
+
+LANGUAGE: sh
+CODE:
+https://app.formbricks.com/s/clin3yxja52k8l80hpwmx4bjy?multi_select_question_id=Sun%2CPalms%2CBeach
+
+----------------------------------------
+
+TITLE: Running Data Migration for v2.6 in Bash
+DESCRIPTION: Command sequence to pull and run the data migration Docker container for v2.6. This migrates the database schema to be compatible with v2.6.
+
+LANGUAGE: bash
+CODE:
+docker pull ghcr.io/formbricks/data-migrations:latest && \
+docker run --rm \
+  --network=formbricks_default \
+  -e DATABASE_URL="postgresql://postgres:postgres@postgres:5432/formbricks?schema=public" \
+  -e UPGRADE_TO_VERSION="v2.6" \
+  ghcr.io/formbricks/data-migrations:v2.6.0
+
+----------------------------------------
+
+TITLE: Creating a Display in Formbricks
+DESCRIPTION: Creates a new display record in Formbricks using the client API. Requires a survey ID and optionally accepts user ID and response ID parameters.
+
+LANGUAGE: typescript
+CODE:
+await api.client.display.create({
+  surveyId: "<your-survey-id>", // required
+  userId: "<your-user-id>", // optional
+  responseId: "<your-response-id>", // optional
+});
+
+----------------------------------------
+
+TITLE: Prometheus Configuration for Scraping Formbricks Metrics
+DESCRIPTION: YAML configuration snippet for adding Formbricks as a scrape target in Prometheus, allowing the collection of metrics from the Formbricks metrics endpoint.
+
+LANGUAGE: yaml
+CODE:
+scrape_configs:
+  - job_name: "formbricks"
+    static_configs:
+      - targets: ["your-formbricks-host:9464"]
+
+----------------------------------------
+
+TITLE: Cloning Formbricks Repository
+DESCRIPTION: Command to clone the Formbricks GitHub repository and navigate to the project directory.
+
+LANGUAGE: bash
+CODE:
+git clone https://github.com/formbricks/formbricks && cd formbricks
+
+----------------------------------------
+
+TITLE: Running Data Migrations for Formbricks v2.4
+DESCRIPTION: Commands to migrate database schema to Formbricks v2.4. Pulls the migration image and runs it in the same network as the Postgres container.
+
+LANGUAGE: bash
+CODE:
+docker pull ghcr.io/formbricks/data-migrations:v2.4.3 && \
+docker run --rm \
+  --network=formbricks_default \
+  -e DATABASE_URL="postgresql://postgres:postgres@postgres:5432/formbricks?schema=public" \
+  -e UPGRADE_TO_VERSION="v2.4" \
+  ghcr.io/formbricks/data-migrations:v2.4.3
+
+----------------------------------------
+
+TITLE: Updating a Response in Formbricks
+DESCRIPTION: Updates an existing survey response with new data. Requires the response ID, completion status, and updated response data. Optionally accepts time-to-completion (ttc) tracking.
+
+LANGUAGE: typescript
+CODE:
+await api.client.response.update({
+  responseId: "<your-response-id>", // required
+  finished: boolean, // required
+  data: {
+    questionId: "<answer-to-this-question-in-string>",
+    anotherQuestionId: 123, // answer to this question in number
+    yetAnotherQuestionId: ["option1", "option2"], // answer to this question in array,
+  }, // required
+  ttc: {
+    questionId: 123, // optional
+  }, // optional
+});
+
+----------------------------------------
+
+TITLE: Uploading a File to Formbricks Storage
+DESCRIPTION: Uploads a file to Formbricks storage. Requires a File object and optionally accepts parameters to specify allowed file types and survey association.
+
+LANGUAGE: typescript
+CODE:
+await api.client.storage.uploadFile(
+  file: File, // required (of interface File of the browser's File API)
+  {
+    allowedFileTypes: ["file-type-allowed", "for-example", "image/jpeg"], // optional
+    surveyId: "<your-survey-id>", // optional
+
+  } // optional
+);
+
+----------------------------------------
+
+TITLE: Starting Updated Formbricks Containers in Bash
+DESCRIPTION: Command to start Formbricks containers with the latest version in detached mode. This will run the updated Formbricks instance.
+
+LANGUAGE: bash
+CODE:
+docker compose up -d
+
+----------------------------------------
+
+TITLE: Writing Test Assertions with Vitest
+DESCRIPTION: Examples of common assertion patterns for testing both successful operations and error cases. These assertions demonstrate checking for success flags, comparing results against expected values, and verifying that exceptions are thrown when expected.
+
+LANGUAGE: typescript
+CODE:
+expect(result.ok).toBe(true);
+expect(result.data).toEqual(expectedData);
+expect(async () => await invalidCall()).rejects.toThrow(ValidationError);
+
+----------------------------------------
+
+TITLE: Defining OpenAPI Endpoint for GET Surveys in Formbricks Management API
+DESCRIPTION: This YAML snippet specifies the OpenAPI definition for the GET /api/v1/management/surveys endpoint in the Formbricks management API. It establishes the path and HTTP method for retrieving survey data.
+
+LANGUAGE: yaml
+CODE:
+openapi: get /api/v1/management/surveys
+
+----------------------------------------
+
+TITLE: Managing State for Formbricks Feedback Widget in React
+DESCRIPTION: State management implementation for the docs feedback widget. It handles the UI state, tracks response IDs, and manages the feedback text input using React's useState hook and Next.js router.
+
+LANGUAGE: tsx
+CODE:
+const router = useRouter(); // to get the URL of the current docs page
+const [isOpen, setIsOpen] = useState(false); // to close Popover after
+const [sharedFeedback, setSharedFeedback] = useState(false); // to display Thank You message
+const [responseId, setResponseId] = useState(null); // to store responseID (will explain more)
+const [freeText, setFreeText] = useState(""); // to locally store the additional info provided by user
+
+----------------------------------------
+
+TITLE: Configuring S3 Storage for Formbricks Cluster
+DESCRIPTION: Environment variables required to configure S3-compatible storage for file uploads in a Formbricks cluster. This allows all instances to share the same storage for user uploads and attachments.
+
+LANGUAGE: sh
+CODE:
+# Required for file uploads in serverless environments
+S3_ACCESS_KEY=your-access-key
+S3_SECRET_KEY=your-secret-key
+S3_REGION=your-region
+S3_BUCKET_NAME=your-bucket-name
+
+# For S3-compatible storage (e.g., StorJ, MinIO)
+# Leave empty for Amazon S3
+S3_ENDPOINT_URL=https://your-s3-compatible-endpoint
+
+# Enable for S3-compatible storage that requires path style
+# 0 for disabled, 1 for enabled
+S3_FORCE_PATH_STYLE=0
+
+----------------------------------------
+
+TITLE: Mocking Database Dependencies with Vitest
+DESCRIPTION: Example of mocking the Formbricks database module using Vitest's mocking capabilities. This approach allows for isolating the code under test from actual database operations by providing mock implementations of database methods.
+
+LANGUAGE: typescript
+CODE:
+vi.mock("@formbricks/database", () => ({
+  prisma: {
+    user: {
+      create: vi.fn(),
+      findUnique: vi.fn(),
+    },
+  },
+}));
+
+----------------------------------------
+
+TITLE: Manually Scaling Formbricks Deployment in Kubernetes
+DESCRIPTION: Command to manually scale the Formbricks deployment to a desired number of replicas when HPA is not enabled, allowing control over the application's resources.
+
+LANGUAGE: sh
+CODE:
+kubectl scale deployment -n {{ .Release.Namespace }} {{ include "formbricks.name" . }} --replicas=<desired_number>
+
+----------------------------------------
+
+TITLE: Disabling Docker Cron Jobs in Cluster Environments
+DESCRIPTION: Environment variable to disable built-in Docker cron jobs when running Formbricks in a cluster setup. This prevents duplicate job execution across multiple instances.
+
+LANGUAGE: sh
+CODE:
+# Disable Docker cron jobs (0 = disabled, 1 = enabled)
+DOCKER_CRON_ENABLED=0
+
+----------------------------------------
+
+TITLE: Defining OpenAPI GET Endpoint for People Management
+DESCRIPTION: This snippet defines the OpenAPI specification for a GET endpoint that retrieves people data from the Formbricks management API. It includes the endpoint path, HTTP method, and related metadata.
+
+LANGUAGE: yaml
+CODE:
+openapi: get /api/v1/management/people
+
+----------------------------------------
+
+TITLE: Accessing Kubernetes Pod Logs for Formbricks
+DESCRIPTION: Commands for accessing logs from Formbricks running as Kubernetes pods, including standard log viewing and following log output in real-time.
+
+LANGUAGE: bash
+CODE:
+kubectl logs <pod-name> -n <namespace>
+kubectl logs -f <pod-name> -n <namespace> # Follow logs
+
+----------------------------------------
+
+TITLE: Tracking Button Click Actions in React
+DESCRIPTION: This example shows how to track a button click action in a React component. When the user clicks the button, the handleClick function is called, which tracks the "Button Clicked" action via Formbricks.
+
+LANGUAGE: javascript
+CODE:
+const handleClick = () => {
+  formbricks.track("Button Clicked");
+};
+
+return <button onClick={handleClick}>Click Me</button>;
+
+----------------------------------------
+
+TITLE: Domain Name Prompt in Formbricks Installation Script
+DESCRIPTION: Displays the prompt where users need to enter their domain name for hosting Formbricks. This domain will be used for SSL certificate generation. The script has already completed Docker installation at this point.
+
+LANGUAGE: bash
+CODE:
+🚀 Executing default step of installing Formbricks
+🧱 Welcome to the Formbricks Setup Script
+
+🛸 Fasten your seatbelts! We're setting up your Formbricks environment on your Ubuntu 24.04 LTS server.
+
+🧹 Time to sweep away any old Docker installations.
+🔄 Updating your package list.
+📦 Installing the necessary dependencies.
+🔑 Adding Docker's official GPG key and setting up the stable repository.
+File '/etc/apt/keyrings/docker.gpg' exists. Overwrite? (y/N) y
+🔄 Updating your package list again.
+🐳 Installing Docker.
+🚀 Testing your Docker installation.
+🎉 Docker is installed!
+🐳 Adding your user to the Docker group to avoid using sudo with docker commands.
+🎉 Hooray! Docker is all set and ready to go. You're now ready to run your Formbricks instance!
+📁 Created Formbricks Quickstart directory at ./formbricks.
+🔗 Please enter your domain name for the SSL certificate (🚨 do NOT enter the protocol (http/https/etc)):
+
+----------------------------------------
+
+TITLE: OpenAPI Specification for POST Displays Endpoint in Formbricks
+DESCRIPTION: YAML specification defining the POST endpoint for tracking displays in Formbricks' client API. The endpoint requires an environment ID in the path and accepts a body with a survey ID and person properties.
+
+LANGUAGE: yaml
+CODE:
+openapi: post /api/v1/client/{environmentId}/displays
+
+----------------------------------------
+
+TITLE: Defining GET /api/v1/management/me OpenAPI Endpoint
+DESCRIPTION: OpenAPI specification for an endpoint that retrieves the current user's information. The endpoint is part of the management API (v1) and requires authentication.
+
+LANGUAGE: yaml
+CODE:
+openapi: get /api/v1/management/me
+
+----------------------------------------
+
+TITLE: Accessing Formbricks via Ingress in Kubernetes
+DESCRIPTION: Command to retrieve the Ingress hostnames for the Formbricks application. This helps users identify the URL through which the application is accessible when Ingress is enabled.
+
+LANGUAGE: sh
+CODE:
+kubectl get ingress {{ include "formbricks.name" . }} -n {{ .Release.Namespace }} -o jsonpath='{.items[*].spec.rules[*].host}' | tr ' ' '\n'
+
+----------------------------------------
+
+TITLE: Failed Authentication Response
+DESCRIPTION: This shows the response message when API key authentication fails (HTTP 401). The server responds with a simple 'Not authenticated' message when the provided API key is invalid or missing.
+
+LANGUAGE: bash
+CODE:
+Not authenticated
+
+----------------------------------------
+
+TITLE: PUT Endpoint for Updating Responses in Formbricks
+DESCRIPTION: An OpenAPI specification for the endpoint that updates a specific response identified by responseId within a given environment. The endpoint follows the pattern `/api/v1/client/{environmentId}/responses/{responseId}`.
+
+LANGUAGE: openapi
+CODE:
+openapi: put /api/v1/client/{environmentId}/responses/{responseId}
+
+----------------------------------------
+
+TITLE: Tracking Actions with Formbricks
+DESCRIPTION: This code demonstrates the basic syntax for tracking an action in Formbricks. When called, it sends the specified action name to Formbricks to potentially trigger a survey.
+
+LANGUAGE: javascript
+CODE:
+formbricks.track("action");
+
+----------------------------------------
+
+TITLE: Starting Updated Formbricks Containers
+DESCRIPTION: Command to start the containers with the latest version of Formbricks in detached mode.
+
+LANGUAGE: bash
+CODE:
+docker compose up -d
+
+----------------------------------------
+
+TITLE: Successful API Key Response
+DESCRIPTION: This shows the JSON response format when the API key authentication is successful (HTTP 200). The response includes user ID, timestamps, project details, and setup status information.
+
+LANGUAGE: bash
+CODE:
+{
+  "id": "cll2m30r70004mx0huqkitgqv",
+  "createdAt": "2023-08-08T18:04:59.922Z",
+  "updatedAt": "2023-08-08T18:04:59.922Z",
+  "type": "production",
+  "project": {
+      "id": "cll2m30r60003mx0hnemjfckr",
+      "name": "My Project"
+  },
+  "appSetupCompleted": false,
+  "websiteSetupCompleted": false,
+}
+
+----------------------------------------
+
+TITLE: Updating Feedback with Additional Information in Formbricks API
+DESCRIPTION: A function that updates an existing feedback response with additional free text information. It requires the response ID from the initial submission and marks the response as finished for completion rate calculation.
+
+LANGUAGE: tsx
+CODE:
+export const updateFeedback = async (freeText, responseId) => {
+  if (!responseId) {
+    console.error("No response ID available"); // If there is not response ID, no response can be updated.
+    return;
+  }
+
+  const payload = {
+    response: {
+      data: {
+        additionalInfo: freeText,
+      },
+      finished: true, // Lets Formbricks calculate Completion Rate
+    },
+  };
+
+  try {
+    const res = await fetch(
+      `${process.env.NEXT_PUBLIC_FORMBRICKS_COM_API_HOST}/api/v1/client/environments/${process.env.NEXT_PUBLIC_FORMBRICKS_COM_ENVIRONMENT_ID}/responses/${responseId}`,
+      {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(payload),
+      }
+    );
+
+    if (!res.ok) {
+      console.error("Error updating response");
+    }
+  } catch (error) {
+    console.error("Error updating response:", error);
+  }
+};
+
+----------------------------------------
+
+TITLE: Pulling Latest Formbricks Docker Images
+DESCRIPTION: Updates the local Docker images to the latest version of Formbricks. This ensures you have the most recent version before proceeding with the migration.
+
+LANGUAGE: bash
+CODE:
+docker compose pull
+
+----------------------------------------
+
+TITLE: Initializing Formbricks API Client
+DESCRIPTION: Creates a new instance of the FormbricksAPI client with the required configuration, including the app URL and environment ID.
+
+LANGUAGE: typescript
+CODE:
+import { FormbricksAPI } from "@formbricks/api";
+
+const api = new FormbricksAPI({
+  appUrl: `https://app.formbricks.com`, // If you have self-hosted Formbricks, change this to your self hosted instance's URL
+  environmentId: "<environment-id>", // Replace this with your Formbricks environment ID
+});
+
+----------------------------------------
+
+TITLE: Using Mintlify Components for Notes
+DESCRIPTION: Example of using Mintlify's note component to highlight important information in documentation.
+
+LANGUAGE: markdown
+CODE:
+<Note>
+Important information goes here
+</Note>
+
+----------------------------------------
+
+TITLE: Environment Variable Validation for Formbricks Integration
+DESCRIPTION: Conditional rendering that checks for required environment variables before displaying the feedback widget. Ensures the Formbricks API connection is properly configured before attempting to collect feedback.
+
+LANGUAGE: tsx
+CODE:
+if (
+  !process.env.NEXT_PUBLIC_FORMBRICKS_COM_DOCS_FEEDBACK_SURVEY_ID ||
+  !process.env.NEXT_PUBLIC_FORMBRICKS_COM_API_HOST ||
+  !process.env.NEXT_PUBLIC_FORMBRICKS_COM_ENVIRONMENT_ID
+) {
+  return null;
+}
+
+----------------------------------------
+
+TITLE: Stopping and Removing Formbricks Containers
+DESCRIPTION: Stops the running Formbricks instance and removes the associated containers. This is necessary before starting containers with the updated images.
+
+LANGUAGE: bash
+CODE:
+docker compose down
+
+----------------------------------------
+
+TITLE: Embedding Formbricks Survey in Email Footer
+DESCRIPTION: HTML code snippet for adding a simple feedback survey to an email signature. This implementation uses query parameters to pass the user's response (Yes/No) as a hidden field in the survey.
+
+LANGUAGE: html
+CODE:
+Was our conversation helpful?
+<a href="<Link-Survey-URL>?helpful=Yes">Yes 👍</a> |
+<a href="<Link-Survey-URL>?helpful=No">No 👎</a>
+
+----------------------------------------
+
+TITLE: Setting SSL Certificate File Permissions (Bash)
+DESCRIPTION: Commands to set appropriate ownership and permissions on SSL certificate files for security.
+
+LANGUAGE: bash
+CODE:
+sudo chown root:root certs/*
+sudo chmod 600 certs/*
+
+----------------------------------------
+
+TITLE: Backing up Postgres Database for v1.6 Migration
+DESCRIPTION: Creates a backup of the Formbricks PostgreSQL database before migration to v1.6. Uses pg_dump to create a custom-format backup file with timestamp.
+
+LANGUAGE: bash
+CODE:
+docker exec formbricks-quickstart-postgres-1 pg_dump -Fc -U postgres -d formbricks > formbricks_pre_v1.6_$(date +%Y%m%d_%H%M%S).dump
+
+----------------------------------------
+
+TITLE: Handling Formbricks Survey Completion Events with JavaScript
+DESCRIPTION: JavaScript event listener that detects when a user completes a survey within an embedded iframe. The code verifies the origin of the message for security and executes custom actions when a survey is completed.
+
+LANGUAGE: javascript
+CODE:
+window.addEventListener("message", (event) => {
+  // Replace 'https://app.formbricks.com' with the actual web app url
+  if (
+    event.origin === "https://app.formbricks.com" &&
+    event.data === "formbricksSurveyCompleted"
+  ) {
+    console.log("Survey completed!");
+    // Implement your custom actions here
+  }
+});
+
+----------------------------------------
+
+TITLE: Setting Up NodeJS Environment with NVM
+DESCRIPTION: Commands to install and use the Node.js version specified in the project using Node Version Manager (nvm).
+
+LANGUAGE: bash
+CODE:
+nvm install && nvm use
+
+----------------------------------------
+
+TITLE: Initializing Formbricks in React Native App
+DESCRIPTION: Code for integrating the Formbricks SDK in a React Native application. Sets up the Formbricks component with configuration.
+
+LANGUAGE: javascript
+CODE:
+// other imports
+import Formbricks from "@formbricks/react-native";
+
+const config = {
+  environmentId: "<environment-id>",
+  appUrl: "<app-url>",
+};
+
+export default function App() {
+  return (
+    <>
+      {/* Your app content */}
+      <Formbricks initConfig={config} />
+    </>
+  );
+}
+
+----------------------------------------
+
+TITLE: Example JSON Log Entry Format in Formbricks
+DESCRIPTION: Shows the structure of a JSON formatted log entry in Formbricks, including fields such as hostname, level, message, process ID, request ID, timestamp, and user ID.
+
+LANGUAGE: json
+CODE:
+{
+  "hostname": "server-1",
+  "level": 30,
+  "msg": "User logged in successfully",
+  "pid": 12345,
+  "requestId": "abc-123",
+  "time": 1710000000000,
+  "userId": "user-789"
+}
+
+----------------------------------------
+
+TITLE: Setting Language Attribute with Formbricks SDK in JavaScript
+DESCRIPTION: This code snippet demonstrates how to initialize the Formbricks SDK and set a specific language for a user. The language code can be either an ISO identifier or the alias set when creating the language in Formbricks. Setting this attribute ensures the user only sees surveys with translations available in their language.
+
+LANGUAGE: javascript
+CODE:
+Formbricks.setup({
+  environmentId: "<environment-id>",
+  appUrl: "<app-url>",
+});
+
+Formbricks.setLanguage("de"); // ISO identifier or Alias set when creating language
+
+----------------------------------------
+
+TITLE: DELETE Endpoint for Action Classes in Formbricks API
+DESCRIPTION: OpenAPI specification for the endpoint that deletes an action class by its ID. This endpoint follows the RESTful pattern using the DELETE method at '/api/v1/management/action-classes/{actionClassId}'.
+
+LANGUAGE: openapi
+CODE:
+openapi: delete /api/v1/management/action-classes/{actionClassId}
+
+----------------------------------------
+
+TITLE: Configuring Log Levels in Formbricks
+DESCRIPTION: Demonstrates how to set the minimum log level using the LOG_LEVEL environment variable, which accepts values such as debug, info, warn, error, and fatal.
+
+LANGUAGE: env
+CODE:
+LOG_LEVEL=debug
+
+----------------------------------------
+
+TITLE: Embedding a Formbricks Contact Form in a Website
+DESCRIPTION: This code snippet demonstrates how to embed a Formbricks contact form into a webpage using the shareable link. It references an optional 'Embed Mode' toggle that can update the src parameter to '?embed=true' for a minimalist design without padding and background.
+
+LANGUAGE: html
+CODE:
+<Note>
+  Note: There is an options toggle button called "Embed Mode." When enabled, it
+  updates the `src` to `"?embed=true"` and displays your survey in a minimalist
+  design, removing padding and background for a cleaner look.
+</Note>
+
+----------------------------------------
+
+TITLE: Defining DELETE Endpoint for Survey Removal in OpenAPI
+DESCRIPTION: OpenAPI specification for the DELETE endpoint that allows removal of a specific survey by its ID. The endpoint follows the pattern '/api/v1/management/surveys/{surveyId}' where surveyId is a path parameter representing the unique identifier of the survey to be deleted.
+
+LANGUAGE: openapi
+CODE:
+openapi: delete /api/v1/management/surveys/{surveyId}
+
+----------------------------------------
+
+TITLE: Integrating FormbricksProvider in Next.js Root Layout
+DESCRIPTION: Code for including the FormbricksProvider in a Next.js app's root layout file. Uses Suspense to ensure client-side rendering.
+
+LANGUAGE: typescript
+CODE:
+// other imports
+import FormbricksProvider from "./formbricks";
+import { Suspense } from "react";
+
+export default function RootLayout({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
+  return (
+    <html lang="en">
+      <Suspense>
+        <FormbricksProvider />
+      </Suspense>
+      <body>{children}</body>
+    </html>
+  );
+}
+
+----------------------------------------
+
+TITLE: Updating Formbricks Docker Installation
+DESCRIPTION: Command to update Formbricks to the latest version from GitHub Container Registry and restart the containers.
+
+LANGUAGE: bash
+CODE:
+./formbricks.sh update
+
+----------------------------------------
+
+TITLE: Setting Custom Attribute with Generic Structure
+DESCRIPTION: This snippet shows the general pattern for setting a custom attribute in Formbricks with a key-value pair. The attribute key represents the category while the value contains the specific data.
+
+LANGUAGE: javascript
+CODE:
+formbricks.setAttribute("attribute_key", "attribute_value");
+
+----------------------------------------
+
+TITLE: Running Data Migrations for Formbricks v2.2
+DESCRIPTION: Commands to migrate database schema to Formbricks v2.2, which introduces XM research presets and a new product onboarding experience.
+
+LANGUAGE: bash
+CODE:
+docker pull ghcr.io/formbricks/data-migrations:v2.2 && \
+docker run --rm \
+  --network=formbricks_default \
+  -e DATABASE_URL="postgresql://postgres:postgres@postgres:5432/formbricks?schema=public" \
+  -e UPGRADE_TO_VERSION="v2.2" \
+  ghcr.io/formbricks/data-migrations:v2.2
+
+----------------------------------------
+
+TITLE: Configuring Google OAuth Environment Variables in Docker
+DESCRIPTION: Environment variables needed to integrate Google OAuth with Formbricks. These variables should be added to the .env file in your Docker setup directory.
+
+LANGUAGE: sh
+CODE:
+GOOGLE_CLIENT_ID=your-client-id-here
+GOOGLE_CLIENT_SECRET=your-client-secret-here
+
+----------------------------------------
+
+TITLE: Setting Single Custom Attribute in Formbricks
+DESCRIPTION: This code demonstrates how to set a single custom attribute for a user in Formbricks. Custom attributes allow for more targeted survey delivery based on user characteristics.
+
+LANGUAGE: javascript
+CODE:
+formbricks.setAttribute("Plan", "free");
+
+----------------------------------------
+
+TITLE: Configuring Formbricks API Environment ID for Testing
+DESCRIPTION: Code snippet showing how to replace the environment variables with actual environment ID values in the updateFeedback function for testing purposes.
+
+LANGUAGE: tsx
+CODE:
+  try {
+    const res = await fetch(
+		// Note that we also updated the API host to 'https://app.formbricks.com/'
+      `https:app.formbricks.com/api/v1/client/environments/clgwcwp4z000lpf0hur7uxbuv/responses/${responseId}`, // Note that we also updated the API host to 'https://app.formbricks.com/'
+}
+
+----------------------------------------
+
+TITLE: Overwriting Default CSS Styles for Formbricks Surveys
+DESCRIPTION: CSS variables that can be added to a global CSS file to customize the appearance of Formbricks surveys. These variables control colors for various UI elements including brand colors, text, borders, backgrounds, and interactive elements.
+
+LANGUAGE: css
+CODE:
+/* Overwrite Formbricks default styles */
+--fb-brand-color: red;
+--fb-brand-text-color: white;
+--fb-border-color: green;
+--fb-border-color-highlight: rgb(13, 13, 12);
+--fb-focus-color: red;
+--fb-heading-color: yellow;
+--fb-subheading-color: green;
+--fb-info-text-color: orange;
+--fb-signature-text-color: blue;
+--fb-survey-background-color: black;
+--fb-accent-background-color: rgb(13, 13, 12);
+--fb-accent-background-color-selected: red;
+--fb-placeholder-color: white;
+--fb-shadow-color: var(--fb-brand-color);
+--fb-rating-fill: rgb(13, 13, 12);
+--fb-rating-hover: green;
+--fb-back-btn-border: blue;
+--fb-submit-btn-border: transparent;
+--fb-rating-selected: black;
+
+----------------------------------------
+
+TITLE: Configuring Second Domain (Survey Domain) Environment Variables in Formbricks
+DESCRIPTION: Sets up the environment variables for a dual-domain configuration in Formbricks. This includes the main application URLs and a separate SURVEY_URL that will be used exclusively for serving surveys.
+
+LANGUAGE: bash
+CODE:
+WEBAPP_URL=https://formbricks.example.com
+NEXTAUTH_URL=https://formbricks.example.com
+SURVEY_URL=https://surveys.example.com
+
+----------------------------------------
+
+TITLE: Embedding Formbricks Survey with Statement Question Type
+DESCRIPTION: This code demonstrates how to embed a Formbricks survey that includes a Statement question type. The iframe is styled with specific dimensions, border properties, and overflow settings to ensure proper display within a webpage.
+
+LANGUAGE: jsx
+CODE:
+<iframe
+  title="Survey Embed"
+  src="https://app.formbricks.com/s/k3p7r7riyy504u4zziqat8zj"
+  style={{
+    position: "relative",
+    height: "90vh",
+    maxHeight: "100vh",
+    width: "100%",
+    border: 0,
+    borderRadius: "12px",
+    overflow: "auto",
+  }}
+/>
+
+----------------------------------------
+
+TITLE: Pulling Latest Formbricks Docker Images
+DESCRIPTION: Command to pull the latest version of Formbricks Docker images defined in the docker-compose file.
+
+LANGUAGE: bash
+CODE:
+docker compose pull
+
+----------------------------------------
+
+TITLE: Downloading Docker Compose File in Bash
+DESCRIPTION: Downloads the docker-compose.yml file from the Formbricks GitHub repository using curl.
+
+LANGUAGE: bash
+CODE:
+curl -o docker-compose.yml https://raw.githubusercontent.com/formbricks/formbricks/main/docker/docker-compose.yml
+
+----------------------------------------
+
+TITLE: Embedding a Formbricks Survey with JSX
+DESCRIPTION: This code snippet demonstrates how to embed a Formbricks survey using an iframe with custom styling in a JSX/React environment. The iframe is styled with specific dimensions, border properties, and overflow handling.
+
+LANGUAGE: jsx
+CODE:
+<iframe
+  title="Survey Embed"
+  src="https://app.formbricks.com/s/xtgmwxlk7jxxr4oi6ym7odki"
+  style={{
+    position: "relative",
+    height: "90vh",
+    maxHeight: "100vh",
+    width: "100%",
+    border: 0,
+    borderRadius: "12px",
+    overflow: "auto",
+  }}
+/>
+
+----------------------------------------
+
+TITLE: Installation Completion in Formbricks Setup
+DESCRIPTION: Shows the final message indicating that the Formbricks installation is complete. After providing all required information, users can visit their domain to access the Formbricks home wizard.
+
+LANGUAGE: bash
+CODE:
+🚀 Executing default step of installing Formbricks
+🧱 Welcome to the Formbricks Setup Script
+
+🛸 Fasten your seatbelts! We're setting up your Formbricks environment on your Ubuntu 24.04 LTS server.
+
+----------------------------------------
+
+TITLE: Embedding Formbricks Survey with Matrix Question in JSX
+DESCRIPTION: This code demonstrates how to embed a Formbricks survey with a Matrix question type into a web page using an iframe. The styling defines the iframe's appearance including height, width, border, and overflow handling.
+
+LANGUAGE: jsx
+CODE:
+<iframe
+  title="Survey Embed"
+  src="https://app.formbricks.com/s/obqeey0574jig4lo2gqyv51e"
+  style={{
+    position: "relative",
+    height: "90vh",
+    maxHeight: "100vh",
+    width: "100%",
+    border: 0,
+    borderRadius: "12px",
+    overflow: "auto",
+  }}
+/>
+
+----------------------------------------
+
+TITLE: Generating NextAuth Secret in Bash
+DESCRIPTION: Generates a random string using openssl and automatically inserts it as the NEXTAUTH_SECRET in the docker-compose.yml file using sed.
+
+LANGUAGE: bash
+CODE:
+sed -i "/NEXTAUTH_SECRET:$/s/NEXTAUTH_SECRET:.*/NEXTAUTH_SECRET: $(openssl rand -hex 32)/" docker-compose.yml
+
+----------------------------------------
+
+TITLE: Embedding a Formbricks Survey with Ranking Question in an iframe
+DESCRIPTION: This code demonstrates how to embed a Formbricks survey that includes a ranking question into a webpage using an iframe. The styling includes relative positioning, responsive height settings, and appropriate styling for seamless integration.
+
+LANGUAGE: jsx
+CODE:
+<iframe
+  title="Survey Embed"
+  src="https://app.formbricks.com/s/z6s84x9wbyk0yqqtfaz238px"
+  style={{
+    position: "relative",
+    height: "90vh",
+    maxHeight: "100vh",
+    width: "100%",
+    border: 0,
+    borderRadius: "12px",
+    overflow: "auto",
+  }}
+/>
+
+----------------------------------------
+
+TITLE: Installing Formbricks SDK with npm for React Native
+DESCRIPTION: Command to install the Formbricks React Native SDK using npm for React Native applications.
+
+LANGUAGE: bash
+CODE:
+npm install @formbricks/react-native
+
+----------------------------------------
+
+TITLE: Stopping Formbricks Docker Stack in Bash
+DESCRIPTION: Stops the running Formbricks Docker containers as part of the update process.
+
+LANGUAGE: bash
+CODE:
+docker compose down
+
+----------------------------------------
+
+TITLE: Embedding a Formbricks Survey with Net Promoter Score
+DESCRIPTION: HTML iframe code to embed a Formbricks survey that demonstrates the Net Promoter Score question type. The iframe is styled with CSS for responsive display.
+
+LANGUAGE: html
+CODE:
+<iframe
+  title="Survey Embed"
+  src="https://app.formbricks.com/s/vqmpasmnt5qcpsa4enheips0"
+  style={{
+    position: "relative",
+    height: "90vh",
+    maxHeight: "100vh",
+    width: "100%",
+    border: 0,
+    borderRadius: "12px",
+    overflow: "auto",
+  }}
+/>
+
+----------------------------------------
+
+TITLE: Initializing Formbricks JS Client (Old Approach v1.6.5)
+DESCRIPTION: Shows the deprecated method of initializing the Formbricks JavaScript client in version 1.6.5. This method uses a single entry point for all survey types.
+
+LANGUAGE: typescript
+CODE:
+import formbricks from "@formbricks/js";
+
+formbricks.init({
+  environmentId: "<environment-id>",
+  apiHost: "<api-host>",
+  userId: "<user-id>", // optional
+});
+
+----------------------------------------
+
+TITLE: Embedding a Formbricks Survey with Schedule Meeting Feature using JSX
+DESCRIPTION: This code snippet demonstrates how to embed a Formbricks survey with the Schedule A Meeting question type into a webpage using an iframe. The styling ensures the survey displays appropriately with proper dimensions and visual formatting.
+
+LANGUAGE: jsx
+CODE:
+<iframe
+  title="Survey Embed"
+  src="https://app.formbricks.com/s/hx08x27c2aghywh57rroe6fi"
+  style={{
+    position: "relative",
+    height: "90vh",
+    maxHeight: "100vh",
+    width: "100%",
+    border: 0,
+    borderRadius: "12px",
+    overflow: "auto",
+  }}
+/>
+
+----------------------------------------
+
+TITLE: Restarting Formbricks with Updated Image in Bash
+DESCRIPTION: Restarts the Formbricks stack with the updated Docker image in detached mode after completing the update process.
+
+LANGUAGE: bash
+CODE:
+docker compose up -d
+
+----------------------------------------
+
+TITLE: Embedding a Formbricks Survey in an iframe
+DESCRIPTION: Code for embedding a Formbricks survey as an iframe with responsive styling. The iframe is styled to take 90% of the viewport height with rounded corners and no border.
+
+LANGUAGE: jsx
+CODE:
+<iframe
+  title="Survey Embed"
+  src="https://app.formbricks.com/s/cm2b2eftv000012b0l3htbu0a"
+  style={{
+    position: "relative",
+    height: "90vh",
+    maxHeight: "100vh",
+    width: "100%",
+    border: 0,
+    borderRadius: "12px",
+    overflow: "auto",
+  }}
+/>
+
+----------------------------------------
+
+TITLE: Installing and Pinning Formbricks JS Client
+DESCRIPTION: NPM command to install and pin the Formbricks JavaScript client to version 1.6.5. This ensures compatibility with Formbricks v1.6.
+
+LANGUAGE: bash
+CODE:
+npm install @formbricks/js@~1.6.5
+
+----------------------------------------
+
+TITLE: Viewing Docker Compose Logs in Bash
+DESCRIPTION: Command to view the logs of the Formbricks container for debugging purposes. The '-f' flag follows the log output in real-time.
+
+LANGUAGE: bash
+CODE:
+docker compose logs -f
+
+----------------------------------------
+
+TITLE: Implementing Formbricks Survey Embed with JSX
+DESCRIPTION: Code for embedding a Formbricks survey with a specific consent form example (survey ID: orxp15pca6x2nfr3v8pttpwm). The iframe is styled with responsive dimensions and clean borders.
+
+LANGUAGE: jsx
+CODE:
+<iframe
+  title="Survey Embed"
+  src="https://app.formbricks.com/s/orxp15pca6x2nfr3v8pttpwm"
+  style={{
+    position: "relative",
+    height: "90vh",
+    maxHeight: "100vh",
+    width: "100%",
+    border: 0,
+    borderRadius: "12px",
+    overflow: "auto",
+  }}
+/>
+
+----------------------------------------
+
+TITLE: Embedding Formbricks Survey with JSX Inline Styling
+DESCRIPTION: This code snippet demonstrates how to embed a Formbricks survey into a webpage using an iframe with inline styling. The styling ensures responsive behavior with appropriate height, width, border, and overflow settings.
+
+LANGUAGE: jsx
+CODE:
+<iframe
+  title="Survey Embed"
+  src="https://app.formbricks.com/s/cx7u4n6hwvc3nztuk4vdezl9"
+  style={{
+    position: "relative",
+    height: "90vh",
+    maxHeight: "100vh",
+    width: "100%",
+    border: 0,
+    borderRadius: "12px",
+    overflow: "auto",
+  }}
+/>
+
+----------------------------------------
+
+TITLE: Installing Dependencies with PNPM in GitHub Codespaces
+DESCRIPTION: Command to install all project dependencies using the PNPM package manager.
+
+LANGUAGE: bash
+CODE:
+pnpm install
+
+----------------------------------------
+
+TITLE: Embedding Formbricks Survey in HTML/React
+DESCRIPTION: This code snippet demonstrates how to embed a Formbricks survey with an address question type into a webpage using an iframe. The styling includes settings for position, height, width, and appearance.
+
+LANGUAGE: html
+CODE:
+<iframe
+  title="Survey Embed"
+  src="https://app.formbricks.com/s/m8w91e8wi52pdao8un1f4twu"
+  style={{
+    position: "relative",
+    height: "90vh",
+    maxHeight: "100vh",
+    width: "100%",
+    border: 0,
+    borderRadius: "12px",
+    overflow: "auto",
+  }}
+/>
+
+----------------------------------------
+
+TITLE: Installing Project Dependencies with PNPM
+DESCRIPTION: Command to install all required project dependencies using the PNPM package manager.
+
+LANGUAGE: bash
+CODE:
+pnpm install
+
+----------------------------------------
+
+TITLE: Prefilling NPS Questions in Formbricks
+DESCRIPTION: Example URL for prefilling an NPS question with a value of 10. The query parameter uses the NPS question's ID as the key and the numeric rating (0-10) as the value.
+
+LANGUAGE: sh
+CODE:
+https://app.formbricks.com/s/clin3yxja52k8l80hpwmx4bjy?nps_question_id=10
+
+----------------------------------------
+
+TITLE: Prefilling Survey Data with URL Parameters in Formbricks
+DESCRIPTION: Example URL structure demonstrating how to prefill survey responses using query parameters. Each parameter uses the format 'questionId=answer' to populate answers automatically.
+
+LANGUAGE: sh
+CODE:
+https://app.formbricks.com/s/clin3dxja02k8l80hpwmx4bjy?question_id_1=answer_1&question_id_2=answer_2
+
+----------------------------------------
+
+TITLE: Creating Environment Configuration File
+DESCRIPTION: Command to create a .env file by copying the example template provided in the repository.
+
+LANGUAGE: bash
+CODE:
+cp .env.example .env
+
+----------------------------------------
+
+TITLE: Prefilling Rating Questions in Formbricks
+DESCRIPTION: Example URL for prefilling a rating question with a value of 5. The query parameter uses the rating question's ID as the key and the numeric rating as the value.
+
+LANGUAGE: sh
+CODE:
+https://app.formbricks.com/s/clin3yxja52k8l80hpwmx4bjy?rating_question_id=5
+
+----------------------------------------
+
+TITLE: Setting Up NodeJS Environment with NVM
+DESCRIPTION: Commands to install and use the Node.js version specified in the project's configuration using Node Version Manager (nvm).
+
+LANGUAGE: bash
+CODE:
+nvm install && nvm use
+
+----------------------------------------
+
+TITLE: Prefilling Open Text Questions in Formbricks
+DESCRIPTION: Example URL for prefilling an open text question. The query parameter uses the open text question's ID as the key and the URL-encoded text response as the value.
+
+LANGUAGE: sh
+CODE:
+https://app.formbricks.com/s/clin3yxja52k8l80hpwmx4bjy?openText_question_id=I%20love%20Formbricks
+
+----------------------------------------
+
+TITLE: Prefilling Consent Questions in Formbricks
+DESCRIPTION: Example URL for prefilling a Consent question with 'accepted' status. The query parameter uses the consent question's ID as the key, and valid values are 'accepted' or 'dismissed'.
+
+LANGUAGE: txt
+CODE:
+https://app.formbricks.com/s/clin3yxja52k8l80hpwmx4bjy?consent_question_id=accepted
+
+----------------------------------------
+
+TITLE: Starting Formbricks Development Environment
+DESCRIPTION: Command to start the Formbricks development setup which includes the application server and required services.
+
+LANGUAGE: bash
+CODE:
+pnpm go
+
+----------------------------------------
+
+TITLE: Configuring a Formbricks Link Survey URL with the startAt Parameter
+DESCRIPTION: This example shows the structure of a Formbricks survey URL with the startAt parameter configured to begin the survey at a specific question. The question ID is appended to the base survey URL as a query parameter.
+
+LANGUAGE: sh
+CODE:
+https://formbricks.com/clny997dj087ho30fdzyf4nkl?startAt=bqd29m94l9k0hnc3azbrexl8
+
+----------------------------------------
+
+TITLE: Installing Dependencies with pnpm
+DESCRIPTION: Command to install all required Node.js packages using the pnpm package manager.
+
+LANGUAGE: bash
+CODE:
+pnpm install
+
+----------------------------------------
+
+TITLE: Installing Formbricks SDK with pnpm for React Native
+DESCRIPTION: Command to install the Formbricks React Native SDK using pnpm for React Native applications.
+
+LANGUAGE: bash
+CODE:
+pnpm add @formbricks/react-native
+
+----------------------------------------
+
+TITLE: Initializing Formbricks App Surveys (New Approach v2.0.0+)
+DESCRIPTION: Shows how to initialize the Formbricks JavaScript client for in-app surveys in version 2.0.0 and above. Uses the dedicated app entry point which requires userId.
+
+LANGUAGE: typescript
+CODE:
+import formbricks from "@formbricks/js/app";
+
+formbricks.init({
+  environmentId: "<environment-id>",
+  apiHost: "<api-host>",
+  userId: "<user-id>", // required
+});
+
+----------------------------------------
+
+TITLE: Installing Formbricks JS Library with npm
+DESCRIPTION: Command to install the Formbricks JavaScript library using npm package manager. This is the first step in integrating Formbricks into your project.
+
+LANGUAGE: bash
+CODE:
+npm install -s @formbricks/js
+
+----------------------------------------
+
+TITLE: Integrating Formbricks with Vue Router
+DESCRIPTION: Code for integrating Formbricks with Vue Router to track route changes. Imports the Formbricks module and registers route change events.
+
+LANGUAGE: javascript
+CODE:
+// other imports
+import formbricks from "@/formbricks";
+
+const app = createApp(App);
+
+app.use(router);
+
+app.mount("#app");
+
+router.afterEach((to, from) => {
+  if (typeof formbricks !== "undefined") {
+    formbricks.registerRouteChange();
+  }
+});
+
+----------------------------------------
+
+TITLE: Installing Formbricks JS Package via npm
+DESCRIPTION: Command to install the Formbricks JavaScript library using npm package manager. This is the first step to integrate Formbricks into your project.
+
+LANGUAGE: bash
+CODE:
+npm install @formbricks/js
+
+----------------------------------------
+
+TITLE: Installing Formbricks SDK with pnpm for Vue.js
+DESCRIPTION: Command to install the Formbricks SDK using pnpm for Vue.js applications.
+
+LANGUAGE: bash
+CODE:
+pnpm add @formbricks/js
+
+----------------------------------------
+
+TITLE: Initializing Formbricks Website Surveys (New Approach v2.0.0+)
+DESCRIPTION: Demonstrates how to initialize the Formbricks JavaScript client for website surveys in version 2.0.0 and above. Uses the dedicated website entry point.
+
+LANGUAGE: typescript
+CODE:
+import formbricks from "@formbricks/js/website";
+
+formbricks.init({
+  environmentId: "<environment-id>",
+  apiHost: "<api-host>",
+  // userId is not supported here
+});
+
+----------------------------------------
+
+TITLE: Configuring Formbricks SDK in iOS Application
+DESCRIPTION: Sets up the Formbricks SDK with required configuration parameters. The code initializes a FormbricksConfig object using the Builder pattern with mandatory app URL and environment ID values, and sets the log level to debug.
+
+LANGUAGE: swift
+CODE:
+let config = FormbricksConfig.Builder(appUrl: "[APP_URL]", environmentId: "[ENVIRONMENT_ID]")
+    .setLogLevel(.debug)
+    .build()
+
+----------------------------------------
+
+TITLE: Installing Formbricks SDK with pnpm for Next.js
+DESCRIPTION: Command to install the Formbricks SDK and its peer dependency zod using pnpm for Next.js applications.
+
+LANGUAGE: bash
+CODE:
+pnpm add @formbricks/js zod
+
+----------------------------------------
+
+TITLE: Initializing Formbricks SDK Configuration in Android
+DESCRIPTION: Sets up the Formbricks SDK configuration using a builder pattern. Requires API host and environment ID parameters, with optional logging and fragment manager settings.
+
+LANGUAGE: kotlin
+CODE:
+val config = FormbricksConfig.Builder("[API_HOST]", "[ENVIRONMENT_ID]")
+    .setLoggingEnabled(true)
+    .setFragmentManager(supportFragmentManager)
+
+----------------------------------------
+
+TITLE: Configuring Formbricks API Survey ID for Testing
+DESCRIPTION: Code snippet showing how to replace the environment variables with actual survey ID values for testing the feedback functionality before production deployment.
+
+LANGUAGE: tsx
+CODE:
+  const payload = {
+    response: response_data,
+    surveyId: clgwfv4a7002el50ihyuss38x, // This is an example, replace with yours
+  };
+
+  try {
+    const res = await fetch(
+			// Note that we also updated the API host to 'https://app.formbricks.com/'
+      `https:app.formbricks.com/api/v1/client/environments/clgwcwp4z000lpf0hur7uxbuv/responses`,
+  };
+
+----------------------------------------
+
+TITLE: Running Data Migration to v2.1
+DESCRIPTION: Executes the data migration process to upgrade the database schema to v2.1. This command pulls the migration image and runs it within the Formbricks network, connecting to the Postgres database.
+
+LANGUAGE: bash
+CODE:
+docker pull ghcr.io/formbricks/data-migrations:v2.1.0 && \
+docker run --rm \
+  --network=formbricks_default \
+  -e DATABASE_URL="postgresql://postgres:postgres@postgres:5432/formbricks?schema=public" \
+  -e UPGRADE_TO_VERSION="v2.1" \
+  ghcr.io/formbricks/data-migrations:v2.1.0
+
+----------------------------------------
+
+TITLE: Cloning and Navigating to the Formbricks Repository
+DESCRIPTION: Commands to clone the Formbricks repository from GitHub and navigate to the docs folder where the documentation is located.
+
+LANGUAGE: bash
+CODE:
+git clone https://github.com/formbricks/formbricks.git
+cd formbricks/docs
+
+----------------------------------------
+
+TITLE: CSS Selector for Feedback Button Trigger in Formbricks
+DESCRIPTION: Example CSS selector (#feedback-button) that can be used to trigger a Feedback Box when a user clicks on the element with this ID.
+
+LANGUAGE: html
+CODE:
+#feedback-button
+
+----------------------------------------
+
+TITLE: Deploying Formbricks on Zeabur with One-Click
+DESCRIPTION: A button link for deploying Formbricks on Zeabur platform with a single click. This provides another self-hosting deployment option for users.
+
+LANGUAGE: markdown
+CODE:
+[![Deploy to Zeabur](https://zeabur.com/button.svg)](https://zeabur.com/templates/G4TUJL)
+
+----------------------------------------
+
+TITLE: Viewing Formbricks Docker Logs
+DESCRIPTION: Command to check the logs of Formbricks containers for debugging purposes.
+
+LANGUAGE: bash
+CODE:
+./formbricks.sh logs
+
+----------------------------------------
+
+TITLE: Starting Formbricks with Latest Version
+DESCRIPTION: Launches the Formbricks containers with the latest version in detached mode. This restarts the application with the updated images.
+
+LANGUAGE: bash
+CODE:
+docker compose up -d
+
+----------------------------------------
+
+TITLE: Opening Formbricks in Gitpod for Development
+DESCRIPTION: A button link that opens the Formbricks repository in Gitpod, creating a fully configured workspace in the browser with all necessary dependencies installed for development purposes.
+
+LANGUAGE: markdown
+CODE:
+[![Open in Gitpod](https://gitpod.io/button/open-in-gitpod.svg)](https://gitpod.io/#https://github.com/formbricks/formbricks)
+
+----------------------------------------
+
+TITLE: Restarting Formbricks Docker Services
+DESCRIPTION: Command to restart all Formbricks-related containers and bring up the entire stack with the previous configuration.
+
+LANGUAGE: bash
+CODE:
+./formbricks.sh restart
+
+----------------------------------------
+
+TITLE: Installing Formbricks React Native SDK with npm
+DESCRIPTION: Command to install the Formbricks React Native SDK package using npm. This is the first step required to integrate Formbricks into a React Native application.
+
+LANGUAGE: bash
+CODE:
+npm install @formbricks/react-native
+
+----------------------------------------
+
+TITLE: Stopping Formbricks Docker Services
+DESCRIPTION: Command to stop all Formbricks-related containers and bring down the entire stack.
+
+LANGUAGE: bash
+CODE:
+./formbricks.sh stop
+
+----------------------------------------
+
+TITLE: Backing up Postgres Database in Formbricks v2.2 Migration
+DESCRIPTION: Command to backup the Formbricks Postgres database to a dump file with timestamp before migrating to v2.2.
+
+LANGUAGE: bash
+CODE:
+docker exec formbricks-postgres-1 pg_dump -Fc -U postgres -d formbricks > formbricks_pre_v2.2_$(date +%Y%m%d_%H%M%S).dump
+
+----------------------------------------
+
+TITLE: Integrating Formbricks SDK with HTML using Script Tag
+DESCRIPTION: A simple script tag implementation for adding Formbricks to an HTML page. This code initializes the Formbricks SDK with your environment ID and application URL.
+
+LANGUAGE: javascript
+CODE:
+<!-- START Formbricks Surveys -->
+<script type="text/javascript">
+!function(){
+    var appUrl = "https://app.formbricks.com";
+    var environmentId = "<your-environment-id>";
+    var t=document.createElement("script");t.type="text/javascript",t.async=!0,t.src=appUrl+"/js/formbricks.umd.cjs";var e=document.getElementsByTagName("script")[0];e.parentNode.insertBefore(t,e),setTimeout(function(){window.formbricks.setup({environmentId: environmentId, appUrl: appUrl})},500)}();
+</script>
+<!-- END Formbricks Surveys -->
+
+----------------------------------------
+
+TITLE: Email Address Prompt for SSL Certificate in Formbricks Setup
+DESCRIPTION: Shows the prompt asking users to provide an email address for registering the SSL certificate. This email will receive notifications regarding the certificate status and renewals.
+
+LANGUAGE: bash
+CODE:
+🚀 Executing default step of installing Formbricks
+🧱 Welcome to the Formbricks Setup Script
+
+🛸 Fasten your seatbelts! We're setting up your Formbricks environment on your Ubuntu 24.04 LTS server.
+
+🧹 Time to sweep away any old Docker installations.
+🔄 Updating your package list.
+📦 Installing the necessary dependencies.
+🔑 Adding Docker's official GPG key and setting up the stable repository.
+File '/etc/apt/keyrings/docker.gpg' exists. Overwrite? (y/N) y
+🔄 Updating your package list again.
+🐳 Installing Docker.
+🚀 Testing your Docker installation.
+🎉 Docker is installed!
+🐳 Adding your user to the Docker group to avoid using sudo with docker commands.
+🎉 Hooray! Docker is all set and ready to go. You're now ready to run your Formbricks instance!
+📁 Created Formbricks Quickstart directory at ./formbricks.
+🔗 Please enter your domain name for the SSL certificate (🚨 do NOT enter the protocol (http/https/etc)):
+my.hosted.url.com
+🔗 Do you want us to set up an HTTPS certificate for you? [Y/n]
+Y
+🔗 Please make sure that the domain points to the server's IP address and that ports 80 & 443 are open in your server's firewall. Is everything set up? [Y/n]
+Y
+💡 Please enter your email address for the SSL certificate:
+
+----------------------------------------
+
+TITLE: Installing Formbricks SDK with pnpm for React.js
+DESCRIPTION: Command to install the Formbricks SDK and its peer dependency zod using pnpm for React.js applications.
+
+LANGUAGE: bash
+CODE:
+pnpm add @formbricks/js zod
+
+----------------------------------------
+
+TITLE: DNS Setup Confirmation in Formbricks Installation
+DESCRIPTION: Displays the prompt asking users to confirm their DNS is correctly configured with ports 80 and 443 open. This is crucial for proper SSL certificate issuance and secure server access.
+
+LANGUAGE: bash
+CODE:
+🚀 Executing default step of installing Formbricks
+🧱 Welcome to the Formbricks Setup Script
+
+🛸 Fasten your seatbelts! We're setting up your Formbricks environment on your Ubuntu 24.04 LTS server.
+
+🧹 Time to sweep away any old Docker installations.
+🔄 Updating your package list.
+📦 Installing the necessary dependencies.
+🔑 Adding Docker's official GPG key and setting up the stable repository.
+File '/etc/apt/keyrings/docker.gpg' exists. Overwrite? (y/N) y
+🔄 Updating your package list again.
+🐳 Installing Docker.
+🚀 Testing your Docker installation.
+🎉 Docker is installed!
+🐳 Adding your user to the Docker group to avoid using sudo with docker commands.
+🎉 Hooray! Docker is all set and ready to go. You're now ready to run your Formbricks instance!
+📁 Created Formbricks Quickstart directory at ./formbricks.
+🔗 Please enter your domain name for the SSL certificate (🚨 do NOT enter the protocol (http/https/etc)):
+my.hosted.url.com
+🔗 Do you want us to set up an HTTPS certificate for you? [Y/n]
+Y
+🔗 Please make sure that the domain points to the server's IP address and that ports 80 & 443 are open in your server's firewall. Is everything set up? [Y/n]
+
+----------------------------------------
+
+TITLE: Stopping Formbricks Containers
+DESCRIPTION: Command to stop running Formbricks containers and remove them before upgrading to a new version.
+
+LANGUAGE: bash
+CODE:
+docker compose down
+
+----------------------------------------
+
+TITLE: Initializing Formbricks in React.js App
+DESCRIPTION: Code for initializing the Formbricks SDK in a React.js application. The setup is done client-side with environment ID and app URL configuration.
+
+LANGUAGE: javascript
+CODE:
+// other imports
+import formbricks from "@formbricks/js";
+
+if (typeof window !== "undefined") {
+  formbricks.setup({
+    environmentId: "<environment-id>",
+    appUrl: "<app-url>",
+  });
+}
+
+function App() {
+  // your own app
+}
+
+export default App;
+
+----------------------------------------
+
+TITLE: HTTPS Certificate Setup Prompt in Formbricks Installation
+DESCRIPTION: Shows the prompt asking users if they want to set up an HTTPS certificate for their domain. This is highly recommended for secure access to the Formbricks instance.
+
+LANGUAGE: bash
+CODE:
+🚀 Executing default step of installing Formbricks
+🧱 Welcome to the Formbricks Setup Script
+
+🛸 Fasten your seatbelts! We're setting up your Formbricks environment on your Ubuntu 24.04 LTS server.
+
+🧹 Time to sweep away any old Docker installations.
+🔄 Updating your package list.
+📦 Installing the necessary dependencies.
+🔑 Adding Docker's official GPG key and setting up the stable repository.
+File '/etc/apt/keyrings/docker.gpg' exists. Overwrite? (y/N) y
+🔄 Updating your package list again.
+🐳 Installing Docker.
+🚀 Testing your Docker installation.
+🎉 Docker is installed!
+🐳 Adding your user to the Docker group to avoid using sudo with docker commands.
+🎉 Hooray! Docker is all set and ready to go. You're now ready to run your Formbricks instance!
+📁 Created Formbricks Quickstart directory at ./formbricks.
+🔗 Please enter your domain name for the SSL certificate (🚨 do NOT enter the protocol (http/https/etc)):
+my.hosted.url.com
+🔗 Do you want us to set up an HTTPS certificate for you? [Y/n]
+
+----------------------------------------
+
+TITLE: Installing Formbricks SDK with npm for Next.js
+DESCRIPTION: Command to install the Formbricks SDK and its peer dependency zod using npm for Next.js applications.
+
+LANGUAGE: bash
+CODE:
+npm install @formbricks/js zod
+
+----------------------------------------
+
+TITLE: Generating Cron Secret in Bash
+DESCRIPTION: Generates a random string using openssl and sets it as the CRON_SECRET in the docker-compose.yml file using sed. This secret is used to secure API access for running cron jobs.
+
+LANGUAGE: bash
+CODE:
+sed -i "/CRON_SECRET:$/s/CRON_SECRET:.*/CRON_SECRET: $(openssl rand -hex 32)/" docker-compose.yml
+
+----------------------------------------
+
+TITLE: Backing up Postgres Database in Formbricks v2.4 Migration
+DESCRIPTION: Command to backup the Formbricks Postgres database to a dump file with timestamp before migrating to v2.4. This creates a backup in Postgres custom format.
+
+LANGUAGE: bash
+CODE:
+docker exec formbricks-postgres-1 pg_dump -Fc -U postgres -d formbricks > formbricks_pre_v2.4_$(date +%Y%m%d_%H%M%S).dump
+
+----------------------------------------
+
+TITLE: Initializing Formbricks in Next.js Pages Directory
+DESCRIPTION: Code for integrating Formbricks in a Next.js app using the Pages Directory structure. Connects the Next.js router to Formbricks for route change tracking.
+
+LANGUAGE: javascript
+CODE:
+// other import
+import { useRouter } from "next/router";
+import { useEffect } from "react";
+import formbricks from "@formbricks/js";
+
+if (typeof window !== "undefined") {
+  formbricks.setup({
+    environmentId: "<environment-id>",
+    appUrl: "<app-url>",
+  });
+}
+
+export default function App({ Component, pageProps }: AppProps) {
+  const router = useRouter();
+
+  useEffect(() => {
+    // Connect next.js router to Formbricks
+    const handleRouteChange = formbricks?.registerRouteChange;
+    router.events.on("routeChangeComplete", handleRouteChange);
+
+    return () => {
+      router.events.off("routeChangeComplete", handleRouteChange);
+    };
+  }, []);
+  return <Component {...pageProps} />;
+}
+
+----------------------------------------
+
+TITLE: Configuring AWS SES SMTP for Formbricks
+DESCRIPTION: AWS SES (Simple Email Service) specific SMTP configuration for Formbricks. This setup uses AWS SES credentials to authenticate with Amazon's email service.
+
+LANGUAGE: bash
+CODE:
+MAIL_FROM=noreply@yourdomain.com
+MAIL_FROM_NAME=Formbricks
+SMTP_HOST=email-smtp.us-east-1.amazonaws.com
+SMTP_PORT=587
+SMTP_USER=your_ses_access_key
+SMTP_PASSWORD=your_ses_secret_key
+
+----------------------------------------
+
+TITLE: Installing Formbricks SDK with npm for Vue.js
+DESCRIPTION: Command to install the Formbricks SDK using npm for Vue.js applications.
+
+LANGUAGE: bash
+CODE:
+npm install @formbricks/js
+
+----------------------------------------
+
+TITLE: Configuring Traefik Entry Points (YAML)
+DESCRIPTION: YAML configuration for Traefik to define HTTP to HTTPS redirections and secure entry points.
+
+LANGUAGE: yaml
+CODE:
+entryPoints:
+  web:
+    address: ":80"
+    http:
+      redirections:
+        entryPoint:
+          to: websecure
+          scheme: https
+          permanent: true
+  websecure:
+    address: ":443"
+
+providers:
+  docker:
+    watch: true
+    exposedByDefault: false
+  file:
+    directory: /etc/traefik/dynamic
+
+----------------------------------------
+
+TITLE: Backing Up PostgreSQL Database Before v2.5 Migration in Bash
+DESCRIPTION: Command to backup a Formbricks PostgreSQL database before migrating to v2.5. Creates a compressed custom-format dump file with a timestamp in the filename.
+
+LANGUAGE: bash
+CODE:
+docker exec formbricks-postgres-1 pg_dump -Fc -U postgres -d formbricks > formbricks_pre_v2.5_$(date +%Y%m%d_%H%M%S).dump
+
+----------------------------------------
+
+TITLE: Installing Formbricks SDK with yarn for Vue.js
+DESCRIPTION: Command to install the Formbricks SDK using yarn for Vue.js applications.
+
+LANGUAGE: bash
+CODE:
+yarn add @formbricks/js
+
+----------------------------------------
+
+TITLE: Creating SSL Certificate Directory (Bash)
+DESCRIPTION: Bash commands to create a 'certs' directory and move custom SSL certificate files into it.
+
+LANGUAGE: bash
+CODE:
+mkdir certs
+# Move your SSL certificate files to the certs folder
+mv /path/to/your/fullchain.crt certs/
+mv /path/to/your/cert.key certs/
+
+----------------------------------------
+
+TITLE: Creating Formbricks Module for Vue.js
+DESCRIPTION: Module file for initializing Formbricks in a Vue.js application. Sets up the SDK with environment ID and app URL.
+
+LANGUAGE: javascript
+CODE:
+import formbricks from "@formbricks/js";
+
+if (typeof window !== "undefined") {
+  formbricks.setup({
+    environmentId: "<environment-id>",
+    appUrl: "<app-url>",
+  });
+}
+
+export default formbricks;
+
+----------------------------------------
+
+TITLE: Navigating to Formbricks Directory (Bash)
+DESCRIPTION: A simple bash command to change to the formbricks directory where configuration will take place.
+
+LANGUAGE: bash
+CODE:
+cd formbricks
+
+----------------------------------------
+
+TITLE: Backing Up PostgreSQL Database Before v2.6 Migration in Bash
+DESCRIPTION: Command to backup a Formbricks PostgreSQL database before migrating to v2.6. Creates a compressed custom-format dump file with a timestamp in the filename.
+
+LANGUAGE: bash
+CODE:
+docker exec formbricks-postgres-1 pg_dump -Fc -U postgres -d formbricks > formbricks_pre_v2.6_$(date +%Y%m%d_%H%M%S).dump
+
+----------------------------------------
+
+TITLE: Installing Formbricks SDK with yarn for React Native
+DESCRIPTION: Command to install the Formbricks React Native SDK using yarn for React Native applications.
+
+LANGUAGE: bash
+CODE:
+yarn add @formbricks/react-native
+
+----------------------------------------
+
+TITLE: Adding Google OAuth Environment Variables to a Running Container
+DESCRIPTION: Commands to add Google OAuth environment variables directly to a running Docker container. This is an alternative to updating the .env file if your container is already running.
+
+LANGUAGE: sh
+CODE:
+docker exec -it container_id /bin/bash
+export GOOGLE_CLIENT_ID=your-client-id-here
+export GOOGLE_CLIENT_SECRET=your-client-secret-here
+exit
+
+----------------------------------------
+
+TITLE: Embedding Formbricks Survey with Contact Info Question Type
+DESCRIPTION: This code demonstrates how to embed a Formbricks survey containing a Contact Info question type using an iframe with custom styling for responsive display.
+
+LANGUAGE: jsx
+CODE:
+<iframe
+  title="Survey Embed"
+  src="https://app.formbricks.com/s/z2zjoonfeythx5n6z5qijbsg"
+  style={{
+    position: "relative",
+    height: "90vh",
+    maxHeight: "100vh",
+    width: "100%",
+    border: 0,
+    borderRadius: "12px",
+    overflow: "auto",
+  }}
+/>
+
+----------------------------------------
+
+TITLE: Running Data Migration to v1.6
+DESCRIPTION: Executes the data migration process to upgrade the database schema to v1.6. Runs the migration container with environment variables for database connection and version target.
+
+LANGUAGE: bash
+CODE:
+docker run --rm \
+  --network=formbricks_default \
+  -e DATABASE_URL="postgresql://postgres:postgres@postgres:5432/formbricks?schema=public" \
+  -e UPGRADE_TO_VERSION="v1.6" \
+  ghcr.io/formbricks/data-migrations:v1.6.1
+
+----------------------------------------
+
+TITLE: Running Data Migration for v2.7 in Bash
+DESCRIPTION: Command sequence to pull and run the data migration Docker container for v2.7. This migrates the database schema to be compatible with the latest version.
+
+LANGUAGE: bash
+CODE:
+docker pull ghcr.io/formbricks/data-migrations:latest && \
+docker run --rm \
+  --network=formbricks_default \
+  -e DATABASE_URL="postgresql://postgres:postgres@postgres:5432/formbricks?schema=public" \
+  -e UPGRADE_TO_VERSION="v2.7" \
+  ghcr.io/formbricks/data-migrations:v2.7.0
+
+----------------------------------------
+
+TITLE: Embedding a Formbricks Survey with Date Question Type
+DESCRIPTION: This code snippet demonstrates how to embed a Formbricks survey that contains a Date question type into a web page using an iframe. The styling includes responsive height, width, and border properties to ensure proper display.
+
+LANGUAGE: jsx
+CODE:
+<iframe
+  title="Survey Embed"
+  src="https://app.formbricks.com/s/rk844spc8ffls25vzkxzzhse"
+  style={{
+    position: "relative",
+    height: "90vh",
+    maxHeight: "100vh",
+    width: "100%",
+    border: 0,
+    borderRadius: "12px",
+    overflow: "auto",
+  }}
+/>
+
+----------------------------------------
+
+TITLE: Backing up Postgres Database for v2.0 Migration
+DESCRIPTION: Creates a backup of the Formbricks PostgreSQL database before migration to v2.0. Uses pg_dump to create a custom-format backup file with timestamp.
+
+LANGUAGE: bash
+CODE:
+docker exec formbricks-postgres-1 pg_dump -Fc -U postgres -d formbricks > formbricks_pre_v2.0_$(date +%Y%m%d_%H%M%S).dump
+
+----------------------------------------
+
+TITLE: Embedding a Formbricks Survey with File Upload in React/JSX
+DESCRIPTION: This code snippet demonstrates how to embed a Formbricks survey that contains a File Upload question type using an iframe in a React/JSX application. The iframe is styled with specific dimensions and appearance properties.
+
+LANGUAGE: jsx
+CODE:
+<iframe
+  title="Survey Embed"
+  src="https://app.formbricks.com/s/oo4e6vva48w0trn01ht8krwo"
+  style={{
+    position: "relative",
+    height: "90vh",
+    maxHeight: "100vh",
+    width: "100%",
+    border: 0,
+    borderRadius: "12px",
+    overflow: "auto",
+  }}
+/>
+
+----------------------------------------
+
+TITLE: Backing up Postgres Database for Formbricks Migration
+DESCRIPTION: Creates a backup of the Formbricks PostgreSQL database before migration. The command uses pg_dump to create a custom-format backup file with a timestamp in the filename.
+
+LANGUAGE: bash
+CODE:
+docker exec formbricks-postgres-1 pg_dump -Fc -U postgres -d formbricks > formbricks_pre_v2.1_$(date +%Y%m%d_%H%M%S).dump
+
+----------------------------------------
+
+TITLE: Stopping Formbricks Containers in Bash
+DESCRIPTION: Command to stop running Formbricks containers and remove them. This step is necessary before starting containers with the new version.
+
+LANGUAGE: bash
+CODE:
+docker compose down
+
+----------------------------------------
+
+TITLE: Embedding a Formbricks Survey in JSX/React
+DESCRIPTION: Code snippet showing how to embed a Formbricks survey using an iframe in a React/JSX component. The iframe is styled with specific dimensions, no border, rounded corners, and overflow settings to create a clean integration.
+
+LANGUAGE: jsx
+CODE:
+<iframe
+  title="Survey Embed"
+  src="https://app.formbricks.com/s/jhyo6lwzf6eh3fyplhlp7h5f"
+  style={{
+    position: "relative",
+    height: "90vh",
+    maxHeight: "100vh",
+    width: "100%",
+    border: 0,
+    borderRadius: "12px",
+    overflow: "auto",
+  }}
+/>
+
+----------------------------------------
+
+TITLE: Running Data Migrations for Formbricks v2.3
+DESCRIPTION: Commands to migrate database schema to Formbricks v2.3, focusing on Chinese language support updates.
+
+LANGUAGE: bash
+CODE:
+docker pull ghcr.io/formbricks/data-migrations:v2.3.0 && \
+docker run --rm \
+  --network=formbricks_default \
+  -e DATABASE_URL="postgresql://postgres:postgres@postgres:5432/formbricks?schema=public" \
+  -e UPGRADE_TO_VERSION="v2.3" \
+  ghcr.io/formbricks/data-migrations:v2.3.0
+
+----------------------------------------
+
+TITLE: Embedding a Formbricks Survey with JSX styling
+DESCRIPTION: An iframe code snippet used to embed a Formbricks survey into a web page. The styling includes properties for positioning, height, width, border, border radius, and overflow handling to ensure proper display of the survey.
+
+LANGUAGE: jsx
+CODE:
+<iframe
+  title="Survey Embed"
+  src="https://app.formbricks.com/s/wybd3v3cxpdfve4472fu3lhi"
+  style={{
+    position: "relative",
+    height: "90vh",
+    maxHeight: "100vh",
+    width: "100%",
+    border: 0,
+    borderRadius: "12px",
+    overflow: "auto",
+  }}
+/>
+
+----------------------------------------
+
+TITLE: Backing up Postgres Database in Formbricks v2.3 Migration
+DESCRIPTION: Command to backup the Formbricks Postgres database to a dump file with timestamp before migrating to v2.3.
+
+LANGUAGE: bash
+CODE:
+docker exec formbricks-postgres-1 pg_dump -Fc -U postgres -d formbricks > formbricks_pre_v2.3_$(date +%Y%m%d_%H%M%S).dump
+
+----------------------------------------
+
+TITLE: Backing up PostgreSQL Database for Formbricks v3.0 Migration
+DESCRIPTION: Command to create a backup of the Formbricks database before upgrading to v3.0. This uses pg_dump to create a custom-format backup file with a timestamp in the filename.
+
+LANGUAGE: bash
+CODE:
+docker exec formbricks-postgres-1 pg_dump -Fc -U postgres -d formbricks > formbricks_pre_v3.0_$(date +%Y%m%d_%H%M%S).dump
+
+----------------------------------------
+
+TITLE: Prefilling Single Select Questions in Formbricks
+DESCRIPTION: Example URL for prefilling a single select (radio) question. The query parameter uses the question ID as the key and the URL-encoded option text as the value, which must match an option exactly.
+
+LANGUAGE: sh
+CODE:
+https://app.formbricks.com/s/clin3yxja52k8l80hpwmx4bjy?single_select_question_id=Very%20disappointed
+
+----------------------------------------
+
+TITLE: Running Data Migration for v2.5 in Bash
+DESCRIPTION: Command sequence to pull and run the data migration Docker container for v2.5. This migrates the database schema to be compatible with v2.5.
+
+LANGUAGE: bash
+CODE:
+docker pull ghcr.io/formbricks/data-migrations:latest && \
+docker run --rm \
+  --network=formbricks_default \
+  -e DATABASE_URL="postgresql://postgres:postgres@postgres:5432/formbricks?schema=public" \
+  -e UPGRADE_TO_VERSION="v2.5" \
+  ghcr.io/formbricks/data-migrations:v2.5.3
+
+----------------------------------------
+
+TITLE: Prefilling CTA Questions in Formbricks
+DESCRIPTION: Example URL for prefilling a CTA question with 'clicked' status. The query parameter uses the CTA question's ID as the key, and valid values are 'clicked' or 'dismissed'.
+
+LANGUAGE: txt
+CODE:
+https://app.formbricks.com/s/clin3yxja52k8l80hpwmx4bjy?cta_question_id=clicked
+
+----------------------------------------
+
+TITLE: Pulling Latest Formbricks Docker Images in Bash
+DESCRIPTION: Command to pull the latest Formbricks Docker images before migration. This ensures you have the most recent version of Formbricks containers.
+
+LANGUAGE: bash
+CODE:
+docker compose pull
+
+----------------------------------------
+
+TITLE: Updating Formbricks Docker Container to v3.3
+DESCRIPTION: Series of Docker commands to update a self-hosted Formbricks installation to version 3.3. The process includes pulling the latest image, stopping existing containers, and restarting with the updated version.
+
+LANGUAGE: bash
+CODE:
+docker compose pull
+
+LANGUAGE: bash
+CODE:
+docker compose down
+
+LANGUAGE: bash
+CODE:
+docker compose up -d
+
+----------------------------------------
+
+TITLE: Prefilling Picture Selection Questions in Formbricks
+DESCRIPTION: Example URL for prefilling a Picture Selection question with selected image indexes. The query parameter uses the question ID as the key and comma-separated indexes (starting from 1) as the value.
+
+LANGUAGE: txt
+CODE:
+https://app.formbricks.com/s/clin3yxja52k8l80hpwmx4bjy?pictureSelection_question_id=1%2C2%2C3
+
+----------------------------------------
+
+TITLE: Updating Docker Compose Configuration for pgvector in YAML
+DESCRIPTION: YAML configuration for updating the Postgres database service in docker-compose.yml to use pgvector/pgvector:pg15 instead of postgres:15-alpine. This update is required for the v2.7 migration.
+
+LANGUAGE: yaml
+CODE:
+services:
+  postgres:
+    image: pgvector/pgvector:pg15
+    volumes:
+      - postgres:/var/lib/postgresql/data
+    environment:
+      - POSTGRES_DB=postgres
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=postgres
+    ports:
+      - 5432:5432
+
+----------------------------------------
+
+TITLE: Setting Single Hidden Field in Link Surveys
+DESCRIPTION: Example of how to add a single hidden field ('screen') to a Formbricks survey link. This approach passes additional data to the survey without requiring user input.
+
+LANGUAGE: bash
+CODE:
+sh https://formbricks.com/clin3dxja02k8l80hpwmx4bjy?screen=pricing
+
+----------------------------------------
+
+TITLE: Backing Up PostgreSQL Database Before v2.7 Migration in Bash
+DESCRIPTION: Command to backup a Formbricks PostgreSQL database before migrating to v2.7. Creates a compressed custom-format dump file with a timestamp in the filename.
+
+LANGUAGE: bash
+CODE:
+docker exec formbricks-postgres-1 pg_dump -Fc -U postgres -d formbricks > formbricks_pre_v2.7_$(date +%Y%m%d_%H%M%S).dump
+
+----------------------------------------
+
+TITLE: Restoring Database After Failed Upgrade
+DESCRIPTION: Command to restore the PostgreSQL database from a backup file after a failed upgrade attempt. This uses pg_restore to clean and rebuild the database from the backup dump.
+
+LANGUAGE: bash
+CODE:
+docker exec -i formbricks-quickstart-postgres-1 pg_restore --clean -U postgres -v -d formbricks < formbricks_pre_v1.6_<timestamp_of_your_dump_file>.dump
+
+----------------------------------------
+
+TITLE: Setting User ID in Formbricks JavaScript SDK
+DESCRIPTION: This snippet shows how to identify a user in Formbricks by setting a unique user ID. The ID should be a unique string such as a database ID or email address, which can also be anonymized as long as it remains unique per user.
+
+LANGUAGE: javascript
+CODE:
+formbricks.setUserId("<user-id>");
+
+----------------------------------------
+
+TITLE: Backing up PostgreSQL Database for Formbricks v3.3 Migration
+DESCRIPTION: Command to create a backup of the Formbricks database before upgrading to v3.3. This uses pg_dump to create a custom-format backup file with a timestamp in the filename.
+
+LANGUAGE: bash
+CODE:
+docker exec formbricks-postgres-1 pg_dump -Fc -U postgres -d formbricks > formbricks_pre_v3.3_$(date +%Y%m%d_%H%M%S).dump
+
+----------------------------------------
+
+TITLE: Creating an iframe for Survey Embed in JSX/React
+DESCRIPTION: This code snippet demonstrates how to embed a Formbricks survey using an iframe in a React/JSX context. The iframe is styled with specific dimensions, border properties, and overflow behavior to ensure proper display within the page.
+
+LANGUAGE: jsx
+CODE:
+<iframe
+  title="Survey Embed"
+  src="https://app.formbricks.com/s/cm393eiiq0001kxphzc6lbbku"
+  style={{
+    position: "relative",
+    height: "90vh",
+    maxHeight: "100vh",
+    width: "100%",
+    border: 0,
+    borderRadius: "12px",
+    overflow: "auto",
+  }}
+/>
+
+----------------------------------------
+
+TITLE: ESLint Configuration for Library Packages in Formbricks
+DESCRIPTION: This ESLint configuration extends Vercel's style guide and is used for library packages in the Formbricks project. It includes Node.js and TypeScript-specific rules.
+
+LANGUAGE: javascript
+CODE:
+extends: [
+"@vercel/style-guide/eslint/node",
+"@vercel/style-guide/eslint/typescript"
+]
+
+----------------------------------------
+
+TITLE: Updating Formbricks Docker Image in Bash
+DESCRIPTION: Command to pull the latest Formbricks Docker image as part of the update process.
+
+LANGUAGE: bash
+CODE:
+docker compose pull
+
+----------------------------------------
+
+TITLE: Adding Source Parameter to Formbricks Survey URL
+DESCRIPTION: Demonstrates how to append a source parameter to a Formbricks survey URL to track where respondents are coming from. This example shows tracking a respondent coming from Google.
+
+LANGUAGE: sh
+CODE:
+https://formbricks.com/clin3dxja02k8l80hpwmx4bjy?source=Google
+
+----------------------------------------
+
+TITLE: Creating MDX File Frontmatter for Documentation
+DESCRIPTION: Example of the required frontmatter metadata structure for documentation files using Mintlify, including title, description, and icon properties.
+
+LANGUAGE: markdown
+CODE:
+---
+title: "Document Title"
+description: "Brief description of the content"
+icon: "appropriate-icon"
+---
+
+----------------------------------------
+
+TITLE: Handling Initial Feedback Submission with Formbricks API in TSX
+DESCRIPTION: A function that submits user feedback (Yes/No responses) to the Formbricks API. It captures whether content was helpful and the page URL, sending this data to the Formbricks endpoint and returning the response ID for potential updates.
+
+LANGUAGE: tsx
+CODE:
+export const handleFeedbackSubmit = async (YesNo, pageUrl) => {
+  const response_data = {
+    data: {
+      isHelpful: YesNo, // the "Yes 👍" or "No 👎" response. Remember: They have to be identical with the choices in the survey on app.formbricks.com for it to work.
+      pageUrl: pageUrl, // So you know which page the user gives feedback about.
+    },
+  };
+
+  const payload = {
+    response: response_data,
+    surveyId: process.env.NEXT_PUBLIC_FORMBRICKS_COM_DOCS_FEEDBACK_SURVEY_ID, // For testing, replace this with the survey ID of your survey (more info below)
+  };
+
+  try {
+    const res = await fetch(
+      `${process.env.NEXT_PUBLIC_FORMBRICKS_COM_API_HOST}/api/v1/client/environments/${process.env.NEXT_PUBLIC_FORMBRICKS_COM_ENVIRONMENT_ID}/responses`, // For testing, replace this with the API host and environemnt ID of your Development environment on app.formbricks.com
+  };
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(payload),
+      }
+    );
+
+    if (res.ok) {
+      const responseJson = await res.json();
+      return responseJson.id; // Returns the response ID
+    } else {
+      console.error("Error submitting form");
+    }
+  } catch (error) {
+    console.error("Error submitting form:", error);
+  }
+};
+
+----------------------------------------
+
+TITLE: Using TypeScript Ignore Comments with Explanations
+DESCRIPTION: Demonstrates proper usage of TypeScript ignore directives with mandatory explanatory comments to justify why the type checking is being bypassed.
+
+LANGUAGE: typescript
+CODE:
+// @ts-expect-error -- Required for dynamic function calls
+void window.formbricks.setup(...args);
+
+----------------------------------------
+
+TITLE: Starting Formbricks with Docker Compose in Bash
+DESCRIPTION: Starts the Formbricks application and PostgreSQL database using Docker Compose in detached mode, allowing it to run in the background.
+
+LANGUAGE: bash
+CODE:
+docker compose up -d
+
+----------------------------------------
+
+TITLE: Setting HTML ID for Feature-Specific Button Tracking
+DESCRIPTION: Example of HTML ID attribute that can be used with CSS Selector triggers in Formbricks to track specific feature usage. This allows for precise targeting when multiple elements have the same inner text.
+
+LANGUAGE: html
+CODE:
+id="export-report-featurename"
+
+----------------------------------------
+
+TITLE: Cloning Formbricks Repository via WSL2
+DESCRIPTION: Clone the Formbricks GitHub repository and navigate to the project directory using Git in WSL2.
+
+LANGUAGE: bash
+CODE:
+git clone https://github.com/formbricks/formbricks && cd formbricks
+
+----------------------------------------
+
+TITLE: Setting User Attribute for Survey Segmentation in Formbricks
+DESCRIPTION: This snippet demonstrates how to set a user attribute in Formbricks to pre-segment users for a Product-Market Fit survey. This allows targeting only users who have experienced the product's value, ensuring high-quality feedback.
+
+LANGUAGE: javascript
+CODE:
+formbricks.setAttribute("Loyalty", "Experienced Value");
+
+----------------------------------------
+
+TITLE: Starting Formbricks Development Server
+DESCRIPTION: Command to start the Formbricks development environment.
+
+LANGUAGE: bash
+CODE:
+pnpm go
+
+----------------------------------------
+
+TITLE: Generating Encryption Key in Bash
+DESCRIPTION: Generates a random string using openssl and sets it as the ENCRYPTION_KEY in the docker-compose.yml file using sed. This key is used for authenticating and verifying 2 Factor Authentication.
+
+LANGUAGE: bash
+CODE:
+sed -i "/ENCRYPTION_KEY:$/s/ENCRYPTION_KEY:.*/ENCRYPTION_KEY: $(openssl rand -hex 32)/" docker-compose.yml
+
+----------------------------------------
+
+TITLE: Testing API Key with GET Request in cURL
+DESCRIPTION: This snippet demonstrates how to make a GET request to the /api/v1/me endpoint using cURL to verify if your Formbricks API key is working. The request requires the x-api-key header with your API key value.
+
+LANGUAGE: bash
+CODE:
+GET - /api/v1/me
+
+curl --location \
+'https://app.formbricks.com/api/v1/me' \
+--header \
+'x-api-key: <your-api-key>'
+
+----------------------------------------
+
+TITLE: Setting Up Node.js with nvm
+DESCRIPTION: Commands to install and use the recommended Node.js version using nvm (Node Version Manager).
+
+LANGUAGE: bash
+CODE:
+nvm install && nvm use
+
+----------------------------------------
+
+TITLE: OpenAPI Specification for GET Action Classes Endpoint in YAML
+DESCRIPTION: The OpenAPI specification for a GET endpoint that retrieves action classes from the Formbricks management API. The endpoint is defined at /api/v1/management/action-classes.
+
+LANGUAGE: yaml
+CODE:
+openapi: get /api/v1/management/action-classes
+
+----------------------------------------
+
+TITLE: Generating Security Keys for Formbricks
+DESCRIPTION: Commands to generate random hexadecimal strings for encryption and authentication, then set them as environment variables in the .env file.
+
+LANGUAGE: bash
+CODE:
+sed -i '/^ENCRYPTION_KEY=/c\ENCRYPTION_KEY='$(openssl rand -hex 32) .env
+sed -i '/^NEXTAUTH_SECRET=/c\NEXTAUTH_SECRET='$(openssl rand -hex 32) .env
+sed -i '/^CRON_SECRET=/c\CRON_SECRET='$(openssl rand -hex 32) .env
+
+----------------------------------------
+
+TITLE: Creating a Directory for Formbricks in Bash
+DESCRIPTION: Creates a new directory called 'formbricks-quickstart' and navigates into it using the terminal.
+
+LANGUAGE: bash
+CODE:
+mkdir formbricks-quickstart && cd formbricks-quickstart
+
+----------------------------------------
+
+TITLE: OpenAPI DELETE Endpoint Definition for Attribute Class Deletion in YAML
+DESCRIPTION: OpenAPI specification for the DELETE endpoint that removes an attribute class from the system. The endpoint requires the attributeClassId as a path parameter to identify which attribute class to delete.
+
+LANGUAGE: yaml
+CODE:
+openapi: delete /api/v1/management/attribute-classes/{attributeClassId}
+
+----------------------------------------
+
+TITLE: Creating Environment Configuration File
+DESCRIPTION: Command to create a new .env file based on the example template provided in the repository.
+
+LANGUAGE: bash
+CODE:
+cp .env.example .env
+
+----------------------------------------
+
+TITLE: OpenAPI GET Endpoint Definition for Retrieving Person Data
+DESCRIPTION: This OpenAPI specification defines the endpoint for retrieving a person's data by their ID. The endpoint path is /api/v1/management/people/{personId} and uses the GET HTTP method.
+
+LANGUAGE: openapi
+CODE:
+openapi: get /api/v1/management/people/{personId}
+
+----------------------------------------
+
+TITLE: Installing Dependencies with PNPM
+DESCRIPTION: Command to install all required Node.js packages using the PNPM package manager.
+
+LANGUAGE: bash
+CODE:
+pnpm install
+
+----------------------------------------
+
+TITLE: Installing Formbricks Helm Chart on Kubernetes
+DESCRIPTION: Command to install the Formbricks Helm chart, which deploys the complete Formbricks stack including the application, PostgreSQL, Redis, and optional ingress controllers.
+
+LANGUAGE: sh
+CODE:
+helm install formbricks formbricks/formbricks
+
+----------------------------------------
+
+TITLE: OpenAPI Definition for DELETE Person Endpoint
+DESCRIPTION: OpenAPI specification for the DELETE endpoint to remove a person by their ID. The endpoint is part of the management API and requires the personId as a path parameter.
+
+LANGUAGE: yaml
+CODE:
+openapi: delete /api/v1/management/people/{personId}
+
+----------------------------------------
+
+TITLE: Cloning Formbricks Repository on Linux
+DESCRIPTION: Command to clone the Formbricks repository from GitHub and navigate into the project directory.
+
+LANGUAGE: bash
+CODE:
+git clone https://github.com/formbricks/formbricks && cd formbricks
+
+----------------------------------------
+
+TITLE: OpenAPI DELETE Webhook Endpoint Specification
+DESCRIPTION: OpenAPI specification for the DELETE /api/v1/webhooks/{webhookId} endpoint that allows users to delete a specific webhook by its ID.
+
+LANGUAGE: openapi
+CODE:
+openapi: delete /api/v1/webhooks/{webhookId}
+
+----------------------------------------
+
+TITLE: Starting Formbricks Development Server
+DESCRIPTION: Command to start the Formbricks application in development mode using PNPM.
+
+LANGUAGE: bash
+CODE:
+pnpm go
+
+----------------------------------------
+
+TITLE: Configuring Redis for Formbricks Cluster
+DESCRIPTION: Environment variables required to configure Redis integration in a Formbricks cluster. Redis is used for session management and caching to improve performance and is an Enterprise Edition feature.
+
+LANGUAGE: sh
+CODE:
+REDIS_URL=redis://your-redis-host:6379
+REDIS_DEFAULT_TTL=86400
+REDIS_HTTP_URL=http://your-redis-host:8000
+
+----------------------------------------
+
+TITLE: Rate Limit Error Response in JSON
+DESCRIPTION: The JSON response returned when a client exceeds the defined rate limit. The server responds with a 429 status code and an error message instructing the client to try again later.
+
+LANGUAGE: json
+CODE:
+{
+  "code": 429,
+  "error": "Too many requests, Please try after a while!"
+}
+
+----------------------------------------
+
+TITLE: Cloning Formbricks Repository in Gitpod
+DESCRIPTION: Command to clone the Formbricks repository from GitHub and navigate to its directory. This is typically done automatically by Gitpod but provided as a manual alternative.
+
+LANGUAGE: bash
+CODE:
+git clone https://github.com/formbricks/formbricks && cd formbricks
+
+----------------------------------------
+
+TITLE: Disabling Rate Limiting with Environment Variable
+DESCRIPTION: A bash environment variable setting to disable rate limiting for self-hosted Formbricks instances. This requires server restart to take effect and is not recommended for production environments.
+
+LANGUAGE: bash
+CODE:
+RATE_LIMITING_DISABLED=1
+
+----------------------------------------
+
+TITLE: Creating Environment Configuration File in GitHub Codespaces
+DESCRIPTION: Command to create a .env file from the template example file.
+
+LANGUAGE: bash
+CODE:
+cp .env.example .env
+
+----------------------------------------
+
+TITLE: Configuring OpenTelemetry for Tracing in Formbricks
+DESCRIPTION: Environment variables required to enable and configure Next.js's built-in OpenTelemetry instrumentation for tracing and APM integration in Formbricks.
+
+LANGUAGE: env
+CODE:
+OTEL_ENABLED=true
+OTEL_ENDPOINT=<your-collector-endpoint> # e.g., http://localhost:4318/v1/traces for OTLP HTTP
+OTEL_SERVICE_NAME=formbricks
+NEXT_OTEL_VERBOSE=1 # Optional: enables detailed tracing
+
+----------------------------------------
+
+TITLE: Installing Project Dependencies with PNPM
+DESCRIPTION: Install all required packages for the Formbricks project using the PNPM package manager.
+
+LANGUAGE: bash
+CODE:
+pnpm install
+
+----------------------------------------
+
+TITLE: Retrieving Environment Variables for Formbricks in Kubernetes
+DESCRIPTION: Commands to retrieve important environment variables like NEXTAUTH_SECRET, ENCRYPTION_KEY, and CRON_SECRET from the Kubernetes secrets for the Formbricks deployment.
+
+LANGUAGE: sh
+CODE:
+kubectl get secret --namespace {{ .Release.Namespace }} {{ include "formbricks.name" . }}-app-secrets -o jsonpath="{.data.NEXTAUTH_SECRET}" | base64 --decode
+kubectl get secret --namespace {{ .Release.Namespace }} {{ include "formbricks.name" . }}-app-secrets -o jsonpath="{.data.ENCRYPTION_KEY}" | base64 --decode
+kubectl get secret --namespace {{ .Release.Namespace }} {{ include "formbricks.name" . }}-app-secrets -o jsonpath="{.data.CRON_SECRET}" | base64 --decode
+
+----------------------------------------
+
+TITLE: Creating Environment Configuration File
+DESCRIPTION: Create a local environment configuration file by copying the example template.
+
+LANGUAGE: bash
+CODE:
+cp .env.example .env
+
+----------------------------------------
+
+TITLE: Retrieving External PostgreSQL Connection URL for Formbricks
+DESCRIPTION: Command to display the external PostgreSQL connection URL for the Formbricks application when using an external database instead of the in-cluster PostgreSQL.
+
+LANGUAGE: sh
+CODE:
+echo "{{ .Values.postgresql.externalDatabaseUrl }}"
+
+----------------------------------------
+
+TITLE: Accessing Docker Container Logs for Formbricks
+DESCRIPTION: Commands for accessing logs from Formbricks running in Docker containers, including standard log viewing and following log output in real-time.
+
+LANGUAGE: bash
+CODE:
+# One-Click setup
+cd formbricks
+docker compose logs
+
+# Standard Docker commands
+docker logs <container-name>
+docker logs -f <container-name> # Follow logs
+
+----------------------------------------
+
+TITLE: Generating Secret Keys for Formbricks Environment
+DESCRIPTION: Generate and set secure random values for encryption keys and authentication secrets in the environment file using sed and openssl.
+
+LANGUAGE: bash
+CODE:
+sed -i '/^ENCRYPTION_KEY=/c\ENCRYPTION_KEY='$(openssl rand -hex 32) .env
+sed -i '/^NEXTAUTH_SECRET=/c\NEXTAUTH_SECRET='$(openssl rand -hex 32) .env
+sed -i '/^CRON_SECRET=/c\CRON_SECRET='$(openssl rand -hex 32) .env
+
+----------------------------------------
+
+TITLE: Retrieving PostgreSQL Password for Formbricks in Kubernetes
+DESCRIPTION: Command to retrieve the PostgreSQL user password from the Kubernetes secret for the Formbricks deployment. This is needed for database access when PostgreSQL is deployed within the cluster.
+
+LANGUAGE: sh
+CODE:
+kubectl get secret --namespace {{ .Release.Namespace }} {{ include "formbricks.name" . }}-app-secrets -o jsonpath="{.data.POSTGRES_USER_PASSWORD}" | base64 --decode
+
+----------------------------------------
+
+TITLE: Launching Formbricks Development Environment in GitHub Codespaces
+DESCRIPTION: Command to start the Formbricks development setup using PNPM.
+
+LANGUAGE: bash
+CODE:
+pnpm go
+
+----------------------------------------
+
+TITLE: Accessing Formbricks via NodePort in Kubernetes
+DESCRIPTION: Command to retrieve the NodePort assigned to the Formbricks service, which is needed to access the application when NodePort service type is configured.
+
+LANGUAGE: sh
+CODE:
+kubectl get svc {{ include "formbricks.name" . }} -n {{ .Release.Namespace }} -o jsonpath="{.spec.ports[0].nodePort}"
+
+----------------------------------------
+
+TITLE: Checking Formbricks Stack Logs
+DESCRIPTION: Command to access detailed logs of the Formbricks stack for troubleshooting.
+
+LANGUAGE: bash
+CODE:
+cd formbricks && docker compose logs
+
+----------------------------------------
+
+TITLE: Responsive CSS Styling for Storybook Addon Components
+DESCRIPTION: This CSS defines styling for Storybook addon components with text and image sections. It handles responsive layouts across different device sizes with media queries for screens below 800px and 600px width, adjusting positioning, sizing, and rotation of elements.
+
+LANGUAGE: css
+CODE:
+  .sb-addon-text {
+    padding-left: 48px;
+    max-width: 240px;
+  }
+
+  .sb-addon-text h4 {
+    padding-top: 0px;
+  }
+
+  .sb-addon-img {
+    position: absolute;
+    left: 345px;
+    top: 0;
+    height: 100%;
+    width: 200%;
+    overflow: hidden;
+  }
+
+  .sb-addon-img img {
+    width: 650px;
+    transform: rotate(-15deg);
+    margin-left: 40px;
+    margin-top: -72px;
+    box-shadow: 0 0 1px rgba(255, 255, 255, 0);
+    backface-visibility: hidden;
+  }
+
+  @media screen and (max-width: 800px) {
+    .sb-addon-img {
+      left: 300px;
+    }
+  }
+
+  @media screen and (max-width: 600px) {
+    .sb-section {
+      flex-direction: column;
+    }
+
+    .sb-features-grid {
+      grid-template-columns: repeat(1, 1fr);
+    }
+
+    .sb-socials {
+      grid-template-columns: repeat(2, 1fr);
+    }
+
+    .sb-addon {
+      height: 280px;
+      align-items: flex-start;
+      padding-top: 32px;
+      overflow: hidden;
+    }
+
+    .sb-addon-text {
+      padding-left: 24px;
+    }
+
+    .sb-addon-img {
+      right: 0;
+      left: 0;
+      top: 130px;
+      bottom: 0;
+      overflow: hidden;
+      height: auto;
+      width: 124%;
+    }
+
+    .sb-addon-img img {
+      width: 1200px;
+      transform: rotate(-12deg);
+      margin-left: 0;
+      margin-top: 48px;
+      margin-bottom: -40px;
+      margin-left: -24px;
+    }
+  }
+
+----------------------------------------
+
+TITLE: Accessing Formbricks via LoadBalancer in Kubernetes
+DESCRIPTION: Command to retrieve the LoadBalancer service details including the external IP for accessing the Formbricks application when LoadBalancer service type is configured.
+
+LANGUAGE: sh
+CODE:
+kubectl get svc {{ include "formbricks.name" . }} -n {{ .Release.Namespace }}
+
+----------------------------------------
+
+TITLE: Configuring ESLint Parser Options for React TypeScript Projects
+DESCRIPTION: Configuration for enabling type-aware lint rules in a React TypeScript project. This snippet shows how to set up the parserOptions property in the ESLint configuration file to enable proper TypeScript integration.
+
+LANGUAGE: javascript
+CODE:
+   parserOptions: {
+    ecmaVersion: 'latest',
+    sourceType: 'module',
+    project: ['./tsconfig.json', './tsconfig.node.json'],
+    tsconfigRootDir: __dirname,
+   },
+
+----------------------------------------
+
+TITLE: Executing Formbricks Installation Script via Curl
+DESCRIPTION: A one-line command that downloads and runs the Formbricks installation script from GitHub. This script automates the setup of a production Formbricks instance including Docker, PostgreSQL, and SSL certificate configuration via Let's Encrypt.
+
+LANGUAGE: bash
+CODE:
+/bin/sh -c "$(curl -fsSL https://raw.githubusercontent.com/formbricks/formbricks/main/docker/formbricks.sh)"
+
+----------------------------------------
+
+TITLE: Uninstalling Formbricks Docker Installation
+DESCRIPTION: Command to completely uninstall Formbricks, which stops all containers, removes the Formbricks directory, and deletes the Docker network. This operation will delete all data.
+
+LANGUAGE: bash
+CODE:
+./formbricks.sh uninstall
+
+----------------------------------------
+
+TITLE: Accessing Formbricks via Port Forwarding in Kubernetes
+DESCRIPTION: Command to set up port forwarding from local port 3000 to the Formbricks service when using ClusterIP service type, enabling local access to the cluster-internal service.
+
+LANGUAGE: sh
+CODE:
+kubectl --namespace {{ .Release.Namespace }} port-forward svc/{{ include "formbricks.name" . }} 3000
+
+----------------------------------------
+
+TITLE: Installing Mintlify CLI for Formbricks Documentation
+DESCRIPTION: Installs the Mintlify CLI globally using npm. This is the first step required to work with the Formbricks documentation locally.
+
+LANGUAGE: bash
+CODE:
+npm i -g mintlify
+
+----------------------------------------
+
+TITLE: Verifying External Secrets for Formbricks in Kubernetes
+DESCRIPTION: Command to verify the external secrets configuration for the Formbricks deployment when external secrets are enabled, showing the status of the ExternalSecrets resources.
+
+LANGUAGE: sh
+CODE:
+kubectl get externalsecrets -n {{ .Release.Namespace }}
+
+----------------------------------------
+
+TITLE: Booking a Call with Formbricks Team via Cal.com
+DESCRIPTION: A button link for scheduling a meeting with the Formbricks team through Cal.com to discuss survey needs and get started with the platform.
+
+LANGUAGE: markdown
+CODE:
+<a href="https://cal.com/johannes/onboarding?utm_source=banner&utm_campaign=oss"><img alt="Book us with Cal.com" src="https://cal.com/book-with-cal-dark.svg" /></a>
+
+----------------------------------------
+
+TITLE: Email Service Setup Prompt in Formbricks Installation
+DESCRIPTION: Shows the prompt asking users if they want to configure email service for Formbricks. This is optional and requires SMTP credentials if enabled. Users can skip this step and still use Formbricks without email functionality.
+
+LANGUAGE: bash
+CODE:
+🚀 Executing default step of installing Formbricks
+🧱 Welcome to the Formbricks Setup Script
+
+🛸 Fasten your seatbelts! We're setting up your Formbricks environment on your Ubuntu 24.04 LTS server.
+
+🧹 Time to sweep away any old Docker installations.
+🔄 Updating your package list.
+📦 Installing the necessary dependencies.
+🔑 Adding Docker's official GPG key and setting up the stable repository.
+File '/etc/apt/keyrings/docker.gpg' exists. Overwrite? (y/N) y
+🔄 Updating your package list again.
+🐳 Installing Docker.
+🚀 Testing your Docker installation.
+🎉 Docker is installed!
+🐳 Adding your user to the Docker group to avoid using sudo with docker commands.
+🎉 Hooray! Docker is all set and ready to go. You're now ready to run your Formbricks instance!
+📁 Created Formbricks Quickstart directory at ./formbricks.
+🔗 Please enter your domain name for the SSL certificate (🚨 do NOT enter the protocol (http/https/etc)):
+my.hosted.url.com
+🔗 Do you want us to set up an HTTPS certificate for you? [Y/n]
+Y
+🔗 Please make sure that the domain points to the server's IP address and that ports 80 & 443 are open in your server's firewall. Is everything set up? [Y/n]
+Y
+💡 Please enter your email address for the SSL certificate:
+docs@formbricks.com
+🔗 Do you want to enforce HTTPS (HSTS)? [Y/n]
+Y
+🚗 Configuring Traefik...
+💡 Created traefik.yaml and traefik-dynamic.yaml file.
+💡 Created acme.json file with correct permissions.
+📧 Do you want to set up the email service? You will need SMTP credentials for the same! [y/N]
+
+----------------------------------------
+
+TITLE: Configuring SendGrid SMTP for Formbricks
+DESCRIPTION: SendGrid-specific SMTP configuration for Formbricks. This setup uses SendGrid's SMTP relay with an API key as the authentication method for sending emails.
+
+LANGUAGE: bash
+CODE:
+MAIL_FROM=noreply@yourdomain.com
+MAIL_FROM_NAME=Formbricks
+SMTP_HOST=smtp.sendgrid.net
+SMTP_PORT=587
+SMTP_USER=apikey
+SMTP_PASSWORD=your_sendgrid_api_key
+
+----------------------------------------
+
+TITLE: Updating Contact Attributes in Formbricks
+DESCRIPTION: Updates attributes for a specific user contact. Requires the user ID and an object containing the attributes to be updated.
+
+LANGUAGE: typescript
+CODE:
+await api.client.attribute.update({
+  userId: "<your-user-id>", // required
+  attributes: {
+    plan: "Pro",
+  }, // required
+});
+
+----------------------------------------
+
+TITLE: HTTPS Enforcement (HSTS) Prompt in Formbricks Installation
+DESCRIPTION: Shows the prompt for enabling HTTP Strict Transport Security (HSTS) to ensure all communication with the server is encrypted. This is a recommended security best practice for production environments.
+
+LANGUAGE: bash
+CODE:
+🚀 Executing default step of installing Formbricks
+🧱 Welcome to the Formbricks Setup Script
+
+🛸 Fasten your seatbelts! We're setting up your Formbricks environment on your Ubuntu 24.04 LTS server.
+
+🧹 Time to sweep away any old Docker installations.
+🔄 Updating your package list.
+📦 Installing the necessary dependencies.
+🔑 Adding Docker's official GPG key and setting up the stable repository.
+File '/etc/apt/keyrings/docker.gpg' exists. Overwrite? (y/N) y
+🔄 Updating your package list again.
+🐳 Installing Docker.
+🚀 Testing your Docker installation.
+🎉 Docker is installed!
+🐳 Adding your user to the Docker group to avoid using sudo with docker commands.
+🎉 Hooray! Docker is all set and ready to go. You're now ready to run your Formbricks instance!
+📁 Created Formbricks Quickstart directory at ./formbricks.
+🔗 Please enter your domain name for the SSL certificate (🚨 do NOT enter the protocol (http/https/etc)):
+my.hosted.url.com
+🔗 Do you want us to set up an HTTPS certificate for you? [Y/n]
+Y
+🔗 Please make sure that the domain points to the server's IP address and that ports 80 & 443 are open in your server's firewall. Is everything set up? [Y/n]
+Y
+💡 Please enter your email address for the SSL certificate:
+docs@formbricks.com
+🔗 Do you want to enforce HTTPS (HSTS)? [Y/n]
+
+----------------------------------------
+
+TITLE: Docker GPG Keys Prompt in Formbricks Installation Script
+DESCRIPTION: Shows the initial part of the Formbricks installation script where it prompts the user about overwriting existing Docker GPG keys. The script begins by cleaning old Docker installations, updating packages, and setting up dependencies.
+
+LANGUAGE: bash
+CODE:
+🚀 Executing default step of installing Formbricks
+🧱 Welcome to the Formbricks Setup Script
+
+🛸 Fasten your seatbelts! We're setting up your Formbricks environment on your Ubuntu 24.04 LTS server.
+
+🧹 Time to sweep away any old Docker installations.
+🔄 Updating your package list.
+📦 Installing the necessary dependencies.
+🔑 Adding Docker's official GPG key and setting up the stable repository.
+File '/etc/apt/keyrings/docker.gpg' exists. Overwrite? (y/N)
+
+----------------------------------------
+
+TITLE: Configuring Gmail SMTP for Formbricks
+DESCRIPTION: Gmail-specific SMTP configuration for Formbricks. This setup is suitable for low volume email sending and requires using an App Password if 2FA is enabled on the Gmail account.
+
+LANGUAGE: bash
+CODE:
+MAIL_FROM=your_email@gmail.com
+MAIL_FROM_NAME=Formbricks
+SMTP_HOST=smtp.gmail.com
+SMTP_PORT=587
+SMTP_USER=your_email@gmail.com
+SMTP_PASSWORD=your_app_password
+
+----------------------------------------
+
+TITLE: Adding SMTP Configuration to Docker Compose for Formbricks
+DESCRIPTION: Environment variable configuration for Docker Compose setup, allowing email functionality in containerized Formbricks deployments. These settings should be added to the environment section of your docker-compose.yml file.
+
+LANGUAGE: yaml
+CODE:
+environment:
+  # Email Configuration
+  MAIL_FROM: noreply@yourdomain.com
+  MAIL_FROM_NAME: Formbricks
+  SMTP_HOST: smtp.yourprovider.com
+  SMTP_PORT: 587
+  SMTP_USER: your_username
+  SMTP_PASSWORD: your_password
+  EMAIL_VERIFICATION_DISABLED: 0
+  PASSWORD_RESET_DISABLED: 0
+
+----------------------------------------
+
+TITLE: Enabling Email Verification and Password Reset in Formbricks
+DESCRIPTION: Configuration to enable email verification and password reset features which are disabled by default. Setting these variables to 0 activates these features, but requires a working SMTP configuration.
+
+LANGUAGE: bash
+CODE:
+# Set to 0 to enable email verification (requires working SMTP)
+EMAIL_VERIFICATION_DISABLED=0
+
+# Set to 0 to enable password reset functionality (requires working SMTP)
+PASSWORD_RESET_DISABLED=0
+
+----------------------------------------
+
+TITLE: Updating Docker Compose Configuration (YAML)
+DESCRIPTION: Docker Compose configuration that integrates custom SSL certificates with Formbricks and Traefik services.
+
+LANGUAGE: yaml
+CODE:
+services:
+  formbricks:
+    restart: always
+    image: ghcr.io/formbricks/formbricks:latest
+    depends_on:
+      - postgres
+    labels:
+      - "traefik.enable=true"  # Enable Traefik for this service
+      - "traefik.http.routers.formbricks.rule=Host(`my-domain.com`)"  # Use your actual domain or IP
+      - "traefik.http.routers.formbricks.entrypoints=websecure"  # Use the websecure entrypoint (port 443 with TLS)
+      - "traefik.http.routers.formbricks.tls=true"  # Enable TLS
+      - "traefik.http.services.formbricks.loadbalancer.server.port=3000"  # Forward traffic to Formbricks on port 3000
+    ports:
+      - 3000:3000
+    volumes:
+      - uploads:/home/nextjs/apps/web/uploads/
+    <<: *environment
+
+  traefik:
+    image: "traefik:v2.7"
+    restart: always
+    container_name: "traefik"
+    depends_on:
+      - formbricks
+    ports:
+      - "80:80"
+      - "443:443"
+      - "8080:8080"
+    volumes:
+      - ./traefik.yaml:/traefik.yaml
+      - ./acme.json:/acme.json
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - ./certs:/certs
+      - ./certs-traefik.yaml:/etc/traefik/dynamic/certs-traefik.yaml
+
+----------------------------------------
+
+TITLE: Specifying Certificate Paths for Traefik (YAML)
+DESCRIPTION: YAML configuration that tells Traefik where to find the custom SSL certificate and key files.
+
+LANGUAGE: yaml
+CODE:
+tls:
+  certificates:
+    - certFile: /certs/fullchain.crt
+      keyFile: /certs/cert.key
+
+----------------------------------------
+
+TITLE: Setting Up Google OAuth Redirect URIs
+DESCRIPTION: Configuration for authorized JavaScript origins and redirect URIs needed for Google OAuth setup. These URIs must be specified in the Google Cloud Platform when creating OAuth client credentials.
+
+LANGUAGE: plaintext
+CODE:
+Authorized JavaScript origins: {WEBAPP_URL}
+Authorized redirect URIs: {WEBAPP_URL}/api/auth/callback/google
+
+----------------------------------------
+
+TITLE: Starting Formbricks Development Environment
+DESCRIPTION: Launch the Formbricks development server using the predefined PNPM script.
+
+LANGUAGE: bash
+CODE:
+pnpm go
+
+----------------------------------------
+
+TITLE: Setting up Node.js with NVM in WSL2
+DESCRIPTION: Install the required Node.js version using Node Version Manager (nvm) in WSL2 environment and activate it for the project.
+
+LANGUAGE: bash
+CODE:
+nvm install && nvm use
+
+----------------------------------------
+
+TITLE: Creating Environment Configuration File
+DESCRIPTION: Command to create a .env file from the provided example template.
+
+LANGUAGE: bash
+CODE:
+cp .env.example .env
+
+----------------------------------------
+
+TITLE: Generating Security Keys for Formbricks in GitHub Codespaces
+DESCRIPTION: Commands to generate and set random security keys for encryption, authentication, and cron jobs in the .env file using OpenSSL.
+
+LANGUAGE: bash
+CODE:
+sed -i '/^ENCRYPTION_KEY=/c\ENCRYPTION_KEY='$(openssl rand -hex 32) .env
+sed -i '/^NEXTAUTH_SECRET=/c\NEXTAUTH_SECRET='$(openssl rand -hex 32) .env
+sed -i '/^CRON_SECRET=/c\CRON_SECRET='$(openssl rand -hex 32) .env
+
+----------------------------------------
+
+TITLE: Setting up NodeJS with NVM in GitHub Codespaces
+DESCRIPTION: Commands to install and use the correct Node.js version using Node Version Manager (nvm).
+
+LANGUAGE: bash
+CODE:
+nvm install && nvm use
+
+----------------------------------------
+
+TITLE: Cloning the Formbricks Repository in GitHub Codespaces
+DESCRIPTION: Command for cloning the Formbricks repository from GitHub and navigating to the project directory.
+
+LANGUAGE: bash
+CODE:
+git clone https://github.com/formbricks/formbricks && cd formbricks
+
+----------------------------------------
+
+TITLE: Generating Secure Random Keys for Environment Configuration
+DESCRIPTION: Commands to generate and set secure random hexadecimal values for encryption key, NextAuth secret, and cron secret in the .env file.
+
+LANGUAGE: bash
+CODE:
+sed -i '/^ENCRYPTION_KEY=/c\ENCRYPTION_KEY='$(openssl rand -hex 32) .env
+sed -i '/^NEXTAUTH_SECRET=/c\NEXTAUTH_SECRET='$(openssl rand -hex 32) .env
+sed -i '/^CRON_SECRET=/c\CRON_SECRET='$(openssl rand -hex 32) .env
+
+----------------------------------------
+
+TITLE: Running Mintlify Documentation Server Locally
+DESCRIPTION: Command for testing documentation locally using the Mintlify CLI before publishing changes.
+
+LANGUAGE: bash
+CODE:
+mintlify dev
+
+----------------------------------------
+
+TITLE: Tracking Events with Formbricks SDK
+DESCRIPTION: Demonstrates how to track user events using the Formbricks SDK. This code snippet shows tracking a button click action that can be used to trigger surveys based on user behavior.
+
+LANGUAGE: swift
+CODE:
+Formbricks.track("click_demo_button")
+
+----------------------------------------
+
+TITLE: Creating a Response in Formbricks
+DESCRIPTION: Creates a new response for a survey with required fields including survey ID, completion status, and response data. Supports various optional parameters for tracking and metadata.
+
+LANGUAGE: typescript
+CODE:
+await api.client.response.create({
+  surveyId: "<your-survey-id>", // required
+  finished: boolean, // required
+  data: {
+    questionId: "<answer-to-this-question-in-string>",
+    anotherQuestionId: 123, // answer to this question in number
+    yetAnotherQuestionId: ["option1", "option2"], // answer to this question in array,
+  }, // required
+
+  userId: "<your-user-id>", // optional
+  singleUseId: "<your-single-use-id>", // optional
+  ttc: {
+    questionId: 123, // optional
+  }, // optional
+  meta: {
+    source: "<your-source>", // optional
+    url: "<your-url>", // optional
+    userAgent: {
+      browser: "<your-browser>", // optional
+      device: "<your-device>", // optional
+      os: "<your-os>", // optional
+    },
+    country: "<your-country>", // optional
+  }, // optional
+});
+
+----------------------------------------
+
+TITLE: Installing Formbricks API Package via npm
+DESCRIPTION: Command to install the @formbricks/api package using npm package manager.
+
+LANGUAGE: bash
+CODE:
+npm install @formbricks/api
+
+----------------------------------------
+
+TITLE: Generating Test Coverage Reports for Formbricks SDK
+DESCRIPTION: Shell command to create a debug coverage report for the Formbricks SDK. Used to analyze test coverage after running the FormbricksInstrumentedTest tests.
+
+LANGUAGE: sh
+CODE:
+./gradlew createDebugCoverageReport
+
+----------------------------------------
+
+TITLE: Generating Formbricks SDK Documentation with Dokka
+DESCRIPTION: Shell command to generate developer documentation for the Formbricks SDK using Dokka. Creates HTML documentation in the formbricksSDK/build/dokka/html folder.
+
+LANGUAGE: sh
+CODE:
+./gradlew dokkaHtml
+
+----------------------------------------
+
+TITLE: Checking HPA Status for Formbricks in Kubernetes
+DESCRIPTION: Command to check the Horizontal Pod Autoscaling (HPA) status for the Formbricks deployment when autoscaling is enabled, showing current, minimum, and maximum replicas.
+
+LANGUAGE: sh
+CODE:
+kubectl get hpa -n {{ .Release.Namespace }} {{ include "formbricks.name" . }}
+
+----------------------------------------
+
+TITLE: Retrieving External Redis Connection URL for Formbricks
+DESCRIPTION: Command to display the external Redis connection URL for the Formbricks application when using an external Redis instance instead of the in-cluster Redis.
+
+LANGUAGE: sh
+CODE:
+echo "{{ .Values.redis.externalRedisUrl }}"
+
+----------------------------------------
+
+TITLE: Retrieving Redis Password for Formbricks in Kubernetes
+DESCRIPTION: Command to retrieve the Redis password from the Kubernetes secret for the Formbricks deployment. This is needed for Redis access when Redis is deployed within the cluster.
+
+LANGUAGE: sh
+CODE:
+kubectl get secret --namespace {{ .Release.Namespace }} {{ include "formbricks.name" . }}-app-secrets -o jsonpath="{.data.REDIS_PASSWORD}" | base64 --decode
+
+----------------------------------------
+
+TITLE: Setting Multiple Hidden Fields in Link Surveys
+DESCRIPTION: Example of how to add multiple hidden fields ('screen' and 'job') to a Formbricks survey link. This allows passing multiple data points to be captured with the survey submission.
+
+LANGUAGE: bash
+CODE:
+sh https://formbricks.com/clin3dxja02k8l80hpwmx4bjy?screen=landing_page&job=Founder
+
+----------------------------------------
+
+TITLE: Referencing Google Spreadsheet API Method for Writing Data
+DESCRIPTION: This code reference points to the method in the Formbricks codebase that handles writing survey response data to the selected Google Sheet. It demonstrates the limited scope of access to Google Sheets API.
+
+LANGUAGE: typescript
+CODE:
+https://github.com/formbricks/formbricks/blob/main/packages/lib/googleSheet/service.ts#L70
+
+----------------------------------------
+
+TITLE: Installing Formbricks SDK with yarn for Next.js
+DESCRIPTION: Command to install the Formbricks SDK and its peer dependency zod using yarn for Next.js applications.
+
+LANGUAGE: bash
+CODE:
+yarn add @formbricks/js zod
+
+----------------------------------------
+
+TITLE: Installing Formbricks SDK with yarn for React.js
+DESCRIPTION: Command to install the Formbricks SDK and its peer dependency zod using yarn for React.js applications.
+
+LANGUAGE: bash
+CODE:
+yarn add @formbricks/js zod
+
+----------------------------------------
+
+TITLE: Importing Image Component in React/JSX
+DESCRIPTION: This code snippet shows how to import an image component from a components directory and a commented-out import for a specific picture selection image. This demonstrates the pattern for managing image imports in the project.
+
+LANGUAGE: jsx
+CODE:
+import { img } from "@/components/mdx-image";
+
+// import PictureSelection from "./images/picture-selection.webp";
+
+----------------------------------------
+
+TITLE: Running Formbricks Documentation Locally
+DESCRIPTION: Command to start the Mintlify development server which makes the documentation available at http://localhost:3000 for local viewing and editing.
+
+LANGUAGE: bash
+CODE:
+mintlify dev
+
+----------------------------------------
+
+TITLE: Deploying Formbricks on RepoCloud with One-Click
+DESCRIPTION: A button link that enables users to deploy Formbricks on RepoCloud platform with a single click. This is offered as an alternative self-hosting option.
+
+LANGUAGE: markdown
+CODE:
+[![Deploy on RepoCloud](https://d16t0pc4846x52.cloudfront.net/deploy.png)](https://repocloud.io/details/?app_id=254)
+
+----------------------------------------
+
+TITLE: Deploying Formbricks on Railway with One-Click
+DESCRIPTION: A button link that allows users to deploy Formbricks on Railway platform with a single click. This is one of the community-managed one-click hosting options.
+
+LANGUAGE: markdown
+CODE:
+[![Deploy on Railway](https://railway.app/button.svg)](https://railway.app/new/template/PPDzCd)
+
+----------------------------------------
+
+TITLE: OpenAPI Specification for GET Webhook by ID Endpoint
+DESCRIPTION: YAML specification for the API endpoint that retrieves a specific webhook by its ID. This defines the route structure and parameters required to access individual webhook resources.
+
+LANGUAGE: yaml
+CODE:
+openapi: get /api/v1/webhooks/{webhookId}
+
+----------------------------------------
+
+TITLE: Defining GET Webhook Endpoint in OpenAPI
+DESCRIPTION: This snippet defines the OpenAPI specification for the GET /api/v1/webhooks endpoint. It's part of the Formbricks API documentation that specifies how to retrieve webhook data.
+
+LANGUAGE: yaml
+CODE:
+openapi: get /api/v1/webhooks
+
+----------------------------------------
+
+TITLE: OpenAPI Specification for GET Survey Single-Use IDs Endpoint in YAML
+DESCRIPTION: Defines the GET /api/v1/management/surveys/{surveyId}/singleUseIds endpoint that retrieves single-use IDs for a specific survey. The endpoint requires a surveyId path parameter and returns an array of single-use ID objects.
+
+LANGUAGE: yaml
+CODE:
+openapi: get /api/v1/management/surveys/{surveyId}/singleUseIds
+
+----------------------------------------
+
+TITLE: OpenAPI Specification for GET Survey Endpoint in Formbricks API
+DESCRIPTION: OpenAPI specification for the GET endpoint that retrieves a survey by its ID from the Formbricks management API. The endpoint path is '/api/v1/management/surveys/{surveyId}'.
+
+LANGUAGE: yaml
+CODE:
+openapi: get /api/v1/management/surveys/{surveyId}
+
+----------------------------------------
+
+TITLE: Defining OpenAPI POST Endpoint for Local Storage Management
+DESCRIPTION: YAML front matter that specifies an OpenAPI endpoint for local storage management. The endpoint is defined as a POST request to /api/v1/management/storage/local.
+
+LANGUAGE: yaml
+CODE:
+openapi: post /api/v1/management/storage/local
+
+----------------------------------------
+
+TITLE: OpenAPI Specification for GET Responses Endpoint in Formbricks
+DESCRIPTION: The YAML specification for a GET endpoint that retrieves form responses from the Formbricks API at /api/v1/management/responses.
+
+LANGUAGE: yaml
+CODE:
+openapi: get /api/v1/management/responses
+
+----------------------------------------
+
+TITLE: DELETE Endpoint for Response Deletion in Formbricks API
+DESCRIPTION: OpenAPI specification that defines the DELETE endpoint for removing a specific form response using its unique identifier. This endpoint is part of the management API (v1) and requires authentication.
+
+LANGUAGE: openapi
+CODE:
+openapi: delete /api/v1/management/responses/{responseId}
+
+----------------------------------------
+
+TITLE: Defining POST Endpoint for Form Responses in OpenAPI
+DESCRIPTION: OpenAPI specification for the POST /api/v1/management/responses endpoint that handles form response submissions. The endpoint requires authentication and accepts form response data in the request body.
+
+LANGUAGE: openapi
+CODE:
+openapi: post /api/v1/management/responses
+
+----------------------------------------
+
+TITLE: OpenAPI Definition for GET Contact Attribute Key Endpoint
+DESCRIPTION: OpenAPI specification defining the GET endpoint to retrieve a specific contact attribute key by ID. The endpoint requires the contactAttributeKeyId parameter in the URL path.
+
+LANGUAGE: yaml
+CODE:
+openapi: get /api/v1/management/contact-attribute-keys/{contactAttributeKeyId}
+
+----------------------------------------
+
+TITLE: GET Endpoint for Contact Attribute Keys in Formbricks Management API
+DESCRIPTION: This OpenAPI specification defines the GET endpoint for retrieving contact attribute keys from the Formbricks management API. The endpoint path is /api/v1/management/contact-attribute-keys.
+
+LANGUAGE: openapi
+CODE:
+openapi: get /api/v1/management/contact-attribute-keys
+
+----------------------------------------
+
+TITLE: OpenAPI Specification for GET Attribute Class Endpoint in YAML
+DESCRIPTION: OpenAPI specification defining the GET endpoint for retrieving a specific attribute class by ID. It specifies the required path parameter, authentication requirements, and possible response types including successful retrieval and error conditions.
+
+LANGUAGE: yaml
+CODE:
+openapi: get /api/v1/management/attribute-classes/{attributeClassId}
+
+----------------------------------------
+
+TITLE: OpenAPI Specification for POST Response Endpoint in Formbricks
+DESCRIPTION: YAML specification for a POST endpoint that handles form response submissions in the Formbricks API. The endpoint accepts responses for a specific environment identified by the environmentId parameter.
+
+LANGUAGE: yaml
+CODE:
+openapi: post /api/v1/client/{environmentId}/responses
+
+----------------------------------------
+
+TITLE: Defining PUT Endpoint for Client Display Updates in OpenAPI
+DESCRIPTION: This YAML snippet defines an OpenAPI specification for a PUT endpoint that updates display information for a specific environment and display ID in the Formbricks API.
+
+LANGUAGE: yaml
+CODE:
+openapi: put /api/v1/client/{environmentId}/displays/{displayId}
+
+----------------------------------------
+
+TITLE: Styling Storybook Documentation Page with CSS
+DESCRIPTION: CSS styling for the Storybook documentation page, defining the layout and visual presentation of sections, containers, and interactive elements. Includes grid layouts, spacing, typography, and component-specific styling.
+
+LANGUAGE: CSS
+CODE:
+  .sb-container {
+    margin-bottom: 48px;
+  }
+
+  .sb-section {
+    width: 100%;
+    display: flex;
+    flex-direction: row;
+    gap: 20px;
+  }
+
+  img {
+    object-fit: cover;
+  }
+
+  .sb-section-title {
+    margin-bottom: 32px;
+  }
+
+  .sb-section a:not(h1 a, h2 a, h3 a) {
+    font-size: 14px;
+  }
+
+  .sb-section-item, .sb-grid-item {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+  }
+
+  .sb-section-item-heading {
+    padding-top: 20px !important;
+    padding-bottom: 5px !important;
+    margin: 0 !important;
+  }
+  .sb-section-item-paragraph {
+    margin: 0;
+    padding-bottom: 10px;
+  }
+
+  .sb-chevron {
+    margin-left: 5px;
+  }
+
+  .sb-features-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    grid-gap: 32px 20px;
+  }
+
+  .sb-socials {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+  }
+
+  .sb-socials p {
+    margin-bottom: 10px;
+  }
+
+  .sb-explore-image {
+    max-height: 32px;
+    align-self: flex-start;
+  }
+
+  .sb-addon {
+    width: 100%;
+    display: flex;
+    align-items: center;
+    position: relative;
+    background-color: #EEF3F8;
+    border-radius: 5px;
+    border: 1px solid rgba(0, 0, 0, 0.05);
+    background: #EEF3F8;
+    height: 180px;
+    margin-bottom: 48px;
+    overflow: hidden;
+  }
+
+----------------------------------------
+
+TITLE: Implementing RightArrow Component in JSX
+DESCRIPTION: A reusable arrow icon component implemented as an SVG element. This component is used throughout the page as a visual indicator for links, incorporating current text color through CSS.
+
+LANGUAGE: JSX
+CODE:
+export const RightArrow = () => (
+  <svg
+    viewBox="0 0 14 14"
+    width="8px"
+    height="14px"
+    style={{
+      marginLeft: "4px",
+      display: "inline-block",
+      shapeRendering: "inherit",
+      verticalAlign: "middle",
+      fill: "currentColor",
+      "path fill": "currentColor",
+    }}>
+    <path d="m11.1 7.35-5.5 5.5a.5.5 0 0 1-.7-.7L10.04 7 4.9 1.85a.5.5 0 1 1 .7-.7l5.5 5.5c.2.2.2.5 0 .7Z" />
+  </svg>
+)

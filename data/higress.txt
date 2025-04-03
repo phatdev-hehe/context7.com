@@ -1,0 +1,5236 @@
+TITLE: Configuring Global Authentication and Route-level Authorization in YAML
+DESCRIPTION: This YAML configuration sets up global Key Auth authentication and route-specific authorization for a Higress gateway instance. It defines consumers with credentials and specifies allowed consumers for specific routes and domains.
+
+LANGUAGE: yaml
+CODE:
+global_auth: false
+consumers:
+- credential: 2bda943c-ba2b-11ec-ba07-00163e1250b5
+  name: consumer1
+- credential: c8c8e9ca-558e-4a2d-bb62-e700dcc40e35
+  name: consumer2
+keys:
+- apikey
+- x-api-key
+
+LANGUAGE: yaml
+CODE:
+allow: 
+- consumer1
+
+LANGUAGE: yaml
+CODE:
+allow:
+- consumer2
+
+----------------------------------------
+
+TITLE: Configuring Auth0 OIDC in YAML
+DESCRIPTION: YAML configuration for setting up Auth0 as the OIDC provider in Higress, including service and plugin settings.
+
+LANGUAGE: yaml
+CODE:
+redirect_url: 'http://foo.bar.com/oauth2/callback'
+oidc_issuer_url: 'https://dev-o43xb1mz7ya7ach4.us.auth0.com/'
+client_id: 'XXXXXXXXXXXXXXXX'
+client_secret: 'XXXXXXXXXXXXXXXX'
+scope: 'openid email offline_access'
+cookie_secret: 'nqavJrGvRmQxWwGNptLdyUVKcBNZ2b18Guc1n_8DCfY='
+service_name: 'auth.dns'
+service_port: 443
+match_type: 'whitelist'
+match_list:
+    - match_rule_domain: '*.bar.com'
+      match_rule_path: '/foo'
+      match_rule_type: 'prefix'
+
+----------------------------------------
+
+TITLE: Configuring Custom JSON Schema
+DESCRIPTION: YAML configuration to define a custom JSON schema for weather information responses.
+
+LANGUAGE: yaml
+CODE:
+jsonResp:
+  enable: true
+  jsonSchema:
+    title: WeatherSchema
+    type: object
+    properties:
+      location:
+        type: string
+        description: city name.
+      weather:
+        type: string
+        description: weather conditions.
+      temperature:
+        type: string
+        description: temperature.
+      update_time:
+        type: string
+        description: the update time of data.
+    required:
+      - location
+      - weather
+      - temperature
+    additionalProperties: false
+
+----------------------------------------
+
+TITLE: Configuring AI Agent Plugin in YAML
+DESCRIPTION: YAML configuration for the AI Agent plugin, including LLM settings, API providers, prompt templates, and JSON response formatting.
+
+LANGUAGE: yaml
+CODE:
+llm:
+  apiKey: xxxxxxxxxxxxxxxxxx
+  domain: dashscope.aliyuncs.com
+  serviceName: dashscope.dns
+  servicePort: 443
+  path: /compatible-mode/v1/chat/completions
+  model: qwen-max-0403
+  maxIterations: 2
+promptTemplate:
+  language: CH
+apis:
+- apiProvider:
+    domain: restapi.amap.com
+    serviceName: geo.dns
+    servicePort: 80
+    apiKey: 
+      in: query
+      name: key
+      value: xxxxxxxxxxxxxxx
+  api: |
+    openapi: 3.1.0
+    info:
+      title: 高德地图
+      description: 获取 POI 的相关信息
+      version: v1.0.0
+    servers:
+      - url: https://restapi.amap.com
+    paths:
+      /v5/place/text:
+        get:
+          description: 根据POI名称，获得POI的经纬度坐标
+          operationId: get_location_coordinate
+          parameters:
+            - name: keywords
+              in: query
+              description: POI名称，必须是中文
+              required: true
+              schema:
+                type: string
+            - name: region
+              in: query
+              description: POI所在的区域名，必须是中文
+              required: true
+              schema:
+                type: string
+          deprecated: false
+      /v5/place/around:
+        get:
+          description: 搜索给定坐标附近的POI
+          operationId: search_nearby_pois
+          parameters:
+            - name: keywords
+              in: query
+              description: 目标POI的关键字
+              required: true
+              schema:
+                type: string
+            - name: location
+              in: query
+              description: 中心点的经度和纬度，用逗号隔开
+              required: true
+              schema:
+                type: string
+          deprecated: false
+    components:
+      schemas: {}
+- apiProvider:
+    domain: api.seniverse.com
+    serviceName: seniverse.dns
+    servicePort: 80
+    apiKey: 
+      in: query
+      name: key
+      value: xxxxxxxxxxxxxxx
+  api: |
+    openapi: 3.1.0
+    info:
+      title: 心知天气
+      description: 获取 天气预办相关信息
+      version: v1.0.0
+    servers:
+      - url: https://api.seniverse.com
+    paths:
+      /v3/weather/now.json:
+        get:
+          description: 获取指定城市的天气实况
+          operationId: get_weather_now
+          parameters:
+            - name: location
+              in: query
+              description: 所查询的城市
+              required: true
+              schema:
+                type: string
+            - name: language
+              in: query
+              description: 返回天气查询结果所使用的语言
+              required: true
+              schema:
+                type: string
+                default: zh-Hans 
+                enum:
+                  - zh-Hans 
+                  - en 
+                  - ja 
+            - name: unit
+              in: query
+              description: 表示温度的的单位，有摄氏度和华氏度两种
+              required: true
+              schema:
+                type: string
+                default: c 
+                enum:
+                  - c 
+                  - f 
+          deprecated: false
+    components:
+      schemas: {}
+- apiProvider:
+    apiKey:
+      in: "header"
+      name: "DeepL-Auth-Key"
+      value: "73xxxxxxxxxxxxxxx:fx"
+    domain: "api-free.deepl.com"
+    serviceName: "deepl.dns"
+    servicePort: 443
+  api: |
+    openapi: 3.1.0
+    info:
+      title: DeepL API Documentation
+      description: The DeepL API provides programmatic access to DeepL's machine translation technology.
+      version: v1.0.0
+    servers:
+      - url: https://api-free.deepl.com/v2
+    paths:
+      /translate:
+        post:
+          summary: Request Translation
+          operationId: translateText
+          requestBody:
+            required: true
+            content:
+              application/json:
+                schema:
+                  type: object
+                  required:
+                    - text
+                    - target_lang
+                  properties:
+                    text:
+                      description: |
+                        Text to be translated. Only UTF-8-encoded plain text is supported. The parameter may be specified
+                        up to 50 times in a single request. Translations are returned in the same order as they are requested.
+                      type: array
+                      maxItems: 50
+                      items:
+                        type: string
+                        example: Hello, World!
+                    target_lang:
+                      description: The language into which the text should be translated.
+                      type: string
+                      enum:
+                        - BG
+                        - CS
+                        - DA
+                        - DE
+                        - EL
+                        - EN-GB
+                        - EN-US
+                        - ES
+                        - ET
+                        - FI
+                        - FR
+                        - HU
+                        - ID
+                        - IT
+                        - JA
+                        - KO
+                        - LT
+                        - LV
+                        - NB
+                        - NL
+                        - PL
+                        - PT-BR
+                        - PT-PT
+                        - RO
+                        - RU
+                        - SK
+                        - SL
+                        - SV
+                        - TR
+                        - UK
+                        - ZH
+                        - ZH-HANS
+                      example: DE
+    components:
+      schemas: {}
+
+----------------------------------------
+
+TITLE: Configuring JWT Authentication Plugin at Instance Level
+DESCRIPTION: Example YAML configuration for setting up JWT authentication globally with multiple consumers.
+
+LANGUAGE: yaml
+CODE:
+global_auth: false
+consumers:
+- name: consumer1
+  issuer: abcd
+  jwks: |
+    {
+      "keys": [
+        {
+          "kty": "oct",
+          "kid": "123",
+          "k": "hM0k3AbXBPpKOGg__Ql2Obcq7s60myWDpbHXzgKUQdYo7YCRp0gUqkCnbGSvZ2rGEl4YFkKqIqW7mTHdj-bcqXpNr-NOznEyMpVPOIlqG_NWVC3dydBgcsIZIdD-MR2AQceEaxriPA_VmiUCwfwL2Bhs6_i7eolXoY11EapLQtutz0BV6ZxQQ4dYUmct--7PLNb4BWJyQeWu0QfbIthnvhYllyl2dgeLTEJT58wzFz5HeNMNz8ohY5K0XaKAe5cepryqoXLhA-V-O1OjSG8lCNdKS09OY6O0fkyweKEtuDfien5tHHSsHXoAxYEHPFcSRL4bFPLZ0orTt1_4zpyfew",
+          "alg": "HS256"
+        }
+      ]
+    }
+- name: consumer2
+  issuer: abc
+  jwks: |
+    {
+      "keys": [
+        {
+          "kty": "RSA",
+          "e": "AQAB",
+          "use": "sig",
+          "kid": "123",
+          "alg": "RS256",
+          "n": "i0B67f1jggT9QJlZ_8QL9QQ56LfurrqDhpuu8BxtVcfxrYmaXaCtqTn7OfCuca7cGHdrJIjq99rz890NmYFZuvhaZ-LMt2iyiSb9LZJAeJmHf7ecguXS_-4x3hvbsrgUDi9tlg7xxbqGYcrco3anmalAFxsbswtu2PAXLtTnUo6aYwZsWA6ksq4FL3-anPNL5oZUgIp3HGyhhLTLdlQcC83jzxbguOim-0OEz-N4fniTYRivK7MlibHKrJfO3xa_6whBS07HW4Ydc37ZN3Rx9Ov3ZyV0idFblU519nUdqp_inXj1eEpynlxH60Ys_aTU2POGZh_25KXGdF_ZC_MSRw"
+        }
+      ]
+    }
+
+----------------------------------------
+
+TITLE: Configuring AI Agent Plugin in YAML
+DESCRIPTION: YAML configuration for the AI Agent plugin, including LLM settings, API integrations, and prompt templates.
+
+LANGUAGE: yaml
+CODE:
+llm:
+  apiKey: xxxxxxxxxxxxxxxxxx
+  domain: dashscope.aliyuncs.com
+  serviceName: dashscope.dns
+  servicePort: 443
+  path: /compatible-mode/v1/chat/completions
+  model: qwen-max-0403
+  maxIterations: 2
+promptTemplate:
+  language: CH
+apis:
+- apiProvider:
+    domain: restapi.amap.com
+    serviceName: geo.dns
+    servicePort: 80
+    apiKey:
+      in: query
+      name: key
+      value: xxxxxxxxxxxxxxx
+  api: |
+    openapi: 3.1.0
+    info:
+      title: Amap
+      description: Get related information of POI
+      version: v1.0.0
+    servers:
+      - url: https://restapi.amap.com
+    paths:
+      /v5/place/text:
+        get:
+          description: Get latitude and longitude coordinates based on POI name
+          operationId: get_location_coordinate
+          parameters:
+            - name: keywords
+              in: query
+              description: POI name, must be in Chinese
+              required: true
+              schema:
+                type: string
+            - name: region
+              in: query
+              description: The name of the region where the POI is located, must be in Chinese
+              required: true
+              schema:
+                type: string
+          deprecated: false
+      /v5/place/around:
+        get:
+          description: Search for POI near the given coordinates
+          operationId: search_nearby_pois
+          parameters:
+            - name: keywords
+              in: query
+              description: Keywords for the target POI
+              required: true
+              schema:
+                type: string
+            - name: location
+              in: query
+              description: Latitude and longitude of the center point, separated by a comma
+              required: true
+              schema:
+                type: string
+          deprecated: false
+    components:
+      schemas: {}
+- apiProvider:
+    domain: api.seniverse.com
+    serviceName: seniverse.dns
+    servicePort: 80
+    apiKey:
+      in: query
+      name: key
+      value: xxxxxxxxxxxxxxx
+  api: |
+    openapi: 3.1.0
+    info:
+      title: XZWeather
+      description: Get weather related information
+      version: v1.0.0
+    servers:
+      - url: https://api.seniverse.com
+    paths:
+      /v3/weather/now.json:
+        get:
+          description: Get weather conditions for a specified city
+          operationId: get_weather_now
+          parameters:
+            - name: location
+              in: query
+              description: The city to query
+              required: true
+              schema:
+                type: string
+            - name: language
+              in: query
+              description: Language used for the weather query results
+              required: true
+              schema:
+                type: string
+                default: zh-Hans
+                enum:
+                  - zh-Hans
+                  - en
+                  - ja
+            - name: unit
+              in: query
+              description: Units of temperature, available in Celsius and Fahrenheit
+              required: true
+              schema:
+                type: string
+                default: c
+                enum:
+                  - c
+                  - f
+          deprecated: false
+    components:
+      schemas: {}
+- apiProvider:
+    apiKey:
+      in: "header"
+      name: "DeepL-Auth-Key"
+      value: "73xxxxxxxxxxxxxxx:fx"
+    domain: "api-free.deepl.com"
+    serviceName: "deepl.dns"
+    servicePort: 443
+  api: |
+    openapi: 3.1.0
+    info:
+      title: DeepL API Documentation
+      description: The DeepL API provides programmatic access to DeepL's machine translation technology.
+      version: v1.0.0
+    servers:
+      - url: https://api-free.deepl.com/v2
+    paths:
+      /translate:
+        post:
+          summary: Request Translation
+          operationId: translateText
+          requestBody:
+            required: true
+            content:
+              application/json:
+                schema:
+                  type: object
+                  required:
+                    - text
+                    - target_lang
+                  properties:
+                    text:
+                      description: |
+                        Text to be translated. Only UTF-8-encoded plain text is supported. 
+                        The parameter may be specified up to 50 times in a single request. 
+                        Translations are returned in the same order as they are requested.
+                      type: array
+                      maxItems: 50
+                      items:
+                        type: string
+                        example: Hello, World!
+                    target_lang:
+                      description: The language into which the text should be translated.
+                      type: string
+                      enum:
+                        - BG
+                        - CS
+                        - DA
+                        - DE
+                        - EL
+                        - EN-GB
+                        - EN-US
+                        - ES
+                        - ET
+                        - FI
+                        - FR
+                        - HU
+                        - ID
+                        - IT
+                        - JA
+                        - KO
+                        - LT
+                        - LV
+                        - NB
+                        - NL
+                        - PL
+                        - PT-BR
+                        - PT-PT
+                        - RO
+                        - RU
+                        - SK
+                        - SL
+                        - SV
+                        - TR
+                        - UK
+                        - ZH
+                        - ZH-HANS
+                      example: DE
+    components:
+      schemas: {}
+
+----------------------------------------
+
+TITLE: Configuring Global Authentication and Route Authorization in YAML
+DESCRIPTION: Example YAML configuration for enabling Key Auth authentication globally and setting up granular route authorization.
+
+LANGUAGE: yaml
+CODE:
+global_auth: false
+consumers:
+- credential: 2bda943c-ba2b-11ec-ba07-00163e1250b5
+  name: consumer1
+- credential: c8c8e9ca-558e-4a2d-bb62-e700dcc40e35
+  name: consumer2
+keys:
+- apikey
+- x-api-key
+
+----------------------------------------
+
+TITLE: Configuring AI Intent Recognition Plugin in YAML
+DESCRIPTION: Example configuration for the AI Intent Recognition plugin showing scene settings and LLM proxy configuration. Demonstrates how to set up categories, prompts, and connection details for the large language model service.
+
+LANGUAGE: yaml
+CODE:
+scene:
+  category: "Finance|E-commerce|Law|Higress"
+  prompt: "You are a smart category recognition assistant responsible for determining which preset category a user's question belongs to based on the question posed by the user and the preset categories, and returning the corresponding category. The user's question is: '%s', the preset categories are '%s', directly return a specific category; if not found, return 'NotFound'."
+llm:
+  proxyServiceName: "intent-service.static"
+  proxyUrl: "http://127.0.0.1:80/intent/compatible-mode/v1/chat/completions"
+  proxyDomain: "127.0.0.1"
+  proxyPort: "80"
+  proxyModel: "qwen-long"
+  proxyApiKey: ""
+  proxyTimeout: "10000"
+
+----------------------------------------
+
+TITLE: Configuring AI Intent Recognition Plugin in YAML
+DESCRIPTION: Example configuration for the AI Intent Recognition plugin showing scene settings and LLM proxy configuration. Demonstrates how to set up categories, prompts, and connection details for the large language model service.
+
+LANGUAGE: yaml
+CODE:
+scene:
+  category: "Finance|E-commerce|Law|Higress"
+  prompt: "You are a smart category recognition assistant responsible for determining which preset category a user's question belongs to based on the question posed by the user and the preset categories, and returning the corresponding category. The user's question is: '%s', the preset categories are '%s', directly return a specific category; if not found, return 'NotFound'."
+llm:
+  proxyServiceName: "intent-service.static"
+  proxyUrl: "http://127.0.0.1:80/intent/compatible-mode/v1/chat/completions"
+  proxyDomain: "127.0.0.1"
+  proxyPort: "80"
+  proxyModel: "qwen-long"
+  proxyApiKey: ""
+  proxyTimeout: "10000"
+
+----------------------------------------
+
+TITLE: Configuring Aliyun OIDC in YAML
+DESCRIPTION: YAML configuration for setting up Aliyun as the OIDC provider in Higress, including service and plugin settings.
+
+LANGUAGE: yaml
+CODE:
+redirect_url: 'http://foo.bar.com/oauth2/callback'
+provider: aliyun
+oidc_issuer_url: 'https://oauth.aliyun.com/'
+client_id: 'XXXXXXXXXXXXXXXX'
+client_secret: 'XXXXXXXXXXXXXXXX'
+scope: 'openid'
+cookie_secret: 'nqavJrGvRmQxWwGNptLdyUVKcBNZ2b18Guc1n_8DCfY='
+service_name: 'aliyun.dns'
+service_port: 443
+match_type: whitelist
+match_list:
+ - match_rule_domain: 'foo.bar.com'
+   match_rule_path: /foo
+   match_rule_type: prefix
+
+----------------------------------------
+
+TITLE: Configuring Global Authentication and Route Authorization in YAML
+DESCRIPTION: This snippet demonstrates how to set up global authentication and granular route authorization using the key-auth plugin in Higress. It includes consumer definitions, API key sources, and allow lists for specific routes and hostnames.
+
+LANGUAGE: yaml
+CODE:
+global_auth: false
+consumers:
+- credential: 2bda943c-ba2b-11ec-ba07-00163e1250b5
+  name: consumer1
+- credential: c8c8e9ca-558e-4a2d-bb62-e700dcc40e35
+  name: consumer2
+keys:
+- apikey
+- x-api-key
+
+LANGUAGE: yaml
+CODE:
+allow:
+- consumer1
+
+LANGUAGE: yaml
+CODE:
+allow:
+- consumer2
+
+----------------------------------------
+
+TITLE: Configuring AI Prompt Templates in YAML
+DESCRIPTION: Example YAML configuration for AI prompt templates. It defines a template named 'developer-chat' using the GPT-3.5-turbo model with system and user messages.
+
+LANGUAGE: yaml
+CODE:
+templates:
+- name: "developer-chat"
+  template:
+    model: gpt-3.5-turbo
+    messages:
+    - role: system
+      content: "You are a {{program}} expert, in {{language}} programming language."
+    - role: user
+      content: "Write me a {{program}} program."
+
+----------------------------------------
+
+TITLE: Configuring Basic AI Proxy Settings in YAML
+DESCRIPTION: Example YAML configuration for the AI Proxy plugin, including provider type, API tokens, and model mapping.
+
+LANGUAGE: yaml
+CODE:
+provider:
+  type: openai
+  apiTokens:
+    - "YOUR_OPENAI_API_TOKEN"
+  modelMapping:
+    '*': "gpt-3.5-turbo"
+
+----------------------------------------
+
+TITLE: Configuring AI Content Security Plugin for Input Validation in YAML
+DESCRIPTION: This YAML configuration snippet demonstrates how to set up the AI content security plugin to check if the input to an LLM is legal. It specifies the service details, authentication keys, and enables request checking.
+
+LANGUAGE: yaml
+CODE:
+serviceName: safecheck.dns
+servicePort: 443
+serviceHost: "green-cip.cn-shanghai.aliyuncs.com"
+accessKey: "XXXXXXXXX"
+secretKey: "XXXXXXXXXXXXXXX"
+checkRequest: true
+
+----------------------------------------
+
+TITLE: Configuring AI Transformer Plugin in YAML
+DESCRIPTION: Example configuration for the AI Request-Response Transformation plugin showing request/response transformation settings and provider configuration. Demonstrates setup for Qwen LLM service integration.
+
+LANGUAGE: yaml
+CODE:
+request:
+    enable: false
+    prompt: "If the request path starts with /httpbin, please remove the /httpbin prefix and do not change anything else."
+response:
+    enable: true
+    prompt: "Please modify the following HTTP response information with the requirements: 1. change content-type to application/json; 2. convert body from xml to json; 3. remove content-length."
+provider:
+    serviceName: qwen
+    domain: dashscope.aliyuncs.com
+    apiKey: xxxxxxxxxxxxx
+
+----------------------------------------
+
+TITLE: Configuring WAF Rules in YAML
+DESCRIPTION: Example configuration for WAF plugin showing how to enable OWASP CRS and define custom ModSecurity rules. Includes debug logging, rule engine activation, and specific rules for blocking admin access and malicious payloads.
+
+LANGUAGE: yaml
+CODE:
+useCRS: true
+secRules:
+  - "SecDebugLogLevel 3"
+  - "SecRuleEngine On"
+  - "SecAction \"id:100,phase:1,pass\""
+  - "SecRule REQUEST_URI \"@streq /admin\" \"id:101,phase:1,t:lowercase,deny\""
+  - "SecRule REQUEST_BODY \"@rx maliciouspayload\" \"id:102,phase:2,t:lowercase,deny\""
+
+----------------------------------------
+
+TITLE: Configuring AI RAG Plugin in YAML for Higress
+DESCRIPTION: This YAML configuration snippet demonstrates how to set up the AI RAG plugin for Higress. It includes settings for both the Dashscope (Tongyi Qianwen) and Dashvector (Alibaba Cloud Vector Retrieval) services, specifying API keys, service endpoints, and retrieval parameters.
+
+LANGUAGE: yaml
+CODE:
+dashscope:
+    apiKey: xxxxxxxxxxxxxxx
+    serviceFQDN: dashscope
+    servicePort: 443
+    serviceHost: dashscope.aliyuncs.com
+dashvector:
+    apiKey: xxxxxxxxxxxxxxxxxxxx
+    serviceFQDN: dashvector
+    servicePort: 443
+    serviceHost: vrs-cn-xxxxxxxxxxxxxxx.dashvector.cn-hangzhou.aliyuncs.com
+    collection: xxxxxxxxxxxxxxx
+    topk: 1
+    threshold: 0.4
+    field: raw
+
+----------------------------------------
+
+TITLE: Configuring WAF Plugin in YAML for Higress
+DESCRIPTION: This YAML configuration enables OWASP CRS and sets custom security rules for the WAF plugin. It includes debug logging, rule engine activation, and specific rules for blocking admin access and malicious payloads.
+
+LANGUAGE: yaml
+CODE:
+useCRS: true
+secRules: 
+  - "SecDebugLogLevel 3"
+  - "SecRuleEngine On"
+  - "SecAction \"id:100,phase:1,pass\""
+  - "SecRule REQUEST_URI \"@streq /admin\" \"id:101,phase:1,t:lowercase,deny\""
+  - "SecRule REQUEST_BODY \"@rx maliciouspayload\" \"id:102,phase:2,t:lowercase,deny\""
+
+----------------------------------------
+
+TITLE: Configuring AI Token Rate Limiting by Request Parameter
+DESCRIPTION: This YAML configuration example demonstrates how to set up rate limiting based on the 'apikey' request parameter. It defines different rate limits for specific API keys and uses regular expressions for matching groups of keys.
+
+LANGUAGE: yaml
+CODE:
+rule_name: default_rule
+rule_items:
+  - limit_by_param: apikey
+    limit_keys:
+      - key: 9a342114-ba8a-11ec-b1bf-00163e1250b5
+        token_per_minute: 10
+      - key: a6a6d7f2-ba8a-11ec-bec2-00163e1250b5
+        token_per_hour: 100
+  - limit_by_per_param: apikey
+    limit_keys:
+      # 正则表达式，匹配以a开头的所有字符串，每个apikey对应的请求10qds
+      - key: "regexp:^a.*"
+       	token_per_second: 10
+      # 正则表达式，匹配以b开头的所有字符串，每个apikey对应的请求100qd
+      - key: "regexp:^b.*"
+        token_per_minute: 100
+      # 兜底用，匹配所有请求，每个apikey对应的请求1000qdh
+      - key: "*"
+        token_per_hour: 1000
+redis:
+  service_name: redis.static
+
+----------------------------------------
+
+TITLE: Configuring CORS Plugin for All Origins without Credentials in YAML
+DESCRIPTION: This YAML configuration allows all cross-origin access without allowing the requester to carry credentials. It sets all origins, methods, headers, and expose headers to '*', with a max age of 7200 seconds.
+
+LANGUAGE: yaml
+CODE:
+allow_origins:
+  - '*'
+allow_methods:
+  - '*'
+allow_headers:
+  - '*'
+expose_headers:
+  - '*'
+allow_credentials: false
+max_age: 7200
+
+----------------------------------------
+
+TITLE: Configuring Higress CORS Plugin with McpBridge and Ingress in YAML
+DESCRIPTION: This YAML configuration sets up the CORS plugin for Higress using McpBridge and Ingress resources. It includes detailed settings for allowed origins, methods, headers, and other CORS-related options.
+
+LANGUAGE: yaml
+CODE:
+apiVersion: networking.higress.io/v1
+kind: McpBridge
+metadata:
+  name: mcp-cors-httpbin
+  namespace: higress-system
+spec:
+  registries:
+    - domain: httpbin.org
+      name: httpbin
+      port: 80
+      type: dns
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  annotations:
+    higress.io/destination: httpbin.dns
+    higress.io/upstream-vhost: "httpbin.org"
+    higress.io/backend-protocol: HTTP
+  name: ingress-cors-httpbin
+  namespace: higress-system
+spec:
+  ingressClassName: higress
+  rules:
+    - host: httpbin.example.com
+      http:
+        paths:
+          - backend:
+              resource:
+                apiGroup: networking.higress.io
+                kind: McpBridge
+                name: mcp-cors-httpbin
+            path: /
+            pathType: Prefix
+---
+apiVersion: extensions.higress.io/v1alpha1
+kind: WasmPlugin
+metadata:
+  name: wasm-cors-httpbin
+  namespace: higress-system
+spec:
+  defaultConfigDisable: true
+  matchRules:
+    - config:
+        allow_origins:
+          - http://httpbin.example.net
+        allow_origin_patterns:
+          - http://*.example.com:[*]
+          - http://*.example.org:[9090,8080]
+        allow_methods:
+          - GET
+          - POST
+          - PATCH
+        allow_headers:
+          - Content-Type
+          - Token
+          - Authorization
+        expose_headers:
+          - X-Custom-Header
+          - X-Env-UTM
+        allow_credentials: true
+        max_age: 3600
+      configDisable: false
+      ingress:
+        - ingress-cors-httpbin
+  url: oci://higress-registry.cn-hangzhou.cr.aliyuncs.com/plugins/cors:1.0.0
+  imagePullPolicy: Always
+
+----------------------------------------
+
+TITLE: Configuring Global Authentication and Route Authorization in YAML
+DESCRIPTION: Example YAML configuration for setting up global authentication and route-specific authorization using the HMAC Authentication plugin.
+
+LANGUAGE: yaml
+CODE:
+global_auth: false
+consumers:
+- key: appKey-example-1
+  secret: appSecret-example-1
+  name: consumer-1
+- key: appKey-example-2
+  secret: appSecret-example-2
+  name: consumer-2
+
+LANGUAGE: yaml
+CODE:
+allow:
+- consumer1
+
+LANGUAGE: yaml
+CODE:
+allow:
+- consumer2
+
+----------------------------------------
+
+TITLE: Configuring CORS Plugin for All Origins with Credentials in YAML
+DESCRIPTION: This YAML configuration allows all cross-origin access while allowing the requester to carry credentials. It uses allow_origin_patterns instead of allow_origins to comply with CORS specifications when credentials are allowed.
+
+LANGUAGE: yaml
+CODE:
+allow_origin_patterns:
+  - '*'
+allow_methods:
+  - '*'
+allow_headers:
+  - '*'
+expose_headers:
+  - '*'
+allow_credentials: true
+max_age: 7200
+
+----------------------------------------
+
+TITLE: Configuring AI Token Rate Limiting by Client IP
+DESCRIPTION: This example demonstrates how to configure rate limiting based on the client IP address, obtained from the 'x-forwarded-for' header. It includes limits for specific IPs, IP ranges, and a default limit for all IPs.
+
+LANGUAGE: yaml
+CODE:
+rule_name: default_rule
+rule_items:
+  - limit_by_per_ip: from-header-x-forwarded-for
+    limit_keys:
+      # 精确ip
+      - key: 1.1.1.1
+        token_per_day: 10
+      # ip段，符合这个ip段的ip，每个ip 100qpd
+      - key: 1.1.1.0/24
+        token_per_day: 100
+      # 兜底用，即默认每个ip 1000qpd
+      - key: 0.0.0.0/0
+        token_per_day: 1000
+redis:
+  service_name: redis.static
+
+----------------------------------------
+
+TITLE: Configuring Global Authentication in YAML
+DESCRIPTION: Example YAML configuration showing how to set up global Basic Auth authentication with multiple consumers. Each consumer has a credential (username:password) and name defined.
+
+LANGUAGE: yaml
+CODE:
+consumers:
+- credential: 'admin:123456'
+  name: consumer1
+- credential: 'guest:abc'
+  name: consumer2
+global_auth: false
+
+----------------------------------------
+
+TITLE: Configuring Keycloak OIDC in YAML
+DESCRIPTION: This YAML configuration sets up Keycloak as the OIDC provider in Higress.
+
+LANGUAGE: yaml
+CODE:
+redirect_url: 'http://foo.bar.com/oauth2/callback'
+oidc_issuer_url: 'http://127.0.0.1:9090/realms/myrealm'
+client_id: 'XXXXXXXXXXXXXXXX'
+client_secret: 'XXXXXXXXXXXXXXXX'
+scope: 'openid email'
+cookie_secret: 'nqavJrGvRmQxWwGNptLdyUVKcBNZ2b18Guc1n_8DCfY='
+service_name: 'keycloak.static'
+service_port: 80
+service_host: '127.0.0.1:9090'
+match_type: 'blacklist'
+match_list:
+    - match_rule_domain: '*.bar.com'
+      match_rule_path: '/headers'
+      match_rule_type: 'prefix'
+
+----------------------------------------
+
+TITLE: Configuring Global OAuth2 Authentication with Route-Specific Authorization in YAML
+DESCRIPTION: YAML configuration for global OAuth2 authentication at the instance level with route-specific authorization rules.
+
+LANGUAGE: yaml
+CODE:
+global_auth: false
+consumers:
+- name: consumer1
+  client_id: 12345678-xxxx-xxxx-xxxx-xxxxxxxxxxxx
+  client_secret: abcdefgh-xxxx-xxxx-xxxx-xxxxxxxxxxxx
+- name: consumer2
+  client_id: 87654321-xxxx-xxxx-xxxx-xxxxxxxxxxxx
+  client_secret: hgfedcba-xxxx-xxxx-xxxx-xxxxxxxxxxxx
+
+----------------------------------------
+
+TITLE: Configuring AI Quota Management with Redis
+DESCRIPTION: Example configuration for the ai-quota plugin showing Redis connection settings and quota management parameters. Demonstrates how to set up quota limits with Redis backend for API key-based rate limiting.
+
+LANGUAGE: yaml
+CODE:
+redis_key_prefix: "chat_quota:"
+admin_consumer: consumer3
+admin_path: /quota
+redis:
+  service_name: redis-service.default.svc.cluster.local
+  service_port: 6379
+  timeout: 2000
+
+----------------------------------------
+
+TITLE: Configuring Gateway-level Authentication in YAML
+DESCRIPTION: This YAML configuration enables Key Auth authentication at the gateway instance level. All requests to the gateway will require authentication using the specified API keys and consumers.
+
+LANGUAGE: yaml
+CODE:
+global_auth: true
+consumers:
+- credential: 2bda943c-ba2b-11ec-ba07-00163e1250b5
+  name: consumer1
+- credential: c8c8e9ca-558e-4a2d-bb62-e700dcc40e35
+  name: consumer2
+keys:
+- apikey
+- x-api-key
+
+----------------------------------------
+
+TITLE: Configuring AI Content Security Plugin for Input and Output Validation in YAML
+DESCRIPTION: This YAML configuration snippet shows how to configure the AI content security plugin to check both the input and output of an LLM for legality. It includes service details, authentication keys, and enables both request and response checking.
+
+LANGUAGE: yaml
+CODE:
+serviceName: safecheck.dns
+servicePort: 443
+serviceHost: green-cip.cn-shanghai.aliyuncs.com
+accessKey: "XXXXXXXXX"
+secretKey: "XXXXXXXXXXXXXXX"
+checkRequest: true
+checkResponse: true
+
+----------------------------------------
+
+TITLE: Configuring Redis for AI Cache Plugin in YAML
+DESCRIPTION: This YAML snippet demonstrates how to configure Redis settings for the AI Cache plugin in Higress. It includes specifying the Redis service name, timeout, port, and database.
+
+LANGUAGE: yaml
+CODE:
+redis:  
+  serviceName: my-redis.dns  
+  timeout: 2000  
+  servicePort: 6379
+  database: 1
+
+----------------------------------------
+
+TITLE: Configuring DeGraphQL Plugin in Higress YAML
+DESCRIPTION: YAML configuration for setting up the DeGraphQL plugin in Higress, including McpBridge, Ingress, and WasmPlugin resources. It defines the GitHub API endpoint and GraphQL query parameters.
+
+LANGUAGE: yaml
+CODE:
+apiVersion: networking.higress.io/v1
+kind: McpBridge
+metadata:
+  name: default
+  namespace: higress-system
+spec:
+  registries:
+  - domain: api.github.com
+    name: github
+    port: 443
+    type: dns
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  annotations:
+    higress.io/destination: github.dns
+    higress.io/upstream-vhost: "api.github.com"
+    higress.io/backend-protocol: HTTPS
+  name: github-api
+  namespace: higress-system
+spec:
+  ingressClassName: higress  
+  rules:
+  - http:
+      paths:
+      - backend:
+          resource:
+            apiGroup: networking.higress.io
+            kind: McpBridge
+            name: default
+        path: /api
+        pathType: Prefix
+---
+apiVersion: extensions.higress.io/v1alpha1
+kind: WasmPlugin
+metadata:
+  name: de-graphql-github-api
+  namespace: higress-system
+spec:
+  matchRules:
+  - ingress:
+    - github-api
+    config:
+      timeout: 5000
+      endpoint: /graphql
+      domain: api.github.com
+      gql: |
+           query ($owner:String! $name:String!){
+              repository(owner:$owner, name:$name) {
+                name
+                forkCount
+                description
+             }
+           }
+  url: oci://higress-registry.cn-hangzhou.cr.aliyuncs.com/plugins/de-graphql:1.0.0
+
+----------------------------------------
+
+TITLE: Configuring AI RAG Plugin in YAML
+DESCRIPTION: Example YAML configuration for the AI RAG plugin, including settings for DashScope and DashVector services. This configuration specifies API keys, service endpoints, and vector search parameters.
+
+LANGUAGE: yaml
+CODE:
+dashscope:
+    apiKey: xxxxxxxxxxxxxxx
+    serviceFQDN: dashscope
+    servicePort: 443
+    serviceHost: dashscope.aliyuncs.com
+dashvector:
+    apiKey: xxxxxxxxxxxxxxxxxxxx
+    serviceFQDN: dashvector
+    servicePort: 443
+    serviceHost: vrs-cn-xxxxxxxxxxxxxxx.dashvector.cn-hangzhou.aliyuncs.com
+    collection: xxxxxxxxxxxxxxx
+    topk: 1
+    threshold: 0.4
+    field: raw
+
+----------------------------------------
+
+TITLE: Configuring IP Geolocation Plugin in YAML
+DESCRIPTION: Example configuration for the geo-ip plugin showing how to set up IP protocol, source type, and header name settings.
+
+LANGUAGE: yaml
+CODE:
+ip_protocol: ipv4
+ip_source_type: header
+ip_header_name: X-Real-Ip
+
+----------------------------------------
+
+TITLE: Configuring AI Proxy in Docker Compose YAML
+DESCRIPTION: Docker Compose YAML configuration for setting up the AI Proxy plugin with Envoy.
+
+LANGUAGE: yaml
+CODE:
+version: '3.7'
+services:
+  envoy:
+    image: higress-registry.cn-hangzhou.cr.aliyuncs.com/higress/envoy:1.20
+    entrypoint: /usr/local/bin/envoy
+    command: -c /etc/envoy/envoy.yaml --component-log-level wasm:debug
+    networks:
+      - higress-net
+    ports:
+      - "10000:10000"
+    volumes:
+      - ./envoy.yaml:/etc/envoy/envoy.yaml
+      - ./plugin.wasm:/etc/envoy/plugin.wasm
+networks:
+  higress-net: {}
+
+----------------------------------------
+
+TITLE: Configuring Model Mapping in YAML for Higress Model Mapper Plugin
+DESCRIPTION: This YAML configuration demonstrates how to set up model mapping rules for the model-mapper plugin. It shows how to map different model prefixes to specific target models, including a fallback option.
+
+LANGUAGE: yaml
+CODE:
+modelMapping:
+  'gpt-4-*': "qwen-max"
+  'gpt-4o': "qwen-vl-plus"
+  '*': "qwen-turbo"
+
+----------------------------------------
+
+TITLE: Configuring OPA Plugin in YAML
+DESCRIPTION: Example YAML configuration for the OPA plugin in Higress. It specifies the service source, name, port, namespace, policy, and timeout.
+
+LANGUAGE: yaml
+CODE:
+serviceSource: k8s
+serviceName: opa
+servicePort: 8181
+namespace: higress-backend
+policy: example1
+timeout: 5s
+
+----------------------------------------
+
+TITLE: Default Bot Detection Regular Expressions in Higress
+DESCRIPTION: A set of regular expressions used by the bot-detect plugin to identify common web crawlers and bots. These patterns match various bot naming conventions and version numbers.
+
+LANGUAGE: bash
+CODE:
+# Bots General matcher 'name/0.0'
+    (?:\/[A-Za-z0-9\.]+|) {0,5}([A-Za-z0-9 \-_\!\[\]:]{0,50}(?:[Aa]rchiver|[Ii]ndexer|[Ss]craper|[Bb]ot|[Ss]pider|[Cc]rawl[a-z]{0,50}))[/ ](\d+)(?:\.(\d+)(?:\.(\d+)|)|)
+# Bots General matcher 'name 0.0'
+    (?:\/[A-Za-z0-9\.]+|) {0,5}([A-Za-z0-9 \-_\!\[\]:]{0,50}(?:[Aa]rchiver|[Ii]ndexer|[Ss]craper|[Bb]ot|[Ss]pider|[Cc]rawl[a-z]{0,50})) (\d+)(?:\.(\d+)(?:\.(\d+)|)|)
+# Bots containing spider|scrape|bot(but not CUBOT)|Crawl
+    ((?:[A-z0-9]{1,50}|[A-z\-]{1,50} ?|)(?: the |)(?:[Ss][Pp][Ii][Dd][Ee][Rr]|[Ss]crape|[Cc][Rr][Aa][Ww][Ll])[A-z0-9]{0,50})(?:(?:[ /]| v)(\d+)(?:\.(\d+)|)(?:\.(\d+)|)|)
+# Bots Pattern '/name-0.0'
+    /((?:Ant-)?Nutch|[A-z]+[Bb]ot|[A-z]+[Ss]pider|Axtaris|fetchurl|Isara|ShopSalad|Tailsweep)[ \-](\d+)(?:\.(\d+)(?:\.(\d+))?)?
+# Bots Pattern 'name/0.0'
+    \b(008|Altresium|Argus|BaiduMobaider|BoardReader|DNSGroup|DataparkSearch|EDI|Goodzer|Grub|INGRID|Infohelfer|LinkedInBot|LOOQ|Nutch|OgScrper|PathDefender|Peew|PostPost|Steeler|Twitterbot|VSE|WebCrunch|WebZIP|Y!J-BR[A-Z]|YahooSeeker|envolk|sproose|wminer)/(\d+)(?:\.(\d+)|)(?:\.(\d+)|)
+# More bots
+    (CSimpleSpider|Cityreview Robot|CrawlDaddy|CrawlFire|Finderbots|Index crawler|Job Roboter|KiwiStatus Spider|Lijit Crawler|QuerySeekerSpider|ScollSpider|Trends Crawler|USyd-NLP-Spider|SiteCat Webbot|BotName\/\$BotVersion|123metaspider-Bot|1470\.net crawler|50\.nu|8bo Crawler Bot|Aboundex|Accoona-[A-z]{1,30}-Agent|AdsBot-Google(?:-[a-z]{1,30}|)|altavista|AppEngine-Google|archive.{0,30}\.org_bot|archiver|Ask Jeeves|[Bb]ai[Dd]u[Ss]pider(?:-[A-Za-z]{1,30})(?:-[A-Za-z]{1,30}|)|bingbot|BingPreview|blitzbot|BlogBridge|Bloglovin|BoardReader Blog Indexer|BoardReader Favicon Fetcher|boitho.com-dc|BotSeer|BUbiNG|\b\w{0,30}favicon\w{0,30}\b|\bYeti(?:-[a-z]{1,30}|)|Catchpoint(?: bot|)|[Cc]harlotte|Checklinks|clumboot|Comodo HTTP\(S\) Crawler|Comodo-Webinspector-Crawler|ConveraCrawler|CRAWL-E|CrawlConvera|Daumoa(?:-feedfetcher|)|Feed Seeker Bot|Feedbin|findlinks|Flamingo_SearchEngine|FollowSite Bot|furlbot|Genieo|gigabot|GomezAgent|gonzo1|(?:[a-zA-Z]{1,30}-|)Googlebot(?:-[a-zA-Z]{1,30}|)|Google SketchUp|grub-client|gsa-crawler|heritrix|HiddenMarket|holmes|HooWWWer|htdig|ia_archiver|ICC-Crawler|Icarus6j|ichiro(?:/mobile|)|IconSurf|IlTrovatore(?:-Setaccio|)|InfuzApp|Innovazion Crawler|InternetArchive|IP2[a-z]{1,30}Bot|jbot\b|KaloogaBot|Kraken|Kurzor|larbin|LEIA|LesnikBot|Linguee Bot|LinkAider|LinkedInBot|Lite Bot|Llaut|lycos|Mail\.RU_Bot|masscan|masidani_bot|Mediapartners-Google|Microsoft .{0,30} Bot|mogimogi|mozDex|MJ12bot|msnbot(?:-media {0,2}|)|msrbot|Mtps Feed Aggregation System|netresearch|Netvibes|NewsGator[^/]{0,30}|^NING|Nutch[^/]{0,30}|Nymesis|ObjectsSearch|OgScrper|Orbiter|OOZBOT|PagePeeker|PagesInventory|PaxleFramework|Peeplo Screenshot Bot|PlantyNet_WebRobot|Pompos|Qwantify|Read%20Later|Reaper|RedCarpet|Retreiver|Riddler|Rival IQ|scooter|Scrapy|Scrubby|searchsight|seekbot|semanticdiscovery|SemrushBot|Simpy|SimplePie|SEOstats|SimpleRSS|SiteCon|Slackbot-LinkExpanding|Slack-ImgProxy|Slurp|snappy|Speedy Spider|Squrl Java|Stringer|TheUsefulbot|ThumbShotsBot|Thumbshots\.ru|Tiny Tiny RSS|Twitterbot|WhatsApp|URL2PNG|Vagabondo|VoilaBot|^vortex|Votay bot|^voyager|WASALive.Bot|Web-sniffer|WebThumb|WeSEE:[A-z]{1,30}|WhatWeb|WIRE|WordPress|Wotbox|www\.almaden\.ibm\.com|Xenu(?:.s|) Link Sleuth|Xerka [A-z]{1,30}Bot|yacy(?:bot|)|YahooSeeker|Yahoo! Slurp|Yandex\w{1,30}|YodaoBot(?:-[A-z]{1,30}|)|YottaaMonitor|Yowedo|^Zao|^Zao-Crawler|ZeBot_www\.ze\.bz|ZooShot|ZyBorg)(?:[ /]v?(\d+)(?:\.(\d+)(?:\.(\d+)|)|)|)
+
+----------------------------------------
+
+TITLE: Default Bot Detection Regular Expressions in Higress
+DESCRIPTION: A set of regular expressions used by the bot-detect plugin to identify common web crawlers and bots. These patterns match various bot naming conventions and version numbers.
+
+LANGUAGE: bash
+CODE:
+# Bots General matcher 'name/0.0'
+    (?:\/[A-Za-z0-9\.]+|) {0,5}([A-Za-z0-9 \-_\!\[\]:]{0,50}(?:[Aa]rchiver|[Ii]ndexer|[Ss]craper|[Bb]ot|[Ss]pider|[Cc]rawl[a-z]{0,50}))[/ ](\d+)(?:\.(\d+)(?:\.(\d+)|)|)
+# Bots General matcher 'name 0.0'
+    (?:\/[A-Za-z0-9\.]+|) {0,5}([A-Za-z0-9 \-_\!\[\]:]{0,50}(?:[Aa]rchiver|[Ii]ndexer|[Ss]craper|[Bb]ot|[Ss]pider|[Cc]rawl[a-z]{0,50})) (\d+)(?:\.(\d+)(?:\.(\d+)|)|)
+# Bots containing spider|scrape|bot(but not CUBOT)|Crawl
+    ((?:[A-z0-9]{1,50}|[A-z\-]{1,50} ?|)(?: the |)(?:[Ss][Pp][Ii][Dd][Ee][Rr]|[Ss]crape|[Cc][Rr][Aa][Ww][Ll])[A-z0-9]{0,50})(?:(?:[ /]| v)(\d+)(?:\.(\d+)|)(?:\.(\d+)|)|)
+# Bots Pattern '/name-0.0'
+    /((?:Ant-)?Nutch|[A-z]+[Bb]ot|[A-z]+[Ss]pider|Axtaris|fetchurl|Isara|ShopSalad|Tailsweep)[ \-](\d+)(?:\.(\d+)(?:\.(\d+))?)?
+# Bots Pattern 'name/0.0'
+    \b(008|Altresium|Argus|BaiduMobaider|BoardReader|DNSGroup|DataparkSearch|EDI|Goodzer|Grub|INGRID|Infohelfer|LinkedInBot|LOOQ|Nutch|OgScrper|PathDefender|Peew|PostPost|Steeler|Twitterbot|VSE|WebCrunch|WebZIP|Y!J-BR[A-Z]|YahooSeeker|envolk|sproose|wminer)/(\d+)(?:\.(\d+)|)(?:\.(\d+)|)
+# More bots
+    (CSimpleSpider|Cityreview Robot|CrawlDaddy|CrawlFire|Finderbots|Index crawler|Job Roboter|KiwiStatus Spider|Lijit Crawler|QuerySeekerSpider|ScollSpider|Trends Crawler|USyd-NLP-Spider|SiteCat Webbot|BotName\/\$BotVersion|123metaspider-Bot|1470\.net crawler|50\.nu|8bo Crawler Bot|Aboundex|Accoona-[A-z]{1,30}-Agent|AdsBot-Google(?:-[a-z]{1,30}|)|altavista|AppEngine-Google|archive.{0,30}\.org_bot|archiver|Ask Jeeves|[Bb]ai[Dd]u[Ss]pider(?:-[A-Za-z]{1,30})(?:-[A-Za-z]{1,30}|)|bingbot|BingPreview|blitzbot|BlogBridge|Bloglovin|BoardReader Blog Indexer|BoardReader Favicon Fetcher|boitho.com-dc|BotSeer|BUbiNG|\b\w{0,30}favicon\w{0,30}\b|\bYeti(?:-[a-z]{1,30}|)|Catchpoint(?: bot|)|[Cc]harlotte|Checklinks|clumboot|Comodo HTTP\(S\) Crawler|Comodo-Webinspector-Crawler|ConveraCrawler|CRAWL-E|CrawlConvera|Daumoa(?:-feedfetcher|)|Feed Seeker Bot|Feedbin|findlinks|Flamingo_SearchEngine|FollowSite Bot|furlbot|Genieo|gigabot|GomezAgent|gonzo1|(?:[a-zA-Z]{1,30}-|)Googlebot(?:-[a-zA-Z]{1,30}|)|Google SketchUp|grub-client|gsa-crawler|heritrix|HiddenMarket|holmes|HooWWWer|htdig|ia_archiver|ICC-Crawler|Icarus6j|ichiro(?:/mobile|)|IconSurf|IlTrovatore(?:-Setaccio|)|InfuzApp|Innovazion Crawler|InternetArchive|IP2[a-z]{1,30}Bot|jbot\b|KaloogaBot|Kraken|Kurzor|larbin|LEIA|LesnikBot|Linguee Bot|LinkAider|LinkedInBot|Lite Bot|Llaut|lycos|Mail\.RU_Bot|masscan|masidani_bot|Mediapartners-Google|Microsoft .{0,30} Bot|mogimogi|mozDex|MJ12bot|msnbot(?:-media {0,2}|)|msrbot|Mtps Feed Aggregation System|netresearch|Netvibes|NewsGator[^/]{0,30}|^NING|Nutch[^/]{0,30}|Nymesis|ObjectsSearch|OgScrper|Orbiter|OOZBOT|PagePeeker|PagesInventory|PaxleFramework|Peeplo Screenshot Bot|PlantyNet_WebRobot|Pompos|Qwantify|Read%20Later|Reaper|RedCarpet|Retreiver|Riddler|Rival IQ|scooter|Scrapy|Scrubby|searchsight|seekbot|semanticdiscovery|SemrushBot|Simpy|SimplePie|SEOstats|SimpleRSS|SiteCon|Slackbot-LinkExpanding|Slack-ImgProxy|Slurp|snappy|Speedy Spider|Squrl Java|Stringer|TheUsefulbot|ThumbShotsBot|Thumbshots\.ru|Tiny Tiny RSS|Twitterbot|WhatsApp|URL2PNG|Vagabondo|VoilaBot|^vortex|Votay bot|^voyager|WASALive.Bot|Web-sniffer|WebThumb|WeSEE:[A-z]{1,30}|WhatWeb|WIRE|WordPress|Wotbox|www\.almaden\.ibm\.com|Xenu(?:.s|) Link Sleuth|Xerka [A-z]{1,30}Bot|yacy(?:bot|)|YahooSeeker|Yahoo! Slurp|Yandex\w{1,30}|YodaoBot(?:-[A-z]{1,30}|)|YottaaMonitor|Yowedo|^Zao|^Zao-Crawler|ZeBot_www\.ze\.bz|ZooShot|ZyBorg)(?:[ /]v?(\d+)(?:\.(\d+)(?:\.(\d+)|)|)|)
+
+----------------------------------------
+
+TITLE: Content-based Traffic Tagging Configuration in YAML
+DESCRIPTION: Configuration example showing how to implement content-based traffic tagging using role headers and query parameters. The setup adds x-mse-tag headers based on specified conditions with a default fallback value.
+
+LANGUAGE: yaml
+CODE:
+defaultTagKey: x-mse-tag
+defaultTagVal: base
+conditionGroups:
+  - headerName: x-mse-tag
+    headerValue: gray
+    logic: and
+    conditions:
+      - conditionType: header
+        key: role
+        operator: in
+        value:
+          - user
+          - viewer
+          - editor
+      - conditionType: parameter
+        key: foo
+        operator: equal
+        value:
+          - bar
+
+----------------------------------------
+
+TITLE: Configuring Github OIDC in YAML
+DESCRIPTION: YAML configuration for setting up Github as the OIDC provider in Higress, including service and plugin settings.
+
+LANGUAGE: yaml
+CODE:
+redirect_url: 'http://foo.bar.com/oauth2/callback'
+provider: github
+oidc_issuer_url: 'https://github.com/'
+pass_access_token: true
+client_id: 'XXXXXXXXXXXXXXXX'
+client_secret: 'XXXXXXXXXXXXXXXX'
+scope: 'user repo'
+cookie_secret: 'nqavJrGvRmQxWwGNptLdyUVKcBNZ2b18Guc1n_8DCfY='
+service_name: 'github.dns'
+service_port: 443
+validate_service_name: 'api.dns'
+validate_service_port: 443
+match_type: 'whitelist'
+match_list:
+    - match_rule_domain: '*.bar.com'
+      match_rule_path: '/headers'
+      match_rule_type: 'prefix'
+
+----------------------------------------
+
+TITLE: Configuring IP Whitelist with Origin Source
+DESCRIPTION: Example configuration showing how to set up IP whitelisting using the origin source IP. Allows access from a specific IP (10.0.0.1) and a CIDR range (192.168.0.0/16).
+
+LANGUAGE: yaml
+CODE:
+ip_source_type: origin-source
+allow:
+  - 10.0.0.1
+  - 192.168.0.0/16
+
+----------------------------------------
+
+TITLE: Configuring AI Quota Management with Redis in YAML
+DESCRIPTION: Example configuration showing how to set up the AI quota management plugin with Redis backend. Demonstrates setting the redis key prefix, admin consumer, admin path, and Redis connection details.
+
+LANGUAGE: yaml
+CODE:
+redis_key_prefix: "chat_quota:"
+admin_consumer: consumer3
+admin_path: /quota
+redis:
+  service_name: redis-service.default.svc.cluster.local
+  service_port: 6379
+  timeout: 2000
+
+----------------------------------------
+
+TITLE: Configuring AI Token Rate Limiting by IP Address
+DESCRIPTION: This YAML configuration demonstrates how to set up AI token rate limiting based on the client IP address, using the 'x-forwarded-for' header. It includes rules for specific IPs, IP ranges, and a fallback rule.
+
+LANGUAGE: yaml
+CODE:
+rule_name: default_rule
+rule_items:
+  - limit_by_per_ip: from-header-x-forwarded-for
+    limit_keys:
+      # Exact IP
+      - key: 1.1.1.1
+        token_per_day: 10
+      # IP segment, matching IPs in this segment, each IP 100 qpd
+      - key: 1.1.1.0/24
+        token_per_day: 100
+      # Fallback, i.e., default each IP 1000 qpd
+      - key: 0.0.0.0/0
+        token_per_day: 1000
+redis:
+  service_name: redis.static
+
+----------------------------------------
+
+TITLE: Configuring Cache-Control for Image Files in YAML
+DESCRIPTION: This YAML configuration sets up caching for jpg, png, and jpeg files with a caching time of one hour (3600 seconds). It demonstrates how to specify multiple file extensions and set the expiration time.
+
+LANGUAGE: yaml
+CODE:
+suffix: jpg|png|jpeg
+expires: 3600
+
+----------------------------------------
+
+TITLE: Multiple Search Engines Configuration in YAML
+DESCRIPTION: Advanced configuration example showing how to integrate multiple search engines including Google and Bing with custom prompt template
+
+LANGUAGE: yaml
+CODE:
+defaultLang: "en-US"
+promptTemplate: |
+  # Search Results:
+  {search_results}
+  
+  # Please answer this question: 
+  {question}
+searchFrom:
+- type: google
+  apiKey: "google-key"
+  cx: "github-search-id"
+  serviceName: "google-svc.dns"
+  servicePort: 443
+- type: google
+  apiKey: "google-key"
+  cx: "news-search-id"
+  serviceName: "google-svc.dns"
+  servicePort: 443
+- type: bing
+  apiKey: "bing-key"
+  serviceName: "bing-svc.dns"
+  servicePort: 443
+  optionArgs:
+    answerCount: "5"
+
+----------------------------------------
+
+TITLE: Configuring AI Token Rate Limiting by Cookie
+DESCRIPTION: This YAML configuration demonstrates how to set up AI token rate limiting based on cookie values. It includes specific cookie value rules and fallback rules using regular expressions.
+
+LANGUAGE: yaml
+CODE:
+rule_name: default_rule
+rule_items:
+  - limit_by_cookie: key1
+    limit_keys:
+      - key: value1
+        token_per_minute: 10
+      - key: value2
+        token_per_hour: 100
+  - limit_by_per_cookie: key1
+    limit_keys:
+      # Regular expression, matches all strings starting with a, each value in cookie corresponds to 10 qds
+      - key: "regexp:^a.*"
+        token_per_second: 10
+      # Regular expression, matches all strings starting with b, each value in cookie corresponds to 100 qd
+      - key: "regexp:^b.*"
+        token_per_minute: 100
+      # Fallback, matches all requests, each value in cookie corresponds to 1000 qdh
+      - key: "*"
+        token_per_hour: 1000
+rejected_code: 200
+rejected_msg: '{"code":-1,"msg":"Too many requests"}'
+redis:
+  service_name: redis.static
+
+----------------------------------------
+
+TITLE: Configuring AI Token Rate Limiting by Consumer
+DESCRIPTION: This configuration sets up rate limiting based on the consumer. It defines specific limits for named consumers and uses regular expressions to group consumers and apply shared limits.
+
+LANGUAGE: yaml
+CODE:
+rule_name: default_rule
+rule_items:
+  - limit_by_consumer: ''
+    limit_keys:
+      - key: consumer1
+        token_per_second: 10
+      - key: consumer2
+        token_per_hour: 100
+  - limit_by_per_consumer: ''
+    limit_keys:
+      # 正则表达式，匹配以a开头的所有字符串，每个consumer对应的请求10qds
+      - key: "regexp:^a.*"
+        token_per_second: 10
+      # 正则表达式，匹配以b开头的所有字符串，每个consumer对应的请求100qd
+      - key: "regexp:^b.*"
+        token_per_minute: 100
+      # 兜底用，匹配所有请求，每个consumer对应的请求1000qdh
+      - key: "*"
+        token_per_hour: 1000     
+redis:
+  service_name: redis.static
+
+----------------------------------------
+
+TITLE: Rewrite Configuration for CDN Deployment in Frontend Gray Release YAML
+DESCRIPTION: Illustrates a complex configuration including rewrite rules for CDN deployment scenarios, along with gray release rules and version deployments.
+
+LANGUAGE: yaml
+CODE:
+grayKey: userid
+rules:
+- name: inner-user
+  grayKeyValue:
+  - '00000001'
+  - '00000005'
+- name: beta-user
+  grayKeyValue:
+  - '00000002'
+  - '00000003'
+  grayTagKey: level
+  grayTagValue:
+  - level3
+  - level5
+rewrite:
+  host: frontend-gray.oss-cn-shanghai-internal.aliyuncs.com
+  notFoundUri: /mfe/app1/dev/404.html
+  indexRouting:
+    /app1: '/mfe/app1/{version}/index.html'
+    /: '/mfe/app1/{version}/index.html',
+  fileRouting:
+    /: '/mfe/app1/{version}'
+    /app1/: '/mfe/app1/{version}'
+baseDeployment:
+  version: base
+grayDeployments:
+  - name: beta-user
+    version: gray
+    enabled: true
+
+----------------------------------------
+
+TITLE: Configuring Replay Attack Prevention Plugin in YAML
+DESCRIPTION: A complete configuration example of the replay attack prevention plugin, including settings for nonce validation, Redis connection, and error responses.
+
+LANGUAGE: yaml
+CODE:
+force_nonce: true
+nonce_header: "X-Higress-Nonce"    # Specifies the name of the nonce request header
+nonce_ttl: 900                    # The validity period of the nonce, set to 900 seconds
+nonce_min_length: 8               # The minimum length of the nonce
+nonce_max_length: 128             # The maximum length of the nonce
+validate_base64: true             # Whether to enable Base64 format verification
+reject_code: 429                  # The HTTP status code returned when a request is rejected
+reject_msg: "Replay Attack Detected"  # The error message content returned when a request is rejected
+redis:
+  service_name: redis.static       # The name of the Redis service
+  service_port: 80                # The port used by the Redis service
+  timeout: 1000                   # The timeout time of Redis operations (unit: milliseconds)
+  key_prefix: "replay-protection" # The key prefix in Redis
+
+----------------------------------------
+
+TITLE: Configuring AI Token Rate Limiting by Cookie
+DESCRIPTION: This example shows how to configure rate limiting based on a specific cookie key-value pair. It includes limits for specific cookie values and uses regular expressions for grouping cookie values.
+
+LANGUAGE: yaml
+CODE:
+rule_name: default_rule
+rule_items:
+  - limit_by_cookie: key1
+    limit_keys:
+      - key: value1
+        token_per_minute: 10
+      - key: value2
+        token_per_hour: 100
+  - limit_by_per_cookie: key1
+    limit_keys:
+      # 正则表达式，匹配以a开头的所有字符串，每个cookie中的value对应的请求10qds
+      - key: "regexp:^a.*"
+        token_per_second: 10
+      # 正则表达式，匹配以b开头的所有字符串，每个cookie中的value对应的请求100qd
+      - key: "regexp:^b.*"
+        token_per_minute: 100
+      # 兜底用，匹配所有请求，每个cookie中的value对应的请求1000qdh
+      - key: "*"
+        token_per_hour: 1000 
+rejected_code: 200
+rejected_msg: '{"code":-1,"msg":"Too many requests"}'
+redis:
+  service_name: redis.static
+
+----------------------------------------
+
+TITLE: Sending JWT Authentication Requests in cURL
+DESCRIPTION: Examples of sending authenticated requests using JWT tokens in URL parameters and HTTP headers.
+
+LANGUAGE: bash
+CODE:
+curl  'http://xxx.hello.com/test?access_token=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCIsImtpZCI6IjEyMyJ9.eyJpc3MiOiJhYmNkIiwic3ViIjoidGVzdCIsImlhdCI6MTY2NTY2MDUyNywiZXhwIjoxODY1NjczODE5fQ.-vBSV0bKeDwQcuS6eeSZN9dLTUnSnZVk8eVCXdooCQ4'
+
+LANGUAGE: bash
+CODE:
+curl  http://xxx.hello.com/test -H 'Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCIsImtpZCI6IjEyMyJ9.eyJpc3MiOiJhYmNkIiwic3ViIjoidGVzdCIsImlhdCI6MTY2NTY2MDUyNywiZXhwIjoxODY1NjczODE5fQ.-vBSV0bKeDwQcuS6eeSZN9dLTUnSnZVk8eVCXdooCQ4'
+
+----------------------------------------
+
+TITLE: Configuring Mock Response in Higress
+DESCRIPTION: Example configuration for setting up a mock response with custom status code, headers, and JSON body. This configuration returns a 200 status code with application/json content type and a simple JSON payload.
+
+LANGUAGE: yaml
+CODE:
+status_code: 200
+headers:
+- Content-Type=application/json
+- Hello=World
+body: "{\"hello\":\"world\"}"
+
+LANGUAGE: text
+CODE:
+HTTP/1.1 200 OK
+Content-Type: application/json
+Hello: World
+Content-Length: 17
+{"hello":"world"}
+
+----------------------------------------
+
+TITLE: OpenAI Request Format Example
+DESCRIPTION: Example of a basic request format following OpenAI standards with model specification and message content.
+
+LANGUAGE: json
+CODE:
+{
+  "model": "gpt-4",
+  "messages": [
+    {"role": "user", "content": "give me a api doc for add the variable x to x+5"}
+  ]
+}
+
+----------------------------------------
+
+TITLE: Configuring Rate Limiting by Request Parameter in YAML
+DESCRIPTION: This snippet demonstrates how to configure the key-rate-limit plugin to use the 'apikey' request parameter for differentiated rate limiting. It sets different rate limits for two specific API keys.
+
+LANGUAGE: yaml
+CODE:
+limit_by_param: apikey
+limit_keys:
+- key: 9a342114-ba8a-11ec-b1bf-00163e1250b5
+  query_per_second: 10
+- key: a6a6d7f2-ba8a-11ec-bec2-00163e1250b5
+  query_per_minute: 100
+
+----------------------------------------
+
+TITLE: Configuring Request Body Blocking in YAML
+DESCRIPTION: Example YAML configuration for blocking requests with specific body content in Higress. This configuration demonstrates case-insensitive matching for 'hello world' in the request body.
+
+LANGUAGE: yaml
+CODE:
+block_bodies:
+- "hello world"
+case_sensitive: false
+
+----------------------------------------
+
+TITLE: Configuring Aliyun OIDC in YAML
+DESCRIPTION: This YAML configuration sets up Aliyun as the OIDC provider in Higress.
+
+LANGUAGE: yaml
+CODE:
+redirect_url: 'http://foo.bar.com/oauth2/callback'
+provider: aliyun
+oidc_issuer_url: 'https://oauth.aliyun.com/'
+client_id: 'XXXXXXXXXXXXXXXX'
+client_secret: 'XXXXXXXXXXXXXXXX'
+scope: 'openid'
+cookie_secret: 'nqavJrGvRmQxWwGNptLdyUVKcBNZ2b18Guc1n_8DCfY='
+service_name: 'aliyun.dns'
+service_port: 443
+match_type: whitelist
+match_list:
+ - match_rule_domain: 'foo.bar.com'
+   match_rule_path: /foo
+   match_rule_type: prefix
+
+----------------------------------------
+
+TITLE: Configuring AI History Dialogue Plugin in YAML
+DESCRIPTION: Example YAML configuration for the AI History Dialogue plugin, specifying Redis service name and timeout.
+
+LANGUAGE: yaml
+CODE:
+redis:
+  serviceName: my-redis.dns
+  timeout: 2000
+
+----------------------------------------
+
+TITLE: Configuring Global Authentication in Higress
+DESCRIPTION: Instance-level configuration for basic authentication defining consumers with their credentials and global authentication flag.
+
+LANGUAGE: yaml
+CODE:
+consumers:
+- credential: 'admin:123456'
+  name: consumer1
+- credential: 'guest:abc'
+  name: consumer2
+global_auth: false
+
+----------------------------------------
+
+TITLE: Configuring GitHub OIDC in YAML
+DESCRIPTION: This YAML configuration sets up GitHub as the OIDC provider in Higress.
+
+LANGUAGE: yaml
+CODE:
+redirect_url: 'http://foo.bar.com/oauth2/callback'
+provider: github
+oidc_issuer_url: 'https://github.com/'
+pass_access_token: true
+client_id: 'XXXXXXXXXXXXXXXX'
+client_secret: 'XXXXXXXXXXXXXXXX'
+scope: 'user repo'
+cookie_secret: 'nqavJrGvRmQxWwGNptLdyUVKcBNZ2b18Guc1n_8DCfY='
+service_name: 'github.dns'
+service_port: 443
+validate_service_name: 'api.dns'
+validate_service_port: 443
+match_type: 'whitelist'
+match_list:
+    - match_rule_domain: '*.bar.com'
+      match_rule_path: '/headers'
+      match_rule_type: 'prefix'
+
+----------------------------------------
+
+TITLE: Sending API Key in URL Parameters using cURL
+DESCRIPTION: Example cURL command demonstrating how to send an API Key in URL parameters.
+
+LANGUAGE: bash
+CODE:
+curl  http://xxx.hello.com/test?apikey=2bda943c-ba2b-11ec-ba07-00163e1250b5
+
+----------------------------------------
+
+TITLE: Configuring Domain-Specific OAuth2 Authorization in YAML
+DESCRIPTION: YAML configuration for OAuth2 authorization on specific domains.
+
+LANGUAGE: yaml
+CODE:
+allow:
+- consumer2
+
+----------------------------------------
+
+TITLE: Configuring Global Authentication and Route-level Authorization in YAML
+DESCRIPTION: Example YAML configuration for setting up global HMAC authentication and route-specific authorization in Higress.
+
+LANGUAGE: yaml
+CODE:
+global_auth: false
+consumers: 
+- key: appKey-example-1
+  secret: appSecret-example-1
+  name: consumer-1
+- key: appKey-example-2
+  secret: appSecret-example-2
+  name: consumer-2
+
+LANGUAGE: yaml
+CODE:
+allow:
+- consumer1
+
+LANGUAGE: yaml
+CODE:
+allow:
+- consumer2
+
+----------------------------------------
+
+TITLE: Configuring Number Range Validation in Higress Request Validation
+DESCRIPTION: Demonstrates how to validate integer values within a specific range using JSON Schema. Requires the payload to be between 1 and 10.
+
+LANGUAGE: yaml
+CODE:
+body_schema:
+  type: object
+  required:
+    - integer_payload
+  properties:
+    integer_payload:
+      type: integer
+      minimum: 1
+      maximum: 10
+
+----------------------------------------
+
+TITLE: Configuring Route-Specific OAuth2 Authorization in YAML
+DESCRIPTION: YAML configuration for OAuth2 authorization on specific routes.
+
+LANGUAGE: yaml
+CODE:
+allow:
+- consumer1
+
+----------------------------------------
+
+TITLE: Configuring Global OAuth2 Credentials in YAML
+DESCRIPTION: YAML configuration for enabling global OAuth2 credentials across routes.
+
+LANGUAGE: yaml
+CODE:
+global_credentials: true
+consumers:
+- name: consumer1
+  client_id: 12345678-xxxx-xxxx-xxxx-xxxxxxxxxxxx
+  client_secret: abcdefgh-xxxx-xxxx-xxxx-xxxxxxxxxxxx
+
+----------------------------------------
+
+TITLE: Configuring IP Blacklist with Header Source
+DESCRIPTION: Example configuration showing how to set up IP blacklisting using a custom header (x-real-iP). Blocks access from a specific IP (10.0.0.1) and a CIDR range (192.169.0.0/16).
+
+LANGUAGE: yaml
+CODE:
+ip_source_type: header
+ip_header_name: x-real-iP
+deny:
+  - 10.0.0.1
+  - 192.169.0.0/16
+
+----------------------------------------
+
+TITLE: Basic Configuration for Frontend Gray Release in YAML
+DESCRIPTION: Demonstrates a basic configuration for the frontend-gray plugin, including user identification, gray release rules, and version deployments.
+
+LANGUAGE: yaml
+CODE:
+grayKey: userid
+rules:
+- name: inner-user
+  grayKeyValue:
+  - '00000001'
+  - '00000005'
+- name: beta-user
+  grayKeyValue:
+  - '00000002'
+  - '00000003'
+  grayTagKey: level
+  grayTagValue:
+  - level3
+  - level5
+baseDeployment:
+  version: base
+grayDeployments:
+  - name: beta-user
+    version: gray
+    enabled: true
+
+----------------------------------------
+
+TITLE: Configuring Gateway-Level OAuth2 Authentication in YAML
+DESCRIPTION: YAML configuration for enabling OAuth2 authentication at the gateway instance level.
+
+LANGUAGE: yaml
+CODE:
+global_auth: true
+consumers:
+- name: consumer1
+  client_id: 12345678-xxxx-xxxx-xxxx-xxxxxxxxxxxx
+  client_secret: abcdefgh-xxxx-xxxx-xxxx-xxxxxxxxxxxx
+- name: consumer2
+  client_id: 87654321-xxxx-xxxx-xxxx-xxxxxxxxxxxx
+  client_secret: hgfedcba-xxxx-xxxx-xxxx-xxxxxxxxxxxx
+
+----------------------------------------
+
+TITLE: Generating JWT Token using Java
+DESCRIPTION: Java code snippet for generating a JWT token using RSA keys.
+
+LANGUAGE: java
+CODE:
+import java.security.PrivateKey;
+import org.jose4j.json.JsonUtil;
+import org.jose4j.jwk.RsaJsonWebKey;
+import org.jose4j.jwk.RsaJwkGenerator;
+import org.jose4j.jws.AlgorithmIdentifiers;
+import org.jose4j.jws.JsonWebSignature;
+import org.jose4j.jwt.JwtClaims;
+import org.jose4j.jwt.NumericDate;
+import org.jose4j.lang.JoseException;
+
+public class GenerateJwtDemo {
+    public static void main(String[] args) throws JoseException  {
+        String keyId = "uniq_key";
+        String privateKeyJson = "{
+"kty": "RSA",
+"d": "O9MJSOgcjjiVMNJ4jmBAh0mRHF_TlaVva70Imghtlgwxl8BLfcf1S8ueN1PD7xV6Cnq8YenSKsfiNOhC6yZ_fjW1syn5raWfj68eR7cjHWjLOvKjwVY33GBPNOvspNhVAFzeqfWneRTBbga53Agb6jjN0SUcZdJgnelzz5JNdOGaLzhacjH6YPJKpbuzCQYPkWtoZHDqWTzCSb4mJ3n0NRTsWy7Pm8LwG_Fd3pACl7JIY38IanPQDLoighFfo-Lriv5z3IdlhwbPnx0tk9sBwQBTRdZ8JkqqYkxUiB06phwr7mAnKEpQJ6HvhZBQ1cCnYZ_nIlrX9-I7qomrlE1UoQ",
+"e": "AQAB",
+"alg": "RS256",
+"n": "vCuB8MgwPZfziMSytEbBoOEwxsG7XI3MaVMoocziP4SjzU4IuWuE_DodbOHQwb_thUru57_Efe--sfATHEa0Odv5ny3QbByqsvjyeHk6ZE4mSAV9BsHYa6GWAgEZtnDceeeDc0y76utXK2XHhC1Pysi2KG8KAzqDa099Yh7s31AyoueoMnrYTmWfEyDsQL_OAIiwgXakkS5U8QyXmWicCwXntDzkIMh8MjfPskesyli0XQD1AmCXVV3h2Opm1Amx0ggSOOiINUR5YRD6mKo49_cN-nrJWjtwSouqDdxHYP-4c7epuTcdS6kQHiQERBd1ejdpAxV4c0t0FHF7MOy9kw"
+}";
+        JwtClaims claims = new JwtClaims();
+        claims.setGeneratedJwtId();
+        claims.setIssuedAtToNow();
+        NumericDate date = NumericDate.now();
+        date.addSeconds(120*60);
+        claims.setExpirationTime(date);
+        claims.setNotBeforeMinutesInThePast(1);
+        claims.setSubject("YOUR_SUBJECT");
+        claims.setAudience("YOUR_AUDIENCE");
+        claims.setClaim("userId", "1213234");
+        claims.setClaim("email", "userEmail@youapp.com");
+        JsonWebSignature jws = new JsonWebSignature();
+        jws.setAlgorithmHeaderValue(AlgorithmIdentifiers.RSA_USING_SHA256);
+        jws.setKeyIdHeaderValue(keyId);
+        jws.setPayload(claims.toJson());
+        PrivateKey privateKey = new RsaJsonWebKey(JsonUtil.parseJson(privateKeyJson)).getPrivateKey();
+        jws.setKey(privateKey);
+        String jwtResult = jws.getCompactSerialization();
+        System.out.println("Generate Json Web token , result is " + jwtResult);
+    }
+}
+
+----------------------------------------
+
+TITLE: Configuring Rate Limiting by Request Header in YAML
+DESCRIPTION: This example shows how to set up the key-rate-limit plugin to use the 'x-ca-key' request header for differentiated rate limiting. It defines different rate limits for two specific header values.
+
+LANGUAGE: yaml
+CODE:
+limit_by_header: x-ca-key
+limit_keys:
+- key: 102234
+  query_per_second: 10
+- key: 308239
+  query_per_hour: 10
+
+----------------------------------------
+
+TITLE: AI Agent Response for Weather Information
+DESCRIPTION: JSON response from the AI Agent providing current weather information for Jinan.
+
+LANGUAGE: json
+CODE:
+{
+  "id": "ebd6ea91-8e38-9e14-9a5b-90178d2edea4",
+  "choices": [
+    {
+      "index": 0,
+      "message": {
+        "role": "assistant",
+        "content": " The current weather condition in Jinan is overcast, with a temperature of 31°C. This information was last updated on August 9, 2024, at 15:12 (Beijing time)."
+      },
+      "finish_reason": "stop"
+    }
+  ],
+  "created": 1723187991,
+  "model": "qwen-max-0403",
+  "object": "chat.completion",
+  "usage": {
+    "prompt_tokens": 890,
+    "completion_tokens": 56,
+    "total_tokens": 946
+  }
+}
+
+----------------------------------------
+
+TITLE: Sending JWT in HTTP Headers
+DESCRIPTION: Example cURL command for sending a JWT token in HTTP headers.
+
+LANGUAGE: bash
+CODE:
+curl  http://xxx.hello.com/test -H 'Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCIsImtpZCI6IjEyMyJ9.eyJpc3MiOiJhYmNkIiwic3ViIjoidGVzdCIsImlhdCI6MTY2NTY2MDUyNywiZXhwIjoxODY1NjczODE5fQ.-vBSV0bKeDwQcuS6eeSZN9dLTUnSnZVk8eVCXdooCQ4'
+
+----------------------------------------
+
+TITLE: Rate Limiting by Request Parameter
+DESCRIPTION: Configuration example showing rate limiting based on apikey parameter with multiple rule definitions including regex patterns.
+
+LANGUAGE: yaml
+CODE:
+rule_name: default_rule
+rule_items:
+- limit_by_param: apikey
+  limit_keys:
+  - key: 9a342114-ba8a-11ec-b1bf-00163e1250b5
+    query_per_minute: 10
+  - key: a6a6d7f2-ba8a-11ec-bec2-00163e1250b5
+    query_per_hour: 100
+- limit_by_per_param: apikey
+  limit_keys:
+  - key: "regexp:^a.*"
+    query_per_second: 10
+  - key: "regexp:^b.*"
+    query_per_minute: 100
+  - key: "*"
+    query_per_hour: 1000
+redis:
+  service_name: redis.static
+show_limit_quota_header: true
+
+----------------------------------------
+
+TITLE: AI Agent Response with Custom JSON Schema
+DESCRIPTION: JSON response from the AI Agent providing weather information for Beijing formatted according to the custom JSON schema.
+
+LANGUAGE: json
+CODE:
+{
+  "id": "ebd6ea91-8e38-9e14-9a5b-90178d2edea4",
+  "choices": [
+    {
+      "index": 0,
+      "message": {
+        "role": "assistant",
+        "content": "{\"location\": \"Beijing\", \"weather\": \"cloudy\", \"temperature\": \"19℃\", \"update_time\": \"Oct 9, 2024, at 16:37\"}"
+      },
+      "finish_reason": "stop"
+    }
+  ],
+  "created": 1723187991,
+  "model": "qwen-max-0403",
+  "object": "chat.completion",
+  "usage": {
+    "prompt_tokens": 890,
+    "completion_tokens": 56,
+    "total_tokens": 946
+  }
+}
+
+----------------------------------------
+
+TITLE: Configuring Route Authorization in Higress
+DESCRIPTION: Authorization configuration for specific routes allowing access to designated consumers.
+
+LANGUAGE: yaml
+CODE:
+allow:
+- consumer1
+
+----------------------------------------
+
+TITLE: Configuring Rate Limiting Response in Higress
+DESCRIPTION: YAML configuration for custom response handling when rate limiting is triggered, implementing a 302 redirect.
+
+LANGUAGE: yaml
+CODE:
+enable_on_status:
+- 429
+status_code: 302
+headers:
+- Location=https://example.com
+
+----------------------------------------
+
+TITLE: AI Agent Response with JSON Formatting
+DESCRIPTION: JSON response from the AI Agent providing weather information for Beijing in a formatted JSON structure.
+
+LANGUAGE: json
+CODE:
+{
+  "id": "ebd6ea91-8e38-9e14-9a5b-90178d2edea4",
+  "choices": [
+    {
+      "index": 0,
+      "message": {
+        "role": "assistant",
+        "content": "{\"city\": \"BeiJing\", \"weather_condition\": \"cloudy\", \"temperature\": \"19℃\", \"data_update_time\": \"Oct 9, 2024, at 16:37\"}"
+      },
+      "finish_reason": "stop"
+    }
+  ],
+  "created": 1723187991,
+  "model": "qwen-max-0403",
+  "object": "chat.completion",
+  "usage": {
+    "prompt_tokens": 890,
+    "completion_tokens": 56,
+    "total_tokens": 946
+  }
+}
+
+----------------------------------------
+
+TITLE: Configuring JWT Authentication for Specific Routes
+DESCRIPTION: YAML configuration for enabling JWT authentication on specific routes.
+
+LANGUAGE: yaml
+CODE:
+allow:
+- consumer1
+
+----------------------------------------
+
+TITLE: Advanced Envoy Mode Configuration with Headers
+DESCRIPTION: Advanced configuration example for ext-auth plugin using envoy endpoint mode with custom header handling and authorization response configuration.
+
+LANGUAGE: yaml
+CODE:
+http_service:
+  authorization_request:
+    allowed_headers:
+      - exact: x-auth-version
+    headers_to_add:
+      x-envoy-header: true
+  authorization_response:
+    allowed_upstream_headers:
+      - exact: x-user-id
+      - exact: x-auth-version
+  endpoint_mode: envoy
+  endpoint:
+    service_name: ext-auth.backend.svc.cluster.local
+    service_host: my-domain.local
+    service_port: 8090
+    path_prefix: /auth
+  timeout: 1000
+
+----------------------------------------
+
+TITLE: Rate Limiting by Cookie
+DESCRIPTION: Configuration example for cookie-based rate limiting with custom rejection settings and pattern matching.
+
+LANGUAGE: yaml
+CODE:
+rule_name: default_rule
+rule_items:
+  - limit_by_cookie: key1
+    limit_keys:
+      - key: value1
+        query_per_minute: 10
+      - key: value2
+        query_per_hour: 100
+  - limit_by_per_cookie: key1
+    limit_keys:
+      - key: "regexp:^a.*"
+        query_per_second: 10
+      - key: "regexp:^b.*"
+        query_per_minute: 100
+      - key: "*"
+        query_per_hour: 1000
+rejected_code: 200
+rejected_msg: '{"code":-1,"msg":"Too many requests"}'
+redis:
+  service_name: redis.static
+show_limit_quota_header: true
+
+----------------------------------------
+
+TITLE: Configuring OAuth2 Authentication for Routes in YAML
+DESCRIPTION: YAML configuration for setting up OAuth2 authentication on specific routes with a single consumer.
+
+LANGUAGE: yaml
+CODE:
+consumers:
+- name: consumer1
+  client_id: 12345678-xxxx-xxxx-xxxx-xxxxxxxxxxxx
+  client_secret: abcdefgh-xxxx-xxxx-xxxx-xxxxxxxxxxxx
+
+----------------------------------------
+
+TITLE: Configuring Blacklist Mode in Ext-Auth Plugin
+DESCRIPTION: Configuration example demonstrating blacklist mode setup where specified requests require verification based on domain, path, and method rules.
+
+LANGUAGE: yaml
+CODE:
+match_type: 'blacklist'
+match_list:
+  - match_rule_domain: 'admin.example.com'
+    match_rule_path: '/sensitive'
+    match_rule_type: 'prefix'
+  - match_rule_method: ["DELETE"]
+    match_rule_path: '/user'
+    match_rule_type: 'exact'
+  - match_rule_domain: 'legacy.example.com'
+    match_rule_method: ["POST"]
+
+----------------------------------------
+
+TITLE: cURL Request Example
+DESCRIPTION: Example of making an HTTP POST request to the completions endpoint using cURL.
+
+LANGUAGE: bash
+CODE:
+curl -X POST "http://localhost:8001/v1/chat/completions" \
+-H "Content-Type: application/json" \
+-d '{
+  "model": "gpt-4",
+  "messages": [
+    {"role": "user", "content": "give me a api doc for add the variable x to x+5"}
+  ]
+}'
+
+----------------------------------------
+
+TITLE: Default Crawler Detection Patterns - Bash Regex
+DESCRIPTION: Collection of regular expressions used by default to identify various types of web crawlers, bots, and spiders. Includes patterns for matching common bot naming conventions and specific bot identifiers.
+
+LANGUAGE: bash
+CODE:
+# Bots General matcher 'name/0.0'
+    (?:\/[A-Za-z0-9\.]+|) {0,5}([A-Za-z0-9 \-_\!\[\]:]{0,50}(?:[Aa]rchiver|[Ii]ndexer|[Ss]craper|[Bb]ot|[Ss]pider|[Cc]rawl[a-z]{0,50}))[/ ](\d+)(?:\.(\d+)(?:\.(\d+)|)|)
+# Bots General matcher 'name 0.0'
+    (?:\/[A-Za-z0-9\.]+|) {0,5}([A-Za-z0-9 \-_\!\[\]:]{0,50}(?:[Aa]rchiver|[Ii]ndexer|[Ss]craper|[Bb]ot|[Ss]pider|[Cc]rawl[a-z]{0,50})) (\d+)(?:\.(\d+)(?:\.(\d+)|)|)
+# Bots containing spider|scrape|bot(but not CUBOT)|Crawl
+    ((?:[A-z0-9]{1,50}|[A-z\-]{1,50} ?|)(?: the |)(?:[Ss][Pp][Ii][Dd][Ee][Rr]|[Ss]crape|[Cc][Rr][Aa][Ww][Ll])[A-z0-9]{0,50})(?:(?:[ /]| v)(\d+)(?:\.(\d+)|)(?:\.(\d+)|)|)
+# Bots Pattern '/name-0.0'
+    /((?:Ant-)?Nutch|[A-z]+[Bb]ot|[A-z]+[Ss]pider|Axtaris|fetchurl|Isara|ShopSalad|Tailsweep)[ \-](\d+)(?:\.(\d+)(?:\.(\d+))?)?\b(008|Altresium|Argus|BaiduMobaider|BoardReader|DNSGroup|DataparkSearch|EDI|Goodzer|Grub|INGRID|Infohelfer|LinkedInBot|LOOQ|Nutch|OgScrper|PathDefender|Peew|PostPost|Steeler|Twitterbot|VSE|WebCrunch|WebZIP|Y!J-BR[A-Z]|YahooSeeker|envolk|sproose|wminer)/(\d+)(?:\.(\d+)|)(?:\.(\d+)|)
+
+----------------------------------------
+
+TITLE: Configuring String Length Validation in Higress Request Validation
+DESCRIPTION: Shows how to validate string length constraints using JSON Schema. Requires the string length to be between 1 and 10 characters.
+
+LANGUAGE: yaml
+CODE:
+body_schema:
+  type: object
+  required:
+    - string_payload
+  properties:
+    string_payload:
+      type: string
+      minLength: 1
+      maxLength: 10
+
+----------------------------------------
+
+TITLE: GraphQL Query with Parameters
+DESCRIPTION: Example of a GraphQL query with parameters, demonstrating the use of variables and non-null constraints.
+
+LANGUAGE: graphql
+CODE:
+query ($owner : String!, $name : String!) {
+  repository(owner: $owner, name: $name) {
+    name
+    forkCount
+    description
+  }
+}
+
+----------------------------------------
+
+TITLE: Configuring Model-to-Header Routing in YAML
+DESCRIPTION: YAML configuration for routing based on the model parameter, setting it to a specific request header for subsequent routing.
+
+LANGUAGE: yaml
+CODE:
+modelToHeader: x-higress-llm-model
+
+----------------------------------------
+
+TITLE: Configuring Array Validation in Higress Request Validation
+DESCRIPTION: Shows how to validate array contents using JSON Schema. Requires unique integer values between 1 and 10 with at least one item.
+
+LANGUAGE: yaml
+CODE:
+body_schema:
+  type: object
+  required:
+    - array_payload
+  properties:
+    array_payload:
+      type: array
+      minItems: 1
+      items:
+        type: integer
+        minimum: 1
+        maximum: 10
+      uniqueItems: true
+      default: [1, 2, 3]
+
+----------------------------------------
+
+TITLE: Testing GitHub GraphQL API with cURL
+DESCRIPTION: Shell commands to test the GitHub GraphQL API using cURL, including authentication and query parameters.
+
+LANGUAGE: shell
+CODE:
+curl https://api.github.com/graphql -X POST \
+-H "Authorization: bearer <PAT>" \
+-d "{\"query\": \"query { viewer { login }}\"}"
+
+LANGUAGE: shell
+CODE:
+curl 'https://api.github.com/graphql' -X POST \
+-H 'Authorization: bearer <PAT>' \
+-d '{"query":"query ($owner: String!, $name: String!) {\n  repository(owner: $owner, name: $name) {\n    name\n    forkCount\n    description\n  }\n}\n","variables":{"owner":"2456868764","name":"higress"}}'
+
+----------------------------------------
+
+TITLE: Modified LLM Request JSON After Model Mapper Processing
+DESCRIPTION: This JSON snippet demonstrates the result of processing the original LLM request through the model-mapper plugin. The 'model' field has been rewritten based on the configured mapping rules.
+
+LANGUAGE: json
+CODE:
+{
+    "model": "qwen-vl-plus",
+    "frequency_penalty": 0,
+    "max_tokens": 800,
+    "stream": false,
+    "messages": [{
+        "role": "user",
+        "content": "What is the GitHub address of the main repository for the higress project?"
+    }],
+    "presence_penalty": 0,
+    "temperature": 0.7,
+    "top_p": 0.95
+}
+
+----------------------------------------
+
+TITLE: Configuring Combined Validation in Higress Request Validation
+DESCRIPTION: Demonstrates how to combine multiple validation types using JSON Schema. Includes boolean, array, and regex validations together.
+
+LANGUAGE: yaml
+CODE:
+body_schema:
+  type: object
+  required:
+    - boolean_payload
+    - array_payload
+    - regex_payload
+  properties:
+    boolean_payload:
+      type: boolean
+    array_payload:
+      type: array
+      minItems: 1
+      items:
+          type: integer
+          minimum: 1
+          maximum: 10
+      uniqueItems: true
+      default: [1, 2, 3]
+    regex_payload:
+      type: string
+      minLength: 1
+      maxLength: 10
+      pattern: "^[a-zA-Z0-9_]+$"
+
+----------------------------------------
+
+TITLE: Testing Illegal CORS Header Preflight Request with cURL
+DESCRIPTION: This cURL command tests an illegal CORS preflight request with an unauthorized header to the configured Higress server. It demonstrates the server's response to requests with disallowed headers.
+
+LANGUAGE: shell
+CODE:
+curl -v -X OPTIONS -H "Origin: http://httpbin2.example.org:9090" -H "Host: httpbin.example.com" -H "Access-Control-Request-Method: GET" -H "Access-Control-Request-Headers: TokenView" http://127.0.0.1/anything/get\?foo\=1
+
+----------------------------------------
+
+TITLE: Configuring Mock Response in Higress
+DESCRIPTION: YAML configuration example for setting up a mock response with custom status code, headers, and JSON body content.
+
+LANGUAGE: yaml
+CODE:
+status_code: 200
+headers:
+- Content-Type=application/json
+- Hello=World
+body: "{\"hello\":\"world\"}"
+
+----------------------------------------
+
+TITLE: Configuring Custom Rejection Response in Higress Request Validation
+DESCRIPTION: Shows how to configure custom rejection responses when validation fails. Includes custom HTTP status code and message.
+
+LANGUAGE: yaml
+CODE:
+body_schema:
+  type: object
+  required:
+    - boolean_payload
+  properties:
+    boolean_payload:
+      type: boolean
+rejected_code: 403
+rejected_msg: "Request rejected"
+
+----------------------------------------
+
+TITLE: Sending Authenticated Requests with API Key in URL Parameter
+DESCRIPTION: This curl command demonstrates how to send an authenticated request by including the API key as a URL parameter. The request will be allowed if it matches the configured route and uses a valid API key.
+
+LANGUAGE: bash
+CODE:
+curl  http://xxx.hello.com/test?apikey=2bda943c-ba2b-11ec-ba07-00163e1250b5
+
+----------------------------------------
+
+TITLE: Configuring Instance-Level Authentication in YAML
+DESCRIPTION: YAML configuration for enabling Key Auth authentication at the instance level for all gateway requests.
+
+LANGUAGE: yaml
+CODE:
+global_auth: true
+consumers:
+- credential: 2bda943c-ba2b-11ec-ba07-00163e1250b5
+  name: consumer1
+- credential: c8c8e9ca-558e-4a2d-bb62-e700dcc40e35
+  name: consumer2
+keys:
+- apikey
+- x-api-key
+
+----------------------------------------
+
+TITLE: Failed Authentication Request Examples
+DESCRIPTION: Bash curl commands showing various scenarios that result in authentication or authorization failures.
+
+LANGUAGE: bash
+CODE:
+curl  http://xxx.hello.com/test
+curl -u admin:abc  http://xxx.hello.com/test
+curl -u guest:abc  http://xxx.hello.com/test
+
+----------------------------------------
+
+TITLE: AI Agent Response for Translation
+DESCRIPTION: JSON response from the AI Agent providing the German translation of the phrase 'Hail Hydra!'
+
+LANGUAGE: json
+CODE:
+{
+  "id": "65dcf12c-61ff-9e68-bffa-44fc9e6070d5",
+  "choices": [
+    {
+      "index": 0,
+      "message": {
+        "role": "assistant",
+        "content": " The German translation of \"Hail Hydra!\" is \"Hoch lebe Hydra!\"."
+      },
+      "finish_reason": "stop"
+    }
+  ],
+  "created": 1724043865,
+  "model": "qwen-max-0403",
+  "object": "chat.completion",
+  "usage": {
+    "prompt_tokens": 908,
+    "completion_tokens": 52,
+    "total_tokens": 960
+  }
+}
+
+----------------------------------------
+
+TITLE: Configuring JSON Response Formatting
+DESCRIPTION: YAML configuration to enable JSON response formatting in the AI Agent plugin.
+
+LANGUAGE: yaml
+CODE:
+jsonResp:
+  enable: true
+
+----------------------------------------
+
+TITLE: Configuring Route Authorization in YAML
+DESCRIPTION: YAML configuration for route-specific authorization rules that specify which consumers are allowed access.
+
+LANGUAGE: yaml
+CODE:
+allow:
+- consumer1
+
+----------------------------------------
+
+TITLE: Testing CORS Preflight Request with cURL
+DESCRIPTION: This cURL command tests a CORS preflight request to the configured Higress server. It uses the OPTIONS method and includes necessary CORS headers to simulate a preflight request.
+
+LANGUAGE: shell
+CODE:
+curl -v -X OPTIONS -H "Origin: http://httpbin2.example.org:9090" -H "Host: httpbin.example.com" -H "Access-Control-Request-Method: POST" -H "Access-Control-Request-Headers: Content-Type, Token" http://127.0.0.1/anything/get\?foo\=1
+
+----------------------------------------
+
+TITLE: AI Agent Response for Coffee Recommendations
+DESCRIPTION: JSON response from the AI Agent providing coffee shop recommendations near Xinshi Building in Jinan.
+
+LANGUAGE: json
+CODE:
+{
+  "id": "139487e7-96a0-9b13-91b4-290fb79ac992",
+  "choices": [
+    {
+      "index": 0,
+      "message": {
+        "role": "assistant",
+        "content": " Near the Xinshi Building in Jinan, you can choose from the following coffee shops:\n1. luckin coffee 瑞幸咖啡(鑫盛大厦店), located in the lobby of Xinshi Building, No. 1299 Xinluo Avenue;\n2. 三庆齐盛广场挪瓦咖啡(三庆·齐盛广场店), located 60 meters southwest of the intersection of Xinluo Avenue and Yingxiu Road;\n3. luckin coffee 瑞幸咖啡(三庆·齐盛广场店), located at No. 1267 Yingxiu Road;\n4. 库迪咖啡(齐鲁软件园店), located in the commercial space of Building 4, Sanqing Qisheng Plaza, Xinluo Avenue;\n5. 库迪咖啡(美莲广场店), located at L117, Meilian Plaza, No. 1166 Xinluo Avenue, High-tech Zone; and a few other options. I hope these suggestions help!"
+      },
+      "finish_reason": "stop"
+    }
+  ],
+  "created": 1723172296,
+  "model": "qwen-max-0403",
+  "object": "chat.completion",
+  "usage": {
+    "prompt_tokens": 886,
+    "completion_tokens": 50,
+    "total_tokens": 936
+  }
+}
+
+----------------------------------------
+
+TITLE: Testing Illegal CORS Method Preflight Request with cURL
+DESCRIPTION: This cURL command tests an illegal CORS preflight request with an unauthorized method to the configured Higress server. It shows how the server responds to requests with disallowed methods.
+
+LANGUAGE: shell
+CODE:
+curl -v -X OPTIONS -H "Origin: http://httpbin2.example.org:9090" -H "Host: httpbin.example.com" -H "Access-Control-Request-Method: DELETE" http://127.0.0.1/anything/get\?foo\=1
+
+----------------------------------------
+
+TITLE: Testing Illegal CORS Origin Preflight Request with cURL
+DESCRIPTION: This cURL command tests an illegal CORS preflight request with an invalid origin to the configured Higress server. It demonstrates how the server handles unauthorized origins.
+
+LANGUAGE: shell
+CODE:
+curl -v -X OPTIONS -H "Origin: http://httpbin2.example.org" -H "Host: httpbin.example.com" -H "Access-Control-Request-Method: GET" http://127.0.0.1/anything/get\?foo\=1
+
+----------------------------------------
+
+TITLE: Modified LLM Request JSON After Provider Extraction
+DESCRIPTION: Sample JSON body of an LLM request after processing by the model-router plugin, showing the modified model parameter with the provider removed.
+
+LANGUAGE: json
+CODE:
+{
+    "model": "qwen-long",
+    "frequency_penalty": 0,
+    "max_tokens": 800,
+    "stream": false,
+    "messages": [{
+        "role": "user",
+        "content": "What is the GitHub address of the Higress project's main repository?"
+    }],
+    "presence_penalty": 0,
+    "temperature": 0.7,
+    "top_p": 0.95
+}
+
+----------------------------------------
+
+TITLE: Testing CORS Simple Request with cURL
+DESCRIPTION: This cURL command tests a simple CORS request to the configured Higress server. It includes an Origin header to simulate a cross-origin request.
+
+LANGUAGE: shell
+CODE:
+curl -v -H "Origin: http://httpbin2.example.org:9090" -H "Host: httpbin.example.com" http://127.0.0.1/anything/get\?foo\=1
+
+----------------------------------------
+
+TITLE: AI Agent Response for Weather in Japanese
+DESCRIPTION: JSON response from the AI Agent providing weather information for Jinan in Fahrenheit and Japanese language.
+
+LANGUAGE: json
+CODE:
+{
+  "id": "ebd6ea91-8e38-9e14-9a5b-90178d2edea4",
+  "choices": [
+    {
+      "index": 0,
+      "message": {
+        "role": "assistant",
+        "content": " 現在の济南の天気は曇りで、気温は88°Fです。この情報は2024年8月9日15時12分（東京時間）に更新されました。"
+      },
+      "finish_reason": "stop"
+    }
+  ],
+  "created": 1723187991,
+  "model": "qwen-max-0403",
+  "object": "chat.completion",
+  "usage": {
+    "prompt_tokens": 890,
+    "completion_tokens": 56,
+    "total_tokens": 946
+  }
+}
+
+----------------------------------------
+
+TITLE: Adding Custom Crawler Identification in YAML
+DESCRIPTION: YAML configuration to add custom crawler identification rules to the bot-detect plugin, specifically blocking requests with User-Agent strings containing 'spd-tools'.
+
+LANGUAGE: yaml
+CODE:
+deny:
+- "spd-tools.*"
+
+----------------------------------------
+
+TITLE: Configuring CORS Plugin for Specific Subdomains and Methods in YAML
+DESCRIPTION: This YAML configuration allows specific subdomains, methods, and request headers for cross-origin access, while allowing the requester to carry credentials. It demonstrates more granular control over CORS settings.
+
+LANGUAGE: yaml
+CODE:
+allow_origin_patterns:
+  - http://*.example.com
+  - http://*.example.org:[8080,9090]
+allow_methods:
+  - GET
+  - PUT
+  - POST
+  - DELETE
+allow_headers:
+  - Token
+  - Content-Type
+  - Authorization
+expose_headers:
+  - '*'
+allow_credentials: true
+max_age: 7200
+
+----------------------------------------
+
+TITLE: Testing WAF Rule Blocking
+DESCRIPTION: Example curl commands demonstrating requests that will be blocked by the configured WAF rules, including accessing admin path and sending malicious payload.
+
+LANGUAGE: bash
+CODE:
+curl http://example.com/admin
+curl http://example.com -d "maliciouspayload"
+
+----------------------------------------
+
+TITLE: Arxiv Search Configuration in YAML
+DESCRIPTION: Example configuration for integrating Arxiv academic paper search functionality
+
+LANGUAGE: yaml
+CODE:
+searchFrom:
+- type: arxiv
+  serviceName: "arxiv-svc.dns" 
+  servicePort: 443
+  arxivCategory: "cs.AI"
+  count: 10
+
+----------------------------------------
+
+TITLE: Testing Blocked Request Headers with cURL
+DESCRIPTION: Example cURL commands to test the request header blocking configuration. These requests would be denied access based on the previous YAML configuration.
+
+LANGUAGE: bash
+CODE:
+curl http://example.com -H 'example-key: 123'
+curl http://exmaple.com -H 'my-header: example-value'
+
+----------------------------------------
+
+TITLE: Querying AI Agent for Weather in Different Language
+DESCRIPTION: cURL command to request weather information for Jinan in Fahrenheit and Japanese language.
+
+LANGUAGE: shell
+CODE:
+curl 'http://<replace with gateway public IP>/api/openai/v1/chat/completions' \
+-H 'Accept: application/json, text/event-stream' \
+-H 'Content-Type: application/json' \
+--data-raw '{"model":"qwen","frequency_penalty":0,"max_tokens":800,"stream":false,"messages":[{"role":"user","content":"What is the current weather in Jinan? Please indicate in Fahrenheit and respond in Japanese."}],"presence_penalty":0,"temperature":0,"top_p":0}'
+
+----------------------------------------
+
+TITLE: Configuring AI Proxy and Token Rate Limiting Plugins
+DESCRIPTION: This YAML configuration sets up the AI Proxy plugin for Qwen and the AI Token Rate Limiting plugin. It limits the total number of input and output tokens to 200 per minute.
+
+LANGUAGE: yaml
+CODE:
+apiVersion: extensions.higress.io/v1alpha1
+kind: WasmPlugin
+metadata:
+  name: ai-proxy
+  namespace: higress-system
+spec:
+  matchRules:
+  - config:
+      provider:
+        type: qwen
+        apiTokens:
+        - "<YOUR_API_TOKEN>"
+        modelMapping:
+          'gpt-3': "qwen-turbo"
+          'gpt-35-turbo': "qwen-plus"
+          'gpt-4-turbo': "qwen-max"
+          '*': "qwen-turbo"
+    ingress:
+    - qwen
+  url: oci://higress-registry.cn-hangzhou.cr.aliyuncs.com/plugins/ai-proxy:1.0.0
+  phase: UNSPECIFIED_PHASE
+  priority: 100
+---
+apiVersion: extensions.higress.io/v1alpha1
+kind: WasmPlugin
+metadata:
+  name: ai-token-ratelimit
+  namespace: higress-system
+spec:
+  defaultConfig:
+    rule_name: default_limit_by_param_apikey
+    rule_items:
+    - limit_by_param: apikey
+      limit_keys:
+      - key: 123456
+        token_per_minute: 200
+    redis:
+      # By default, to reduce data plane pressure, the `global.onlyPushRouteCluster` parameter in Higress is set to true, meaning that Kubernetes Services are not automatically discovered.
+      # If you need to use Kubernetes Service for service discovery, set `global.onlyPushRouteCluster` to false,
+      # allowing you to directly set `service_name` to the Kubernetes Service without needing to create an McpBridge and an Ingress route for Redis.
+      # service_name: redis.default.svc.cluster.local
+      service_name: redis.dns
+      service_port: 6379
+  url: oci://higress-registry.cn-hangzhou.cr.aliyuncs.com/plugins/ai-token-ratelimit:1.0.0
+  phase: UNSPECIFIED_PHASE
+  priority: 600
+
+----------------------------------------
+
+TITLE: Testing Blocked Request Bodies with cURL
+DESCRIPTION: Example cURL commands to test the request body blocking configuration. These requests would be denied access based on the previous YAML configuration.
+
+LANGUAGE: bash
+CODE:
+curl http://example.com -d 'Hello World'
+curl http://exmaple.com -d 'hello world'
+
+----------------------------------------
+
+TITLE: Querying AI Agent with Custom JSON Schema
+DESCRIPTION: cURL command to request weather information for Beijing using the custom JSON schema.
+
+LANGUAGE: shell
+CODE:
+curl 'http://<replace with gateway public IP>/api/openai/v1/chat/completions' \
+-H 'Accept: application/json, text/event-stream' \
+-H 'Content-Type: application/json' \
+--data-raw '{"model":"qwen","frequency_penalty":0,"max_tokens":800,"stream":false,"messages":[{"role":"user","content":"What is the current weather in Beijing ?"}],"presence_penalty":0,"temperature":0,"top_p":0}'
+
+----------------------------------------
+
+TITLE: Concurrent Query Configuration in YAML
+DESCRIPTION: Configuration example demonstrating how to set up concurrent search queries with different offsets to retrieve more results
+
+LANGUAGE: yaml
+CODE:
+searchFrom:
+- type: google
+  apiKey: "your-google-api-key"
+  cx: "search-engine-id"
+  serviceName: "google-svc.dns"
+  servicePort: 443
+  start: 0
+  count: 10
+- type: google
+  apiKey: "your-google-api-key"
+  cx: "search-engine-id"
+  serviceName: "google-svc.dns"
+  servicePort: 443
+  start: 10
+  count: 10
+- type: google
+  apiKey: "your-google-api-key"
+  cx: "search-engine-id"
+  serviceName: "google-svc.dns"
+  servicePort: 443
+  start: 20
+  count: 10
+
+----------------------------------------
+
+TITLE: Testing Blocked URL Paths with cURL
+DESCRIPTION: Example cURL commands to test the URL path blocking configuration. These requests would be denied access based on the previous YAML configuration.
+
+LANGUAGE: bash
+CODE:
+curl http://example.com?foo=Bar
+curl http://exmaple.com/Swagger.html
+
+----------------------------------------
+
+TITLE: Sending a Chat Completion Request to Claude Service
+DESCRIPTION: Example cURL command for sending a chat completion request to the Claude service through the AI Proxy plugin.
+
+LANGUAGE: bash
+CODE:
+curl "http://localhost:10000/v1/chat/completions"  -H "Content-Type: application/json"  -d '{
+  "model": "claude-3-opus-20240229",
+  "max_tokens": 1024,
+  "messages": [
+    {
+      "role": "user",
+      "content": "hello, who are you?"
+    }
+  ]
+}'
+
+----------------------------------------
+
+TITLE: Sending AI Prompt Request in JSON
+DESCRIPTION: Example JSON request body for using the configured AI prompt template. It specifies the template name and provides values for the template properties.
+
+LANGUAGE: json
+CODE:
+{
+  "template": "developer-chat",
+  "properties": {
+    "program": "quick sort",
+    "language": "python"
+  }
+}
+
+----------------------------------------
+
+TITLE: Configuring URL Path Blocking in YAML
+DESCRIPTION: Example YAML configuration for blocking specific URL paths in Higress. This configuration demonstrates case-insensitive matching for 'swagger.html' and 'foo=bar' in the URL.
+
+LANGUAGE: yaml
+CODE:
+block_urls:
+- swagger.html
+- foo=bar
+case_sensitive: false
+
+----------------------------------------
+
+TITLE: Testing Custom Bot Detection Rule in Higress
+DESCRIPTION: Bash commands demonstrating how to test the custom bot detection rule using curl. These requests would be blocked based on the custom 'spd-tools' User-Agent rule.
+
+LANGUAGE: bash
+CODE:
+curl http://example.com -H 'User-Agent: spd-tools/1.1'
+curl http://exmaple.com -H 'User-Agent: spd-tools'
+
+----------------------------------------
+
+TITLE: Configuring Provider Extraction in YAML
+DESCRIPTION: YAML configuration for extracting the provider field from the model parameter and setting it to a specific request header for routing.
+
+LANGUAGE: yaml
+CODE:
+addProviderHeader: x-higress-llm-provider
+
+----------------------------------------
+
+TITLE: Configuring Route-level and Domain-level WasmPlugin
+DESCRIPTION: This YAML snippet demonstrates how to configure a WasmPlugin with route-level and domain-level matching rules. It shows different configurations for specific ingresses and domains.
+
+LANGUAGE: yaml
+CODE:
+apiVersion: extensions.higress.io/v1alpha1
+kind: WasmPlugin
+metadata:
+  name: request-block
+  namespace: higress-system
+spec:
+  defaultConfig:
+   block_urls:
+   - "swagger.html"
+  matchRules:
+  - ingress:
+    - default/foo
+    config:
+      block_bodies:
+      - "foo"
+  - ingress:
+    - default/bar
+    config:
+      block_bodies:
+      - "bar"
+  - domain:
+    - "*.example.com"
+    config:
+      block_bodies:
+       - "foo"
+       - "bar"
+  url: oci://<your_registry_hub>/request-block:1.0.0
+
+----------------------------------------
+
+TITLE: Local Gateway Service Configuration
+DESCRIPTION: YAML configuration example for setting up a local gateway service.
+
+LANGUAGE: yaml
+CODE:
+serviceName: localservice
+serviceDomain: 127.0.0.1
+servicePort: 80
+
+----------------------------------------
+
+TITLE: Configuring Qwen Service with File Context in YAML
+DESCRIPTION: YAML configuration for using Qwen service with file-based context in the AI Proxy plugin.
+
+LANGUAGE: yaml
+CODE:
+provider:
+  type: qwen
+  apiTokens:
+    - "YOUR_QWEN_API_TOKEN"
+  modelMapping:
+    "*": "qwen-long"
+  qwenFileIds:
+  - "file-fe-xxx"
+  - "file-fe-yyy"
+
+----------------------------------------
+
+TITLE: Setting API Key in HTTP Request Headers using cURL
+DESCRIPTION: This bash command shows how to make a request with an API key set in the HTTP request headers, another supported method for key authentication in Higress.
+
+LANGUAGE: bash
+CODE:
+curl  http://xxx.hello.com/test -H 'x-api-key: 2bda943c-ba2b-11ec-ba07-00163e1250b5'
+
+----------------------------------------
+
+TITLE: Configuring JSON Response Formatting
+DESCRIPTION: YAML configuration for enabling JSON response formatting in the AI Agent plugin.
+
+LANGUAGE: yaml
+CODE:
+jsonResp:
+  enable: true
+  jsonSchema: |
+    title: WeatherSchema
+    type: object
+    properties:
+      location:
+        type: string
+        description: 城市名称.
+      weather:
+        type: string
+        description: 天气情况.
+      temperature:
+        type: string
+        description: 温度.
+      update_time:
+        type: string
+        description: 数据更新时间.
+    required:
+      - location
+      - weather
+      - temperature
+    additionalProperties: false
+
+----------------------------------------
+
+TITLE: Simulating User API Access in Shell
+DESCRIPTION: This shell command simulates a user accessing an API endpoint protected by OIDC authentication.
+
+LANGUAGE: shell
+CODE:
+curl --url "foo.bar.com/headers"
+
+----------------------------------------
+
+TITLE: Configuring Instance-Level Authentication in YAML
+DESCRIPTION: This YAML configuration enables Basic Auth authentication at the instance level for the Higress gateway, requiring all requests to pass authentication before accessing any resource.
+
+LANGUAGE: yaml
+CODE:
+global_auth: true
+consumers:
+- credential: 2bda943c-ba2b-11ec-ba07-00163e1250b5
+  name: consumer1
+- credential: c8c8e9ca-558e-4a2d-bb62-e700dcc40e35
+  name: consumer2
+keys:
+- apikey
+- x-api-key
+
+----------------------------------------
+
+TITLE: Rate Limiting by Consumer
+DESCRIPTION: Example showing consumer-based rate limiting with specific consumer limits and pattern matching rules.
+
+LANGUAGE: yaml
+CODE:
+rule_name: default_rule
+rule_items:
+- limit_by_consumer: ''
+  limit_keys:
+  - key: consumer1
+    query_per_second: 10
+  - key: consumer2
+    query_per_hour: 100
+- limit_by_per_consumer: ''
+  limit_keys:
+  - key: "regexp:^a.*"
+    query_per_second: 10
+  - key: "regexp:^b.*"
+    query_per_minute: 100
+  - key: "*"
+    query_per_hour: 1000
+redis:
+  service_name: redis.static
+show_limit_quota_header: true
+
+----------------------------------------
+
+TITLE: Allowing Go-http-client Requests in YAML
+DESCRIPTION: YAML configuration to allow requests from the default Golang network library, which would otherwise be treated as crawlers and blocked by the bot-detect plugin.
+
+LANGUAGE: yaml
+CODE:
+allow:
+- ".*Go-http-client.*"
+
+----------------------------------------
+
+TITLE: Configuring Hostname-Specific Authorization in YAML
+DESCRIPTION: YAML configuration for allowing specific consumers on hostnames *.example.com and test.com.
+
+LANGUAGE: yaml
+CODE:
+allow:
+- consumer2
+
+----------------------------------------
+
+TITLE: Weight-based Traffic Tagging Configuration in YAML
+DESCRIPTION: Configuration example demonstrating weight-based traffic distribution using the traffic-tag plugin. Distributes traffic between gray and blue tags with 30% probability each, leaving 40% untagged.
+
+LANGUAGE: yaml
+CODE:
+weightGroups:
+  - headerName: x-mse-tag
+    headerValue: gray
+    weight: 30
+  - headerName: x-mse-tag
+    headerValue: blue
+    weight: 30
+
+----------------------------------------
+
+TITLE: Configuring Boolean Validation in Higress Request Validation
+DESCRIPTION: Shows how to validate boolean values in request body using JSON Schema. Requires the payload to be a boolean value.
+
+LANGUAGE: yaml
+CODE:
+body_schema:
+  type: object
+  required:
+    - boolean_payload
+  properties:
+    boolean_payload:
+      type: boolean
+      default: true
+
+----------------------------------------
+
+TITLE: Sending Request with Invalid API Key using cURL
+DESCRIPTION: Example cURL command demonstrating a request with an invalid API Key, which will be denied.
+
+LANGUAGE: bash
+CODE:
+curl  http://xxx.hello.com/test?apikey=926d90ac-ba2e-11ec-ab68-00163e1250b5
+
+----------------------------------------
+
+TITLE: Configuring Groq Service in Kubernetes YAML
+DESCRIPTION: Full Kubernetes YAML configuration for using Groq service with the AI Proxy plugin.
+
+LANGUAGE: yaml
+CODE:
+apiVersion: extensions.higress.io/v1alpha1
+kind: WasmPlugin
+metadata:
+  name: ai-proxy-groq
+  namespace: higress-system
+spec:
+  matchRules:
+  - config:
+      provider:
+        type: groq
+        apiTokens:
+          - "YOUR_API_TOKEN"
+    ingress:
+    - groq
+  url: oci://higress-registry.cn-hangzhou.cr.aliyuncs.com/plugins/ai-proxy:1.0.0
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  annotations:
+    higress.io/backend-protocol: HTTPS
+    higress.io/destination: groq.dns
+    higress.io/proxy-ssl-name: api.groq.com
+    higress.io/proxy-ssl-server-name: "on"
+  labels:
+    higress.io/resource-definer: higress
+  name: groq
+  namespace: higress-system
+spec:
+  ingressClassName: higress
+  rules:
+  - host: <YOUR-DOMAIN>
+    http:
+      paths:
+      - backend:
+          resource:
+            apiGroup: networking.higress.io
+            kind: McpBridge
+            name: default
+        path: /
+        pathType: Prefix
+---
+apiVersion: networking.higress.io/v1
+kind: McpBridge
+metadata:
+  name: default
+  namespace: higress-system
+spec:
+  registries:
+  - domain: api.groq.com
+    name: groq
+    port: 443
+    type: dns
+
+----------------------------------------
+
+TITLE: Configuring Enum Validation in Higress Request Validation
+DESCRIPTION: Demonstrates how to validate enum string values in request body using JSON Schema. Requires the payload to match one of the specified enum values.
+
+LANGUAGE: yaml
+CODE:
+body_schema:
+  type: object
+  required:
+    - enum_payload
+  properties:
+    enum_payload:
+      type: string
+      enum:
+        - "enum_string_1"
+        - "enum_string_2"
+      default: "enum_string_1"
+
+----------------------------------------
+
+TITLE: Sending Request with Unauthorized API Key using cURL
+DESCRIPTION: Example cURL command demonstrating a request with an API Key that lacks access rights, which will be denied.
+
+LANGUAGE: bash
+CODE:
+curl  http://xxx.hello.com/test?apikey=c8c8e9ca-558e-4a2d-bb62-e700dcc40e35
+
+----------------------------------------
+
+TITLE: Configuring Request Header Blocking in YAML
+DESCRIPTION: Example YAML configuration for blocking requests with specific header keys or values in Higress. This configuration blocks headers containing 'example-key' or 'example-value'.
+
+LANGUAGE: yaml
+CODE:
+block_headers:
+- example-key
+- example-value
+
+----------------------------------------
+
+TITLE: Configuring Regex Validation in Higress Request Validation
+DESCRIPTION: Demonstrates how to validate strings against a regular expression pattern using JSON Schema. Requires alphanumeric characters or underscores.
+
+LANGUAGE: yaml
+CODE:
+body_schema:
+  type: object
+  required:
+    - regex_payload
+  properties:
+    regex_payload:
+      type: string
+      minLength: 1
+      maxLength: 10
+      pattern: "^[a-zA-Z0-9_]+$"
+
+----------------------------------------
+
+TITLE: Configuring Envoy for AI Proxy in YAML
+DESCRIPTION: Envoy YAML configuration for setting up the AI Proxy plugin.
+
+LANGUAGE: yaml
+CODE:
+admin:
+  address:
+    socket_address:
+      protocol: TCP
+      address: 0.0.0.0
+      port_value: 9901
+static_resources:
+  listeners:
+    - name: listener_0
+      address:
+        socket_address:
+          protocol: TCP
+          address: 0.0.0.0
+          port_value: 10000
+      filter_chains:
+        - filters:
+            - name: envoy.filters.network.http_connection_manager
+              typed_config:
+                "@type": type.googleapis.com/envoy.extensions.filters.network.http_connection_manager.v3.HttpConnectionManager
+                scheme_header_transformation:
+                  scheme_to_overwrite: https
+                stat_prefix: ingress_http
+                access_log:
+                  - name: envoy.access_loggers.stdout
+                    typed_config:
+                      "@type": type.googleapis.com/envoy.extensions.access_loggers.stream.v3.StdoutAccessLog
+                route_config:
+                  name: local_route
+                  virtual_hosts:
+                    - name: local_service
+                      domains: [ "*" ]
+                      routes:
+                        - match:
+                            prefix: "/"
+                          route:
+                            cluster: claude
+                            timeout: 300s
+                http_filters:
+                  - name: claude
+                    typed_config:
+                      "@type": type.googleapis.com/udpa.type.v1.TypedStruct
+                      type_url: type.googleapis.com/envoy.extensions.filters.http.wasm.v3.Wasm
+                      value:
+                        config:
+                          name: claude
+                          vm_config:
+                            runtime: envoy.wasm.runtime.v8
+                            code:
+                              local:
+                                filename: /etc/envoy/plugin.wasm
+                          configuration:
+                            "@type": "type.googleapis.com/google.protobuf.StringValue"
+                            value: |
+                              {
+                                "provider": {
+                                  "type": "claude",
+                                  "apiTokens": [
+                                    "YOUR_API_TOKEN"
+                                  ]
+                                }
+                              }
+                  - name: envoy.filters.http.router
+  clusters:
+    - name: claude
+      connect_timeout: 30s
+      type: LOGICAL_DNS
+      dns_lookup_family: V4_ONLY
+      lb_policy: ROUND_ROBIN
+      load_assignment:
+        cluster_name: claude
+        endpoints:
+          - lb_endpoints:
+              - endpoint:
+                  address:
+                    socket_address:
+                      address: api.anthropic.com
+                      port_value: 443
+      transport_socket:
+        name: envoy.transport_sockets.tls
+        typed_config:
+          "@type": type.googleapis.com/envoy.extensions.transport_sockets.tls.v3.UpstreamTlsContext
+          "sni": "api.anthropic.com"
+
+----------------------------------------
+
+TITLE: Configuring AI Token Rate Limiting by Consumer
+DESCRIPTION: This YAML configuration shows how to set up AI token rate limiting based on the consumer. It includes specific consumer rules and fallback rules using regular expressions.
+
+LANGUAGE: yaml
+CODE:
+rule_name: default_rule
+rule_items:
+  - limit_by_consumer: ''
+    limit_keys:
+      - key: consumer1
+        token_per_second: 10
+      - key: consumer2
+        token_per_hour: 100
+  - limit_by_per_consumer: ''
+    limit_keys:
+      # Regular expression, matches all strings starting with a, each consumer corresponds to 10 qds
+      - key: "regexp:^a.*"
+        token_per_second: 10
+      # Regular expression, matches all strings starting with b, each consumer corresponds to 100 qd
+      - key: "regexp:^b.*"
+        token_per_minute: 100
+      # Fallback, matches all requests, each consumer corresponds to 1000 qdh
+      - key: "*"
+        token_per_hour: 1000
+redis:
+  service_name: redis.static
+
+----------------------------------------
+
+TITLE: Sending API Key in HTTP Headers using cURL
+DESCRIPTION: Example cURL command demonstrating how to send an API Key in HTTP request headers.
+
+LANGUAGE: bash
+CODE:
+curl  http://xxx.hello.com/test -H 'x-api-key: 2bda943c-ba2b-11ec-ba07-00163e1250b5'
+
+----------------------------------------
+
+TITLE: Configuring Azure OpenAI Service in YAML
+DESCRIPTION: YAML configuration for using Azure OpenAI service with the AI Proxy plugin.
+
+LANGUAGE: yaml
+CODE:
+provider:
+  type: azure
+  apiTokens:
+    - "YOUR_AZURE_OPENAI_API_TOKEN"
+  azureServiceUrl: "https://YOUR_RESOURCE_NAME.openai.azure.com/openai/deployments/YOUR_DEPLOYMENT_NAME/chat/completions?api-version=2024-02-15-preview"
+
+----------------------------------------
+
+TITLE: Example LLM Query Without RAG
+DESCRIPTION: An example of a user query about a rear-end collision in Hainan, demonstrating the limited response from an LLM without RAG enhancement.
+
+LANGUAGE: plaintext
+CODE:
+Where did the rear-end collision in Hainan occur? What was the cause? How many casualties were there?
+
+----------------------------------------
+
+TITLE: Error Response Example
+DESCRIPTION: Example of an error response when something goes wrong during processing.
+
+LANGUAGE: json
+CODE:
+{
+  "Code": 1006,
+  "Msg": "retry count exceed max retry count"
+}
+
+----------------------------------------
+
+TITLE: Sending LLM Request with Geo Location using cURL
+DESCRIPTION: Example of how to send an LLM request using cURL, including an X-Forwarded-For header for IP-based geolocation.
+
+LANGUAGE: bash
+CODE:
+curl http://localhost/test \
+-H "content-type: application/json" \
+-H "x-forwarded-for: 87.254.207.100,4.5.6.7" \
+-d '{
+  "model": "gpt-3.5-turbo",
+  "messages": [
+    {
+      "role": "user",
+      "content": "How is the weather today?"
+    }
+  ]
+}'
+
+----------------------------------------
+
+TITLE: Example LLM Response With RAG
+DESCRIPTION: The enhanced response from the LLM after processing with the RAG plugin, providing specific details about the accident that were not available in the non-RAG response.
+
+LANGUAGE: plaintext
+CODE:
+The rear-end collision in Hainan occurred on the Haiven Expressway, 37 kilometers from Wenchang to Haikou. Regarding the specific cause of the accident, traffic police were still conducting further investigations at the time, so the exact cause of the accident cannot be determined based on the provided information. The casualty situation is 1 death (the driver died on the spot) and 8 injuries (including 2 children and 6 adults). All injured persons were rescued and sent to the hospital for treatment.
+
+----------------------------------------
+
+TITLE: Querying AI Agent for Coffee Recommendations
+DESCRIPTION: cURL command to request coffee recommendations near a specific location in Jinan.
+
+LANGUAGE: shell
+CODE:
+curl 'http://<replace with gateway public IP>/api/openai/v1/chat/completions' \
+-H 'Accept: application/json, text/event-stream' \
+-H 'Content-Type: application/json' \
+--data-raw '{"model":"qwen","frequency_penalty":0,"max_tokens":800,"stream":false,"messages":[{"role":"user","content":"I want to have coffee near the Xinshi Building in Jinan, please recommend a few."}],"presence_penalty":0,"temperature":0,"top_p":0}'
+
+----------------------------------------
+
+TITLE: Sending LLM Request with cURL
+DESCRIPTION: Example of how to send an LLM request using cURL, which will be processed by the AI Prompts plugin.
+
+LANGUAGE: bash
+CODE:
+curl http://localhost/test \
+-H "content-type: application/json" \
+-d '{
+  "model": "gpt-3.5-turbo",
+  "messages": [
+    {
+      "role": "user",
+      "content": "Who are you?"
+    }
+  ]
+}
+
+----------------------------------------
+
+TITLE: JSON User Information Configuration for Frontend Gray Release in YAML
+DESCRIPTION: Shows how to configure the frontend-gray plugin when user information exists in JSON format within a cookie.
+
+LANGUAGE: yaml
+CODE:
+grayKey: appInfo
+graySubKey: userId
+rules:
+- name: inner-user
+  grayKeyValue:
+  - '00000001'
+  - '00000005'
+- name: beta-user
+  grayKeyValue:
+  - '00000002'
+  - '00000003'
+  grayTagKey: level
+  grayTagValue:
+  - level3
+  - level5
+baseDeployment:
+  version: base
+grayDeployments:
+  - name: beta-user
+    version: gray
+    enabled: true
+
+----------------------------------------
+
+TITLE: Retrieving OAuth2 Access Token via POST in Bash
+DESCRIPTION: Bash command to retrieve an OAuth2 access token using the POST method.
+
+LANGUAGE: bash
+CODE:
+curl 'http://test.com/oauth2/token' -H 'content-type: application/x-www-form-urlencoded' -d 'grant_type=client_credentials&client_id=12345678-xxxx-xxxx-xxxx-xxxxxxxxxxxx&client_secret=abcdefgh-xxxx-xxxx-xxxx-xxxxxxxxxxxx'
+
+----------------------------------------
+
+TITLE: Processed LLM Request with AI Prompts
+DESCRIPTION: Example of how the LLM request looks after being processed by the AI Prompts plugin, showing the inserted prompts.
+
+LANGUAGE: bash
+CODE:
+curl http://localhost/test \
+-H "content-type: application/json" \
+-d '{
+  "model": "gpt-3.5-turbo",
+  "messages": [
+    {
+      "role": "system",
+      "content": "Please answer the questions in English."
+    },
+    {
+      "role": "user",
+      "content": "Who are you?"
+    },
+    {
+      "role": "user",
+      "content": "After answering each question, try to ask a follow-up question."
+    }
+  ]
+}
+
+----------------------------------------
+
+TITLE: Configuring geo-ip Plugin in YAML
+DESCRIPTION: Example configuration for the geo-ip plugin, which is used to calculate user geographic location information based on IP.
+
+LANGUAGE: yaml
+CODE:
+ipProtocal: "ipv4"
+
+----------------------------------------
+
+TITLE: Retrieving OAuth2 Access Token via GET in Bash
+DESCRIPTION: Bash command to retrieve an OAuth2 access token using the GET method.
+
+LANGUAGE: bash
+CODE:
+curl 'http://test.com/oauth2/token?grant_type=client_credentials&client_id=12345678-xxxx-xxxx-xxxx-xxxxxxxxxxxx&client_secret=abcdefgh-xxxx-xxxx-xxxx-xxxxxxxxxxxx'
+
+----------------------------------------
+
+TITLE: Configuring AI Token Rate Limiting by Request Header
+DESCRIPTION: This configuration example shows how to set up rate limiting based on the 'x-ca-key' request header. It defines specific limits for certain header values and uses regular expressions for grouping.
+
+LANGUAGE: yaml
+CODE:
+rule_name: default_rule
+rule_items:
+  - limit_by_header: x-ca-key
+    limit_keys:
+    	- key: 102234
+        token_per_minute: 10
+      - key: 308239
+        token_per_hour: 10
+  - limit_by_per_header: x-ca-key
+    limit_keys:
+      # 正则表达式，匹配以a开头的所有字符串，每个apikey对应的请求10qds
+      - key: "regexp:^a.*"
+        token_per_second: 10
+      # 正则表达式，匹配以b开头的所有字符串，每个apikey对应的请求100qd
+      - key: "regexp:^b.*"
+        token_per_minute: 100
+      # 兜底用，匹配所有请求，每个apikey对应的请求1000qdh
+      - key: "*"
+        token_per_hour: 1000            
+redis:
+  service_name: redis.static
+
+----------------------------------------
+
+TITLE: Configuring OPA Plugin in YAML
+DESCRIPTION: Example YAML configuration for the OPA plugin showing required fields for Kubernetes service source setup.
+
+LANGUAGE: yaml
+CODE:
+serviceSource: k8s
+serviceName: opa
+servicePort: 8181
+namespace: higress-backend
+policy: example1
+timeout: 5s
+
+----------------------------------------
+
+TITLE: Memory Statistics Response Format in Bash
+DESCRIPTION: Example JSON response showing memory statistics returned by the gc-test plugin, including system memory (Sys), heap statistics (HeapSys, HeapIdle, HeapInuse, HeapReleased) used to monitor memory leak detection.
+
+LANGUAGE: bash
+CODE:
+{"Sys": 15073280,"HeapSys": 10682368,"HeapIdle": 139264,"HeapInuse": 0,"HeapReleased": 0}
+
+----------------------------------------
+
+TITLE: Complete AI Token Rate Limiting Setup with Redis and Qwen AI Service
+DESCRIPTION: This comprehensive example demonstrates the full setup for AI Token rate limiting, including Redis deployment, AI proxy configuration, and rate limit rules. It shows how to integrate with the Qwen AI service and set up the necessary Kubernetes resources.
+
+LANGUAGE: yaml
+CODE:
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: redis
+  labels:
+    app: redis
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: redis
+  template:
+    metadata:
+      labels:
+        app: redis
+    spec:
+      containers:
+      - name: redis
+        image: redis
+        ports:
+        - containerPort: 6379
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: redis
+  labels:
+    app: redis
+spec:
+  ports:
+  - port: 6379
+    targetPort: 6379
+  selector:
+    app: redis
+---
+apiVersion: extensions.higress.io/v1alpha1
+kind: WasmPlugin
+metadata:
+  name: ai-proxy
+  namespace: higress-system
+spec:
+  matchRules:
+  - config:
+      provider:
+        type: qwen
+        apiTokens:
+        - "<YOUR_API_TOKEN>"
+        modelMapping:
+          'gpt-3': "qwen-turbo"
+          'gpt-35-turbo': "qwen-plus"
+          'gpt-4-turbo': "qwen-max"
+          '*': "qwen-turbo"
+    ingress:
+    - qwen
+  url: oci://higress-registry.cn-hangzhou.cr.aliyuncs.com/plugins/ai-proxy:1.0.0
+  phase: UNSPECIFIED_PHASE
+  priority: 100
+---
+apiVersion: extensions.higress.io/v1alpha1
+kind: WasmPlugin
+metadata:
+  name: ai-token-ratelimit
+  namespace: higress-system
+spec:
+  defaultConfig:
+    rule_name: default_limit_by_param_apikey
+    rule_items:
+    - limit_by_param: apikey
+      limit_keys:
+      - key: 123456
+        token_per_minute: 200
+    redis:
+      service_name: redis.dns
+      service_port: 6379
+  url: oci://higress-registry.cn-hangzhou.cr.aliyuncs.com/plugins/ai-token-ratelimit:1.0.0
+  phase: UNSPECIFIED_PHASE
+  priority: 600
+
+----------------------------------------
+
+TITLE: Creating OPA Policy via API
+DESCRIPTION: cURL command to create an OPA policy that allows only GET requests.
+
+LANGUAGE: shell
+CODE:
+curl -X PUT '127.0.0.1:8181/v1/policies/example1' \
+  -H 'Content-Type: text/plain' \
+  -d 'package example1
+import input.request
+default allow = false
+allow {
+    # HTTP method must GET
+    request.method == "GET"}'
+
+----------------------------------------
+
+TITLE: Configuring Higress Config Sources in Kubernetes ConfigMap
+DESCRIPTION: This YAML snippet shows the configuration of Higress config sources in a Kubernetes ConfigMap named 'higress-config'. It specifies the mesh configuration including access log encoding and config sources for xDS and Kubernetes.
+
+LANGUAGE: yaml
+CODE:
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: higress-config
+  namespace: higress-system
+data:
+  mesh: |-
+    accessLogEncoding: TEXT
+    ...
+    configSources:
+    - address: xds://127.0.0.1:15051
+    - address: k8s://
+    ...
+  meshNetworks: "networks: {}"
+
+----------------------------------------
+
+TITLE: Configuring McpBridge for Service Discovery
+DESCRIPTION: This YAML configuration sets up McpBridge for service discovery, including the Qwen service and Redis.
+
+LANGUAGE: yaml
+CODE:
+apiVersion: networking.higress.io/v1
+kind: McpBridge
+metadata:
+  name: default
+  namespace: higress-system
+spec:
+  registries:
+  - domain: dashscope.aliyuncs.com
+    name: qwen
+    port: 443
+    type: dns
+  - domain: redis.default.svc.cluster.local # Kubernetes Service
+    name: redis
+    type: dns
+    port: 6379
+
+----------------------------------------
+
+TITLE: Configuring Route-Specific Authorization in YAML
+DESCRIPTION: YAML configuration for allowing specific consumers on routes route-a and route-b.
+
+LANGUAGE: yaml
+CODE:
+allow:
+- consumer1
+
+----------------------------------------
+
+TITLE: Example Curl Command with Sensitive Data Masking
+DESCRIPTION: Shell script example demonstrating a POST request with masked sensitive data like API keys, email addresses, and IP addresses.
+
+LANGUAGE: sh
+CODE:
+curl -X POST \
+     -H "Authorization: sk-12345" \
+     -H "Auth: test@gmail.com" \
+     -H "Content-Type: application/json" \
+     -d '{"key":"value"}' \
+     http://172.20.5.14/api/openai/v1/chat/completions
+
+----------------------------------------
+
+TITLE: Processing AI Response in JSON
+DESCRIPTION: Example JSON response from the AI History Dialogue plugin, showing the structure of the assistant's message and usage statistics.
+
+LANGUAGE: json
+CODE:
+{
+  "id": "02f4c621-820e-97d4-a905-1e3d0d8f59c6",
+  "choices": [
+    {
+      "index": 0,
+      "message": {
+        "role": "assistant",
+        "content": "While both Higress and Nginx have gateway functionalities, their design philosophies and application scenarios differ. Nginx is better known as a high-performance HTTP and reverse proxy server, while Higress is a cloud-native gateway that integrates many cloud-native features such as service mesh, observability, and security management in addition to basic routing capabilities.\n\nTherefore, if you want to deploy applications in a cloud-native environment and wish to obtain advanced features required for modern applications, such as service governance, gray release, circuit breaker and rate limiting, and security authentication, then Higress can be a good alternative to Nginx. However, if it's a relatively simple static website or only requires basic reverse proxy functionality, traditional Nginx configurations may be simpler and more direct."
+      },
+      "finish_reason": "stop"
+    }
+  ],
+  "created": 1724077770,
+  "model": "qwen-long",
+  "object": "chat.completion",
+  "usage": {
+    "prompt_tokens": 7316,
+    "completion_tokens": 164,
+    "total_tokens": 7480
+  }
+}
+
+----------------------------------------
+
+TITLE: Configuring Whitelist Mode in Ext-Auth Plugin
+DESCRIPTION: Configuration example showing whitelist mode setup where specified requests bypass verification based on domain, path, and method rules.
+
+LANGUAGE: yaml
+CODE:
+match_type: 'whitelist'
+match_list:
+  - match_rule_domain: 'api.example.com'
+    match_rule_path: '/public'
+    match_rule_type: 'prefix'
+  - match_rule_domain: 'images.example.com'
+    match_rule_method: ["GET"]
+  - match_rule_method: ["HEAD"]
+    match_rule_path: '/health-check'
+    match_rule_type: 'exact'
+
+----------------------------------------
+
+TITLE: Configuring AI Prompts Plugin with Geo Location in YAML
+DESCRIPTION: Example configuration for the AI Prompts plugin that includes user geographic location information obtained from the geo-ip plugin.
+
+LANGUAGE: yaml
+CODE:
+prepend:
+- role: system
+  content: "The user's current geographic location is, country: ${geo-country}, province: ${geo-province}, city: ${geo-city}."
+append:
+- role: user
+  content: "After answering each question, try to ask a follow-up question."
+
+----------------------------------------
+
+TITLE: Retrieving Historical Data with cURL
+DESCRIPTION: Example cURL command for retrieving historical dialogue data from the AI History Dialogue plugin.
+
+LANGUAGE: bash
+CODE:
+curl 'http://example.com/api/openai/v1/chat/completions/ai-history/query?cnt=3' \
+  -H 'Accept: application/json, text/event-stream' \
+  -H 'Content-Type: application/json' \
+  -H 'Authorization: Bearer sk-Nzf7RtkdS4s0zFyn5575124129254d9bAf9473A5D7D06dD3'
+
+----------------------------------------
+
+TITLE: Creating Ingress Rules for Qwen and Redis
+DESCRIPTION: This YAML configuration creates Ingress rules for routing traffic to the Qwen service and Redis.
+
+LANGUAGE: yaml
+CODE:
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  annotations:
+    higress.io/backend-protocol: HTTPS
+    higress.io/destination: qwen.dns
+    higress.io/proxy-ssl-name: dashscope.aliyuncs.com
+    higress.io/proxy-ssl-server-name: "on"
+  labels:
+    higress.io/resource-definer: higress
+  name: qwen
+  namespace: higress-system
+spec:
+  ingressClassName: higress
+  rules:
+  - host: qwen-test.com
+    http:
+      paths:
+      - backend:
+          resource:
+            apiGroup: networking.higress.io
+            kind: McpBridge
+            name: default
+        path: /
+        pathType: Prefix
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  annotations:
+    higress.io/destination: redis.dns
+    higress.io/ignore-path-case: "false"
+  labels:
+    higress.io/resource-definer: higress
+  name: redis
+spec:
+  ingressClassName: higress
+  rules:
+  - http:
+      paths:
+      - backend:
+          resource:
+            apiGroup: networking.higress.io
+            kind: McpBridge
+            name: default
+        path: /
+        pathType: Prefix
+
+----------------------------------------
+
+TITLE: Processing Historical Data Response in JSON
+DESCRIPTION: Example JSON response when retrieving historical dialogue data, showing the structure of multiple dialogue turns.
+
+LANGUAGE: json
+CODE:
+[
+  {
+    "role": "user",
+    "content": "Can Higress replace Nginx?"
+  },
+  {
+    "role": "assistant",
+    "content": "While both Higress and Nginx have gateway functionalities, their design philosophies and application scenarios differ. Nginx is better known as a high-performance HTTP and reverse proxy server, while Higress is a cloud-native gateway that integrates many cloud-native features such as service mesh, observability, and security management in addition to basic routing capabilities.\n\nTherefore, if you want to deploy applications in a cloud-native environment and wish to obtain advanced features required for modern applications, such as service governance, gray release, circuit breaker and rate limiting, and security authentication, then Higress can be a good alternative to Nginx. However, if it's a relatively simple static website or only requires basic reverse proxy functionality, traditional Nginx configurations may be simpler and more direct."
+  },
+  {
+    "role": "user",
+    "content": "What about Spring Cloud GateWay?"
+  },
+  {
+    "role": "assistant",
+    "content": "Compared to Spring Cloud Gateway, Higress is also an API gateway, but there are some key differences between them:\n\n- **Design Philosophy**: Spring Cloud Gateway mainly targets service-to-service communication and routing in microservice architectures. As part of the Spring Cloud ecosystem, it is more focused on scenarios for Java developers in microservices. In contrast, Higress, as a cloud-native gateway, not only focuses on service communication but also offers a range of cloud-native features such as service mesh, observability, security management, etc.\n- **Deployment Method**: Spring Cloud Gateway typically runs as part of microservice applications on application servers, whereas Higress usually deploys as an independent microservice or containerized service in Kubernetes environments, suitable for modern cloud-native deployment models.\n- **Scalability and Integration**: Higress provides wider integration and support, for example, deep integration with ecosystems like Istio, Kubernetes, etc., making it better suited for complex cloud-native environments.\n\nTherefore, if your application is built on Spring Cloud and you want a lightweight, easy-to-integrate service gateway, then Spring Cloud Gateway might be a suitable choice. However, if you are building or refactoring cloud-native applications and require more powerful routing rules, service governance, observability, etc., then Higress is likely a better choice."
+  },
+  {
+    "role": "user",
+    "content": "Can Higress replace Nginx?"
+  },
+  {
+    "role": "assistant",
+    "content": "While both Higress and Nginx have gateway functionalities, their design philosophies and application scenarios differ. Nginx is better known as a high-performance HTTP and reverse proxy server, while Higress is a cloud-native gateway that integrates many cloud-native features such as service mesh, observability, and security management in addition to basic routing capabilities.\n\nTherefore, if you want to deploy applications in a cloud-native environment and wish to obtain advanced features required for modern applications, such as service governance, gray release, circuit breaker and rate limiting, and security authentication, then Higress can be a good alternative to Nginx. However, if it's a relatively simple static website or only requires basic reverse proxy functionality, traditional Nginx configurations may be simpler and more direct."
+  }
+]
+
+----------------------------------------
+
+TITLE: Configuring AI Token Rate Limiting by Request Header
+DESCRIPTION: This YAML configuration shows how to set up AI token rate limiting based on the 'x-ca-key' request header. It includes specific key rules and fallback rules using regular expressions.
+
+LANGUAGE: yaml
+CODE:
+rule_name: default_rule
+rule_items:
+  - limit_by_header: x-ca-key
+    limit_keys:
+    	- key: 102234
+        token_per_minute: 10
+      - key: 308239
+        token_per_hour: 10
+  - limit_by_per_header: x-ca-key
+    limit_keys:
+      # Regular expression, matches all strings starting with a, each apikey corresponds to 10 qds
+      - key: "regexp:^a.*"
+        token_per_second: 10
+      # Regular expression, matches all strings starting with b, each apikey corresponds to 100 qd
+      - key: "regexp:^b.*"
+        token_per_minute: 100
+      # Fallback, matches all requests, each apikey corresponds to 1000 qdh
+      - key: "*"
+        token_per_hour: 1000
+redis:
+  service_name: redis.static
+
+----------------------------------------
+
+TITLE: Configuring JWT Authentication in Higress YAML
+DESCRIPTION: Example YAML configuration for setting up JWT authentication with multiple consumers and route-specific authorization.
+
+LANGUAGE: yaml
+CODE:
+global_auth: false
+consumers:
+- name: consumer1
+  issuer: abcd
+  jwks: |
+    {
+      "keys": [
+        {
+          "kty": "oct",
+          "kid": "123",
+          "k": "hM0k3AbXBPpKOGg__Ql2Obcq7s60myWDpbHXzgKUQdYo7YCRp0gUqkCnbGSvZ2rGEl4YFkKqIqW7mTHdj-bcqXpNr-NOznEyMpVPOIlqG_NWVC3dydBgcsIZIdD-MR2AQceEaxriPA_VmiUCwfwL2Bhs6_i7eolXoY11EapLQtutz0BV6ZxQQ4dYUmct--7PLNb4BWJyQeWu0QfbIthnvhYllyl2dgeLTEJT58wzFz5HeNMNz8ohY5K0XaKAe5cepryqoXLhA-V-O1OjSG8lCNdKS09OY6O0fkyweKEtuDfien5tHHSsHXoAxYEHPFcSRL4bFPLZ0orTt1_4zpyfew",
+          "alg": "HS256"
+        }
+      ]
+    }
+- name: consumer2
+  issuer: abc
+  jwks: |
+    {
+      "keys": [
+        {
+          "kty": "RSA",
+          "e": "AQAB",
+          "use": "sig",
+          "kid": "123",
+          "alg": "RS256",
+          "n": "i0B67f1jggT9QJlZ_8QL9QQ56LfurrqDhpuu8BxtVcfxrYmaXaCtqTn7OfCuca7cGHdrJIjq99rz890NmYFZuvhaZ-LMt2iyiSb9LZJAeJmHf7ecguXS_-4x3hvbsrgUDi9tlg7xxbqGYcrco3anmalAFxsbswtu2PAXLtTnUo6aYwZsWA6ksq4FL3-anPNL5oZUgIp3HGyhhLTLdlQcC83jzxbguOim-0OEz-N4fniTYRivK7MlibHKrJfO3xa_6whBS07HW4Ydc37ZN3Rx9Ov3ZyV0idFblU519nUdqp_inXj1eEpynlxH60Ys_aTU2POGZh_25KXGdF_ZC_MSRw"
+        }
+      ]
+    }
+
+----------------------------------------
+
+TITLE: Basic Google Search Engine Configuration in YAML
+DESCRIPTION: Configuration example showing the minimal required settings for integrating Google Custom Search with the plugin
+
+LANGUAGE: yaml
+CODE:
+needReference: true
+searchFrom:
+- type: google
+  apiKey: "your-google-api-key"
+  cx: "search-engine-id"
+  serviceName: "google-svc.dns"
+  servicePort: 443
+  count: 5
+  optionArgs:
+    fileType: "pdf"
+
+----------------------------------------
+
+TITLE: Default Crawler Identification Regex Patterns in Bash
+DESCRIPTION: A set of regular expressions used by the bot-detect plugin to identify common crawler patterns in User-Agent strings. These patterns cover various bot naming conventions and known crawler identifiers.
+
+LANGUAGE: bash
+CODE:
+# Bots General matcher 'name/0.0'
+    (?:\/[A-Za-z0-9\.]+|) {0,5}([A-Za-z0-9 \-_\!\[\]:]{0,50}(?:[Aa]rchiver|[Ii]ndexer|[Ss]craper|[Bb]ot|[Ss]pider|[Cc]rawl[a-z]{0,50}))[/ ](\d+)(?:\.(\d+)(?:\.(\d+)|)|)
+# Bots General matcher 'name 0.0'
+    (?:\/[A-Za-z0-9\.]+|) {0,5}([A-Za-z0-9 \-_\!\[\]:]{0,50}(?:[Aa]rchiver|[Ii]ndexer|[Ss]craper|[Bb]ot|[Ss]pider|[Cc]rawl[a-z]{0,50})) (\d+)(?:\.(\d+)(?:\.(\d+)|)|)
+# Bots containing spider|scrape|bot(but not CUBOT)|Crawl
+    ((?:[A-z0-9]{1,50}|[A-z\-]{1,50} ?|)(?: the |)(?:[Ss][Pp][Ii][Dd][Ee][Rr]|[Ss]crape|[Cc][Rr][Aa][Ww][Ll])[A-z0-9]{0,50})(?:(?:[ /]| v)(\d+)(?:\.(\d+)|)(?:\.(\d+)|)|)
+# Bots Pattern '/name-0.0'
+    /((?:Ant-)?Nutch|[A-z]+[Bb]ot|[A-z]+[Ss]pider|Axtaris|fetchurl|Isara|ShopSalad|Tailsweep)[ \-](\d+)(?:\.(\d+)(?:\.(\d+))?)?\n# Bots Pattern 'name/0.0'
+    \b(008|Altresium|Argus|BaiduMobaider|BoardReader|DNSGroup|DataparkSearch|EDI|Goodzer|Grub|INGRID|Infohelfer|LinkedInBot|LOOQ|Nutch|OgScrper|PathDefender|Peew|PostPost|Steeler|Twitterbot|VSE|WebCrunch|WebZIP|Y!J-BR[A-Z]|YahooSeeker|envolk|sproose|wminer)/(\d+)(?:\.(\d+)|)(?:\.(\d+)|)
+# More bots
+    (CSimpleSpider|Cityreview Robot|CrawlDaddy|CrawlFire|Finderbots|Index crawler|Job Roboter|KiwiStatus Spider|Lijit Crawler|QuerySeekerSpider|ScollSpider|Trends Crawler|USyd-NLP-Spider|SiteCat Webbot|BotName\/\$BotVersion|123metaspider-Bot|1470\.net crawler|50\.nu|8bo Crawler Bot|Aboundex|Accoona-[A-z]{1,30}-Agent|AdsBot-Google(?:-[a-z]{1,30}|)|altavista|AppEngine-Google|archive.{0,30}\.org_bot|archiver|Ask Jeeves|[Bb]ai[Dd]u[Ss]pider(?:-[A-Za-z]{1,30})(?:-[A-Za-z]{1,30}|)|bingbot|BingPreview|blitzbot|BlogBridge|Bloglovin|BoardReader Blog Indexer|BoardReader Favicon Fetcher|boitho.com-dc|BotSeer|BUbiNG|\b\w{0,30}favicon\w{0,30}\b|\bYeti(?:-[a-z]{1,30}|)|Catchpoint(?: bot|)|[Cc]harlotte|Checklinks|clumboot|Comodo HTTP\(S\) Crawler|Comodo-Webinspector-Crawler|ConveraCrawler|CRAWL-E|CrawlConvera|Daumoa(?:-feedfetcher|)|Feed Seeker Bot|Feedbin|findlinks|Flamingo_SearchEngine|FollowSite Bot|furlbot|Genieo|gigabot|GomezAgent|gonzo1|(?:[a-zA-Z]{1,30}-|)Googlebot(?:-[a-zA-Z]{1,30}|)|Google SketchUp|grub-client|gsa-crawler|heritrix|HiddenMarket|holmes|HooWWWer|htdig|ia_archiver|ICC-Crawler|Icarus6j|ichiro(?:/mobile|)|IconSurf|IlTrovatore(?:-Setaccio|)|InfuzApp|Innovazion Crawler|InternetArchive|IP2[a-z]{1,30}Bot|jbot\b|KaloogaBot|Kraken|Kurzor|larbin|LEIA|LesnikBot|Linguee Bot|LinkAider|LinkedInBot|Lite Bot|Llaut|lycos|Mail\.RU_Bot|masscan|masidani_bot|Mediapartners-Google|Microsoft .{0,30} Bot|mogimogi|mozDex|MJ12bot|msnbot(?:-media {0,2}|)|msrbot|Mtps Feed Aggregation System|netresearch|Netvibes|NewsGator[^/]{0,30}|^NING|Nutch[^/]{0,30}|Nymesis|ObjectsSearch|OgScrper|Orbiter|OOZBOT|PagePeeker|PagesInventory|PaxleFramework|Peeplo Screenshot Bot|PlantyNet_WebRobot|Pompos|Qwantify|Read%20Later|Reaper|RedCarpet|Retreiver|Riddler|Rival IQ|scooter|Scrapy|Scrubby|searchsight|seekbot|semanticdiscovery|SemrushBot|Simpy|SimplePie|SEOstats|SimpleRSS|SiteCon|Slackbot-LinkExpanding|Slack-ImgProxy|Slurp|snappy|Speedy Spider|Squrl Java|Stringer|TheUsefulbot|ThumbShotsBot|Thumbshots\.ru|Tiny Tiny RSS|Twitterbot|WhatsApp|URL2PNG|Vagabondo|VoilaBot|^vortex|Votay bot|^voyager|WASALive.Bot|Web-sniffer|WebThumb|WeSEE:[A-z]{1,30}|WhatWeb|WIRE|WordPress|Wotbox|www\.almaden\.ibm\.com|Xenu(?:.s|) Link Sleuth|Xerka [A-z]{1,30}Bot|yacy(?:bot|)|YahooSeeker|Yahoo! Slurp|Yandex\w{1,30}|YodaoBot(?:-[A-z]{1,30}|)|YottaaMonitor|Yowedo|^Zao|^Zao-Crawler|ZeBot_www\.ze\.bz|ZooShot|ZyBorg)(?:[ /]v?(\d+)(?:\.(\d+)(?:\.(\d+)|)|)|)
+
+----------------------------------------
+
+TITLE: Configuring Whitelist Mode in YAML
+DESCRIPTION: This YAML configuration sets up a whitelist mode for OIDC authentication, allowing specific paths to bypass authentication.
+
+LANGUAGE: yaml
+CODE:
+match_type: 'whitelist'
+match_list:
+    - match_rule_domain: '*.bar.com'
+      match_rule_path: '/foo'
+      match_rule_type: 'prefix'
+
+----------------------------------------
+
+TITLE: Search Context Configuration in JSON
+DESCRIPTION: Example showing how to configure search context size in request parameters
+
+LANGUAGE: json
+CODE:
+{
+  "web_search_options": {
+    "search_context_size": "medium"
+  }
+}
+
+----------------------------------------
+
+TITLE: Sending Request with Nonce in Bash
+DESCRIPTION: An example of how to generate a nonce and send a request with the nonce header using curl in Bash.
+
+LANGUAGE: bash
+CODE:
+# Generate nonce
+nonce=$(openssl rand -base64 32)
+
+# Send request
+curl -X POST 'https://api.example.com/path' \
+  -H "X-Higress-Nonce: $nonce" \
+  -d '{"key": "value"}'
+
+----------------------------------------
+
+TITLE: Configuring Keycloak OIDC in YAML
+DESCRIPTION: YAML configuration for setting up Keycloak as the OIDC provider in Higress, including service and plugin settings.
+
+LANGUAGE: yaml
+CODE:
+redirect_url: 'http://foo.bar.com/oauth2/callback'
+oidc_issuer_url: 'http://127.0.0.1:9090/realms/myrealm'
+client_id: 'XXXXXXXXXXXXXXXX'
+client_secret: 'XXXXXXXXXXXXXXXX'
+scope: 'openid email'
+cookie_secret: 'nqavJrGvRmQxWwGNptLdyUVKcBNZ2b18Guc1n_8DCfY='
+service_name: 'keycloak.static'
+service_port: 80
+service_host: '127.0.0.1:9090'
+match_type: 'blacklist'
+match_list:
+    - match_rule_domain: '*.bar.com'
+      match_rule_path: '/headers'
+      match_rule_type: 'prefix'
+
+----------------------------------------
+
+TITLE: Processed LLM Request with AI Prompts and Geo Location
+DESCRIPTION: Example of how the LLM request looks after being processed by both the geo-ip and AI Prompts plugins, showing the inserted prompts with geographic information.
+
+LANGUAGE: bash
+CODE:
+curl http://localhost/test \
+-H "content-type: application/json" \
+-H "x-forwarded-for: 87.254.207.100,4.5.6.7" \
+-d '{
+  "model": "gpt-3.5-turbo",
+  "messages": [
+    {
+      "role": "system",
+      "content": "The user's current geographic location is, country: China, province: Beijing, city: Beijing."
+    },
+    {
+      "role": "user",
+      "content": "How is the weather today?"
+    },
+    {
+      "role": "user",
+      "content": "After answering each question, try to ask a follow-up question."
+    }
+  ]
+}'
+
+----------------------------------------
+
+TITLE: Basic Auth Authentication Request Examples
+DESCRIPTION: Curl commands demonstrating how to make authenticated requests using Basic Auth credentials.
+
+LANGUAGE: bash
+CODE:
+# Using curl's -u parameter to specify
+curl -u admin:123456  http://xxx.hello.com/test
+# Or directly specify the Authorization request header with the username and password encoded in base64
+curl -H 'Authorization: Basic YWRtaW46MTIzNDU2'  http://xxx.hello.com/test
+
+LANGUAGE: bash
+CODE:
+curl  http://xxx.hello.com/test
+
+LANGUAGE: bash
+CODE:
+curl -u admin:abc  http://xxx.hello.com/test
+
+LANGUAGE: bash
+CODE:
+# consumer2 is not in the allow list for route-a
+curl -u guest:abc  http://xxx.hello.com/test
+
+----------------------------------------
+
+TITLE: Allowing Go-http-client Requests in Higress Bot Detection
+DESCRIPTION: YAML configuration to allow requests from Go-http-client, which would otherwise be blocked by the default bot detection rules. This is useful for permitting legitimate Golang-based HTTP clients.
+
+LANGUAGE: yaml
+CODE:
+allow:
+- ".*Go-http-client.*"
+
+----------------------------------------
+
+TITLE: Configuring AI Prompts Plugin in YAML
+DESCRIPTION: Example configuration for the AI Prompts plugin, demonstrating how to insert prompts before and after the initial input in LLM requests.
+
+LANGUAGE: yaml
+CODE:
+prepend:
+- role: system
+  content: "Please answer the questions in English."
+append:
+- role: user
+  content: "After answering each question, try to ask a follow-up question."
+
+----------------------------------------
+
+TITLE: Exchanging Authorization Code for Tokens in Shell
+DESCRIPTION: This shell command exchanges an authorization code for ID token, access token, and refresh token in the OIDC flow.
+
+LANGUAGE: shell
+CODE:
+curl -X POST \
+  --url "https://dev-o43xb1mz7ya7ach4.us.auth0.com/oauth/token" \
+  --data "grant_type=authorization_code" \
+  --data "client_id=YagFqRD9tfNIaac5BamjhsSatjrAnsnZ" \
+  --data "client_secret=ekqv5XoZuMFtYms1NszEqRx03qct6BPvGeJUeptNG4y09PrY16BKT9IWezTrrhJJ" \
+  --data "redirect_uri=http%3A%2F%2Ffoo.bar.com%2Foauth2%2Fcallback" \
+  --data "code=0bdopoS2c2lx95u7iO0OH9kY1TvaEdJHo4lB6CT2_qVFm" \
+
+----------------------------------------
+
+TITLE: Adding Custom Bot Detection Rule in Higress
+DESCRIPTION: YAML configuration to add a custom bot detection rule that blocks requests with User-Agent containing 'spd-tools'. This demonstrates how to extend the bot detection capabilities with project-specific rules.
+
+LANGUAGE: yaml
+CODE:
+deny:
+- "spd-tools.*"
+
+----------------------------------------
+
+TITLE: Generating Cookie Secret in Python
+DESCRIPTION: Python command to generate a secure cookie secret for OIDC authentication configuration.
+
+LANGUAGE: python
+CODE:
+python -c 'import os, base64; print(base64.urlsafe_b64encode(os.urandom(32)).decode())'
+
+----------------------------------------
+
+TITLE: Sending a Chat Completion Request to Groq Service
+DESCRIPTION: Example cURL command for sending a chat completion request to the Groq service through the AI Proxy plugin.
+
+LANGUAGE: bash
+CODE:
+curl "http://<YOUR-DOMAIN>/v1/chat/completions" -H "Content-Type: application/json" -d '{
+  "model": "llama3-8b-8192",
+  "messages": [
+    {
+      "role": "user",
+      "content": "hello, who are you?"
+    }
+  ]
+}'
+
+----------------------------------------
+
+TITLE: Default Bot Detection Regular Expressions
+DESCRIPTION: Collection of regular expressions used by default to identify various types of web crawlers and bots based on User-Agent patterns.
+
+LANGUAGE: bash
+CODE:
+# Bots General matcher 'name/0.0'
+    (?:\/[A-Za-z0-9\.]+|) {0,5}([A-Za-z0-9 \-_\!\[\]:]{0,50}(?:[Aa]rchiver|[Ii]ndexer|[Ss]craper|[Bb]ot|[Ss]pider|[Cc]rawl[a-z]{0,50}))[/ ](\d+)(?:\.(\d+)(?:\.(\d+)|)|)
+# Bots General matcher 'name 0.0'
+    (?:\/[A-Za-z0-9\.]+|) {0,5}([A-Za-z0-9 \-_\!\[\]:]{0,50}(?:[Aa]rchiver|[Ii]ndexer|[Ss]craper|[Bb]ot|[Ss]pider|[Cc]rawl[a-z]{0,50})) (\d+)(?:\.(\d+)(?:\.(\d+)|)|)
+# Bots containing spider|scrape|bot(but not CUBOT)|Crawl
+    ((?:[A-z0-9]{1,50}|[A-z\-]{1,50} ?|)(?: the |)(?:[Ss][Pp][Ii][Dd][Ee][Rr]|[Ss]crape|[Cc][Rr][Aa][Ww][Ll])[A-z0-9]{0,50})(?:(?:[ /]| v)(\d+)(?:\.(\d+)|)(?:\.(\d+)|)|)
+# Bots Pattern '/name-0.0'
+    /((?:Ant-)?Nutch|[A-z]+[Bb]ot|[A-z]+[Ss]pider|Axtaris|fetchurl|Isara|ShopSalad|Tailsweep)[ \-](\d+)(?:\.(\d+)(?:\.(\d+))?)?\n# More bots
+[...]
+
+----------------------------------------
+
+TITLE: Making an Authenticated Request with OAuth2 Token in Bash
+DESCRIPTION: Bash command to make an authenticated request using an OAuth2 access token.
+
+LANGUAGE: bash
+CODE:
+curl 'http://test.com' -H 'Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6ImFwcGxpY2F0aW9uXC9hdCtqd3QifQ.eyJhdWQiOiJkZWZhdWx0IiwiY2xpZW50X2lkIjoiMTIzNDU2NzgteHh4eC14eHh4LXh4eHgteHh4eHh4eHh4eHh4IiwiZXhwIjoxNjg3OTUxNDYzLCJpYXQiOjE2ODc5NDQyNjMsImlzcyI6IkhpZ3Jlc3MtR2F0ZXdheSIsImp0aSI6IjEwOTU5ZDFiLThkNjEtNGRlYy1iZWE3LTk0ODEwMzc1YjYzYyIsInN1YiI6ImNvbnN1bWVyMSJ9.NkT_rG3DcV9543vBQgneVqoGfIhVeOuUBwLJJ4Wycb0'
+
+----------------------------------------
+
+TITLE: Sending Request without API Key using cURL
+DESCRIPTION: Example cURL command demonstrating a request without an API Key, which will be denied.
+
+LANGUAGE: bash
+CODE:
+curl  http://xxx.hello.com/test
+
+----------------------------------------
+
+TITLE: Allowing Go HTTP Client Requests Configuration
+DESCRIPTION: YAML configuration to allow Go HTTP client requests that would otherwise be blocked by default bot detection rules.
+
+LANGUAGE: yaml
+CODE:
+allow:
+- ".*Go-http-client.*"
+
+----------------------------------------
+
+TITLE: Setting API Key in URL Parameters using cURL
+DESCRIPTION: This bash command demonstrates how to make a request with an API key set in the URL parameters, which is one of the supported methods for key authentication in Higress.
+
+LANGUAGE: bash
+CODE:
+curl  http://xxx.hello.com/test?apikey=2bda943c-ba2b-11ec-ba07-00163e1250b5
+
+----------------------------------------
+
+TITLE: Sending Auto-fill Request in cURL
+DESCRIPTION: Example cURL command for sending an auto-fill request to the AI History Dialogue endpoint, including headers and JSON payload.
+
+LANGUAGE: bash
+CODE:
+curl 'http://example.com/api/openai/v1/chat/completions?fill_history_cnt=3' \
+  -H 'Accept: application/json, text/event-stream' \
+  -H 'Content-Type: application/json' \
+  -H 'Authorization: Bearer sk-Nzf7RtkdS4s0zFyn5575124129254d9bAf9473A5D7D06dD3'
+  --data-raw '{"model":"qwen-long","frequency_penalty":0,"max_tokens":800,"stream":false,"messages":[
+        {
+            "role": "user",
+            "content": "Can Higress replace Nginx?"
+        }
+    ],"presence_penalty":0,"temperature":0.7,"top_p":0.95}'
+
+----------------------------------------
+
+TITLE: Accessing API with Bearer Token in Shell
+DESCRIPTION: This shell command demonstrates how to access an API endpoint using a Bearer token obtained from OIDC authentication.
+
+LANGUAGE: shell
+CODE:
+curl --url "foo.bar.com/headers"
+  --header "Authorization: Bearer eyJhbGciOiJkaXIiLCJlbmMiOiJBMjU2R0NNIiwiaXNzIjoiaHR0cHM6Ly9kZXYtbzQzeGIxbXo3eWE3YWNoNC51cy5hdXRoMC5jb20vIn0..WP_WRVM-y3fM1sN4.fAQqtKoKZNG9Wj0OhtrMgtsjTJ2J72M2klDRd9SvUKGbiYsZNPmIl_qJUf81D3VIjD59o9xrOOJIzXTgsfFVA2x15g-jBlNh68N7dyhXu9237Tbplweu1jA25IZDSnjitQ3pbf7xJVIfPnWcrzl6uT8G1EP-omFcl6AQprV2FoKFMCGFCgeafuttppKe1a8mpJDj7AFLPs-344tT9mvCWmI4DuoLFh0PiqMMJBByoijRSxcSdXLPxZng84j8JVF7H6mFa-dj-icP-KLy6yvzEaRKz_uwBzQCzgYK434LIpqw_PRuN3ClEsenwRgIsNdVjvKcoAysfoZhmRy9BQaE0I7qTohSBFNX6A.mgGGeeWgugfXcUcsX4T5dQ"
+
+----------------------------------------
+
+TITLE: Calculating Content-MD5 in Java
+DESCRIPTION: Java code snippet demonstrating how to calculate the Content-MD5 value for HMAC Authentication.
+
+LANGUAGE: java
+CODE:
+String content-MD5 = Base64.encodeBase64(MD5(bodyStream.getBytes("UTF-8")));
+
+----------------------------------------
+
+TITLE: WASM Plugin Dockerfile
+DESCRIPTION: Minimal Dockerfile for packaging WASM plugin into a container image.
+
+LANGUAGE: dockerfile
+CODE:
+FROM scratch
+COPY main.wasm plugin.wasm
+
+----------------------------------------
+
+TITLE: Refreshing Access Token in Shell
+DESCRIPTION: This shell command demonstrates how to refresh an access token using a refresh token in the OIDC flow.
+
+LANGUAGE: shell
+CODE:
+curl -X POST \
+  --url "https://dev-o43xb1mz7ya7ach4.us.auth0.com/oauth/token" \
+  --data "grant_type=refresh_token" \
+  --data "client_id=YagFqRD9tfNIaac5BamjhsSatjrAnsnZ" \
+  --data "client_secret=ekqv5XoZuMFtYms1NszEqRx03qct6BPvGeJUeptNG4y09PrY16BKT9IWezTrrhJJ" \
+  --data "refresh_token=GrZ1f2JvzjAZQzSXmyr1ScWbv8aMFBvzAXHBUSiILcDEG"
+
+----------------------------------------
+
+TITLE: Testing DeGraphQL Plugin with cURL
+DESCRIPTION: Shell command to test the DeGraphQL plugin configuration using cURL. It sends a GET request to the configured endpoint with query parameters.
+
+LANGUAGE: shell
+CODE:
+curl "http://localhost/api?owner=alibaba&name=higress" -H "Authorization: Bearer some-token"
+
+----------------------------------------
+
+TITLE: Running WASM Plugin E2E Tests
+DESCRIPTION: This bash command demonstrates how to run E2E tests for a specific WASM plugin. It uses environment variables to specify the plugin type and name.
+
+LANGUAGE: bash
+CODE:
+PLUGIN_TYPE=CPP PLUGIN_NAME=request_block make higress-wasmplugin-test
+
+----------------------------------------
+
+TITLE: Configuring Blacklist Mode in YAML
+DESCRIPTION: This YAML configuration sets up a blacklist mode for OIDC authentication, requiring authentication for specific paths.
+
+LANGUAGE: yaml
+CODE:
+match_type: 'blacklist'
+match_list:
+    - match_rule_domain: '*.bar.com'
+      match_rule_path: '/headers'
+      match_rule_type: 'prefix'
+
+----------------------------------------
+
+TITLE: Configuring OIDC Blacklist in YAML
+DESCRIPTION: YAML configuration example for setting up a blacklist in OIDC authentication, specifying domain and path rules.
+
+LANGUAGE: yaml
+CODE:
+match_type: 'blacklist'
+match_list:
+    - match_rule_domain: '*.bar.com'
+      match_rule_path: '/headers'
+      match_rule_type: 'prefix'
+
+----------------------------------------
+
+TITLE: Configuring Request Block Wasm Plugin in Higress
+DESCRIPTION: YAML configuration for using the request-block Wasm plugin version 1.0.0 in Higress. It demonstrates how to set up a WasmPlugin resource, including selector and default configuration.
+
+LANGUAGE: yaml
+CODE:
+apiVersion: extensions.higress.io/v1alpha1
+kind: WasmPlugin
+metadata:
+  name: request-block
+  namespace: higress-system
+spec:
+  selector:
+    matchLabels:
+      higress: higress-system-higress-gateway
+  defaultConfig:
+    block_urls:
+    - "swagger.html"
+  url: oci://higress-registry.cn-hangzhou.cr.aliyuncs.com/plugins/request-block:1.0.0
+
+----------------------------------------
+
+TITLE: Configuring HTTPS Backend in Ingress YAML
+DESCRIPTION: This Ingress YAML configuration sets up HTTPS protocol for backend services in Higress.
+
+LANGUAGE: yaml
+CODE:
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: auth0-ingress
+  annotations:
+    higress.io/destination: auth.dns
+    higress.io/backend-protocol: "HTTPS"
+    higress.io/ignore-path-case: "false"
+spec:
+  ingressClassName: higress
+  rules:
+    - host: foo.bar.com
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              resource:
+                apiGroup: networking.higress.io
+                kind: McpBridge
+                name: default
+
+----------------------------------------
+
+TITLE: Testing Cache-Control Configuration with cURL
+DESCRIPTION: These cURL commands demonstrate how to test the cache-control configuration by requesting PNG and JPG files. The responses will include Expires and Cache-Control headers with an expiration time of 1 hour later.
+
+LANGUAGE: bash
+CODE:
+curl http://example.com/test.png
+curl http://example.com/test.jpg
+
+----------------------------------------
+
+TITLE: Example Mock Response Output
+DESCRIPTION: Sample HTTP response showing the formatted output of the mock response configuration.
+
+LANGUAGE: text
+CODE:
+HTTP/1.1 200 OK
+Content-Type: application/json
+Hello: World
+Content-Length: 17
+{"hello":"world"}
+
+----------------------------------------
+
+TITLE: Configuring OIDC Whitelist in YAML
+DESCRIPTION: YAML configuration example for setting up a whitelist in OIDC authentication, specifying domain and path rules.
+
+LANGUAGE: yaml
+CODE:
+match_type: 'whitelist'
+match_list:
+    - match_rule_domain: '*.bar.com'
+      match_rule_path: '/foo'
+      match_rule_type: 'prefix'
+
+----------------------------------------
+
+TITLE: Basic Envoy Mode Configuration Example
+DESCRIPTION: Basic configuration example for ext-auth plugin using envoy endpoint mode with service endpoint details.
+
+LANGUAGE: yaml
+CODE:
+http_service:
+  endpoint_mode: envoy
+  endpoint:
+    service_name: ext-auth.backend.svc.cluster.local
+    service_port: 8090
+    path_prefix: /auth
+  timeout: 1000
+
+----------------------------------------
+
+TITLE: Rate Limiting by Request Header
+DESCRIPTION: Example configuration for rate limiting based on x-ca-key header value with specific limits and fallback rules.
+
+LANGUAGE: yaml
+CODE:
+rule_name: default_rule
+rule_items:
+- limit_by_header: x-ca-key
+  limit_keys:
+  - key: 102234
+    query_per_minute: 10
+  - key: 308239
+    query_per_hour: 10
+- limit_by_per_header: x-ca-key
+  limit_keys:
+  - key: "regexp:^a.*"
+    query_per_second: 10
+  - key: "regexp:^b.*"
+    query_per_minute: 100
+  - key: "*"
+    query_per_hour: 1000
+redis:
+  service_name: redis.static
+show_limit_quota_header: true
+
+----------------------------------------
+
+TITLE: Configuring Maximum Cache Time for All Files in YAML
+DESCRIPTION: This YAML configuration sets up caching for all files with a maximum caching time of 'Thu, 31 Dec 2037 23:55:55 GMT'. It demonstrates how to use the 'max' keyword for the expires field.
+
+LANGUAGE: yaml
+CODE:
+expires: max
+
+----------------------------------------
+
+TITLE: Basic WasmPlugin Configuration
+DESCRIPTION: YAML configuration for deploying a WASM plugin in Higress with URL blocking functionality.
+
+LANGUAGE: yaml
+CODE:
+apiVersion: extensions.higress.io/v1alpha1
+kind: WasmPlugin
+metadata:
+  name: request-block
+  namespace: higress-system
+spec:
+  defaultConfig:
+    block_urls:
+    - "swagger.html"
+  url: oci://<your_registry_hub>/request-block:1.0.0
+
+----------------------------------------
+
+TITLE: Example Blocked Request Commands - Bash
+DESCRIPTION: Example curl commands demonstrating requests that would be blocked by the spd-tools deny pattern configuration.
+
+LANGUAGE: bash
+CODE:
+curl http://example.com -H 'User-Agent: spd-tools/1.1'
+curl http://exmaple.com -H 'User-Agent: spd-tools'
+
+----------------------------------------
+
+TITLE: Sample GraphQL Response JSON
+DESCRIPTION: Example JSON response from the GraphQL query, showing repository details including name, fork count, and description.
+
+LANGUAGE: json
+CODE:
+{
+	"data": {
+		"repository": {
+			"description": "Next-generation Cloud Native Gateway",
+			"forkCount": 149,
+			"name": "higress"
+		}
+	}
+}
+
+----------------------------------------
+
+TITLE: Testing SSE Timing Plugin with HTTP Request
+DESCRIPTION: Command to send an HTTP request to the local Envoy instance running with the SSE timing plugin. This tests the plugin's functionality.
+
+LANGUAGE: sh
+CODE:
+$ curl localhost:10000/
+
+----------------------------------------
+
+TITLE: Checking Git User Configuration
+DESCRIPTION: Commands to verify git user name and email configuration to ensure proper GitHub attribution.
+
+LANGUAGE: bash
+CODE:
+git config --get user.name
+git config --get user.email
+
+----------------------------------------
+
+TITLE: GraphQL POST Request JSON Structure
+DESCRIPTION: Example of a standard GraphQL POST request body in JSON format, including query, operationName, and variables fields.
+
+LANGUAGE: json
+CODE:
+{
+  "query": "{viewer{name}}",
+  "operationName": "",
+  "variables": {
+    "name": "value"
+  }
+}
+
+----------------------------------------
+
+TITLE: Running Higress Conformance and WasmPlugin Tests (Makefile)
+DESCRIPTION: Makefile targets for running Ingress API conformance tests and WasmPlugin tests in the Higress project. Includes options for building and testing specific plugins.
+
+LANGUAGE: makefile
+CODE:
+make higress-conformance-test
+make higress-wasmplugin-test
+PLUGIN_NAME=request-block make higress-wasmplugin-test
+PLUGIN_TYPE=CPP PLUGIN_NAME=key_auth make higress-wasmplugin-test
+TEST_SHORTNAME=WasmPluginsIPRestrictionAllow,WasmPluginsIPRestrictionDeny make higress-wasmplugin-test
+
+----------------------------------------
+
+TITLE: Checking Git Remote Configuration
+DESCRIPTION: Command to verify the git remote configuration showing both origin and upstream settings.
+
+LANGUAGE: shell
+CODE:
+$ git remote -v
+origin     git@github.com:<your-username>/higress.git (fetch)
+origin     git@github.com:<your-username>/higress.git (push)
+upstream   git@github.com:alibaba/higress.git (fetch)
+upstream   no-pushing (push)
+
+----------------------------------------
+
+TITLE: Docker Build and Push Commands
+DESCRIPTION: Commands to build and push the WASM plugin Docker image to a registry.
+
+LANGUAGE: bash
+CODE:
+docker build -t <your_registry_hub>/request-block:1.0.0 -f <your_dockerfile> .
+docker push <your_registry_hub>/request-block:1.0.0
+
+----------------------------------------
+
+TITLE: Sending a Chat Completion Request in JSON
+DESCRIPTION: Example JSON request for a chat completion using the AI Proxy plugin.
+
+LANGUAGE: json
+CODE:
+{
+  "model": "gpt-3",
+  "messages": [
+    {
+      "role": "user",
+      "content": "Hello, who are you?"
+    }
+  ],
+  "temperature": 0.3
+}
+
+----------------------------------------
+
+TITLE: Example LLM Request JSON for Provider Extraction
+DESCRIPTION: Sample JSON body of an LLM request before processing by the model-router plugin, demonstrating the structure with a provider/model parameter.
+
+LANGUAGE: json
+CODE:
+{
+    "model": "dashscope/qwen-long",
+    "frequency_penalty": 0,
+    "max_tokens": 800,
+    "stream": false,
+    "messages": [{
+        "role": "user",
+        "content": "What is the GitHub address of the Higress project's main repository?"
+    }],
+    "presence_penalty": 0,
+    "temperature": 0.7,
+    "top_p": 0.95
+}
+
+----------------------------------------
+
+TITLE: Building WASM Plugin Using Higress Builder
+DESCRIPTION: Command to build a WASM plugin using the Higress wasm-go builder with optional EXTRA_TAGS configuration via .buildrc file.
+
+LANGUAGE: bash
+CODE:
+PLUGIN_NAME=request-block make build
+
+----------------------------------------
+
+TITLE: Testing Custom Crawler Identification in Bash
+DESCRIPTION: Bash commands demonstrating how to test the custom crawler identification rules using curl, showing requests that would be blocked based on the configured deny patterns.
+
+LANGUAGE: bash
+CODE:
+curl http://example.com -H 'User-Agent: spd-tools/1.1'
+curl http://exmaple.com -H 'User-Agent: spd-tools'
+
+----------------------------------------
+
+TITLE: Sample JSON Response After Transformation
+DESCRIPTION: Example JSON response after the XML has been transformed by the plugin according to the configured prompt
+
+LANGUAGE: json
+CODE:
+{
+  "slideshow": {
+    "title": "Sample Slide Show",
+    "date": "Date of publication",
+    "author": "Yours Truly",
+    "slides": [
+      {
+        "type": "all",
+        "title": "Wake up to WonderWidgets!"
+      },
+      {
+        "type": "all",
+        "title": "Overview",
+        "items": [
+          "Why <em>WonderWidgets</em> are great",
+          "",
+          "Who <em>buys</em> WonderWidgets"
+        ]
+      }
+    ]
+  }
+}
+
+----------------------------------------
+
+TITLE: Specifying Yamllint Version Requirement
+DESCRIPTION: This snippet defines the exact version of Yamllint required for the project. It uses the double equals sign to specify an exact version match.
+
+LANGUAGE: text
+CODE:
+yamllint==1.29.0
+
+----------------------------------------
+
+TITLE: Normal Response Example
+DESCRIPTION: Example of a successful JSON response that has been validated against the JSON Schema.
+
+LANGUAGE: json
+CODE:
+{
+  "apiVersion": "1.0",
+  "request": {
+    "endpoint": "/add_to_five",
+    "method": "POST",
+    "port": 8080,
+    "headers": {
+      "Content-Type": "application/json"
+    },
+    "body": {
+      "x": 7
+    }
+  }
+}
+
+----------------------------------------
+
+TITLE: Querying AI Agent for Weather Information
+DESCRIPTION: cURL command to request current weather information for Jinan.
+
+LANGUAGE: shell
+CODE:
+curl 'http://<replace with gateway public IP>/api/openai/v1/chat/completions' \
+-H 'Accept: application/json, text/event-stream' \
+-H 'Content-Type: application/json' \
+--data-raw '{"model":"qwen","frequency_penalty":0,"max_tokens":800,"stream":false,"messages":[{"role":"user","content":"What is the current weather in Jinan?"}],"presence_penalty":0,"temperature":0,"top_p":0}'
+
+----------------------------------------
+
+TITLE: Specifying CodeSpell Dependency Version
+DESCRIPTION: Defines the required version of codespell package as 2.2.2, which is a tool used for checking spelling in code and documentation.
+
+LANGUAGE: plaintext
+CODE:
+codespell==2.2.2
+
+----------------------------------------
+
+TITLE: Sample XML Response Before Transformation
+DESCRIPTION: Example XML response from the original httpbin /xml endpoint before transformation by the plugin
+
+LANGUAGE: xml
+CODE:
+<?xml version='1.0' encoding='us-ascii'?>
+<!--  A SAMPLE set of slides  -->
+<slideshow
+    title="Sample Slide Show"
+    date="Date of publication"
+    author="Yours Truly"
+    >
+    <!-- TITLE SLIDE -->
+    <slide type="all">
+      <title>Wake up to WonderWidgets!</title>
+    </slide>
+    <!-- OVERVIEW -->
+    <slide type="all">
+        <title>Overview</title>
+        <item>Why <em>WonderWidgets</em> are great</item>
+        <item/>
+        <item>Who <em>buys</em> WonderWidgets</item>
+    </slide>
+</slideshow>
+
+----------------------------------------
+
+TITLE: Querying AI Agent for Translation
+DESCRIPTION: cURL command to request translation of a phrase from English to German.
+
+LANGUAGE: shell
+CODE:
+curl 'http://<replace with gateway public IP>/api/openai/v1/chat/completions' \
+-H 'Accept: application/json, text/event-stream' \
+-H 'Content-Type: application/json' \
+--data-raw '{"model":"qwen","frequency_penalty":0,"max_tokens":800,"stream":false,"messages":[{"role":"user","content":"Help me translate the following sentence into German: \"Hail Hydra!\""}],"presence_penalty":0,"temperature":0,"top_p":0}'
+
+----------------------------------------
+
+TITLE: Querying Helm Release Status
+DESCRIPTION: Shell commands for retrieving information about an installed Helm release, including status and full configuration details.
+
+LANGUAGE: shell
+CODE:
+$ helm status {{ .Release.Name }}
+$ helm get all {{ .Release.Name }}
+
+----------------------------------------
+
+TITLE: Testing WAF Rules with cURL Commands
+DESCRIPTION: These cURL commands demonstrate requests that will be blocked by the configured WAF rules. The first attempts to access the '/admin' path, and the second includes a malicious payload in the request body.
+
+LANGUAGE: bash
+CODE:
+curl http://example.com/admin
+curl http://example.com -d "maliciouspayload"
+
+----------------------------------------
+
+TITLE: Querying AI Agent with JSON Formatting Enabled
+DESCRIPTION: cURL command to request weather information for Beijing with JSON formatting enabled.
+
+LANGUAGE: shell
+CODE:
+curl 'http://<replace with gateway public IP>/api/openai/v1/chat/completions' \
+-H 'Accept: application/json, text/event-stream' \
+-H 'Content-Type: application/json' \
+--data-raw '{"model":"qwen","frequency_penalty":0,"max_tokens":800,"stream":false,"messages":[{"role":"user","content":"What is the current weather in Beijing ?"}],"presence_penalty":0,"temperature":0,"top_p":0}'
+
+----------------------------------------
+
+TITLE: Example Blocked Request Patterns
+DESCRIPTION: Example curl commands showing requests that would be blocked based on the custom bot detection configuration.
+
+LANGUAGE: bash
+CODE:
+curl http://example.com -H 'User-Agent: spd-tools/1.1'
+curl http://exmaple.com -H 'User-Agent: spd-tools'
+
+----------------------------------------
+
+TITLE: Additional Bot Detection Rules Configuration
+DESCRIPTION: YAML configuration to add custom bot detection rules for blocking specific User-Agent patterns.
+
+LANGUAGE: yaml
+CODE:
+deny:
+- "spd-tools.*"
+
+----------------------------------------
+
+TITLE: AI Agent Response in JSON Format
+DESCRIPTION: Example of the JSON response from the AI Agent, showing the structured output of the chat completion request.
+
+LANGUAGE: json
+CODE:
+{
+  "id": "139487e7-96a0-9b13-91b4-290fb79ac992",
+  "choices": [
+    {
+      "index": 0,
+      "message": {
+        "role": "assistant",
+        "content": " 在济南市鑫盛大厦附近，您可以选择以下咖啡店：\n1. luckin coffee 瑞幸咖啡(鑫盛大厦店)，位于新泺大街1299号鑫盛大厦2号楼大堂；\n2. 三庆齐盛广场挪瓦咖啡(三庆·齐盛广场店)，位于新泺大街与颖秀路交叉口西南60米；\n3. luckin coffee 瑞幸咖啡(三庆·齐盛广场店)，位于颖秀路1267号；\n4. 库迪咖啡(齐鲁软件园店)，位于新泺大街三庆齐盛广场4号楼底商；\n5. 库迪咖啡(美莲广场店)，位于高新区新泺大街1166号美莲广场L117号；以及其他一些选项。希望这些建议对您有所帮助！"
+      },
+      "finish_reason": "stop"
+    }
+  ],
+  "created": 1723172296,
+  "model": "qwen-max-0403",
+  "object": "chat.completion",
+  "usage": {
+    "prompt_tokens": 886,
+    "completion_tokens": 50,
+    "total_tokens": 936
+  }
+}
+
+----------------------------------------
+
+TITLE: Calculating Content-MD5 in Java
+DESCRIPTION: Java code snippet for calculating the Content-MD5 header value used in HMAC authentication.
+
+LANGUAGE: java
+CODE:
+String content-MD5 = Base64.encodeBase64(MD5(bodyStream.getbytes("UTF-8")));
+
+----------------------------------------
+
+TITLE: Generating Cookie Secret in Python
+DESCRIPTION: This Python snippet generates a secure cookie secret for use in OIDC authentication configuration.
+
+LANGUAGE: python
+CODE:
+python -c 'import os,base64; print(base64.urlsafe_b64encode(os.urandom(32)).decode())'
+
+----------------------------------------
+
+TITLE: Generating HMAC Signature in Java
+DESCRIPTION: Java code for generating the HMAC signature using HmacSHA256 algorithm.
+
+LANGUAGE: java
+CODE:
+Mac hmacSha256 = Mac.getInstance("HmacSHA256");
+byte[] secretBytes = secret.getBytes("UTF-8");
+hmacSha256.init(new SecretKeySpec(secretBytes, 0, secretBytes.length, "HmacSHA256"));
+byte[] result = hmacSha256.doFinal(stringToSign.getBytes("UTF-8"));
+String sign = Base64.encodeBase64String(result);
+
+----------------------------------------
+
+TITLE: Creating OPA Policy with cURL
+DESCRIPTION: Shell command using cURL to create an OPA policy named 'example1'. The policy allows GET requests only.
+
+LANGUAGE: shell
+CODE:
+curl -X PUT '127.0.0.1:8181/v1/policies/example1' \
+  -H 'Content-Type: text/plain' \
+  -d 'package example1
+
+import input.request
+
+default allow = false
+
+allow {
+    # HTTP method must GET
+    request.method == "GET"
+}'
+
+----------------------------------------
+
+TITLE: Generating JWT Tokens in Java
+DESCRIPTION: Java code example for generating JWT tokens using RSA keys and the jose4j library.
+
+LANGUAGE: java
+CODE:
+import java.security.PrivateKey; 
+import org.jose4j.json.JsonUtil;
+import org.jose4j.jwk.RsaJsonWebKey;
+import org.jose4j.jwk.RsaJwkGenerator;
+import org.jose4j.jws.AlgorithmIdentifiers;
+import org.jose4j.jws.JsonWebSignature;
+import org.jose4j.jwt.JwtClaims;
+import org.jose4j.jwt.NumericDate;
+import org.jose4j.lang.JoseException;
+
+public class GenerateJwtDemo {
+    public static void main(String[] args) throws JoseException  {
+        String keyId = "uniq_key";
+        String privateKeyJson = "{\n"
+            + "  \"kty\": \"RSA\",\n"
+            + "  \"d\": "
+            + "\"O9MJSOgcjjiVMNJ4jmBAh0mRHF_TlaVva70Imghtlgwxl8BLfcf1S8ueN1PD7xV6Cnq8YenSKsfiNOhC6yZ_fjW1syn5raWfj68eR7cjHWjLOvKjwVY33GBPNOvspNhVAFzeqfWneRTBbga53Agb6jjN0SUcZdJgnelzz5JNdOGaLzhacjH6YPJKpbuzCQYPkWtoZHDqWTzCSb4mJ3n0NRTsWy7Pm8LwG_Fd3pACl7JIY38IanPQDLoighFfo-Lriv5z3IdlhwbPnx0tk9sBwQBTRdZ8JkqqYkxUiB06phwr7mAnKEpQJ6HvhZBQ1cCnYZ_nIlrX9-I7qomrlE1UoQ\",\n"
+            + "  \"e\": \"AQAB\",\n"
+            + "  \"alg\": \"RS256\",\n"
+            + "  \"n\": \"vCuB8MgwPZfziMSytEbBoOEwxsG7XI3MaVMoocziP4SjzU4IuWuE_DodbOHQwb_thUru57_Efe"
+            + "--sfATHEa0Odv5ny3QbByqsvjyeHk6ZE4mSAV9BsHYa6GWAgEZtnDceeeDc0y76utXK2XHhC1Pysi2KG8KAzqDa099Yh7s31AyoueoMnrYTmWfEyDsQL_OAIiwgXakkS5U8QyXmWicCwXntDzkIMh8MjfPskesyli0XQD1AmCXVV3h2Opm1Amx0ggSOOiINUR5YRD6mKo49_cN-nrJWjtwSouqDdxHYP-4c7epuTcdS6kQHiQERBd1ejdpAxV4c0t0FHF7MOy9kw\"\n"
+            + "}";
+        JwtClaims claims = new JwtClaims();
+        claims.setGeneratedJwtId();
+        claims.setIssuedAtToNow();
+        NumericDate date = NumericDate.now();
+        date.addSeconds(120*60);
+        claims.setExpirationTime(date);
+        claims.setNotBeforeMinutesInThePast(1);
+        claims.setSubject("YOUR_SUBJECT");
+        claims.setAudience("YOUR_AUDIENCE");
+        claims.setClaim("userId", "1213234");
+        claims.setClaim("email", "userEmail@youapp.com");
+        JsonWebSignature jws = new JsonWebSignature();
+        jws.setAlgorithmHeaderValue(AlgorithmIdentifiers.RSA_USING_SHA256);
+        jws.setKeyIdHeaderValue(keyId);
+        jws.setPayload(claims.toJson());
+        PrivateKey privateKey = new RsaJsonWebKey(JsonUtil.parseJson(privateKeyJson)).getPrivateKey();
+     
+        jws.setKey(privateKey);
+        String jwtResult = jws.getCompactSerialization();
+        System.out.println("Generate Json Web token , result is " + jwtResult);
+    }
+}
+
+----------------------------------------
+
+TITLE: Testing OPA Policy via API
+DESCRIPTION: cURL command to test the OPA policy by querying the allow decision with a GET method request.
+
+LANGUAGE: shell
+CODE:
+curl -X POST '127.0.0.1:8181/v1/data/example1/allow' \
+  -H 'Content-Type: application/json' \
+  -d '{"input":{"request":{"method":"GET"}}}'
+
+----------------------------------------
+
+TITLE: Sending JWT in URL Parameters
+DESCRIPTION: Example cURL command for sending a JWT token in URL parameters.
+
+LANGUAGE: bash
+CODE:
+curl  'http://xxx.hello.com/test?access_token=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCIsImtpZCI6IjEyMyJ9.eyJpc3MiOiJhYmNkIiwic3ViIjoidGVzdCIsImlhdCI6MTY2NTY2MDUyNywiZXhwIjoxODY1NjczODE5fQ.-vBSV0bKeDwQcuS6eeSZN9dLTUnSnZVk8eVCXdooCQ4'
+
+----------------------------------------
+
+TITLE: Basic Auth Authentication Request Examples
+DESCRIPTION: Bash curl commands demonstrating how to make authenticated requests using Basic Auth with both username/password and base64 encoded credentials.
+
+LANGUAGE: bash
+CODE:
+# Using curl's -u parameter to specify
+curl -u admin:123456  http://xxx.hello.com/test
+# Or directly specify the Authorization request header with the username and password encoded in base64
+curl -H 'Authorization: Basic YWRtaW46MTIzNDU2'  http://xxx.hello.com/test
+
+----------------------------------------
+
+TITLE: Starting OPA Service with Docker
+DESCRIPTION: Shell command to start an OPA service using Docker. It runs the OPA container in detached mode, exposing port 8181.
+
+LANGUAGE: shell
+CODE:
+docker run -d --name opa -p 8181:8181 openpolicyagent/opa:0.35.0 run -s
+
+----------------------------------------
+
+TITLE: Applying WasmPlugin API in Kubernetes
+DESCRIPTION: This YAML snippet shows how to create a WasmPlugin API resource in Kubernetes. It configures a plugin to block requests containing 'swagger.html' in the URL.
+
+LANGUAGE: yaml
+CODE:
+apiVersion: extensions.higress.io/v1alpha1
+kind: WasmPlugin
+metadata:
+  name: request-block
+  namespace: higress-system
+spec:
+  defaultConfig:
+    block_urls:
+    - "swagger.html"
+  url: oci://<your_registry_hub>/request-block:1.0.0
+
+----------------------------------------
+
+TITLE: Querying OPA Policy with cURL
+DESCRIPTION: Shell command using cURL to query the 'example1' OPA policy. It sends a POST request with JSON input to check if a GET method is allowed.
+
+LANGUAGE: shell
+CODE:
+curl -X POST '127.0.0.1:8181/v1/data/example1/allow' \
+  -H 'Content-Type: application/json' \
+  -d '{"input":{"request":{"method":"GET"}}}'
+
+----------------------------------------
+
+TITLE: Adding WASM Plugin E2E Test Cases in Go
+DESCRIPTION: This Go snippet shows how to add WASM plugin E2E test cases to the test suite. It demonstrates conditional test selection based on plugin type and name.
+
+LANGUAGE: go
+CODE:
+cSuite.Setup(t)
+	var higressTests []suite.ConformanceTest
+
+	if *isWasmPluginTest {
+		if strings.Compare(*wasmPluginType, "CPP") == 0 {
+			m := make(map[string]suite.ConformanceTest)
+			m["request_block"] = tests.CPPWasmPluginsRequestBlock
+			m["key_auth"] = tests.CPPWasmPluginsKeyAuth
+        //Add your newly written case method name here
+
+			higressTests = []suite.ConformanceTest{
+				m[*wasmPluginName],
+			}
+		} else {
+			higressTests = []suite.ConformanceTest{
+				tests.WasmPluginsRequestBlock,
+			}
+		}
+	} else {
+...
+
+----------------------------------------
+
+TITLE: Error Response Example in JSON
+DESCRIPTION: An example of the JSON error response returned when a replay attack is detected.
+
+LANGUAGE: json
+CODE:
+{
+  "code": 429,
+  "message": "Replay Attack Detected"
+}
+
+----------------------------------------
+
+TITLE: Advanced WasmPlugin Route Configuration
+DESCRIPTION: Extended YAML configuration demonstrating route-level and domain-level matching rules for WASM plugin.
+
+LANGUAGE: yaml
+CODE:
+apiVersion: extensions.higress.io/v1alpha1
+kind: WasmPlugin
+metadata:
+  name: request-block
+  namespace: higress-system
+spec:
+  defaultConfig:
+    block_urls:
+    - "swagger.html"
+  matchRules:
+  - ingress:
+    - default/foo
+    config:
+      block_bodies:
+      - "foo"
+  - ingress:
+    - default/bar
+    config:
+      block_bodies:
+      - "bar"
+  - domain:
+    - "*.example.com"
+    config:
+      block_bodies:
+       - "foo"
+       - "bar"
+  url: oci://<your_registry_hub>/request-block:1.0.0
+
+----------------------------------------
+
+TITLE: Local WASM Build Command
+DESCRIPTION: TinyGo command to build WASM plugin locally, requiring Go >= 1.18 and TinyGo >= 0.25.0.
+
+LANGUAGE: bash
+CODE:
+tinygo build -o main.wasm -scheduler=none -target=wasi ./extensions/request-block/main.go
+
+----------------------------------------
+
+TITLE: Building Higress WASM-Go Plugin with Docker
+DESCRIPTION: This snippet demonstrates how to quickly build a WASM-Go plugin using Docker. It uses a Makefile command to build the plugin and output a WASM file and Docker image.
+
+LANGUAGE: bash
+CODE:
+$ PLUGIN_NAME=request_block make build
+
+----------------------------------------
+
+TITLE: Apache 2.0 License Header
+DESCRIPTION: Standard copyright notice and Apache 2.0 license header used in Higress project source files. Contains copyright statement for Alibaba Group Holding Ltd. and standard Apache 2.0 license terms.
+
+LANGUAGE: plaintext
+CODE:
+// Copyright (c) 2022 Alibaba Group Holding Ltd.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//      http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
+----------------------------------------
+
+TITLE: Building Proxy-Wasm SSE Timing Plugin
+DESCRIPTION: Command to build the Proxy-Wasm plugin for SSE timing. This step is required before using the plugin in Envoy.
+
+LANGUAGE: sh
+CODE:
+$ make
+
+----------------------------------------
+
+TITLE: Higress WasmPlugin Test Environment Setup (Makefile)
+DESCRIPTION: Makefile targets for setting up, running, and cleaning the Higress WasmPlugin test environment. Includes steps for preparing the environment, compiling plugins, running tests, and cleaning up resources.
+
+LANGUAGE: makefile
+CODE:
+make higress-wasmplugin-test
+make higress-wasmplugin-test-prepare
+make run-higress-e2e-test-wasmplugin
+make run-higress-e2e-test-wasmplugin-setup
+make run-higress-e2e-test-wasmplugin-run
+make run-higress-e2e-test-wasmplugin-clean
+make higress-wasmplugin-test-clean
+
+----------------------------------------
+
+TITLE: Running Envoy with SSE Timing Plugin using Docker Compose
+DESCRIPTION: Command to start Envoy with the SSE timing plugin using Docker Compose. This setup includes a matching Envoy configuration for the plugin.
+
+LANGUAGE: sh
+CODE:
+$ docker compose up
+
+----------------------------------------
+
+TITLE: Deploying Redis for AI Token Rate Limiting
+DESCRIPTION: This YAML configuration sets up a Redis deployment and service, which is required for the AI Token Rate Limiting plugin to track available tokens.
+
+LANGUAGE: yaml
+CODE:
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: redis
+  labels:
+    app: redis
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: redis
+  template:
+    metadata:
+      labels:
+        app: redis
+    spec:
+      containers:
+      - name: redis
+        image: redis
+        ports:
+        - containerPort: 6379
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: redis
+  labels:
+    app: redis
+spec:
+  ports:
+  - port: 6379
+    targetPort: 6379
+  selector:
+    app: redis
+---
+
+----------------------------------------
+
+TITLE: Adding Higress Helm Repository
+DESCRIPTION: Commands to add the Higress Helm repository and update the local cache.
+
+LANGUAGE: console
+CODE:
+helm repo add higress.io https://higress.io/helm-charts
+helm repo update
+
+----------------------------------------
+
+TITLE: Pre-development Build Commands
+DESCRIPTION: Commands to prepare the development environment by running prebuild and updating dependencies.
+
+LANGUAGE: shell
+CODE:
+make prebuild && go mod tidy
+
+----------------------------------------
+
+TITLE: Uninstalling Higress
+DESCRIPTION: Command to uninstall the Higress deployment using Helm.
+
+LANGUAGE: console
+CODE:
+helm delete higress -n higress-system
+
+----------------------------------------
+
+TITLE: Setting Git Remote for Higress Development
+DESCRIPTION: Commands for configuring git remote settings to contribute to Higress. Sets up upstream remote and prevents direct pushing to upstream.
+
+LANGUAGE: bash
+CODE:
+git remote add upstream git@github.com:alibaba/higress.git
+git remote set-url --push upstream no-pushing
+
+----------------------------------------
+
+TITLE: Querying Higress Release Information using Helm
+DESCRIPTION: Commands to retrieve status and details of the Higress release using Helm. These commands help users learn more about the installed release.
+
+LANGUAGE: bash
+CODE:
+$ helm status {{ .Release.Name }} -n {{ .Release.Namespace }}
+$ helm get all {{ .Release.Name }} -n {{ .Release.Namespace }}
+
+----------------------------------------
+
+TITLE: Setting Up Istio Helm Repository
+DESCRIPTION: These commands add the Istio Helm repository and update the local repository cache. This is a prerequisite for installing the Istio base chart.
+
+LANGUAGE: console
+CODE:
+helm repo add istio https://istio-release.storage.googleapis.com/charts
+helm repo update
+
+----------------------------------------
+
+TITLE: Installing Istio Base Chart
+DESCRIPTION: These commands create the istio-system namespace and install the Istio base chart with the release name 'istio-base'. This installs shared resources including Istio CRDs.
+
+LANGUAGE: console
+CODE:
+kubectl create namespace istio-system
+helm install istio-base istio/base -n istio-system
+
+----------------------------------------
+
+TITLE: Installing Higress with Helm
+DESCRIPTION: Command to install Higress using Helm with the release name 'higress' in the 'higress-system' namespace.
+
+LANGUAGE: console
+CODE:
+helm install higress -n higress-system higress.io/higress --create-namespace --render-subchart-notes
+
+----------------------------------------
+
+TITLE: Higress Conformance Test Environment Setup (Makefile)
+DESCRIPTION: Makefile targets for setting up, running, and cleaning the Higress conformance test environment. Includes steps for preparing the environment, running tests, and cleaning up resources.
+
+LANGUAGE: makefile
+CODE:
+make higress-conformance-test
+make higress-conformance-test-prepare
+make run-higress-e2e-test
+make run-higress-e2e-test-setup
+make run-higress-e2e-test-run
+make run-higress-e2e-test-clean
+make higress-conformance-test-clean
+
+----------------------------------------
+
+TITLE: Installing Higress Docker Container
+DESCRIPTION: Docker command to start a Higress instance with AI capabilities. Maps ports 8001 (UI console), 8080 (HTTP), and 8443 (HTTPS) to the host system and mounts a local directory for configuration storage.
+
+LANGUAGE: bash
+CODE:
+# 创建一个工作目录
+mkdir higress; cd higress
+# 启动 higress，配置文件会写到工作目录下
+docker run -d --rm --name higress-ai -v ${PWD}:/data \
+        -p 8001:8001 -p 8080:8080 -p 8443:8443  \
+        higress-registry.cn-hangzhou.cr.aliyuncs.com/higress/all-in-one:latest

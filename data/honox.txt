@@ -1,0 +1,588 @@
+TITLE: Structuring a Basic HonoX Application Project
+DESCRIPTION: Shows the typical directory and file structure for a HonoX application, including routes organization, server entry point, and configuration files.
+
+LANGUAGE: txt
+CODE:
+.
+├── app
+│   ├── global.d.ts // global type definitions
+│   ├── routes
+│   │   ├── _404.tsx // not found page
+│   │   ├── _error.tsx // error page
+│   │   ├── _renderer.tsx // renderer definition
+│   │   ├── about
+│   │   │   └── [name].tsx // matches `/about/:name`
+│   │   └── index.tsx // matches `/`
+│   └── server.ts // server entry file
+├── package.json
+├── tsconfig.json
+└── vite.config.ts
+
+----------------------------------------
+
+TITLE: Creating a HonoX Server Entry File
+DESCRIPTION: Demonstrates how to initialize a HonoX application in the server entry file, which is the first file called during development or build.
+
+LANGUAGE: ts
+CODE:
+// app/server.ts
+import { createApp } from 'honox/server'
+import { showRoutes } from 'hono/dev'
+
+const app = createApp()
+
+showRoutes(app)
+
+export default app
+
+----------------------------------------
+
+TITLE: Displaying Project Structure for HonoX Client Application
+DESCRIPTION: Shows the directory and file structure for a minimal HonoX application that includes client-side functionality, highlighting key files like client.ts and island components.
+
+LANGUAGE: txt
+CODE:
+.
+├── app
+│   ├── client.ts // client entry file
+│   ├── global.d.ts
+│   ├── islands
+│   │   └── counter.tsx // island component
+│   ├── routes
+│   │   ├── _renderer.tsx
+│   │   └── index.tsx
+│   └── server.ts
+├── package.json
+├── tsconfig.json
+└── vite.config.ts
+
+----------------------------------------
+
+TITLE: Creating a JSX Renderer for HonoX
+DESCRIPTION: Shows how to implement a JSX renderer middleware that defines the HTML structure for all pages in the application.
+
+LANGUAGE: tsx
+CODE:
+// app/routes/_renderer.tsx
+import { jsxRenderer } from 'hono/jsx-renderer'
+
+export default jsxRenderer(({ children, title }) => {
+  return (
+    <html lang='en'>
+      <head>
+        <meta charset='UTF-8' />
+        <meta name='viewport' content='width=device-width, initial-scale=1.0' />
+        {title ? <title>{title}</title> : <></>}
+      </head>
+      <body>{children}</body>
+    </html>
+  )
+})
+
+----------------------------------------
+
+TITLE: Defining GET Routes with createRoute in HonoX
+DESCRIPTION: Shows how to create a basic route handler for GET requests using createRoute() helper function and JSX rendering.
+
+LANGUAGE: tsx
+CODE:
+// app/routes/index.tsx
+// `createRoute()` helps you create handlers
+import { createRoute } from 'honox/factory'
+
+export default createRoute((c) => {
+  return c.render(
+    <div>
+      <h1>Hello!</h1>
+    </div>
+  )
+})
+
+----------------------------------------
+
+TITLE: Creating a Client Entry File in HonoX
+DESCRIPTION: Illustrates the minimal client entry file configuration required for HonoX applications with client-side functionality, which initializes the client using createClient().
+
+LANGUAGE: ts
+CODE:
+// app/client.ts
+import { createClient } from 'honox/client'
+
+createClient()
+
+----------------------------------------
+
+TITLE: Handling Multiple HTTP Methods with HonoX Routes
+DESCRIPTION: Demonstrates how to handle different HTTP methods like GET and POST in a single route file, including form handling and cookie management.
+
+LANGUAGE: tsx
+CODE:
+// app/routes/index.tsx
+import { createRoute } from 'honox/factory'
+import { getCookie, setCookie } from 'hono/cookie'
+
+export const POST = createRoute(async (c) => {
+  const { name } = await c.req.parseBody<{ name: string }>()
+  setCookie(c, 'name', name)
+  return c.redirect('/')
+})
+
+export default createRoute((c) => {
+  const name = getCookie(c, 'name') ?? 'no name'
+  return c.render(
+    <div>
+      <h1>Hello, {name}!</h1>
+      <form method='POST'>
+        <input type='text' name='name' placeholder='name' />
+        <input type='submit' />
+      </form>
+    </div>
+  )
+})
+
+----------------------------------------
+
+TITLE: Creating API Routes with Hono in HonoX
+DESCRIPTION: Shows how to export a Hono instance to create API endpoints with dynamic route parameters.
+
+LANGUAGE: ts
+CODE:
+// app/routes/about/index.ts
+import { Hono } from 'hono'
+
+const app = new Hono()
+
+// matches `/about/:name`
+app.get('/:name', (c) => {
+  const name = c.req.param('name')
+  return c.json({
+    'your name is': name,
+  })
+})
+
+export default app
+
+----------------------------------------
+
+TITLE: Implementing Basic Nested Layout in HonoX
+DESCRIPTION: Creates a nested layout for posts routes using the JSX Renderer middleware. The renderer function receives children and Layout components as props, allowing posts pages to have a specific navigation menu.
+
+LANGUAGE: tsx
+CODE:
+// app/routes/posts/_renderer.tsx
+
+import { jsxRenderer } from 'hono/jsx-renderer'
+
+export default jsxRenderer(({ children, Layout }) => {
+  return (
+    <Layout>
+      <nav>Posts Menu</nav>
+      <div>{children}</div>
+    </Layout>
+  )
+})
+
+----------------------------------------
+
+TITLE: Implementing an Interactive Counter Island Component in HonoX
+DESCRIPTION: Creates a Counter island component with state management using useState hook, demonstrating how to build interactive UI elements that will be hydrated on the client side.
+
+LANGUAGE: tsx
+CODE:
+// app/islands/counter.tsx
+import { useState } from 'hono/jsx'
+
+export default function Counter() {
+  const [count, setCount] = useState(0)
+  return (
+    <div>
+      <p>Count: {count}</p>
+      <button onClick={() => setCount(count + 1)}>Increment</button>
+    </div>
+  )
+}
+
+----------------------------------------
+
+TITLE: Creating a Basic Renderer with Client Script Loading in HonoX
+DESCRIPTION: Implements a renderer component that conditionally loads client-side JavaScript based on the environment. The renderer uses HasIslands to optimize client script loading for pages with interactive components.
+
+LANGUAGE: tsx
+CODE:
+// app/routes/_renderer.tsx
+import { jsxRenderer } from 'hono/jsx-renderer'
+import { HasIslands } from 'honox/server'
+
+export default jsxRenderer(({ children }) => {
+  return (
+    <html lang='en'>
+      <head>
+        <meta charset='UTF-8' />
+        <meta name='viewport' content='width=device-width, initial-scale=1.0' />
+        {import.meta.env.PROD ? (
+          <HasIslands>
+            <script type='module' src='/static/client.js'></script>
+          </HasIslands>
+        ) : (
+          <script type='module' src='/app/client.ts'></script>
+        )}
+      </head>
+      <body>{children}</body>
+    </html>
+  )
+})
+
+----------------------------------------
+
+TITLE: Implementing a Renderer with Script Component in HonoX
+DESCRIPTION: Shows how to use the Script component from honox/server for more efficient client script loading, which is especially useful when a manifest file is available and offers better development performance than HasIslands.
+
+LANGUAGE: tsx
+CODE:
+// app/routes/_renderer.tsx
+import { jsxRenderer } from 'hono/jsx-renderer'
+import { Script } from 'honox/server'
+
+export default jsxRenderer(({ children }) => {
+  return (
+    <html lang='en'>
+      <head>
+        <meta charset='UTF-8' />
+        <meta name='viewport' content='width=device-width, initial-scale=1.0' />
+        <Script src='/app/client.ts' />
+      </head>
+      <body>{children}</body>
+    </html>
+  )
+})
+
+----------------------------------------
+
+TITLE: Creating a React Renderer Component for HonoX
+DESCRIPTION: Implementation of a React renderer for HonoX that defines the HTML structure of the app. It includes handling for the document head, setting up client-side scripts, and rendering the title and children elements.
+
+LANGUAGE: tsx
+CODE:
+// app/routes/_renderer.tsx
+import { reactRenderer } from '@hono/react-renderer'
+
+export default reactRenderer(({ children, title }) => {
+  return (
+    <html lang='en'>
+      <head>
+        <meta charSet='UTF-8' />
+        <meta name='viewport' content='width=device-width, initial-scale=1.0' />
+        {import.meta.env.PROD ? (
+          <script type='module' src='/static/client.js'></script>
+        ) : (
+          <script type='module' src='/app/client.ts'></script>
+        )}
+        {title ? <title>{title}</title> : ''}
+      </head>
+      <body>{children}</body>
+    </html>
+  )
+})
+
+----------------------------------------
+
+TITLE: Using Island Components in HonoX Routes
+DESCRIPTION: Shows how to import and use island components within route files, where they are server-side rendered initially and then hydrated on the client side for interactivity.
+
+LANGUAGE: tsx
+CODE:
+// app/routes/index.tsx
+import { createRoute } from 'honox/factory'
+import Counter from '../islands/counter'
+
+export default createRoute((c) => {
+  return c.render(
+    <div>
+      <h1>Hello</h1>
+      <Counter />
+    </div>
+  )
+})
+
+----------------------------------------
+
+TITLE: Creating a Route Handler with Props in HonoX
+DESCRIPTION: Defines a route handler for a nested page that passes a title prop to the renderer. This demonstrates how to send custom properties from a route to its layout components.
+
+LANGUAGE: tsx
+CODE:
+// app/routes/nested/index.tsx
+export default createRoute((c) => {
+  return c.render(<div>Content</div>, { title: 'Dashboard' })
+})
+
+----------------------------------------
+
+TITLE: Configuring Vite for HonoX Development
+DESCRIPTION: The minimum Vite configuration required for HonoX development, using the honox Vite plugin.
+
+LANGUAGE: ts
+CODE:
+import { defineConfig } from 'vite'
+import honox from 'honox/vite'
+
+export default defineConfig({
+  plugins: [honox()],
+})
+
+----------------------------------------
+
+TITLE: Simplifying Routes with Direct JSX Return in HonoX
+DESCRIPTION: Demonstrates the simplest way to create a route by directly returning JSX from a function component.
+
+LANGUAGE: tsx
+CODE:
+// app/routes/index.tsx
+export default function Home(_c: Context) {
+  return <h1>Welcome!</h1>
+}
+
+----------------------------------------
+
+TITLE: Passing Data to Island Components in HonoX
+DESCRIPTION: Demonstrates how to pass data from the request context to island components, which cannot directly access the context object but can receive props from parent components.
+
+LANGUAGE: tsx
+CODE:
+import { useRequestContext } from 'hono/jsx-renderer'
+import Counter from '../islands/counter.tsx'
+
+export default function Component() {
+  const c = useRequestContext()
+  return <Counter init={parseInt(c.req.query('count') ?? '0', 10)} />
+}
+
+----------------------------------------
+
+TITLE: Passing Props Between Nested Layouts in HonoX
+DESCRIPTION: Implements a nested renderer that receives props from route handlers and forwards them to parent layouts. This example shows how to pass the title prop from a nested layout to the parent layout.
+
+LANGUAGE: tsx
+CODE:
+// app/routes/nested/_renderer.tsx
+export default jsxRenderer(({ children, Layout, title }) => {
+  return (
+    <Layout title={title}>
+      {/* Pass the title prop to the parent renderer */}
+      <main>{children}</main>
+    </Layout>
+  )
+})
+
+----------------------------------------
+
+TITLE: Configuring Security Headers Middleware for CSP Nonce in HonoX
+DESCRIPTION: Demonstrates how to set up a security headers middleware that generates a nonce value for Content Security Policy, which can be used with script elements for enhanced security.
+
+LANGUAGE: ts
+CODE:
+// app/routes/_middleware.ts
+import { createRoute } from 'honox/factory'
+import { secureHeaders, NONCE } from 'hono/secure-headers'
+
+secureHeaders({
+  contentSecurityPolicy: {
+    scriptSrc: [NONCE],
+  },
+})
+
+----------------------------------------
+
+TITLE: Implementing Custom Error Page in HonoX
+DESCRIPTION: Shows how to create a custom Error page handler to handle exceptions in a HonoX application.
+
+LANGUAGE: tsx
+CODE:
+// app/routes/_error.tsx
+import { ErrorHandler } from 'hono'
+
+const handler: ErrorHandler = (e, c) => {
+  return c.render(<h1>Error! {e.message}</h1>)
+}
+
+export default handler
+
+----------------------------------------
+
+TITLE: Implementing Custom 404 Page in HonoX
+DESCRIPTION: Shows how to create a custom Not Found (404) page handler for a HonoX application.
+
+LANGUAGE: tsx
+CODE:
+// app/routes/_404.tsx
+import { NotFoundHandler } from 'hono'
+
+const handler: NotFoundHandler = (c) => {
+  return c.render(<h1>Sorry, Not Found...</h1>)
+}
+
+export default handler
+
+----------------------------------------
+
+TITLE: Creating a Client Entry Point for React Hydration in HonoX
+DESCRIPTION: Client-side entry point that sets up React hydration for HonoX applications. It defines how to hydrate DOM elements and create React elements for client-side rendering.
+
+LANGUAGE: ts
+CODE:
+// app/client.ts
+import { createClient } from 'honox/client'
+
+createClient({
+  hydrate: async (elem, root) => {
+    const { hydrateRoot } = await import('react-dom/client')
+    hydrateRoot(root, elem)
+  },
+  createElement: async (type: any, props: any) => {
+    const { createElement } = await import('react')
+    return createElement(type, props)
+  },
+})
+
+----------------------------------------
+
+TITLE: Creating a Parent Layout Renderer in HonoX
+DESCRIPTION: Defines the parent renderer that receives props from nested layouts. This example shows the root layout structure with HTML, head, and body elements that consumes the title prop from nested layouts.
+
+LANGUAGE: tsx
+CODE:
+// app/routes/_renderer.tsx
+export default jsxRenderer(({ children, title }) => {
+  return (
+    <html lang='en'>
+      <head>
+        <title>{title}</title> {/* Use the title prop here */}
+      </head>
+      <body>
+        {children} {/* Insert the Layout's children here */}
+      </body>
+    </html>
+  )
+})
+
+----------------------------------------
+
+TITLE: Using CSP Nonce with Script Component in HonoX Renderer
+DESCRIPTION: Shows how to access and apply the Content Security Policy nonce value to the Script component in a renderer, enhancing security for client-side scripts.
+
+LANGUAGE: tsx
+CODE:
+// app/routes/_renderer.tsx
+import { jsxRenderer } from 'hono/jsx-renderer'
+import { Script } from 'honox/server'
+
+export default jsxRenderer(({ children }, c) => {
+  return (
+    <html lang='en'>
+      <head>
+        <Script src='/app/client.ts' async nonce={c.get('secureHeadersNonce')} />
+      </head>
+      <body>{children}</body>
+    </html>
+  )
+})
+
+----------------------------------------
+
+TITLE: Configuring Vite for React and HonoX Integration
+DESCRIPTION: Vite configuration for HonoX with React. It handles different modes for client and server builds, sets up output paths for client assets, and adds necessary plugins for HonoX and Cloudflare Pages.
+
+LANGUAGE: ts
+CODE:
+// vite.config.ts
+import build from '@hono/vite-build/cloudflare-pages'
+import honox from 'honox/vite'
+import { defineConfig } from 'vite'
+
+export default defineConfig(({ mode }) => {
+  if (mode === 'client') {
+    return {
+      build: {
+        rollupOptions: {
+          input: ['./app/client.ts'],
+          output: {
+            entryFileNames: 'static/client.js',
+            chunkFileNames: 'static/assets/[name]-[hash].js',
+            assetFileNames: 'static/assets/[name].[ext]',
+          },
+        },
+        emptyOutDir: false,
+      },
+    }
+  } else {
+    return {
+      ssr: {
+        external: ['react', 'react-dom'],
+      },
+      plugins: [honox(), build()],
+    }
+  }
+})
+
+----------------------------------------
+
+TITLE: Defining Renderer Types for HonoX
+DESCRIPTION: Shows how to extend the Hono types to include custom renderer type definitions in global.d.ts.
+
+LANGUAGE: ts
+CODE:
+// app/global.d.ts
+import type {} from 'hono'
+
+type Head = {
+  title?: string
+}
+
+declare module 'hono' {
+  interface ContextRenderer {
+    (content: string | Promise<string>, head?: Head): Response | Promise<Response>
+  }
+}
+
+----------------------------------------
+
+TITLE: Configuring TypeScript for React JSX in HonoX
+DESCRIPTION: TypeScript configuration that sets up React as the JSX factory source, which is necessary for proper JSX compilation when using React with HonoX.
+
+LANGUAGE: ts
+CODE:
+// tsconfig.json
+{
+  "compilerOptions": {
+    ...
+    "jsxImportSource": "react"
+    ...
+  }
+}
+
+
+----------------------------------------
+
+TITLE: Defining Props Interface for React Renderer in TypeScript
+DESCRIPTION: TypeScript declaration for extending the React renderer's Props interface in a global.d.ts file. This defines a title property that can be passed to the renderer.
+
+LANGUAGE: ts
+CODE:
+// global.d.ts
+import '@hono/react-renderer'
+
+declare module '@hono/react-renderer' {
+  interface Props {
+    title?: string
+  }
+}
+
+----------------------------------------
+
+TITLE: Installing Dependencies for React with HonoX
+DESCRIPTION: Command to install the necessary npm packages for using React with HonoX, including the React renderer, React core packages, and TypeScript type definitions.
+
+LANGUAGE: txt
+CODE:
+npm i @hono/react-renderer react react-dom hono
+npm i -D @types/react @types/react-dom

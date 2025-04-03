@@ -1,3 +1,5 @@
+![](shark.jpg)
+
 ```bash
 npm install &&
 node . &&

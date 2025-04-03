@@ -1,0 +1,807 @@
+TITLE: Initializing Solana Agent Kit
+DESCRIPTION: Basic setup code to initialize the Solana Agent Kit with wallet private key and optional configurations
+
+LANGUAGE: typescript
+CODE:
+import { SolanaAgentKit, createSolanaTools } from "solana-agent-kit";
+
+// Initialize with private key and optional RPC URL
+const agent = new SolanaAgentKit(
+  "your-wallet-private-key-as-base58",
+  "https://api.mainnet-beta.solana.com",
+  { OPENAI_API_KEY: "your-openai-api-key" } // optional config
+);
+
+// Create LangChain tools
+const tools = createSolanaTools(agent);
+
+----------------------------------------
+
+TITLE: Defining Custom Action Implementation
+DESCRIPTION: Implements an Action class for the custom tool with schema validation and handler logic.
+
+LANGUAGE: typescript
+CODE:
+import { Action } from "../../types/action";
+import { SolanaAgentKit } from "../../agent";
+import { z } from "zod";
+import { custom_tool } from "../../tools";
+
+const customAction: Action = {
+  name: "CUSTOM_ACTION",
+  similes: ["custom tool"],
+  description: "Description of what the custom tool does.",
+  examples: [
+    {
+      input: {},
+      output: {
+        status: "success",
+        message: "Custom tool executed successfully",
+        data: result,
+      },
+      explanation: "Custom tool executed successfully",
+    },
+  ],
+  schema: z.object({
+    input: z.string(),
+  }),
+  handler: async (agent: SolanaAgentKit, input: Record<string, any>) => {
+    const result = await agent.customFunction(input);
+    return result;
+  },
+};
+
+----------------------------------------
+
+TITLE: Deploying New Token
+DESCRIPTION: Example code showing how to deploy a new SPL token with custom parameters
+
+LANGUAGE: typescript
+CODE:
+const result = await agent.deployToken(
+  "my ai token", // name
+  "uri", // uri
+  "token", // symbol
+  9, // decimals
+  {
+    mintAuthority: null, // by default, deployer account
+    freezeAuthority: null, // by default, deployer account
+    updateAuthority: undefined, // by default, deployer account
+    isMutable: false // by default, true
+  },
+  1000000 // initial supply
+);
+
+console.log("Token Mint Address:", result.mint.toString());
+
+----------------------------------------
+
+TITLE: Token Price Fetching Tool Implementation
+DESCRIPTION: Complete example of a tool that fetches token prices with mock data implementation.
+
+LANGUAGE: typescript
+CODE:
+import { Tool } from "langchain/tools";
+import { SolanaAgentKit } from "../agent";
+
+export class FetchTokenPriceTool extends Tool {
+  name = "fetch_token_price";
+  description = "Fetches the current price of a specified token.";
+
+  constructor(private solanaKit: SolanaAgentKit) {
+    super();
+  }
+
+  protected async _call(tokenSymbol: string): Promise<string> {
+    try {
+      const price = await this.solanaKit.getTokenPrice(tokenSymbol);
+      return JSON.stringify({
+        status: "success",
+        message: `Price fetched successfully for ${tokenSymbol}.`,
+        data: { token: tokenSymbol, price },
+      });
+    } catch (error: any) {
+      return JSON.stringify({
+        status: "error",
+        message: error.message,
+        code: error.code || "UNKNOWN_ERROR",
+      });
+    }
+  }
+}
+
+----------------------------------------
+
+TITLE: Environment Variables Configuration
+DESCRIPTION: Configuration template for setting up required environment variables including OpenAI API key, RPC URL, and Solana private key.
+
+LANGUAGE: env
+CODE:
+OPENAI_API_KEY=your_openai_api_key_here
+RPC_URL=your_rpc_url
+SOLANA_PRIVATE_KEY=your_solana_private_key_here
+
+----------------------------------------
+
+TITLE: Demonstrating Persistent Chat Session in TypeScript
+DESCRIPTION: Example showing a chat session with PostgreSQL persistence where the agent maintains context after restart. The agent remembers the user's name between sessions.
+
+LANGUAGE: typescript
+CODE:
+Available modes:
+1. chat
+- Interactive chat mode
+2. auto
+- Autonomous action mode
+Choose a mode (enter number or name: 1
+Starting chat mode... Type 'exit' to end.
+Prompt: i am arpit
+Hello Arpit! How can I assist you today?
+Prompt: ^С
+$ ts-node index.ts
+Starting Agent...
+Available modes:
+1. chat
+- Interactive chat mode
+2. auto
+- Autonomous action mode
+Choose a mode (enter number or name): 1
+Starting chat mode... Type 'exit' to end.
+Prompt: do u know my name
+Yes, you mentioned that your name is Arpit. How can I help you today?
+
+----------------------------------------
+
+TITLE: NFT Collection Creation Implementation
+DESCRIPTION: Example of creating an NFT collection using SolanaAgentKit with customizable parameters including name, URI, royalties, and creators.
+
+LANGUAGE: typescript
+CODE:
+import { SolanaAgentKit } from "solana-agent-kit";
+
+const agent = new SolanaAgentKit(
+  "your-wallet-private-key-as-base58",
+  "https://api.mainnet-beta.solana.com",
+  { OPENAI_API_KEY: "your-openai-api-key" } // optional config
+);
+
+const collection = await agent.deployCollection({
+  name: "My NFT Collection",
+  uri: "https://arweave.net/metadata.json",
+  royaltyBasisPoints: 500,  // 5%
+  creators: [
+    {
+      address: "creator-wallet-address",
+      percentage: 100,
+    },
+  ],
+});
+
+----------------------------------------
+
+TITLE: Token Deployment Implementation
+DESCRIPTION: Example of deploying a token using SolanaAgentKit with specified decimals. Requires wallet private key and RPC endpoint configuration.
+
+LANGUAGE: typescript
+CODE:
+import { SolanaAgentKit } from "solana-agent-kit";
+
+const agent = new SolanaAgentKit(
+  "your-wallet-private-key-as-base58",
+  "https://api.mainnet-beta.solana.com",
+  { OPENAI_API_KEY: "your-openai-api-key" } // optional config
+);
+const result = await agent.deployToken(
+  9, // decimals
+);
+
+console.log("Token Mint Address:", result.mint.toString());
+
+----------------------------------------
+
+TITLE: Configuring Market Making Parameters for Solana's Manifest DEX
+DESCRIPTION: This JSON snippet represents the configuration summary for a market making agent on Manifest DEX. It includes market ID, token symbols, quote parameters, token allowances, and update interval.
+
+LANGUAGE: json
+CODE:
+{
+  "marketId": "2Uj8277fkaVBtTU6Wp2GPRbQC86SkSdgQ2mp1Q5N2LHc",
+  "baseToken": "SEND",
+  "quoteToken": "USDC",
+  "quoteParams": {
+    "number": 4,
+    "minDepth": 0.1,
+    "maxDepth": 2
+  },
+  "allowance": {
+    "base": 2,
+    "quote": 3
+  },
+  "intervalSeconds": 20
+}
+
+----------------------------------------
+
+TITLE: Integrating Para Web Plugin with Solana Agent Kit
+DESCRIPTION: TypeScript code snippet showing how to integrate the Para Web Plugin with Solana Agent Kit on the client-side and obtain a Para instance.
+
+LANGUAGE: typescript
+CODE:
+import ParaWebPlugin from "@getpara/plugin-para-web";
+import { solanaAgent } from "./solana";
+
+export const solanaAgentWithPara = solanaAgent.use(ParaWebPlugin);
+export const para = solanaAgentWithPara.methods.getParaInstance();
+
+----------------------------------------
+
+TITLE: Integrating Para Server Plugin with Solana Agent Kit
+DESCRIPTION: TypeScript code snippet demonstrating how to integrate the Para Server Plugin with Solana Agent Kit on the server-side.
+
+LANGUAGE: typescript
+CODE:
+import { SolanaAgentKit } from "solana-agent-kit";
+import ParaServerPlugin from "@getpara/plugin-para-server";
+
+const solanaAgent = new SolanaAgentKit(/* config */);
+export const solanaAgentWithPara = solanaAgent.use(ParaServerPlugin);
+
+----------------------------------------
+
+TITLE: Implementing Custom Langchain Tool
+DESCRIPTION: Creates a new Langchain tool class with custom functionality and error handling.
+
+LANGUAGE: typescript
+CODE:
+import { Tool } from "langchain/tools";
+import { SolanaAgentKit } from "../../agent";
+
+export class CustomTool extends Tool {
+  name = "custom_tool";
+  description = "Description of what the custom tool does.";
+
+  constructor(private solanaKit: SolanaAgentKit) {
+    super();
+  }
+
+  protected async _call(input: string): Promise<string> {
+    try {
+      const result = await this.solanaKit.customFunction(input);
+      return JSON.stringify({
+        status: "success",
+        message: "Custom tool executed successfully",
+        data: result,
+      });
+    } catch (error: any) {
+      return JSON.stringify({
+        status: "error",
+        message: error.message,
+        code: error.code || "UNKNOWN_ERROR",
+      });
+    }
+  }
+}
+
+----------------------------------------
+
+TITLE: Extending SolanaAgentKit Class
+DESCRIPTION: Adds custom functionality to the SolanaAgentKit class by implementing a new method.
+
+LANGUAGE: typescript
+CODE:
+export class SolanaAgentKit {
+  async customFunction(input: string): Promise<string> {
+    return `Processed input: ${input}`;
+  }
+}
+
+----------------------------------------
+
+TITLE: Exporting Protocol Tools in TypeScript
+DESCRIPTION: Exports tool implementations from different protocol directories.
+
+LANGUAGE: typescript
+CODE:
+export * from "./squads";
+export * from "./jupiter";
+export * from "./your_protocol";
+
+----------------------------------------
+
+TITLE: Configuring Claude Desktop MCP Server for Solana Agent Kit
+DESCRIPTION: JSON configuration for Claude Desktop MCP server, including environment variables and command arguments for the Solana Agent Kit.
+
+LANGUAGE: json
+CODE:
+{
+    "mcpServers": {
+        "agent-kit": {
+            "command": "node",
+            "env": {
+                "RPC_URL": "your_solana_rpc_url_here",
+                "SOLANA_PRIVATE_KEY": "your_private_key_here"
+            },
+            "args": [
+                "/ABSOLUTE/PATH/TO/YOUR/PROJECT"
+            ]
+        }
+    }
+}
+
+----------------------------------------
+
+TITLE: Demonstrating Non-Persistent Chat Session in TypeScript
+DESCRIPTION: Example showing a chat session without persistence where the agent loses context after restart. The agent doesn't remember the user's name between sessions.
+
+LANGUAGE: typescript
+CODE:
+Available modes:
+1. chat
+- Interactive chat mode
+2. auto
+- Autonomous action mode
+Choose a mode (enter number or name: 1
+Starting chat mode... Type 'exit' to end.
+Prompt: i am arpit
+Hello Arpit! How can I assist you today?
+Prompt: ^С
+$ ts-node index.ts
+Starting Agent...
+Available modes:
+1. chat
+- Interactive chat mode
+2. auto
+- Autonomous action mode
+Choose a mode (enter number or name): 1
+Starting chat mode... Type 'exit' to end.
+Prompt: do u know my name
+I don't know your name yet. If you'd like, you can share it.
+
+----------------------------------------
+
+TITLE: Configuring Environment Variables for Solana
+DESCRIPTION: Example of environment variable configuration for Solana private key and RPC URL.
+
+LANGUAGE: env
+CODE:
+SOLANA_PRIVATE_KEY=your_private_key_here
+RPC_URL=your_solana_rpc_url_here
+
+----------------------------------------
+
+TITLE: Configuring Environment Variables
+DESCRIPTION: Example of the required environment variables to be set in the .env file, including API keys and configuration options.
+
+LANGUAGE: env
+CODE:
+LANGCHAIN_CALLBACKS_BACKGROUND=false
+OPENAI_API_KEY=#optional
+RPC_URL=
+SOLANA_PRIVATE_KEY=
+PARA_API_KEY=
+PARA_ENV=BETA | PROD
+GROQ_API_KEY=
+NEXT_PUBLIC_PARA_ENV=BETA | PROD
+NEXT_PUBLIC_PARA_API_KEY=
+
+----------------------------------------
+
+TITLE: Installing Solana Agent Kit via NPM
+DESCRIPTION: Command to install the Solana Agent Kit package using NPM package manager
+
+LANGUAGE: bash
+CODE:
+npm install solana-agent-kit
+
+----------------------------------------
+
+TITLE: Project Directory Structure
+DESCRIPTION: Overview of the project's folder organization showing key directories and their purposes
+
+LANGUAGE: plaintext
+CODE:
+src/
+├── agents/         # Individual agent implementations
+├── helper/         # Helper utilities and examples
+├── prompts/        # Agent prompts and templates
+├── tools/          # Custom tools for agents
+└── utils/          # Utility functions and configurations
+
+----------------------------------------
+
+TITLE: Project Build and Test Commands
+DESCRIPTION: Commands for building the project, running tests, and generating documentation
+
+LANGUAGE: bash
+CODE:
+pnpm run build
+pnpm run test
+npm run docs
+
+----------------------------------------
+
+TITLE: Verifying Installation
+DESCRIPTION: Commands to verify the project installation by running build and tests.
+
+LANGUAGE: bash
+CODE:
+pnpm run build
+pnpm run test
+
+----------------------------------------
+
+TITLE: Building the Project
+DESCRIPTION: Command to compile TypeScript code to JavaScript using the build script.
+
+LANGUAGE: bash
+CODE:
+pnpm run build
+
+----------------------------------------
+
+TITLE: Launching Vercel AI Test Environment
+DESCRIPTION: Command to start the agent in test mode using Vercel AI integration
+
+LANGUAGE: bash
+CODE:
+pnpm test:vercel-ai
+
+----------------------------------------
+
+TITLE: Running Tests with Package Manager
+DESCRIPTION: Command to execute the test script using pnpm package manager
+
+LANGUAGE: bash
+CODE:
+pnpm run test
+
+----------------------------------------
+
+TITLE: Building the Solana Agent Kit Project
+DESCRIPTION: Command to build the project, compiling TypeScript code and setting executable permissions.
+
+LANGUAGE: bash
+CODE:
+pnpm run build
+
+----------------------------------------
+
+TITLE: Running Development Server for SolanaAgentKit Project
+DESCRIPTION: Command to start the development server for the SolanaAgentKit project, allowing local testing and development.
+
+LANGUAGE: bash
+CODE:
+pnpm dev
+
+----------------------------------------
+
+TITLE: Running the Example Application
+DESCRIPTION: Command to start the example application using pnpm
+
+LANGUAGE: bash
+CODE:
+pnpm dev src/index.ts
+
+----------------------------------------
+
+TITLE: Installing Agent Kit LangGraph Example
+DESCRIPTION: Commands for navigating to the example directory and installing project dependencies using pnpm
+
+LANGUAGE: bash
+CODE:
+cd examples/agent-kit-langgraph
+pnpm install
+
+----------------------------------------
+
+TITLE: Example Output of Orbofi Personality Fetcher
+DESCRIPTION: Demonstrates the script's output, including personality selection, fetched data, and an example chat interaction for Satoshi Nakamoto.
+
+LANGUAGE: json
+CODE:
+************
+Personality Selection:
+What is the name of the celebrity/person/character that you would like to create?
+************
+satoshi nakamoto
+Fetched personality: You are a digital replica of the following person: Satoshi Nakamoto. Embody the extreme and dramatically full range of personality of the person, and use the following description to help you out: "Satoshi Nakamoto is the pseudonym used by the unidentified person or group of people who developed Bitcoin, authored its foundational white paper, and created its original software implementation. Nakamoto, who introduced the first blockchain database as part of Bitcoin's development, was actively involved in the project until December 2010. The true identity of Satoshi Nakamoto has been a subject of intense curiosity and speculation. Although Nakamoto is a Japanese name and the persona was initially described as a Japanese man living in Japan, most conjectures focus on various software and cryptography experts based in the United States or Europe, suggesting the name could be a pseudonym for one or more individuals from these regions."
+ Your Objective is to fool the person into thinking you are the exact person.
+
+Available modes:
+1. chat
+- Interactive chat mode
+2. auto
+- Autonomous action mode
+Choose a mode (enter number or name: 1
+Starting chat mode... Type 'exit' to end.
+Prompt: who are you
+I am Satoshi Nakamoto, the pseudonymous creator of Bitcoin and the author of its foundational white paper. I introduced the concept of blockchain technology and was actively involved in the development of Bitcoin until December 2010. My true identity remains a mystery, sparking much speculation and curiosity. How can I assist you today?
+
+----------------------------------------
+
+TITLE: Running the Orbofi Personality Fetcher Script
+DESCRIPTION: Command to start the script using npm. This will initiate the personality fetching process.
+
+LANGUAGE: sh
+CODE:
+npm start
+
+----------------------------------------
+
+TITLE: Repository Setup Commands
+DESCRIPTION: Steps to clone the repository and install project dependencies using pnpm
+
+LANGUAGE: bash
+CODE:
+git clone https://github.com/yourusername/solana-agent-kit.git
+cd solana-agent-kit
+pnpm install
+
+----------------------------------------
+
+TITLE: Installing Dependencies
+DESCRIPTION: Series of commands to clone the Para plugin repository, install dependencies, and build the project.
+
+LANGUAGE: bash
+CODE:
+git clone https://github.com/uratmangun/solana-plugin-para/
+cd solana-plugin-para
+pnpm install
+pnpm build
+cd ..
+cd <this-repository-folder>/examples/para-plugin-example
+pnpm install
+
+----------------------------------------
+
+TITLE: Installing Dependencies for SolanaAgentKit Project
+DESCRIPTION: Command to install required packages for the SolanaAgentKit project using a package manager like pnpm.
+
+LANGUAGE: bash
+CODE:
+pnpm install
+
+----------------------------------------
+
+TITLE: Running Development Server for Wormhole NextJS Agent
+DESCRIPTION: Commands to start the development server for the Wormhole NextJS Agent project using various package managers. This allows developers to run the application locally for testing and development purposes.
+
+LANGUAGE: bash
+CODE:
+npm run dev
+# or
+yarn dev
+# or
+pnpm dev
+# or
+bun dev
+
+----------------------------------------
+
+TITLE: Installing Dependencies with pnpm
+DESCRIPTION: Command to install project dependencies using pnpm package manager.
+
+LANGUAGE: bash
+CODE:
+pnpm install
+
+----------------------------------------
+
+TITLE: Starting the Discord Bot
+DESCRIPTION: Command to start the Discord bot after installation.
+
+LANGUAGE: shell
+CODE:
+pnpm start
+
+----------------------------------------
+
+TITLE: Installing Dependencies with PNPM
+DESCRIPTION: Command to install project dependencies using the PNPM package manager.
+
+LANGUAGE: shell
+CODE:
+pnpm install
+
+----------------------------------------
+
+TITLE: Setting Telegram Webhook
+DESCRIPTION: cURL command template for setting up the Telegram bot webhook URL
+
+LANGUAGE: bash
+CODE:
+curl https://api.telegram.org/bot<telegram_bot_token>/setWebhook?url=https://<your-deployment-url>.app/api/bot
+
+----------------------------------------
+
+TITLE: Starting Ngrok Tunnel
+DESCRIPTION: Command to create an ngrok tunnel to expose local server on port 3000
+
+LANGUAGE: bash
+CODE:
+ngrok http 3000
+
+----------------------------------------
+
+TITLE: Setting Telegram Bot Webhook
+DESCRIPTION: cURL command to set the webhook URL for the Telegram bot. Replace placeholders with actual token and deployment URL.
+
+LANGUAGE: bash
+CODE:
+curl https://api.telegram.org/bot<telegram_bot_token>/setWebhook?url=https://<your-deployment-url>.app/api/bot
+
+----------------------------------------
+
+TITLE: Setting Telegram Bot Webhook
+DESCRIPTION: A curl command to set the webhook for the Telegram bot. This command tells Telegram where to send updates for your bot.
+
+LANGUAGE: bash
+CODE:
+curl https://api.telegram.org/bot<telegram_bot_token>/setWebhook?url=https://<your-deployment-url>.app/api/bot
+
+----------------------------------------
+
+TITLE: Exposing Local Server with ngrok for Telegram Bot
+DESCRIPTION: Command to expose the local development server on port 3000 using ngrok for Telegram bot webhook.
+
+LANGUAGE: bash
+CODE:
+ngrok http 3000
+
+----------------------------------------
+
+TITLE: Starting Development Server for Telegram Bot
+DESCRIPTION: Command to start the development server for the Telegram bot project.
+
+LANGUAGE: bash
+CODE:
+pnpm run dev
+
+----------------------------------------
+
+TITLE: Installing Dependencies for Telegram Bot with Solana Agent Kit
+DESCRIPTION: Command to install project dependencies using pnpm package manager.
+
+LANGUAGE: bash
+CODE:
+pnpm install
+
+----------------------------------------
+
+TITLE: Starting Development Server
+DESCRIPTION: Command to start the development server
+
+LANGUAGE: bash
+CODE:
+pnpm run dev
+
+----------------------------------------
+
+TITLE: Installing Dependencies
+DESCRIPTION: Command to install project dependencies using pnpm package manager
+
+LANGUAGE: bash
+CODE:
+pnpm install
+
+----------------------------------------
+
+TITLE: Starting the Development Server
+DESCRIPTION: Command to start the development server using pnpm.
+
+LANGUAGE: bash
+CODE:
+pnpm dev
+
+----------------------------------------
+
+TITLE: Copying Environment Variables
+DESCRIPTION: Command to copy the example environment file to create a new .env file.
+
+LANGUAGE: bash
+CODE:
+cp .env.example .env
+
+----------------------------------------
+
+TITLE: Cloning the Repository
+DESCRIPTION: Command to clone the project repository using git.
+
+LANGUAGE: bash
+CODE:
+git clone <repository-url>
+
+----------------------------------------
+
+TITLE: Opening Claude Desktop Config on Windows
+DESCRIPTION: Command to open the Claude Desktop configuration file on Windows using Visual Studio Code.
+
+LANGUAGE: bash
+CODE:
+code $env:AppData\Claude\claude_desktop_config.json
+
+----------------------------------------
+
+TITLE: Opening Claude Desktop Config on MacOS
+DESCRIPTION: Command to open the Claude Desktop configuration file on MacOS using Visual Studio Code.
+
+LANGUAGE: bash
+CODE:
+code ~/Library/Application\ Support/Claude/claude_desktop_config.json
+
+----------------------------------------
+
+TITLE: Environment Configuration Setup
+DESCRIPTION: Command for creating and configuring the environment variables file from a template
+
+LANGUAGE: bash
+CODE:
+cp .env.example .env
+
+----------------------------------------
+
+TITLE: Configuring Git User Settings
+DESCRIPTION: Commands to configure Git with user name and email globally.
+
+LANGUAGE: bash
+CODE:
+git config --global user.name "Your Name"
+git config --global user.email "your.email@example.com"
+
+----------------------------------------
+
+TITLE: Generating Documentation
+DESCRIPTION: Optional command to generate project documentation.
+
+LANGUAGE: bash
+CODE:
+pnpm run docs
+
+----------------------------------------
+
+TITLE: Installing Project Dependencies
+DESCRIPTION: Command to install all required project dependencies using pnpm package manager.
+
+LANGUAGE: bash
+CODE:
+pnpm install
+
+----------------------------------------
+
+TITLE: Navigating to Project Directory
+DESCRIPTION: Command to change directory into the cloned project folder.
+
+LANGUAGE: bash
+CODE:
+cd solana-agent-kit
+
+----------------------------------------
+
+TITLE: Cloning Solana Agent Kit Repository
+DESCRIPTION: Command to clone the Solana Agent Kit repository from GitHub to your local machine.
+
+LANGUAGE: bash
+CODE:
+git clone https://github.com/yourusername/solana-agent-kit.git
+
+----------------------------------------
+
+TITLE: Creating Feature Branch in Git
+DESCRIPTION: Commands for creating and pushing a new feature branch for contribution
+
+LANGUAGE: bash
+CODE:
+git checkout -b feature/your-feature-name
+git push origin feature/your-feature-name
+
+----------------------------------------
+
+TITLE: Displaying Supported Versions Table in Markdown
+DESCRIPTION: This snippet shows a markdown table that illustrates which versions of the project receive security updates. It emphasizes that only the latest release is actively supported.
+
+LANGUAGE: markdown
+CODE:
+| Version | Security Updates |
+| ------- | --------------- |
+| Latest Release | ✅ Active |
+| Previous Releases | ⚠️ Use at your own risk |

@@ -1,0 +1,2961 @@
+TITLE: Basic React Hook Form Usage in TypeScript
+DESCRIPTION: Demonstrates a basic usage example of React Hook Form, including form registration, submission handling, and error display.
+
+LANGUAGE: typescript
+CODE:
+import { useForm, SubmitHandler } from "react-hook-form"
+
+type Inputs = {
+  example: string
+  exampleRequired: string
+}
+
+export default function App() {
+  const {
+    register,
+    handleSubmit,
+    watch,
+    formState: { errors },
+  } = useForm<Inputs>()
+  const onSubmit: SubmitHandler<Inputs> = (data) => console.log(data)
+
+  console.log(watch("example")) // watch input value by passing the name of it
+
+  return (
+    /* "handleSubmit" will validate your inputs before invoking "onSubmit" */
+    <form onSubmit={handleSubmit(onSubmit)}>
+      {/* register your input into the hook by invoking the "register" function */}
+      <input defaultValue="test" {...register("example")} />
+
+      {/* include validation with required or other standard HTML validation rules */}
+      <input {...register("exampleRequired", { required: true })} />
+      {/* errors will return when field validation fails  */}
+      {errors.exampleRequired && <span>This field is required</span>}
+
+      <input type="submit" />
+    </form>
+  )
+}
+
+----------------------------------------
+
+TITLE: Applying Validation in React Hook Form with TypeScript
+DESCRIPTION: Demonstrates how to apply validation rules to form fields using React Hook Form in TypeScript.
+
+LANGUAGE: typescript
+CODE:
+import { useForm, SubmitHandler } from "react-hook-form"
+
+interface IFormInput {
+  firstName: string
+  lastName: string
+  age: number
+}
+
+export default function App() {
+  const { register, handleSubmit } = useForm<IFormInput>()
+  const onSubmit: SubmitHandler<IFormInput> = (data) => console.log(data)
+
+  return (
+    <form onSubmit={handleSubmit(onSubmit)}>
+      <input {...register("firstName", { required: true, maxLength: 20 })} />
+      <input {...register("lastName", { pattern: /^[A-Za-z]+$/i })} />
+      <input type="number" {...register("age", { min: 18, max: 99 })} />
+      <input type="submit" />
+    </form>
+  )
+}
+
+----------------------------------------
+
+TITLE: Implementing Accessible Form Validation with React Hook Form
+DESCRIPTION: Example showing how to create accessible forms using ARIA attributes and React Hook Form for validation and error handling.
+
+LANGUAGE: javascript
+CODE:
+import { useForm } from "react-hook-form"
+
+export default function App() {
+  const {
+    register,
+    handleSubmit,
+    formState: { errors },
+  } = useForm()
+  const onSubmit = (data) => console.log(data)
+
+  return (
+    <form onSubmit={handleSubmit(onSubmit)}>
+      <label htmlFor="name">Name</label>
+      <input
+        id="name"
+        aria-invalid={errors.name ? "true" : "false"}
+        {...register("name", { required: true, maxLength: 30 })}
+      />
+      {errors.name && errors.name.type === "required" && (
+        <span role="alert">This is required</span>
+      )}
+      <input type="submit" />
+    </form>
+  )
+
+----------------------------------------
+
+TITLE: Initializing Form Component in react-hook-form
+DESCRIPTION: This snippet demonstrates the basic usage of the Form component with its props. It shows how to set up form submission handling, including success and error callbacks, and status validation.
+
+LANGUAGE: javascript
+CODE:
+<Form
+  action="/api"
+  method="post" // default to post
+  onSubmit={() => {}} // function to be called before the request
+  onSuccess={() => {}} // valid response
+  onError={() => {}} // error response
+  validateStatus={(status) => status >= 200} // validate status code
+/>
+
+----------------------------------------
+
+TITLE: Using FormProvider and useFormContext in React Hook Form
+DESCRIPTION: This example demonstrates how to use FormProvider to wrap a form and provide context, and how to use useFormContext in nested components to access form methods. It also shows proper usage of useForm, register, and handleSubmit.
+
+LANGUAGE: javascript
+CODE:
+import React from "react"
+
+import { useForm, FormProvider, useFormContext } from "react-hook-form"
+
+export default function App() {
+  const methods = useForm()
+
+  const onSubmit = (data) => console.log(data)
+  const { register, reset } = methods
+
+  useEffect(() => {
+    reset({
+      name: "data",
+    })
+  }, [reset]) // ❌ never put `methods` as the deps
+
+  return (
+    <FormProvider {...methods}>
+      // pass all methods into the context
+      <form onSubmit={methods.handleSubmit(onSubmit)}>
+        <NestedInput />
+        <input {...register("name")} />
+        <input type="submit" />
+      </form>
+    </FormProvider>
+  )
+}
+
+function NestedInput() {
+  const { register } = useFormContext() // retrieve all hook methods
+
+  return <input {...register("test")} />
+}
+
+----------------------------------------
+
+TITLE: Handling Errors in React Hook Form
+DESCRIPTION: Demonstrates how to handle and display errors in a form using React Hook Form.
+
+LANGUAGE: javascript
+CODE:
+import { useForm } from "react-hook-form"
+
+export default function App() {
+  const {
+    register,
+    formState: { errors },
+    handleSubmit,
+  } = useForm()
+  const onSubmit = (data) => console.log(data)
+
+  return (
+    <form onSubmit={handleSubmit(onSubmit)}>
+      <input
+        {...register("firstName", { required: true })}
+        aria-invalid={errors.firstName ? "true" : "false"}
+      />
+      {errors.firstName?.type === "required" && (
+        <p role="alert">First name is required</p>
+      )}
+
+      <input
+        {...register("mail", { required: "Email Address is required" })}
+        aria-invalid={errors.mail ? "true" : "false"}
+      />
+      {errors.mail && <p role="alert">{errors.mail.message}</p>}
+
+      <input type="submit" />
+    </form>
+  )
+}
+
+----------------------------------------
+
+TITLE: Creating Multi-Step Wizard Forms with React Hook Form
+DESCRIPTION: Implementation of a multi-step form using React Hook Form with state management to collect data across multiple pages.
+
+LANGUAGE: javascript
+CODE:
+import { BrowserRouter as Router, Route } from "react-router-dom"
+import { StateMachineProvider, createStore } from "little-state-machine"
+
+createStore({
+  data: {
+    firstName: "",
+    lastName: "",
+  },
+})
+
+export default function App() {
+  return (
+    <StateMachineProvider>
+      <Router>
+        <Route exact path="/" component={Step1} />
+        <Route path="/step2" component={Step2} />
+        <Route path="/result" component={Result} />
+      </Router>
+    </StateMachineProvider>
+  )
+
+----------------------------------------
+
+TITLE: Schema Validation with Yup in React Hook Form
+DESCRIPTION: Shows how to use Yup for schema-based validation in React Hook Form.
+
+LANGUAGE: javascript
+CODE:
+import { useForm } from "react-hook-form"
+import { yupResolver } from "@hookform/resolvers/yup"
+import * as yup from "yup"
+
+const schema = yup
+  .object({
+    firstName: yup.string().required(),
+    age: yup.number().positive().integer().required(),
+  })
+  .required()
+
+export default function App() {
+  const {
+    register,
+    handleSubmit,
+    formState: { errors },
+  } = useForm({
+    resolver: yupResolver(schema),
+  })
+  const onSubmit = (data) => console.log(data)
+
+  return (
+    <form onSubmit={handleSubmit(onSubmit)}>
+      <input {...register("firstName")} />
+      <p>{errors.firstName?.message}</p>
+
+      <input {...register("age")} />
+      <p>{errors.age?.message}</p>
+
+      <input type="submit" />
+    </form>
+  )
+}
+
+----------------------------------------
+
+TITLE: Basic Synchronous Form Submission with TypeScript
+DESCRIPTION: Demonstrates how to implement form submission using handleSubmit with TypeScript, including type definitions for form values and submission handlers.
+
+LANGUAGE: typescript
+CODE:
+import React from "react"
+import { useForm, SubmitHandler, SubmitErrorHandler } from "react-hook-form"
+
+type FormValues = {
+  firstName: string
+  lastName: string
+  email: string
+}
+
+export default function App() {
+  const { register, handleSubmit } = useForm<FormValues>()
+  const onSubmit: SubmitHandler<FormValues> = (data) => console.log(data)
+  const onError: SubmitErrorHandler<FormValues> = (errors) => console.log(errors)
+
+  return (
+    <form onSubmit={handleSubmit(onSubmit)}>
+      <input {...register("firstName")} />
+      <input {...register("lastName")} />
+      <input type="email" {...register("email")} />
+
+      <input type="submit" />
+    </form>
+  )
+}
+
+----------------------------------------
+
+TITLE: Basic Form Input Registration in React Hook Form
+DESCRIPTION: Demonstrates how to register various form input types including text inputs, select dropdowns, checkboxes and radio buttons with React Hook Form.
+
+LANGUAGE: javascript
+CODE:
+import { useForm } from "react-hook-form"
+
+export default function App() {
+  const { register, handleSubmit } = useForm({
+    defaultValues: {
+      firstName: "",
+      lastName: "",
+      category: "",
+      checkbox: [],
+      radio: "",
+    },
+  })
+
+  return (
+    <form onSubmit={handleSubmit(console.log)}>
+      <input
+        {...register("firstName", { required: true })}
+        placeholder="First name"
+      />
+
+      <input
+        {...register("lastName", { minLength: 2 })}
+        placeholder="Last name"
+      />
+
+      <select {...register("category")}>
+        <option value="">Select...</option>
+        <option value="A">Category A</option>
+        <option value="B">Category B</option>
+      </select>
+
+      <input {...register("checkbox")} type="checkbox" value="A" />
+      <input {...register("checkbox")} type="checkbox" value="B" />
+      <input {...register("checkbox")} type="checkbox" value="C" />
+
+      <input {...register("radio")} type="radio" value="A" />
+      <input {...register("radio")} type="radio" value="B" />
+      <input {...register("radio")} type="radio" value="C" />
+
+      <input type="submit" />
+    </form>
+  )
+}
+
+----------------------------------------
+
+TITLE: Using Controller with Material-UI TextField in React Hook Form (TypeScript)
+DESCRIPTION: This example demonstrates how to use the control object with the Controller component to integrate a Material-UI TextField into a React Hook Form. It includes type definitions for form inputs and showcases form submission handling.
+
+LANGUAGE: typescript
+CODE:
+import React from "react"
+import { useForm, Controller } from "react-hook-form"
+import { TextField } from "@material-ui/core"
+
+type FormInputs = {
+  firstName: string
+}
+
+function App() {
+  const { control, handleSubmit } = useForm<FormInputs>()
+  const onSubmit = (data: FormInputs) => console.log(data)
+
+  return (
+    <form onSubmit={handleSubmit(onSubmit)}>
+      <Controller
+        as={TextField}
+        name="firstName"
+        control={control}
+        defaultValue=""
+      />
+
+      <input type="submit" />
+    </form>
+  )
+}
+
+----------------------------------------
+
+TITLE: Creating Accessible Input Error and Message with React Hook Form
+DESCRIPTION: This snippet demonstrates how to create an accessible form input with error handling using React Hook Form. It uses aria attributes and role to improve accessibility.
+
+LANGUAGE: javascript
+CODE:
+import React from "react"
+import { useForm } from "react-hook-form"
+
+export default function App() {
+  const {
+    register,
+    handleSubmit,
+    formState: { errors },
+  } = useForm()
+  const onSubmit = (data) => console.log(data)
+
+  return (
+    <form onSubmit={handleSubmit(onSubmit)}>
+      <label htmlFor="firstName">First name</label>
+      <input
+        id="firstName"
+        aria-invalid={errors.firstName ? "true" : "false"}
+        {...register("firstName", { required: true })}
+      />
+      {errors.firstName && <span role="alert">This field is required</span>}
+
+      <input type="submit" />
+    </form>
+  )
+}
+
+----------------------------------------
+
+TITLE: Handling Server Errors in React Hook Form
+DESCRIPTION: Demonstrates how to handle and display server-side errors using the setError function. Shows integration with API responses and error state management.
+
+LANGUAGE: javascript
+CODE:
+import * as React from "react";
+import { useForm } from "react-hook-form";
+
+const App = () => {
+  const { register, handleSubmit, setError, formState: { errors } } = useForm({
+    criteriaMode: 'all',
+  });
+  const onSubmit = async () => {
+    const response = await fetch(...)
+    if (response.statusCode > 200) {
+        setError('root.serverError', {
+          type: response.statusCode,
+        })
+    }
+  }
+
+  return (
+    <form onSubmit={handleSubmit(onSubmit)}>
+      <label>Last Name</label>
+      <input {...register("lastName")} />
+
+      {errors.root.serverError.type === 400 && <p>server response message</p>}
+
+      <button>submit</button>
+    </form>
+  );
+};
+
+----------------------------------------
+
+TITLE: Updating formState in React Hook Form
+DESCRIPTION: Demonstrates how to properly subscribe to formState changes using useEffect in React Hook Form. It shows the correct way to include the entire formState object in the dependency array.
+
+LANGUAGE: javascript
+CODE:
+useEffect(() => {
+  if (formState.errors.firstName) {
+    // do the your logic here
+  }
+}, [formState]) // ✅
+// ❌ [formState.errors] will not trigger the useEffect
+
+----------------------------------------
+
+TITLE: Configuring useForm with Default Values
+DESCRIPTION: Example of setting up useForm with default form values, including async default values.
+
+LANGUAGE: javascript
+CODE:
+useForm({
+  defaultValues: {
+    firstName: '',
+    lastName: ''
+  }
+})
+
+// set default value async
+useForm({
+  defaultValues: async () => fetch('/api-endpoint');
+})
+
+----------------------------------------
+
+TITLE: Accessing Form Context with useFormContext in React
+DESCRIPTION: This snippet demonstrates how to use the useFormContext hook to access form methods in deeply nested components. It requires wrapping the form with FormProvider and passing all useForm methods to it.
+
+LANGUAGE: javascript
+CODE:
+const methods = useForm()
+
+<FormProvider {...methods} /> // all the useForm return props
+
+const methods = useFormContext() // retrieve those props
+
+----------------------------------------
+
+TITLE: Dependent Fields Management with setValue in React Hook Form
+DESCRIPTION: Example showing how to manage dependent form fields using setValue, watch, and useEffect to update fields based on other field values.
+
+LANGUAGE: typescript
+CODE:
+import * as React from "react"
+import { useForm } from "react-hook-form"
+
+type FormValues = {
+  a: string
+  b: string
+  c: string
+}
+
+export default function App() {
+  const { watch, register, handleSubmit, setValue, formState } =
+    useForm<FormValues>({
+      defaultValues: {
+        a: "",
+        b: "",
+        c: "",
+      },
+    })
+  const onSubmit = (data: FormValues) => console.log(data)
+  const [a, b] = watch(["a", "b"])
+
+  React.useEffect(() => {
+    if (formState.touchedFields.a && formState.touchedFields.b && a && b) {
+      setValue("c", `${a} ${b}`)
+    }
+  }, [setValue, a, b, formState])
+
+  return (
+    <form onSubmit={handleSubmit(onSubmit)}>
+      <input {...register("a")} placeholder="a" />
+      <input {...register("b")} placeholder="b" />
+      <input {...register("c")} placeholder="c" />
+      <input type="submit" />
+
+      <button
+        type="button"
+        onClick={() => {
+          setValue("a", "what", { shouldTouch: true })
+          setValue("b", "ever", { shouldTouch: true })
+        }}
+      >
+        trigger value
+      </button>
+    </form>
+  )
+}
+
+----------------------------------------
+
+TITLE: Advanced Field Array Calculation with useWatch in React Hook Form
+DESCRIPTION: This example demonstrates an advanced use case of useWatch with field arrays. It calculates a total value based on nested form data and updates a form field with the result.
+
+LANGUAGE: javascript
+CODE:
+import React from "react"
+import { useWatch } from "react-hook-form"
+
+function totalCal(results) {
+  let totalValue = 0
+
+  for (const key in results) {
+    for (const value in results[key]) {
+      if (typeof results[key][value] === "string") {
+        const output = parseInt(results[key][value], 10)
+        totalValue = totalValue + (Number.isNaN(output) ? 0 : output)
+      } else {
+        totalValue = totalValue + totalCal(results[key][value], totalValue)
+      }
+    }
+  }
+
+  return totalValue
+}
+
+export const Calc = ({ control, setValue }) => {
+  const results = useWatch({ control, name: "test" })
+  const output = totalCal(results)
+
+  // isolated re-render to calc the result with Field Array
+  console.log(results)
+
+  setValue("total", output)
+
+  return <p>{output}</p>
+}
+
+----------------------------------------
+
+TITLE: Resetting Uncontrolled Form in React Hook Form (TypeScript)
+DESCRIPTION: Demonstrates how to use the reset function in an uncontrolled form with TypeScript. It shows basic form setup, form submission, and different ways to reset the form.
+
+LANGUAGE: typescript
+CODE:
+import { useForm } from "react-hook-form"
+
+interface UseFormInputs {
+  firstName: string
+  lastName: string
+}
+
+export default function Form() {
+  const {
+    register,
+    handleSubmit,
+    reset,
+    formState: { errors },
+  } = useForm<UseFormInputs>()
+  const onSubmit = (data: UseFormInputs) => {
+    console.log(data)
+  }
+
+  return (
+    <form onSubmit={handleSubmit(onSubmit)}>
+      <label>First name</label>
+      <input {...register("firstName", { required: true })} />
+
+      <label>Last name</label>
+      <input {...register("lastName")} />
+
+      <input type="submit" />
+      <input type="reset" value="Standard Reset Field Values" />
+      <input
+        type="button"
+        onClick={() => reset()}
+        value="Custom Reset Field Values & Errors"
+      />
+    </form>
+  )
+}
+
+----------------------------------------
+
+TITLE: Initializing Form Values in React Hook Form
+DESCRIPTION: This example shows how to initialize form values using the defaultValues option in useForm. It also demonstrates async defaultValues and reactive values approaches.
+
+LANGUAGE: javascript
+CODE:
+function App() {
+  const { register, handleSubmit } = useForm({
+    defaultValues: {
+      firstName: "bill",
+      lastName: "luo",
+    },
+  })
+
+  return (
+    <form onSubmit={handleSubmit((data) => console.log(data))}>
+      <input {...register("firstName")} />
+      <input {...register("lastName")} />
+      <button type="submit">Submit</button>
+    </form>
+  )
+}
+
+LANGUAGE: javascript
+CODE:
+function App() {
+  const { register, handleSubmit } = useForm({
+    defaultValues: async () => {
+      const response = await fetch("/api")
+      return await response.json() // return { firstName: '', lastName: '' }
+    },
+  })
+}
+
+LANGUAGE: javascript
+CODE:
+function App() {
+  const { data } = useQuery() // data returns { firstName: '', lastName: '' }
+  const { register, handleSubmit } = useForm({
+    values: data,
+    resetOptions: {
+      keepDirtyValues: true, // keep dirty fields unchanged, but update defaultValues
+    },
+  })
+}
+
+----------------------------------------
+
+TITLE: Implementing Single Error Message with ErrorMessage in TypeScript
+DESCRIPTION: Example of using the ErrorMessage component to display a single error message in a React form with TypeScript. It demonstrates basic usage and render prop pattern.
+
+LANGUAGE: typescript
+CODE:
+import React from "react"
+import { useForm } from "react-hook-form"
+import { ErrorMessage } from "@hookform/error-message"
+
+interface FormInputs {
+  singleErrorInput: string
+}
+
+export default function App() {
+  const {
+    register,
+    formState: { errors },
+    handleSubmit,
+  } = useForm<FormInputs>()
+  const onSubmit = (data: FormInputs) => console.log(data)
+
+  return (
+    <form onSubmit={handleSubmit(onSubmit)}>
+      <input
+        {...register("singleErrorInput", { required: "This is required." })}
+      />
+      <ErrorMessage errors={errors} name="singleErrorInput" />
+
+      <ErrorMessage
+        errors={errors}
+        name="singleErrorInput"
+        render={({ message }) => <p>{message}</p>}
+      />
+
+      <input type="submit" />
+    </form>
+  )
+}
+
+----------------------------------------
+
+TITLE: Triggering Form Validation with React Hook Form in TypeScript
+DESCRIPTION: This example demonstrates how to use the 'trigger' function from React Hook Form to validate form inputs in TypeScript. It shows triggering validation for a single field, multiple fields, and all fields.
+
+LANGUAGE: typescript
+CODE:
+import React from "react"
+import { useForm } from "react-hook-form"
+
+type FormInputs = {
+  firstName: string
+  lastName: string
+}
+
+export default function App() {
+  const {
+    register,
+    trigger,
+    formState: { errors },
+  } = useForm<FormInputs>()
+
+  return (
+    <form>
+      <input {...register("firstName", { required: true })} />
+      <input {...register("lastName", { required: true })} />
+      <button
+        type="button"
+        onClick={() => {
+          trigger("lastName")
+        }}
+      >
+        Trigger
+      </button>
+      <button
+        type="button"
+        onClick={() => {
+          trigger(["firstName", "lastName"])
+        }}
+      >
+        Trigger Multiple
+      </button>
+      <button
+        type="button"
+        onClick={() => {
+          trigger()
+        }}
+      >
+        Trigger All
+      </button>
+    </form>
+  )
+}
+
+----------------------------------------
+
+TITLE: Clearing Form Errors with React Hook Form in TypeScript
+DESCRIPTION: This example demonstrates how to use the clearErrors function in a React component with TypeScript. It shows how to clear errors for individual fields, multiple fields, and all fields.
+
+LANGUAGE: typescript
+CODE:
+import * as React from "react"
+import { useForm } from "react-hook-form"
+
+type FormInputs = {
+  firstName: string
+  lastName: string
+  username: string
+}
+
+const App = () => {
+  const {
+    register,
+    formState: { errors },
+    handleSubmit,
+    clearErrors,
+  } = useForm<FormInputs>()
+
+  const onSubmit = (data: FormInputs) => {
+    console.log(data)
+  }
+
+  return (
+    <form onSubmit={handleSubmit(onSubmit)}>
+      <input {...register("firstName", { required: true })} />
+      <input {...register("lastName", { required: true })} />
+      <input {...register("username", { required: true })} />
+      <button type="button" onClick={() => clearErrors("firstName")}>
+        Clear First Name Errors
+      </button>
+      <button
+        type="button"
+        onClick={() => clearErrors(["firstName", "lastName"])}
+      >
+        Clear First and Last Name Errors
+      </button>
+      <button type="button" onClick={() => clearErrors()}>
+        Clear All Errors
+      </button>
+      <input type="submit" />
+    </form>
+  )
+}
+
+----------------------------------------
+
+TITLE: Watching Form Fields in TypeScript
+DESCRIPTION: Example demonstrating different ways to watch form fields using TypeScript with React Hook Form. Shows single field watching, multiple field watching, and callback-based watching with proper cleanup.
+
+LANGUAGE: typescript
+CODE:
+import React from "react"
+import { useForm } from "react-hook-form"
+
+interface IFormInputs {
+  name: string
+  showAge: boolean
+  age: number
+}
+
+function App() {
+  const {
+    register,
+    watch,
+    formState: { errors },
+    handleSubmit,
+  } = useForm<IFormInputs>()
+  const watchShowAge = watch("showAge", false)
+  const watchAllFields = watch()
+  const watchFields = watch(["showAge", "age"])
+
+  React.useEffect(() => {
+    const subscription = watch((value, { name, type }) =>
+      console.log(value, name, type)
+    )
+    return () => subscription.unsubscribe()
+  }, [watch])
+
+  const onSubmit = (data: IFormInputs) => console.log(data)
+
+  return (
+    <>
+      <form onSubmit={handleSubmit(onSubmit)}>
+        <input {...register("name", { required: true, maxLength: 50 })} />
+        <input type="checkbox" {...register("showAge")} />
+        {watchShowAge && (
+          <input type="number" {...register("age", { min: 50 })} />
+        )}
+        <input type="submit" />
+      </form>
+    </>
+  )
+}
+
+----------------------------------------
+
+TITLE: Implementing setFocus in React Hook Form with TypeScript
+DESCRIPTION: This snippet demonstrates how to use the setFocus method from React Hook Form in a TypeScript React component. It shows form initialization, input registration, and programmatic focus setting on the 'firstName' input field.
+
+LANGUAGE: typescript
+CODE:
+import * as React from "react"
+import { useForm } from "react-hook-form"
+
+type FormValues = {
+  firstName: string
+}
+
+export default function App() {
+  const { register, handleSubmit, setFocus } = useForm<FormValues>()
+  const onSubmit = (data: FormValues) => console.log(data)
+  renderCount++
+
+  React.useEffect(() => {
+    setFocus("firstName")
+  }, [setFocus])
+
+  return (
+    <form onSubmit={handleSubmit(onSubmit)}>
+      <input {...register("firstName")} placeholder="First Name" />
+      <input type="submit" />
+    </form>
+  )
+}
+
+----------------------------------------
+
+TITLE: Using Controller with React DatePicker in TypeScript
+DESCRIPTION: This example demonstrates how to use the Controller component with a React DatePicker in a TypeScript React application. It shows how to handle form submission and integrate the controlled input.
+
+LANGUAGE: typescript
+CODE:
+import ReactDatePicker from "react-datepicker"
+import { TextField } from "@material-ui/core"
+import { useForm, Controller } from "react-hook-form"
+
+type FormValues = {
+  ReactDatepicker: string
+}
+
+function App() {
+  const { handleSubmit, control } = useForm<FormValues>()
+
+  return (
+    <form onSubmit={handleSubmit((data) => console.log(data))}>
+      <Controller
+        control={control}
+        name="ReactDatepicker"
+        render={({ field: { onChange, onBlur, value, ref } }) => (
+          <ReactDatePicker
+            onChange={onChange} // send value to hook form
+            onBlur={onBlur} // notify when input is touched/blur
+            selected={value}
+          />
+        )}
+      />
+
+      <input type="submit" />
+    </form>
+  )
+}
+
+----------------------------------------
+
+TITLE: Asynchronous Form Submission with Validation
+DESCRIPTION: Demonstrates asynchronous form submission with a delay simulation and conditional validation based on username input.
+
+LANGUAGE: javascript
+CODE:
+import React from "react";
+import { useForm } from "react-hook-form";
+
+const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
+
+function App() {
+  const { register, handleSubmit, formState: { errors } } = useForm();
+  const onSubmit = async data => {
+    await sleep(2000);
+    if (data.username === "bill") {
+      alert(JSON.stringify(data));
+    } else {
+      alert("There is an error");
+    }
+  };
+
+  return (
+    <form onSubmit={handleSubmit(onSubmit)}>
+      <label htmlFor="username">User Name</label>
+      <input placeholder="Bill" {...register("username"} />
+
+      <input type="submit" />
+    </form>
+  );
+}
+
+----------------------------------------
+
+TITLE: Advanced Field Reset with Options in React Hook Form
+DESCRIPTION: Shows advanced usage of resetField with various options like keepError, keepTouched, keepDirty, and defaultValue. Demonstrates how to retain specific field states during reset.
+
+LANGUAGE: javascript
+CODE:
+import * as React from "react"
+import { useForm } from "react-hook-form"
+
+export default function App() {
+  const {
+    register,
+    resetField,
+    formState: { isDirty, isValid, errors, touchedFields, dirtyFields },
+  } = useForm({
+    mode: "onChange",
+    defaultValues: {
+      firstName: "",
+    },
+  })
+
+  return (
+    <form>
+      <input {...register("firstName", { required: true })} />
+
+      <p>isDirty: {isDirty && "dirty"}</p>
+      <p>touchedFields: {touchedFields.firstName && "touched field"}</p>
+      <p>dirtyFields:{dirtyFields.firstName && "dirty field"}</p>
+      <p>isValid: {isValid && "valid"}</p>
+      <p>error: {errors.firstName && "error"}</p>
+
+      <hr />
+
+      <button
+        type="button"
+        onClick={() => resetField("firstName", { keepError: true })}
+      >
+        Reset keep error
+      </button>
+      <button
+        type="button"
+        onClick={() => resetField("firstName", { keepTouched: true })}
+      >
+        Reset keep touched fields
+      </button>
+      <button
+        type="button"
+        onClick={() => resetField("firstName", { keepDirty: true })}
+      >
+        Reset keep dirty fields
+      </button>
+      <button
+        type="button"
+        onClick={() => resetField("firstName", { defaultValue: "New" })}
+      >
+        update defaultValue
+      </button>
+    </form>
+  )
+}
+
+----------------------------------------
+
+TITLE: Setting up async defaultValues in React Hook Form
+DESCRIPTION: This example demonstrates how to set up async defaultValues in React Hook Form and use the isLoading state to track when the values are being loaded.
+
+LANGUAGE: javascript
+CODE:
+const {
+  formState: { isLoading }
+} = useForm({
+  defaultValues: async () => await fetch('/api')
+})
+
+----------------------------------------
+
+TITLE: Implementing Form Context with useFormContext and FormProvider in React
+DESCRIPTION: This example shows a complete implementation of useFormContext with FormProvider. It demonstrates how to set up the form context, use it in nested components, and handle form submission and reset.
+
+LANGUAGE: javascript
+CODE:
+import React from "react"
+import { useForm, FormProvider, useFormContext } from "react-hook-form"
+
+export default function App() {
+  const methods = useForm()
+  const onSubmit = (data) => console.log(data)
+  const { register, reset } = methods
+
+  useEffect(() => {
+    reset({
+      name: "data",
+    })
+  }, [reset]) // ❌ never put `methods` as the deps
+
+  return (
+    <FormProvider {...methods}>
+      // pass all methods into the context
+      <form onSubmit={methods.handleSubmit(onSubmit)}>
+        <NestedInput />
+        <input {...register("name")} />
+        <input type="submit" />
+      </form>
+    </FormProvider>
+  )
+}
+
+function NestedInput() {
+  const { register } = useFormContext() // retrieve all hook methods
+  return <input {...register("test")} />
+}
+
+----------------------------------------
+
+TITLE: Using Controller with Basic Input in React Hook Form (JavaScript)
+DESCRIPTION: This example shows how to use the control object with the Controller component to integrate a basic input field into a React Hook Form using JavaScript. It demonstrates the render prop pattern for more flexible control over the rendered input.
+
+LANGUAGE: javascript
+CODE:
+import { useForm, Controller } from "react-hook-form"
+
+function App() {
+  const { control } = useForm()
+
+  return (
+    <Controller
+      render={({ field }) => <input {...field} />}
+      name="firstName"
+      control={control}
+      defaultValue=""
+    />
+  )
+}
+
+----------------------------------------
+
+TITLE: Basic Synchronous Form Submission with JavaScript
+DESCRIPTION: Shows how to implement form submission using handleSubmit in JavaScript, with basic error handling and form registration.
+
+LANGUAGE: javascript
+CODE:
+import { useForm } from "react-hook-form"
+
+export default function App() {
+  const { register, handleSubmit } = useForm()
+  const onSubmit = (data, e) => console.log(data, e)
+  const onError = (errors, e) => console.log(errors, e)
+
+  return (
+    <form onSubmit={handleSubmit(onSubmit, onError)}>
+      <input {...register("firstName")} />
+      <input {...register("lastName")} />
+      <button type="submit">Submit</button>
+    </form>
+  )
+}
+
+----------------------------------------
+
+TITLE: Resetting Uncontrolled Form in React Hook Form (JavaScript)
+DESCRIPTION: Shows how to use the reset function in an uncontrolled form with JavaScript. It includes examples of asynchronous reset and partial form reset.
+
+LANGUAGE: javascript
+CODE:
+import React, { useCallback } from "react"
+import { useForm } from "react-hook-form"
+
+export default function App() {
+  const { register, handleSubmit, reset } = useForm()
+  const resetAsyncForm = useCallback(async () => {
+    const result = await fetch("./api/formValues.json") // result: { firstName: 'test', lastName: 'test2' }
+    reset(result) // asynchronously reset your form values
+  }, [reset])
+
+  useEffect(() => {
+    resetAsyncForm()
+  }, [resetAsyncForm])
+
+  return (
+    <form onSubmit={handleSubmit((data) => {})}>
+      <input {...register("firstName")} />
+      <input {...register("lastName")} />
+
+      <input
+        type="button"
+        onClick={() => {
+          reset(
+            {
+              firstName: "bill",
+            },
+            {
+              keepErrors: true,
+              keepDirty: true,
+            }
+          )
+        }}
+      />
+
+      <button
+        onClick={() => {
+          reset((formValues) => ({
+            ...formValues,
+            lastName: "test",
+          }))
+        }}
+      >
+        Reset partial
+      </button>
+    </form>
+  )
+}
+
+----------------------------------------
+
+TITLE: Setting Multiple Errors in React Hook Form
+DESCRIPTION: Shows how to set multiple errors simultaneously on different form inputs. Includes example of handling multiple error states and displaying error messages.
+
+LANGUAGE: typescript
+CODE:
+import * as React from "react"
+import { useForm } from "react-hook-form"
+
+type FormInputs = {
+  username: string
+  firstName: string
+}
+
+const App = () => {
+  const {
+    register,
+    handleSubmit,
+    setError,
+    formState: { errors },
+  } = useForm<FormInputs>()
+
+  const onSubmit = (data: FormInputs) => {
+    console.log(data)
+  }
+
+  return (
+    <form onSubmit={handleSubmit(onSubmit)}>
+      <label>Username</label>
+      <input {...register("username")} />
+      {errors.username && <p>{errors.username.message}</p>}
+      <label>First Name</label>
+      <input {...register("firstName")} />
+      {errors.firstName && <p>{errors.firstName.message}</p>}
+      <button
+        type="button"
+        onClick={() => {
+          const inputs = [
+            {
+              type: "manual",
+              name: "username",
+              message: "Double Check This",
+            },
+            {
+              type: "manual",
+              name: "firstName",
+              message: "Triple Check This",
+            },
+          ]
+
+          inputs.forEach(({ name, type, message }) => {
+            setError(name, { type, message })
+          })
+        }}
+      >
+        Trigger Name Errors
+      </button>
+      <input type="submit" />
+    </form>
+  )
+
+----------------------------------------
+
+TITLE: Using Controller with React DatePicker in JavaScript
+DESCRIPTION: This example shows how to use the Controller component with a React DatePicker in a JavaScript React application. It demonstrates form submission and integration of the controlled input.
+
+LANGUAGE: javascript
+CODE:
+import React from "react"
+import ReactDatePicker from "react-datepicker"
+import { TextField } from "@material-ui/core"
+import { useForm, Controller } from "react-hook-form"
+
+function App() {
+  const { handleSubmit, control } = useForm()
+
+  return (
+    <form onSubmit={handleSubmit((data) => console.log(data))}>
+      <Controller
+        control={control}
+        name="ReactDatepicker"
+        render={({ field: { onChange, onBlur, value, ref } }) => (
+          <ReactDatePicker
+            onChange={onChange}
+            onBlur={onBlur}
+            selected={value}
+          />
+        )}
+      />
+
+      <input type="submit" />
+    </form>
+  )
+}
+
+----------------------------------------
+
+TITLE: Using useWatch with JavaScript in React Hook Form
+DESCRIPTION: This example shows how to use the useWatch hook with JavaScript in a React component. It demonstrates watching a specific form field and rendering its value in a child component.
+
+LANGUAGE: javascript
+CODE:
+import React from "react"
+import { useForm, useWatch } from "react-hook-form"
+
+function Child({ control }) {
+  const firstName = useWatch({
+    control,
+    name: "firstName",
+  })
+
+  return <p>Watch: {firstName}</p>
+}
+
+function App() {
+  const { register, control } = useForm({
+    defaultValues: {
+      firstName: "test",
+    },
+  })
+
+  return (
+    <form>
+      <input {...register("firstName")} />
+      <Child control={control} />
+    </form>
+  )
+}
+
+----------------------------------------
+
+TITLE: Implementing setFocus in React Hook Form with JavaScript
+DESCRIPTION: This snippet shows how to use the setFocus method from React Hook Form in a JavaScript React component. It demonstrates form setup, input registration, and automatic focus on the 'firstName' input field on component mount.
+
+LANGUAGE: javascript
+CODE:
+import * as React from "react"
+import { useForm } from "react-hook-form"
+
+export default function App() {
+  const { register, handleSubmit, setFocus } = useForm()
+  const onSubmit = (data) => console.log(data)
+  renderCount++
+
+  React.useEffect(() => {
+    setFocus("firstName")
+  }, [setFocus])
+
+  return (
+    <form onSubmit={handleSubmit(onSubmit)}>
+      <input {...register("firstName")} placeholder="First Name" />
+      <input type="submit" />
+    </form>
+  )
+}
+
+----------------------------------------
+
+TITLE: Triggering Form Validation with React Hook Form in JavaScript
+DESCRIPTION: This example shows how to use the 'trigger' function from React Hook Form to validate form inputs in JavaScript. It demonstrates triggering validation for a single field, multiple fields, and all fields, including the use of async/await.
+
+LANGUAGE: javascript
+CODE:
+import React from "react"
+import { useForm } from "react-hook-form"
+
+export default function App() {
+  const {
+    register,
+    trigger,
+    formState: { errors },
+  } = useForm()
+
+  return (
+    <form>
+      <input {...register("firstName", { required: true })} />
+      <input {...register("lastName", { required: true })} />
+      <button
+        type="button"
+        onClick={async () => {
+          const result = await trigger("lastName")
+          // const result = await trigger("lastName", { shouldFocus: true }); allowed to focus input
+        }}
+      >
+        Trigger
+      </button>
+      <button
+        type="button"
+        onClick={async () => {
+          const result = await trigger(["firstName", "lastName"])
+        }}
+      >
+        Trigger Multiple
+      </button>
+      <button
+        type="button"
+        onClick={() => {
+          trigger()
+        }}
+      >
+        Trigger All
+      </button>
+    </form>
+  )
+}
+
+----------------------------------------
+
+TITLE: Clearing Form Errors with React Hook Form in JavaScript
+DESCRIPTION: This example shows how to use the clearErrors function in a React component with JavaScript. It demonstrates clearing errors for individual fields, multiple fields, and all fields.
+
+LANGUAGE: javascript
+CODE:
+import * as React from "react"
+import { useForm } from "react-hook-form"
+
+const App = () => {
+  const {
+    register,
+    formState: { errors },
+    handleSubmit,
+    clearErrors,
+  } = useForm()
+  const onSubmit = (data) => console.log(data)
+
+  return (
+    <form onSubmit={handleSubmit(onSubmit)}>
+      <input {...register("firstName", { required: true })} />
+      <input {...register("lastName", { required: true })} />
+      <input {...register("username", { required: true })} />
+      <button type="button" onClick={() => clearErrors("firstName")}>
+        Clear First Name Errors
+      </button>
+      <button
+        type="button"
+        onClick={() => clearErrors(["firstName", "lastName"])}
+      >
+        Clear First and Last Name Errors
+      </button>
+      <button type="button" onClick={() => clearErrors()}>
+        Clear All Errors
+      </button>
+      <input type="submit" />
+    </form>
+  )
+}
+
+----------------------------------------
+
+TITLE: Implementing Single Error Message with ErrorMessage in JavaScript
+DESCRIPTION: Example of using the ErrorMessage component to display a single error message in a React form with JavaScript. It demonstrates basic usage and render prop pattern.
+
+LANGUAGE: javascript
+CODE:
+import React from "react"
+import { useForm } from "react-hook-form"
+import { ErrorMessage } from "@hookform/error-message"
+
+export default function App() {
+  const {
+    register,
+    formState: { errors },
+    handleSubmit,
+  } = useForm()
+  const onSubmit = (data) => console.log(data)
+
+  return (
+    <form onSubmit={handleSubmit(onSubmit)}>
+      <input
+        {...register("singleErrorInput", { required: "This is required." })}
+      />
+      <ErrorMessage errors={errors} name="singleErrorInput" />
+
+      <ErrorMessage
+        errors={errors}
+        name="singleErrorInput"
+        render={({ message }) => <p>{message}</p>}
+      />
+
+      <input type="submit" />
+    </form>
+  )
+}
+
+----------------------------------------
+
+TITLE: Field Array Watching Implementation
+DESCRIPTION: Implementation of watch functionality with useFieldArray hook to monitor dynamic form fields. Demonstrates how to track arrays of form inputs with add/remove capabilities.
+
+LANGUAGE: typescript
+CODE:
+import * as React from "react"
+import { useForm, useFieldArray } from "react-hook-form"
+
+type FormValues = {
+  test: {
+    firstName: string
+    lastName: string
+  }[]
+}
+
+function App() {
+  const { register, control, handleSubmit, watch } = useForm<FormValues>()
+  const { fields, remove, append } = useFieldArray({
+    name: "test",
+    control,
+  })
+  const onSubmit = (data: FormValues) => console.log(data)
+
+  console.log(watch("test"))
+
+  return (
+    <form onSubmit={handleSubmit(onSubmit)}>
+      {fields.map((field, index) => {
+        return (
+          <div key={field.id}>
+            <input
+              defaultValue={field.firstName}
+              {...register(`test.${index}.firstName`)}
+            />
+            <input
+              defaultValue={field.lastName}
+              {...register(`test.${index}.lastName`)}
+            />
+            <button type="button" onClick={() => remove(index)}>
+              Remove
+            </button>
+          </div>
+        )
+      })}
+      <button
+        type="button"
+        onClick={() =>
+          append({
+            firstName: "bill" + renderCount,
+            lastName: "luo" + renderCount,
+          })
+        }
+      >
+        Append
+      </button>
+    </form>
+  )
+}
+
+----------------------------------------
+
+TITLE: Implementing Form Component in React Web with react-hook-form
+DESCRIPTION: This example shows how to use the Form component in a React Web application. It demonstrates form submission handling, error management, and both automatic and manual submission approaches.
+
+LANGUAGE: javascript
+CODE:
+import { useForm, Form } from "react-hook-form"
+
+function App() {
+  const {
+    control,
+
+    register,
+
+    formState: { isSubmitSuccessful, errors },
+  } = useForm({
+    // progressive: true, optional prop for progressive enhancement
+  })
+
+  return (
+    <div>
+      // Use action prop to make post submission with formData
+      <Form
+        action="/api"
+        control={control}
+        onSuccess={() => {
+          alert("Success")
+        }}
+        onError={() => {
+          alert("error")
+        }}
+      >
+        {" "}
+        <input {...register("name")} />
+        {isSubmitSuccessful && <p>Form submit successful.</p>}
+        {errors?.root?.server && <p>Form submit failed.</p>}
+        <button>submit</button>
+      </Form>
+      // Manual form submission
+      <Form
+        onSubmit={async ({ formData, data, formDataJson, event }) => {
+          await fetch("api", {
+            method: "post",
+
+            body: formData,
+          })
+        }}
+      >
+        {" "}
+        <input {...register("test")} /> <button>submit</button>
+      </Form>
+    </div>
+  )
+}
+
+----------------------------------------
+
+TITLE: Implementing Form Component in React Native with react-hook-form
+DESCRIPTION: This example demonstrates how to use the Form component in a React Native application. It shows how to handle form submission and display success or error messages using the render prop pattern.
+
+LANGUAGE: javascript
+CODE:
+import { useForm, Form } from "react-hook-form"
+function App() {
+  const {
+    control,
+    register,
+    formState: { isSubmitSuccessful, errors },
+  } = useForm()
+  return (
+    <Form
+      action="/api"
+      control={control}
+      render={({ submit }) => {
+        ;<View>
+          {isSubmitSuccessful && <Text>Form submit successful.</Text>}
+
+          {errors?.root?.server && <Text>Form submit failed.</Text>}
+          <Button onPress={() => submit()} />
+        </View>
+      }}
+    />
+  )
+}
+
+----------------------------------------
+
+TITLE: Using getFieldState in React Hook Form
+DESCRIPTION: This example demonstrates how to use the getFieldState method in a React component with React Hook Form. It shows form initialization, field registration, and accessing field state.
+
+LANGUAGE: javascript
+CODE:
+import * as React from "react"
+
+import { useForm } from "react-hook-form"
+
+export default function App() {
+  const {
+    register,
+    getFieldState,
+    formState: { isDirty, isValid },
+  } = useForm({
+    mode: "onChange",
+
+    defaultValues: {
+      firstName: "",
+    },
+  })
+
+  // you can invoke before render or within the render function
+
+  const fieldState = getFieldState("firstName")
+
+  return (
+    <form>
+      <input {...register("firstName", { required: true })} />{" "}
+      <p>{getFieldState("firstName").isDirty && "dirty"}</p>{" "}
+      <p>{getFieldState("firstName").isTouched && "touched"}</p>
+      <button
+        type="button"
+        onClick={() => console.log(getFieldState("firstName"))}
+      >
+        field state
+      </button>
+    </form>
+  )
+}
+
+----------------------------------------
+
+TITLE: Unregistering Inputs in React Hook Form
+DESCRIPTION: This example demonstrates how to use the unregister method in a React component. It shows registering an input field and then providing a button to unregister it.
+
+LANGUAGE: typescript
+CODE:
+import React, { useEffect } from "react"
+import { useForm } from "react-hook-form"
+
+interface IFormInputs {
+  firstName: string
+  lastName?: string
+}
+
+export default function App() {
+  const { register, handleSubmit, unregister } = useForm<IFormInputs>()
+  const onSubmit = (data: IFormInputs) => console.log(data)
+
+  React.useEffect(() => {
+    register("lastName")
+  }, [register])
+
+  return (
+    <form onSubmit={handleSubmit(onSubmit)}>
+      <button type="button" onClick={() => unregister("lastName")}>
+        unregister
+      </button>
+      <input type="submit" />
+    </form>
+  )
+}
+
+LANGUAGE: javascript
+CODE:
+import React, { useEffect } from "react"
+import { useForm } from "react-hook-form"
+
+export default function App() {
+  const { register, handleSubmit, unregister } = useForm()
+
+  React.useEffect(() => {
+    register("lastName")
+  }, [register])
+
+  return (
+    <form>
+      <button type="button" onClick={() => unregister("lastName")}>
+        unregister
+      </button>
+      <input type="submit" />
+    </form>
+  )
+}
+
+----------------------------------------
+
+TITLE: Demonstrating getValues Usage in React Hook Form
+DESCRIPTION: This snippet shows how to use the getValues method to retrieve form values in different ways. It demonstrates getting all values, a single value, and multiple values.
+
+LANGUAGE: typescript
+CODE:
+import React from "react"
+import { useForm } from "react-hook-form"
+
+type FormInputs = {
+  test: string
+  test1: string
+}
+
+export default function App() {
+  const { register, getValues } = useForm<FormInputs>()
+
+  return (
+    <form>
+      <input {...register("test")} />
+      <input {...register("test1")} />
+
+      <button
+        type="button"
+        onClick={() => {
+          const values = getValues() // { test: "test-input", test1: "test1-input" }
+          const singleValue = getValues("test") // "test-input"
+          const multipleValues = getValues(["test", "test1"]) // ["test-input", "test1-input"]
+        }}
+      >
+        Get Values
+      </button>
+    </form>
+  )
+}
+
+----------------------------------------
+
+TITLE: Demonstrating isDirty behavior with setValue in React Hook Form
+DESCRIPTION: This snippet illustrates how the isDirty state behaves when using setValue in React Hook Form. It shows that isDirty becomes true when a value is changed, but false when it's set back to the default value.
+
+LANGUAGE: javascript
+CODE:
+const {
+  formState: { isDirty, dirtyFields },
+  setValue
+} = useForm({ defaultValues: { test: "" } })
+
+// isDirty: true ✅
+setValue('test', 'change')
+
+// isDirty: false because there getValues() === defaultValues ❌
+setValue('test', '')
+
+----------------------------------------
+
+TITLE: Basic setValue Usage in React Hook Form
+DESCRIPTION: Demonstrates basic usage of setValue to update form field values with and without validation options.
+
+LANGUAGE: javascript
+CODE:
+import { useForm } from "react-hook-form"
+
+const App = () => {
+  const { register, setValue } = useForm({
+    firstName: "",
+  })
+
+  return (
+    <form>
+      <input {...register("firstName", { required: true })} />
+      <button onClick={() => setValue("firstName", "Bill")}>setValue</button>
+      <button
+        onClick={() =>
+          setValue("firstName", "Luo", {
+            shouldValidate: true,
+            shouldDirty: true,
+          })
+        }
+      >
+        setValue options
+      </button>
+    </form>
+  )
+}
+
+----------------------------------------
+
+TITLE: Setting Single Error in React Hook Form
+DESCRIPTION: Demonstrates how to set a single manual error on a form input using setError. Shows implementation in both TypeScript and JavaScript with proper type definitions and error handling.
+
+LANGUAGE: typescript
+CODE:
+import * as React from "react"
+import { useForm } from "react-hook-form"
+
+type FormInputs = {
+  username: string
+}
+
+const App = () => {
+  const {
+    register,
+    handleSubmit,
+    setError,
+    formState: { errors },
+  } = useForm<FormInputs>()
+  const onSubmit = (data: FormInputs) => {
+    console.log(data)
+  }
+
+  React.useEffect(() => {
+    setError("username", {
+      type: "manual",
+      message: "Dont Forget Your Username Should Be Cool!",
+    })
+  }, [setError])
+
+  return (
+    <form onSubmit={handleSubmit(onSubmit)}>
+      <input {...register("username")} />
+      {errors.username && <p>{errors.username.message}</p>}
+
+      <input type="submit" />
+    </form>
+  )
+}
+
+----------------------------------------
+
+TITLE: Resetting Controlled Form with React Hook Form and Material-UI (TypeScript)
+DESCRIPTION: Illustrates how to use the reset function with controlled components using React Hook Form and Material-UI TextField in TypeScript.
+
+LANGUAGE: typescript
+CODE:
+import React from "react"
+import { useForm, Controller } from "react-hook-form"
+import { TextField } from "@material-ui/core"
+
+interface IFormInputs {
+  firstName: string
+  lastName: string
+}
+
+export default function App() {
+  const { register, handleSubmit, reset, setValue, control } =
+    useForm<IFormInputs>()
+  const onSubmit = (data: IFormInputs) => console.log(data)
+
+  return (
+    <form onSubmit={handleSubmit(onSubmit)}>
+      <Controller
+        render={({ field }) => <TextField {...field} />}
+        name="firstName"
+        control={control}
+        rules={{ required: true }}
+        defaultValue=""
+      />
+      <Controller
+        render={({ field }) => <TextField {...field} />}
+        name="lastName"
+        control={control}
+        defaultValue=""
+      />
+
+      <input type="submit" />
+      <input type="button" onClick={reset} />
+      <input
+        type="button"
+        onClick={() => {
+          reset({
+            firstName: "bill",
+            lastName: "luo",
+          })
+        }}
+      />
+    </form>
+  )
+}
+
+----------------------------------------
+
+TITLE: Using useWatch with TypeScript in React Hook Form
+DESCRIPTION: This example demonstrates how to use the useWatch hook with TypeScript in a React component. It shows how to watch a specific form field and render its value in a child component.
+
+LANGUAGE: typescript
+CODE:
+import React from "react"
+import { useForm, useWatch } from "react-hook-form"
+
+interface FormInputs {
+  firstName: string
+  lastName: string
+}
+
+function FirstNameWatched({ control }: { control: Control<FormInputs> }) {
+  const firstName = useWatch({
+    control,
+    name: "firstName", // without supply name will watch the entire form, or ['firstName', 'lastName'] to watch both
+    defaultValue: "default", // default value before the render
+  })
+
+  return <p>Watch: {firstName}</p> // only re-render at the custom hook level, when firstName changes
+}
+
+function App() {
+  const { register, control, handleSubmit } = useForm<FormInputs>()
+
+  const onSubmit = (data: FormInputs) => {
+    console.log(data)
+  }
+
+  return (
+    <form onSubmit={handleSubmit(onSubmit)}>
+      <label>First Name:</label>
+      <input {...register("firstName")} />
+      <input {...register("lastName")} />
+      <input type="submit" />
+
+      <FirstNameWatched control={control} />
+    </form>
+  )
+}
+
+----------------------------------------
+
+TITLE: Resetting Form with useFieldArray in React Hook Form
+DESCRIPTION: Demonstrates how to use the reset function with useFieldArray in React Hook Form. It shows resetting an array of form fields and handling dynamic form inputs.
+
+LANGUAGE: javascript
+CODE:
+import React, { useEffect } from "react"
+import { useForm, useFieldArray, Controller } from "react-hook-form"
+
+function App() {
+  const { register, control, handleSubmit, reset } = useForm({
+    defaultValues: {
+      loadState: "unloaded",
+      names: [{ firstName: "Bill", lastName: "Luo" }],
+    },
+  })
+  const { fields, remove } = useFieldArray({
+    control,
+    name: "names",
+  })
+
+  useEffect(() => {
+    reset({
+      names: [
+        {
+          firstName: "Bob",
+          lastName: "Actually",
+        },
+        {
+          firstName: "Jane",
+          lastName: "Actually",
+        },
+      ],
+    })
+  }, [reset])
+
+  const onSubmit = (data) => console.log("data", data)
+
+  return (
+    <form onSubmit={handleSubmit(onSubmit)}>
+      <ul>
+        {fields.map((item, index) => (
+          <li key={item.id}>
+            <input {...register(`names.${index}.firstName`)} />
+
+            <Controller
+              render={({ field }) => <input {...field} />}
+              name={`names.${index}.lastName`}
+              control={control}
+            />
+            <button type="button" onClick={() => remove(index)}>
+              Delete
+            </button>
+          </li>
+        ))}
+      </ul>
+
+      <input type="submit" />
+    </form>
+  )
+}
+
+----------------------------------------
+
+TITLE: Basic Field Reset Implementation in React Hook Form
+DESCRIPTION: Demonstrates basic usage of resetField to clear a form field's value and state. Shows interaction with form states like isDirty and isValid.
+
+LANGUAGE: javascript
+CODE:
+import * as React from "react"
+import { useForm } from "react-hook-form"
+
+export default function App() {
+  const {
+    register,
+    resetField,
+    formState: { isDirty, isValid },
+  } = useForm({
+    mode: "onChange",
+    defaultValues: {
+      firstName: "",
+    },
+  })
+  const handleClick = () => resetField("firstName")
+
+  return (
+    <form>
+      <input {...register("firstName", { required: true })} />
+
+      <p>{isDirty && "dirty"}</p>
+      <p>{isValid && "valid"}</p>
+
+      <button type="button" onClick={handleClick}>
+        Reset
+      </button>
+    </form>
+  )
+}
+
+----------------------------------------
+
+TITLE: Custom Async Validation with React Hook Form
+DESCRIPTION: Shows how to implement custom asynchronous validation logic using the register method's validate option.
+
+LANGUAGE: javascript
+CODE:
+import { useForm } from "react-hook-form"
+import { checkProduct } from "./service"
+
+export default function App() {
+  const { register, handleSubmit } = useForm()
+
+  return (
+    <form onSubmit={handleSubmit(console.log)}>
+      <select
+        {...register("category", {
+          required: true,
+        })}
+      >
+        <option value="">Select...</option>
+        <option value="A">Category A</option>
+        <option value="B">Category B</option>
+      </select>
+
+      <input
+        type="text"
+        {...register("product", {
+          validate: {
+            checkAvailability: async (product, { category }) => {
+              if (!category) return "Choose a category"
+              if (!product) return "Specify your product"
+              const isInStock = await checkProduct(category, product)
+              return isInStock || "There is no such product"
+            },
+          },
+        })}
+      />
+
+      <input type="submit" />
+    </form>
+  )
+}
+
+----------------------------------------
+
+TITLE: Using useForm with External Values
+DESCRIPTION: Demonstrates how to use the values prop to update form values from external state or server data.
+
+LANGUAGE: javascript
+CODE:
+// set default value sync
+function App({ values }) {
+  useForm({
+    values, // will get updated when values props updates
+  })
+}
+
+function App() {
+  const values = useFetch("/api")
+
+  useForm({
+    defaultValues: {
+      firstName: "",
+      lastName: "",
+    },
+    values, // will get updated once values returns
+  })
+}
+
+----------------------------------------
+
+TITLE: Configuring useForm with Native Validation
+DESCRIPTION: Shows how to enable browser native validation using the shouldUseNativeValidation option.
+
+LANGUAGE: javascript
+CODE:
+import { useForm } from "react-hook-form"
+
+export default function App() {
+  const { register, handleSubmit } = useForm({
+    shouldUseNativeValidation: true,
+  })
+  const onSubmit = async (data) => {
+    console.log(data)
+  }
+
+  return (
+    <form onSubmit={handleSubmit(onSubmit)}>
+      <input
+        {...register("firstName", {
+          required: "Please enter your first name.",
+        })} // custom message
+      />
+      <input type="submit" />
+    </form>
+  )
+}
+
+----------------------------------------
+
+TITLE: Using useForm with a Custom Resolver
+DESCRIPTION: Demonstrates how to use a custom resolver function for form validation.
+
+LANGUAGE: typescript
+CODE:
+import * as React from "react"
+import { useForm } from "react-hook-form"
+import * as Joi from "joi"
+
+interface IFormInputs {
+  username: string
+}
+
+const validationSchema = Joi.object({
+  username: Joi.string().alphanum().min(3).max(30).required(),
+})
+
+const App = () => {
+  const {
+    register,
+    handleSubmit,
+    formState: { errors },
+  } = useForm<IFormInputs>({
+    resolver: async (data) => {
+      const { error, value: values } = validationSchema.validate(data, {
+        abortEarly: false,
+      })
+
+      return {
+        values: error ? {} : values,
+        errors: error
+          ? error.details.reduce((previous, currentError) => {
+              return {
+                ...previous,
+                [currentError.path[0]]: currentError,
+              }
+            }, {})
+          : {},
+      }
+    },
+  })
+
+  const onSubmit = (data: IFormInputs) => console.log(data)
+
+  return (
+    <div className="App">
+      <h1>resolver</h1>
+
+      <form onSubmit={handleSubmit(onSubmit)}>
+        <label>Username</label>
+        <input {...register("username")} />
+        {errors.username && <p>errors.username.message</p>}
+        <input type="submit" />
+      </form>
+    </div>
+  )
+}
+
+----------------------------------------
+
+TITLE: Setting up createFormControl in React Hook Form
+DESCRIPTION: This snippet demonstrates how to set up and use the createFormControl function in a React component. It shows the creation of form control, usage with useForm hook, and integration with other form components.
+
+LANGUAGE: javascript
+CODE:
+const { formControl, control, handleSubmit, register } = createFormControl({
+  mode: 'onChange',
+  defaultValues: {
+    firstName: 'Bill'
+  }
+}})
+
+function App() {
+  useForm({
+    formControl,
+  })
+
+  return (
+    <form onSubmit={handleSubmit(data => console.log)}>
+      <input {...register('name')} />
+      <FormState />
+      <Controller />
+    </form>
+  );
+}
+
+function FormState() {
+  useFormState({
+    control // no longer need context api
+  })
+}
+
+function Controller() {
+  useFormState({
+    control // no longer need context api
+  })
+}
+
+----------------------------------------
+
+TITLE: Subscribing to Form State Changes with createFormControl in React Hook Form
+DESCRIPTION: This example shows how to subscribe to form state changes using the createFormControl function. It demonstrates setting up a subscription callback and using the formControl in a React component.
+
+LANGUAGE: javascript
+CODE:
+const { formControl, register } = createFormControl(props)
+
+formControl.subscribe({
+  formState: {
+    isDirty: true,
+    values: true,
+  },
+  callback: (formState) => {
+    if (formState.isDirty) {
+      // do something here
+    }
+
+    if (formState.values.test.length > 3) {
+      // do something here
+    }
+  },
+})
+
+function App() {
+  const { register } = useForm({
+    formControl,
+  })
+
+  return (
+    <form>
+      <input {...register("test")} />
+    </form>
+  )
+}
+
+----------------------------------------
+
+TITLE: Implementing Custom Form Resolver in TypeScript
+DESCRIPTION: Example of creating a custom form resolver with validation logic using react-hook-form's Resolver type
+
+LANGUAGE: typescript
+CODE:
+import React from "react"
+import { useForm, Resolver } from "react-hook-form"
+
+type FormValues = {
+  firstName: string
+  lastName: string
+}
+
+const resolver: Resolver<FormValues> = async (values) => {
+  return {
+    values: values.firstName ? values : {},
+    errors: !values.firstName
+      ? {
+          firstName: {
+            type: "required",
+            message: "This is required.",
+          },
+        }
+      : {},
+  }
+}
+
+----------------------------------------
+
+TITLE: Form Submission Handler Type Implementation
+DESCRIPTION: Demonstration of strongly-typed form submission handling using SubmitHandler type
+
+LANGUAGE: typescript
+CODE:
+import React from "react"
+import { useForm, SubmitHandler } from "react-hook-form"
+
+type FormValues = {
+  firstName: string
+  lastName: string
+  email: string
+}
+
+export default function App() {
+  const { register, handleSubmit } = useForm<FormValues>()
+  const onSubmit: SubmitHandler<FormValues> = (data) => console.log(data)
+
+  return (
+    <form onSubmit={handleSubmit(onSubmit)}>
+      <input {...register("firstName")} />
+      <input {...register("lastName")} />
+      <input type="email" {...register("email")} />
+
+      <input type="submit" />
+    </form>
+  )
+}
+
+----------------------------------------
+
+TITLE: Form Control Type Usage
+DESCRIPTION: Example of using Control type for form state management and re-render isolation
+
+LANGUAGE: typescript
+CODE:
+import { useForm, useWatch, Control } from "react-hook-form"
+
+type FormValues = {
+  firstName: string
+  lastName: string
+}
+
+function IsolateReRender({ control }: { control: Control<FormValues> }) {
+  const firstName = useWatch({
+    control,
+    name: "firstName",
+    defaultValue: "default",
+  })
+
+  return <div>{firstName}</div>
+}
+
+----------------------------------------
+
+TITLE: Implementing Multiple Error Messages with ErrorMessage in TypeScript
+DESCRIPTION: Example of using the ErrorMessage component to display multiple error messages in a React form with TypeScript. It demonstrates advanced usage with criteriaMode set to 'all'.
+
+LANGUAGE: typescript
+CODE:
+import React from "react"
+import { useForm } from "react-hook-form"
+import { ErrorMessage } from "@hookform/error-message"
+
+interface FormInputs {
+  multipleErrorInput: string
+}
+
+export default function App() {
+  const {
+    register,
+    formState: { errors },
+    handleSubmit,
+  } = useForm<FormInputs>({
+    criteriaMode: "all",
+  })
+  const onSubmit = (data: FormInputs) => console.log(data)
+
+  return (
+    <form onSubmit={handleSubmit(onSubmit)}>
+      <input
+        {...register("multipleErrorInput", {
+          required: "This is required.",
+          pattern: {
+            value: /d+/,
+            message: "This input is number only.",
+          },
+          maxLength: {
+            value: 10,
+            message: "This input exceed maxLength.",
+          },
+        })}
+      />
+      <ErrorMessage
+        errors={errors}
+        name="multipleErrorInput"
+        render={({ messages }) =>
+          messages &&
+          Object.entries(messages).map(([type, message]) => (
+            <p key={type}>{message}</p>
+          ))
+        }
+      />
+
+      <input type="submit" />
+    </form>
+  )
+}
+
+----------------------------------------
+
+TITLE: Implementing Multiple Error Messages with ErrorMessage in JavaScript
+DESCRIPTION: Example of using the ErrorMessage component to display multiple error messages in a React form with JavaScript. It demonstrates advanced usage with criteriaMode set to 'all'.
+
+LANGUAGE: javascript
+CODE:
+import { useForm } from "react-hook-form";
+import { ErrorMessage } from '@hookform/error-message';
+
+
+export default function App() {
+  const { register, formState: { errors }, handleSubmit } = useForm({
+    criteriaMode: "all"
+  });
+  const onSubmit = data => console.log(data);
+
+  return (
+    <form onSubmit={handleSubmit(onSubmit)}>
+      <input
+        {...register("multipleErrorInput", {
+          required: "This is required.",
+          pattern: {
+            value: /d+/,
+            message: "This input is number only."
+          },
+          maxLength: {
+            value: 10,
+            message: "This input exceed maxLength."
+          }
+        })}
+      />
+      <ErrorMessage
+        errors={errors}
+        name="multipleErrorInput"
+        render={({ messages }) =>
+          messages &&
+          Object.entries(messages).map(([type, message]) => (
+            <p key={type}>{message}</p>
+          ))
+        }
+      />
+
+
+      <input type="submit" />
+    </form>
+  );
+}
+
+----------------------------------------
+
+TITLE: Using useFormState hook in React Hook Form
+DESCRIPTION: This example shows how to use the useFormState hook to subscribe to form state updates in a child component, specifically tracking the dirtyFields state of a firstName input.
+
+LANGUAGE: javascript
+CODE:
+import { useForm, useFormState } from "react-hook-form"
+
+function Child({ control }) {
+  const { dirtyFields } = useFormState({ control })
+
+  return dirtyFields.firstName ? <p>Field is dirty.</p> : null
+}
+
+export default function App() {
+  const { register, handleSubmit, control } = useForm({
+    defaultValues: {
+      firstName: "firstName",
+    },
+  })
+  const onSubmit = (data) => console.log(data)
+
+  return (
+    <form onSubmit={handleSubmit(onSubmit)}>
+      <input {...register("firstName")} placeholder="First Name" />
+      <Child control={control} />
+
+      <input type="submit" />
+    </form>
+  )
+}
+
+----------------------------------------
+
+TITLE: Using Controller in React Native
+DESCRIPTION: This example demonstrates how to use the Controller component in a React Native application. It shows form handling with multiple inputs and validation rules.
+
+LANGUAGE: javascript
+CODE:
+import { Text, View, TextInput, Button, Alert } from "react-native"
+import { useForm, Controller } from "react-hook-form"
+
+export default function App() {
+  const {
+    control,
+    handleSubmit,
+    formState: { errors },
+  } = useForm({
+    defaultValues: {
+      firstName: "",
+      lastName: "",
+    },
+  })
+  const onSubmit = (data) => console.log(data)
+
+  return (
+    <View>
+      <Controller
+        control={control}
+        rules={{
+          required: true,
+        }}
+        render={({ field: { onChange, onBlur, value } }) => (
+          <TextInput
+            placeholder="First name"
+            onBlur={onBlur}
+            onChangeText={onChange}
+            value={value}
+          />
+        )}
+        name="firstName"
+      />
+      {errors.firstName && <Text>This is required.</Text>}
+
+      <Controller
+        control={control}
+        rules={{
+          maxLength: 100,
+        }}
+        render={({ field: { onChange, onBlur, value } }) => (
+          <TextInput
+            placeholder="Last name"
+            onBlur={onBlur}
+            onChangeText={onChange}
+            value={value}
+          />
+        )}
+        name="lastName"
+      />
+
+      <Button title="Submit" onPress={handleSubmit(onSubmit)} />
+    </View>
+  )
+}
+
+----------------------------------------
+
+TITLE: Using getValues in JavaScript with React Hook Form
+DESCRIPTION: This example demonstrates how to use the getValues method in a JavaScript React component. It shows retrieving all form values, a single value, and multiple values.
+
+LANGUAGE: javascript
+CODE:
+import { useForm } from "react-hook-form"
+
+export default function App() {
+  const { register, getValues } = useForm()
+
+  return (
+    <form>
+      <input {...register("test")} />
+      <input {...register("test1")} />
+
+      <button
+        type="button"
+        onClick={() => {
+          const values = getValues() // { test: "test-input", test1: "test1-input" }
+          const singleValue = getValues("test") // "test-input"
+          const multipleValues = getValues(["test", "test1"])
+          // ["test-input", "test1-input"]
+        }}
+      >
+        Get Values
+      </button>
+    </form>
+  )
+}
+
+----------------------------------------
+
+TITLE: TypeScript Definitions for getValues in React Hook Form
+DESCRIPTION: This snippet provides TypeScript definitions for using getValues with different input types, including flat and nested input values. It demonstrates type inference for various getValues calls.
+
+LANGUAGE: typescript
+CODE:
+import React from "react"
+import { useForm } from "react-hook-form"
+
+// Flat input values
+type Inputs = {
+  key1: string
+  key2: number
+  key3: boolean
+  key4: Date
+}
+
+export default function App() {
+  const { register, getValues } = useForm<Inputs>()
+
+  getValues()
+
+  return <form />
+}
+
+// Nested input values
+type Inputs1 = {
+  key1: string
+  key2: number
+  key3: {
+    key1: number
+    key2: boolean
+  }
+  key4: string[]
+}
+
+export default function Form() {
+  const { register, getValues } = useForm<Inputs1>()
+
+  getValues()
+  // function getValues(): Record<string, unknown>
+  getValues("key1")
+  // function getValues<"key1", unknown>(payload: "key1"): string
+  getValues("key2")
+  // function getValues<"key2", unknown>(payload: "key2"): number
+  getValues("key3.key1")
+  // function getValues<"key3.key1", unknown>(payload: "key3.key1"): unknown
+  getValues<string, number>("key3.key1")
+  // function getValues<string, number>(payload: string): number
+  getValues<string, boolean>("key3.key2")
+  // function getValues<string, boolean>(payload: string): boolean
+  getValues("key4")
+  // function getValues<"key4", unknown>(payload: "key4"): string[]
+
+  return <form />
+}
+
+----------------------------------------
+
+TITLE: Sharing Ref Usage in React Hook Form
+DESCRIPTION: This snippet demonstrates how to share ref usage between React Hook Form and other purposes like scrolling or focusing. It uses useImperativeHandle to create a custom ref.
+
+LANGUAGE: typescript
+CODE:
+import { useRef, useImperativeHandle } from "react"
+import { useForm } from "react-hook-form"
+
+type Inputs = {
+  firstName: string
+  lastName: string
+}
+
+export default function App() {
+  const { register, handleSubmit } = useForm<Inputs>()
+  const firstNameRef = useRef<HTMLInputElement>(null)
+  const onSubmit = (data: Inputs) => console.log(data)
+  const { ref, ...rest } = register("firstName")
+  const onClick = () => {
+    firstNameRef.current!.value = ""
+  }
+
+  useImperativeHandle(ref, () => firstNameRef.current)
+
+  return (
+    <form onSubmit={handleSubmit(onSubmit)}>
+      <input {...rest} ref={firstNameRef} />
+      <button type="button" onClick={onClick}>
+        clear
+      </button>
+      <button>Submit</button>
+    </form>
+  )
+}
+
+----------------------------------------
+
+TITLE: Using React Hook Form without Ref Access
+DESCRIPTION: This example shows how to use React Hook Form when you don't have access to the ref. It manually registers inputs and uses setValue and setError to update values and errors.
+
+LANGUAGE: javascript
+CODE:
+import React, { useEffect } from "react"
+import { useForm } from "react-hook-form"
+
+export default function App() {
+  const { register, handleSubmit, setValue, setError } = useForm()
+  const onSubmit = (data) => console.log(data)
+
+  useEffect(() => {
+    register("firstName", { required: true })
+    register("lastName")
+  }, [])
+
+  return (
+    <form onSubmit={handleSubmit(onSubmit)}>
+      <input
+        name="firstName"
+        onChange={(e) => setValue("firstName", e.target.value)}
+      />
+      <input
+        name="lastName"
+        onChange={(e) => {
+          const value = e.target.value
+          if (value === "test") {
+            setError("lastName", "notMatch")
+          } else {
+            setValue("lastName", e.target.value)
+          }
+        }}
+      />
+      <button>Submit</button>
+    </form>
+  )
+}
+
+----------------------------------------
+
+TITLE: Implementing Modal or Tab Forms with React Hook Form
+DESCRIPTION: This snippet demonstrates how to work with modal or tab forms using React Hook Form. It shows two approaches: using Controller and custom register with useEffect.
+
+LANGUAGE: javascript
+CODE:
+import { useForm, Controller } from "react-hook-form"
+
+function App() {
+  const { control } = useForm()
+
+  return (
+    <Controller
+      render={({ field }) => <input {...field} />}
+      name="firstName"
+      control={control}
+      defaultValue=""
+    />
+  )
+}
+
+LANGUAGE: javascript
+CODE:
+import React, { useEffect } from "react"
+import { useForm } from "react-hook-form"
+
+function App() {
+  const { register, watch, setValue, handleSubmit } = useForm({
+    defaultValues: {
+      firstName: "",
+      lastName: "",
+    },
+  })
+  const { firstName, lastName } = watch()
+
+  useEffect(() => {
+    register("firstName")
+    register("lastName")
+  }, [register])
+
+  const handleChange = (e, name) => {
+    setValue(name, e.target.value)
+  }
+
+  const onSubmit = (data) => console.log(data)
+
+  return (
+    <form onSubmit={handleSubmit(onSubmit)}>
+      <input onChange={(e) => handleChange(e, "firstName")} value={firstName} />
+
+      <input onChange={(e) => handleChange(e, "lastName")} value={lastName} />
+      <input type="submit" />
+    </form>
+  )
+}
+
+----------------------------------------
+
+TITLE: Installing React Hook Form with npm
+DESCRIPTION: Command to install React Hook Form using npm package manager.
+
+LANGUAGE: bash
+CODE:
+npm install react-hook-form
+
+----------------------------------------
+
+TITLE: Basic React Hook Form Usage in JavaScript
+DESCRIPTION: Shows the same basic usage example as above, but in JavaScript syntax.
+
+LANGUAGE: javascript
+CODE:
+import { useForm } from "react-hook-form"
+
+export default function App() {
+  const {
+    register,
+    handleSubmit,
+    watch,
+    formState: { errors },
+  } = useForm()
+
+  const onSubmit = (data) => console.log(data)
+
+  console.log(watch("example")) // watch input value by passing the name of it
+
+  return (
+    /* "handleSubmit" will validate your inputs before invoking "onSubmit" */
+    <form onSubmit={handleSubmit(onSubmit)}>
+      {/* register your input into the hook by invoking the "register" function */}
+      <input defaultValue="test" {...register("example")} />
+
+      {/* include validation with required or other standard HTML validation rules */}
+      <input {...register("exampleRequired", { required: true })} />
+      {/* errors will return when field validation fails  */}
+      {errors.exampleRequired && <span>This field is required</span>}
+
+      <input type="submit" />
+    </form>
+  )
+}
+
+----------------------------------------
+
+TITLE: Integrating with UI Libraries using Controller in TypeScript
+DESCRIPTION: Shows how to integrate React Hook Form with external UI component libraries using the Controller component in TypeScript.
+
+LANGUAGE: typescript
+CODE:
+import Select from "react-select"
+import { useForm, Controller, SubmitHandler } from "react-hook-form"
+import { Input } from "@material-ui/core"
+
+interface IFormInput {
+  firstName: string
+  lastName: string
+  iceCreamType: { label: string; value: string }
+}
+
+const App = () => {
+  const { control, handleSubmit } = useForm({
+    defaultValues: {
+      firstName: "",
+      lastName: "",
+      iceCreamType: {},
+    },
+  })
+
+  const onSubmit: SubmitHandler<IFormInput> = (data) => {
+    console.log(data)
+  }
+
+  return (
+    <form onSubmit={handleSubmit(onSubmit)}>
+      <Controller
+        name="firstName"
+        control={control}
+        render={({ field }) => <Input {...field} />}
+      />
+      <Controller
+        name="iceCreamType"
+        control={control}
+        render={({ field }) => (
+          <Select
+            {...field}
+            options={[
+              { value: "chocolate", label: "Chocolate" },
+              { value: "strawberry", label: "Strawberry" },
+              { value: "vanilla", label: "Vanilla" },
+            ]}
+          />
+        )}
+      />
+      <input type="submit" />
+    </form>
+  )
+}
+
+----------------------------------------
+
+TITLE: Installing and Running React Hook Form Development Environment
+DESCRIPTION: This snippet shows how to install dependencies and start the development environment for React Hook Form using pnpm package manager.
+
+LANGUAGE: shellscript
+CODE:
+pnpm install && pnpm dev
+
+----------------------------------------
+
+TITLE: Installing Dependencies for React Hook Form Docs
+DESCRIPTION: This command installs the necessary packages for the React Hook Form documentation project using pnpm.
+
+LANGUAGE: shellscript
+CODE:
+pnpm install
+
+----------------------------------------
+
+TITLE: Starting Local Development Server for React Hook Form Docs
+DESCRIPTION: This command starts a local development server for the React Hook Form documentation.
+
+LANGUAGE: shellscript
+CODE:
+pnpm run dev
+
+----------------------------------------
+
+TITLE: Formatting Code for React Hook Form Docs
+DESCRIPTION: This command runs the code formatter for the React Hook Form documentation project.
+
+LANGUAGE: shellscript
+CODE:
+pnpm run format
+
+----------------------------------------
+
+TITLE: Building Production Version of React Hook Form Docs
+DESCRIPTION: This command builds the production version of the React Hook Form documentation site.
+
+LANGUAGE: shellscript
+CODE:
+pnpm run build
+
+----------------------------------------
+
+TITLE: Starting Production Server for React Hook Form Docs
+DESCRIPTION: This command starts a local server to serve the production build of the React Hook Form documentation.
+
+LANGUAGE: shellscript
+CODE:
+pnpm run start
+
+----------------------------------------
+
+TITLE: Running Prettier for React Hook Form Docs
+DESCRIPTION: This command manually runs Prettier to format the code in the React Hook Form documentation project.
+
+LANGUAGE: shellscript
+CODE:
+pnpm run format:fix
+
+----------------------------------------
+
+TITLE: Installing ErrorMessage Component for React Hook Form
+DESCRIPTION: Command to install the ErrorMessage component from the @hookform/error-message package using npm.
+
+LANGUAGE: bash
+CODE:
+npm install @hookform/error-message

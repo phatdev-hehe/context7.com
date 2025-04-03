@@ -1,0 +1,3265 @@
+TITLE: Generating Validator Keypairs
+DESCRIPTION: Creates the necessary keypairs for validator identity, vote account, and authorized withdrawer.
+
+LANGUAGE: bash
+CODE:
+solana-keygen new -o validator-keypair.json
+solana-keygen new -o vote-account-keypair.json
+solana-keygen new -o authorized-withdrawer-keypair.json
+
+----------------------------------------
+
+TITLE: Updating Ubuntu System Packages
+DESCRIPTION: Commands to update and upgrade Ubuntu system packages to protect against security vulnerabilities. Should be run at least weekly to maintain system security.
+
+LANGUAGE: bash
+CODE:
+sudo apt update
+sudo apt upgrade
+
+----------------------------------------
+
+TITLE: Installing Agave Release on MacOS & Linux
+DESCRIPTION: This snippet shows how to install the latest Agave release using the Solana Install Tool on MacOS and Linux systems. It uses curl to download and execute the installation script.
+
+LANGUAGE: bash
+CODE:
+sh -c "$(curl -sSfL https://release.anza.xyz/LATEST_AGAVE_RELEASE_VERSION/install)"
+
+----------------------------------------
+
+TITLE: Configuring Linux System for Validator
+DESCRIPTION: Optimizes system settings for running a Solana validator, including sysctl parameters and file descriptor limits.
+
+LANGUAGE: bash
+CODE:
+sudo bash -c "cat >/etc/sysctl.d/21-agave-validator.conf <<EOF
+# Increase max UDP buffer sizes
+net.core.rmem_max = 134217728
+net.core.wmem_max = 134217728
+
+# Increase memory mapped files limit
+vm.max_map_count = 1000000
+
+# Increase number of allowed open file descriptors
+fs.nr_open = 1000000
+EOF"
+
+sudo sysctl -p /etc/sysctl.d/21-agave-validator.conf
+
+sudo bash -c "cat >/etc/security/limits.d/90-solana-nofiles.conf <<EOF
+# Increase process file descriptor count limit
+* - nofile 1000000
+EOF"
+
+----------------------------------------
+
+TITLE: Creating a Stake Account with Solana CLI
+DESCRIPTION: Create a new stake account using the Solana CLI. This command transfers tokens from an existing account to the new stake account and sets the stake and withdraw authorities.
+
+LANGUAGE: bash
+CODE:
+solana create-stake-account --from <KEYPAIR> stake-account.json <AMOUNT> \
+    --stake-authority <KEYPAIR> --withdraw-authority <KEYPAIR> \
+    --fee-payer <KEYPAIR>
+
+----------------------------------------
+
+TITLE: Starting Solana Validator
+DESCRIPTION: Launches the Solana validator with specified configuration options.
+
+LANGUAGE: bash
+CODE:
+agave-validator \
+  --identity ~/validator-keypair.json \
+  --vote-account ~/vote-account-keypair.json \
+  --rpc-port 8899 \
+  --entrypoint entrypoint.devnet.solana.com:8001 \
+  --limit-ledger-size \
+  --log ~/agave-validator.log
+
+----------------------------------------
+
+TITLE: Checking Gossip Network Visibility in Solana
+DESCRIPTION: This command checks if the validator's IP address and identity pubkey are visible in the Solana gossip network.
+
+LANGUAGE: bash
+CODE:
+solana gossip
+
+----------------------------------------
+
+TITLE: Creating Agave Validator Startup Script
+DESCRIPTION: Generates a bash script to start the Agave validator with the correct configuration for the Solana testnet.
+
+LANGUAGE: bash
+CODE:
+#!/bin/bash
+exec agave-validator \
+    --identity /home/sol/validator-keypair.json \
+    --vote-account /home/sol/vote-account-keypair.json \
+    --known-validator 5D1fNXzvv5NjV1ysLjirC4WY92RNsVH18vjmcszZd8on \
+    --known-validator 7XSY3MrYnK8vq693Rju17bbPkCN3Z7KvvfvJx4kdrsSY \
+    --known-validator Ft5fbkqNa76vnsjYNwjDZUXoTWpP7VYm3mtsaQckQADN \
+    --known-validator 9QxCLckBiJc783jnMvXZubK4wH86Eqqvashtrwvcsgkv \
+    --only-known-rpc \
+    --log /home/sol/agave-validator.log \
+    --ledger /mnt/ledger \
+    --accounts /mnt/accounts \
+    --rpc-port 8899 \
+    --dynamic-port-range 8000-8020 \
+    --entrypoint entrypoint.testnet.solana.com:8001 \
+    --entrypoint entrypoint2.testnet.solana.com:8001 \
+    --entrypoint entrypoint3.testnet.solana.com:8001 \
+    --expected-genesis-hash 4uhcVJyU9pJkvQyS88uRDiswHXSCkY3zQawwpjk2NsNY \
+    --wal-recovery-mode skip_any_corrupted_record \
+    --limit-ledger-size
+
+----------------------------------------
+
+TITLE: Launching Agave Validator for Mainnet Beta
+DESCRIPTION: Complete command-line configuration for launching an Agave validator node on Solana's Mainnet Beta with specified keypairs, ports, and known validators.
+
+LANGUAGE: bash
+CODE:
+agave-validator \
+    --identity ~/validator-keypair.json \
+    --vote-account ~/vote-account-keypair.json \
+    --known-validator 7Np41oeYqPefeNQEHSv1UDhYrehxin3NStELsSKCT4K2 \
+    --known-validator GdnSyH3YtwcxFvQrVVJMm1JhTS4QVX7MFsX56uJLUfiZ \
+    --known-validator DE1bawNcRJB9rVm3buyMVfr8mBEoyyu73NBovf2oXJsJ \
+    --known-validator CakcnaRDHka2gXyfbEd2d3xsvkJkqsLw2akB3zsN1D2S \
+    --only-known-rpc \
+    --ledger ledger \
+    --rpc-port 8899 \
+    --private-rpc \
+    --dynamic-port-range 8000-8020 \
+    --entrypoint entrypoint.mainnet-beta.solana.com:8001 \
+    --entrypoint entrypoint2.mainnet-beta.solana.com:8001 \
+    --entrypoint entrypoint3.mainnet-beta.solana.com:8001 \
+    --entrypoint entrypoint4.mainnet-beta.solana.com:8001 \
+    --entrypoint entrypoint5.mainnet-beta.solana.com:8001 \
+    --expected-genesis-hash 5eykt4UsFv8P8NJdTREpY1vzqKqZKvdpKuc147dw2N9d \
+    --wal-recovery-mode skip_any_corrupted_record \
+    --limit-ledger-size
+
+----------------------------------------
+
+TITLE: Creating Vote Account
+DESCRIPTION: Creates a vote account for the Solana validator on the blockchain.
+
+LANGUAGE: bash
+CODE:
+solana create-vote-account ~/vote-account-keypair.json ~/validator-keypair.json ~/authorized-withdrawer-keypair.json
+
+----------------------------------------
+
+TITLE: Retrieving Cluster Information via Solana JSON-RPC
+DESCRIPTION: These curl commands demonstrate how to use various JSON-RPC endpoints to monitor the validator and cluster health. They include getting cluster nodes, vote accounts, leader schedule, and epoch information.
+
+LANGUAGE: bash
+CODE:
+# Similar to solana-gossip, you should see your validator in the list of cluster nodes
+curl -X POST -H "Content-Type: application/json" -d '{"jsonrpc":"2.0","id":1, "method":"getClusterNodes"}' http://api.devnet.solana.com
+# If your validator is properly voting, it should appear in the list of `current` vote accounts. If staked, `stake` should be > 0
+curl -X POST -H "Content-Type: application/json" -d '{"jsonrpc":"2.0","id":1, "method":"getVoteAccounts"}' http://api.devnet.solana.com
+# Returns the current leader schedule
+curl -X POST -H "Content-Type: application/json" -d '{"jsonrpc":"2.0","id":1, "method":"getLeaderSchedule"}' http://api.devnet.solana.com
+# Returns info about the current epoch. slotIndex should progress on subsequent calls.
+curl -X POST -H "Content-Type: application/json" -d '{"jsonrpc":"2.0","id":1, "method":"getEpochInfo"}' http://api.devnet.solana.com
+
+----------------------------------------
+
+TITLE: Defining BlockedTransactionsQueue Struct in Rust
+DESCRIPTION: This code snippet defines a struct BlockedTransactionsQueue used to represent a heap of transactions that cannot be scheduled due to account lock conflicts.
+
+LANGUAGE: rust
+CODE:
+struct BlockedTransactionsQueue {
+    // The higher priority transaction blocking all the other transactions in
+    // `blocked_transactions` below
+    highest_priority_blocked_transaction: Transaction,
+    other_blocked_transactions: BinaryHeap<Transaction>
+}
+
+----------------------------------------
+
+TITLE: Monitoring Validator Catch Up in Solana
+DESCRIPTION: Use the 'catchup' command to monitor if your validator has caught up to the cluster. This is necessary before delegating stake.
+
+LANGUAGE: bash
+CODE:
+solana catchup ~/validator-keypair.json
+
+----------------------------------------
+
+TITLE: Creating Stake Account in Solana
+DESCRIPTION: Create a stake account with 1 SOL. This account will be used to delegate stake to your validator.
+
+LANGUAGE: bash
+CODE:
+solana create-stake-account ~/validator-stake-keypair.json 1
+
+----------------------------------------
+
+TITLE: Delegating Stake to Validator in Solana
+DESCRIPTION: Delegate the created stake to your validator using the stake keypair and vote account keypair.
+
+LANGUAGE: bash
+CODE:
+solana delegate-stake ~/validator-stake-keypair.json ~/vote-account-keypair.json
+
+----------------------------------------
+
+TITLE: Delegating Stake with Solana CLI
+DESCRIPTION: Delegate stake from a stake account to a validator's vote account using the stake authority.
+
+LANGUAGE: bash
+CODE:
+solana delegate-stake --stake-authority <KEYPAIR> <STAKE_ACCOUNT_ADDRESS> <VOTE_ACCOUNT_ADDRESS> \
+    --fee-payer <KEYPAIR>
+
+----------------------------------------
+
+TITLE: Checking Validator Balance in Solana
+DESCRIPTION: This command displays the account balance of the validator in lamports, allowing for detailed observation of balance changes due to transaction fees and rewards.
+
+LANGUAGE: bash
+CODE:
+solana balance --lamports
+
+----------------------------------------
+
+TITLE: Implementing Solana Geyser Plugin in Rust
+DESCRIPTION: Instructions for creating a plugin library that implements the GeyserPlugin trait. The plugin must be compiled as a cdylib and expose a _create_plugin() function in C for runtime integration. This enables custom handling of account updates and transaction processing in the Solana validator.
+
+LANGUAGE: rust
+CODE:
+// Required implementation:
+// 1. Implement GeyserPlugin trait
+// 2. Compile as cdylib
+// 3. Expose C function:
+fn _create_plugin() -> Box<dyn GeyserPlugin>
+
+----------------------------------------
+
+TITLE: Deactivating Stake with Solana CLI
+DESCRIPTION: Deactivate delegated stake using the stake authority. Note that deactivated stake enters a cool-down period before it can be withdrawn or re-delegated.
+
+LANGUAGE: bash
+CODE:
+solana deactivate-stake --stake-authority <KEYPAIR> <STAKE_ACCOUNT_ADDRESS> \
+    --fee-payer <KEYPAIR>
+
+----------------------------------------
+
+TITLE: Creating a Stake Account Keypair with Solana CLI
+DESCRIPTION: Generate a new keypair for a stake account without a passphrase. The public key of this keypair will be used as the stake account address.
+
+LANGUAGE: bash
+CODE:
+solana-keygen new --no-passphrase -o stake-account.json
+
+----------------------------------------
+
+TITLE: Generating Solana Keypair using CLI
+DESCRIPTION: Commands to create a new directory and generate a new Solana keypair file. The keypair file contains the unencrypted private and public keys.
+
+LANGUAGE: bash
+CODE:
+mkdir ~/my-solana-wallet
+solana-keygen new --outfile ~/my-solana-wallet/my-keypair.json
+
+----------------------------------------
+
+TITLE: Creating Systemd Service for Solana Validator
+DESCRIPTION: Sets up a systemd service to manage the Solana validator process.
+
+LANGUAGE: bash
+CODE:
+cat > /etc/systemd/system/sol.service <<EOF
+[Unit]
+Description=Solana Validator
+After=network.target
+StartLimitIntervalSec=0
+
+[Service]
+Type=simple
+Restart=always
+RestartSec=1
+User=sol
+LimitNOFILE=1000000
+LogRateLimitIntervalSec=0
+Environment="PATH=/bin:/usr/bin:/home/sol/.local/share/solana/install/active_release/bin"
+ExecStart=/home/sol/bin/validator.sh
+
+[Install]
+WantedBy=multi-user.target
+EOF
+
+----------------------------------------
+
+TITLE: Installing Build Dependencies on Debian-based Linux
+DESCRIPTION: This command installs the necessary build dependencies for compiling Solana from source on Debian-based Linux distributions.
+
+LANGUAGE: bash
+CODE:
+apt-get install \
+    build-essential \
+    pkg-config \
+    libudev-dev llvm libclang-dev \
+    protobuf-compiler
+
+----------------------------------------
+
+TITLE: Checking Wallet Balance in Solana
+DESCRIPTION: Displays the balance of the default wallet in the local Solana cluster.
+
+LANGUAGE: bash
+CODE:
+solana balance
+
+----------------------------------------
+
+TITLE: Creating PostgreSQL Schema for Geyser Plugin
+DESCRIPTION: SQL script to create the necessary database objects for storing accounts and slots data from a Solana validator.
+
+LANGUAGE: sql
+CODE:
+CREATE FUNCTION audit_account_update() RETURNS trigger AS $audit_account_update$
+    BEGIN
+		INSERT INTO account_audit (pubkey, owner, lamports, slot, executable, rent_epoch, data, write_version, updated_on)
+            VALUES (OLD.pubkey, OLD.owner, OLD.lamports, OLD.slot,
+                    OLD.executable, OLD.rent_epoch, OLD.data, OLD.write_version, OLD.updated_on);
+        RETURN NEW;
+    END;
+
+$audit_account_update$ LANGUAGE plpgsql;
+
+CREATE TRIGGER account_update_trigger AFTER UPDATE OR DELETE ON account
+    FOR EACH ROW EXECUTE PROCEDURE audit_account_update();
+
+----------------------------------------
+
+TITLE: Extracting Prebuilt Binaries on Linux
+DESCRIPTION: These commands download, extract, and set up the PATH for prebuilt Solana binaries on Linux systems.
+
+LANGUAGE: bash
+CODE:
+tar jxf solana-release-x86_64-unknown-linux-gnu.tar.bz2
+cd solana-release/
+export PATH=$PWD/bin:$PATH
+
+----------------------------------------
+
+TITLE: Deriving Stake Account Address with Solana CLI
+DESCRIPTION: Calculate the derived address for a stake account based on a base public key and a seed string.
+
+LANGUAGE: bash
+CODE:
+solana create-address-with-seed --from <PUBKEY> <SEED_STRING> STAKE
+
+----------------------------------------
+
+TITLE: Running agave-watchtower for Validator Monitoring in Bash
+DESCRIPTION: Command to run agave-watchtower to monitor an active stake validator with a specific identity public key. This allows for monitoring the validator's health and receiving notifications.
+
+LANGUAGE: bash
+CODE:
+agave-watchtower --monitor-active-stake --validator-identity \
+  2uTk98rqqwENevkPH2AHHzGHXgeGc1h6ku8hQUqWeXZp
+
+----------------------------------------
+
+TITLE: Generating Validator Identity Keypair
+DESCRIPTION: Creates a new identity keypair for the Solana validator.
+
+LANGUAGE: bash
+CODE:
+solana-keygen new -o ~/validator-keypair.json
+
+----------------------------------------
+
+TITLE: Configuring Solana Mainnet Beta Environment
+DESCRIPTION: Configuration commands for setting up Solana metrics and RPC connection for the Mainnet Beta environment.
+
+LANGUAGE: bash
+CODE:
+export SOLANA_METRICS_CONFIG="host=https://metrics.solana.com:8086,db=mainnet-beta,u=mainnet-beta_write,p=password"
+solana config set --url https://api.mainnet-beta.solana.com
+
+----------------------------------------
+
+TITLE: Dropping RocksDB Column Family in Solana Validator
+DESCRIPTION: Command to remove a specific column family from the validator's RocksDB blockstore. This operation should only be performed with guidance from the Solana support team as it can affect validator operation.
+
+LANGUAGE: bash
+CODE:
+ldb --db=<validator ledger path>/rocksdb drop_column_family <column family name>
+
+----------------------------------------
+
+TITLE: Complete Solana Token Transfer Example
+DESCRIPTION: Full example demonstrating wallet creation, airdrop, and token transfer between two wallets.
+
+LANGUAGE: bash
+CODE:
+$ solana-keygen new --outfile my_solana_wallet.json
+$ solana airdrop 1 DYw8jCTfwHNRJhhmFcbXvVDTqWMEVFBX6ZKUmG5CNSKK --url https://api.devnet.solana.com
+$ solana balance DYw8jCTfwHNRJhhmFcbXvVDTqWMEVFBX6ZKUmG5CNSKK --url https://api.devnet.solana.com
+$ solana-keygen new --no-outfile
+$ solana transfer --from my_solana_wallet.json 7S3P4HxJpyyigGzodYwHtCxZyUQe9JiBMHyRWXArAaKv 0.5 --allow-unfunded-recipient --url https://api.devnet.solana.com --fee-payer my_solana_wallet.json
+$ solana balance DYw8jCTfwHNRJhhmFcbXvVDTqWMEVFBX6ZKUmG5CNSKK --url https://api.devnet.solana.com
+$ solana balance 7S3P4HxJpyyigGzodYwHtCxZyUQe9JiBMHyRWXArAaKv --url https://api.devnet.solana.com
+
+----------------------------------------
+
+TITLE: Transferring SOL Tokens
+DESCRIPTION: Command to transfer SOL tokens between wallets with specified fee payer.
+
+LANGUAGE: bash
+CODE:
+solana transfer --from <KEYPAIR> <RECIPIENT_ACCOUNT_ADDRESS> 0.5 --allow-unfunded-recipient --url https://api.devnet.solana.com --fee-payer <KEYPAIR>
+
+----------------------------------------
+
+TITLE: Performing Solana Transfer Transaction
+DESCRIPTION: Executes a basic transfer of 1 SOL to a specified address in the local Solana cluster.
+
+LANGUAGE: bash
+CODE:
+solana transfer EPhgPANa5Rh2wa4V2jxt7YbtWa3Uyw4sTeZ13cQjDDB8 1
+
+----------------------------------------
+
+TITLE: Submitting Multi-Session Offline Signed Solana Transaction
+DESCRIPTION: Example of submitting a Solana transaction that was signed offline in multiple sessions. The command includes the blockhash and signer information from both offline signing sessions.
+
+LANGUAGE: bash
+CODE:
+solana transfer Fdri24WUGtrCXZ55nXiewAj6RM18hRHPGAjZk3o6vBut 10 \
+    --blockhash 7ALDjLv56a8f6sH6upAZALQKkXyjAwwENH9GomyM8Dbc \
+    --from 674RgFMgdqdRoVtMqSBg7mHFbrrNm1h1r721H1ZMquHL \
+    --signer 674RgFMgdqdRoVtMqSBg7mHFbrrNm1h1r721H1ZMquHL=3vJtnba4dKQmEAieAekC1rJnPUndBcpvqRPRMoPWqhLEMCty2SdUxt2yvC1wQW6wVUa5putZMt6kdwCaTv8gk7sQ \
+    --fee-payer 3bo5YiRagwmRikuH6H1d2gkKef5nFZXE3gJeoHxJbPjy \
+    --signer 3bo5YiRagwmRikuH6H1d2gkKef5nFZXE3gJeoHxJbPjy=ohGKvpRC46jAduwU9NW8tP91JkCT5r8Mo67Ysnid4zc76tiiV1Ho6jv3BKFSbBcr2NcPPCarmfTLSkTHsJCtdYi
+
+----------------------------------------
+
+TITLE: Generated Verbose Instruction Enum in Rust
+DESCRIPTION: Auto-generated verbose enum that includes account indices as named fields, with deserialization support from the base instruction type.
+
+LANGUAGE: rust
+CODE:
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
+pub enum TestInstruction {
+    /// Transfer lamports
+    Transfer {
+        /// Funding account
+        funding_account: u8
+
+        /// Recipient account
+        recipient_account: u8
+
+        lamports: u64,
+    },
+
+    /// Provide M of N required signatures
+    Multisig {
+        data_account: u8,
+        signers: Vec<u8>,
+    },
+
+    /// Consumes a stored nonce, replacing it with a successor
+    AdvanceNonceAccount {
+        nonce_account: u8,
+        recent_blockhashes_sysvar: u8,
+        nonce_authority: Option<u8>,
+    }
+}
+
+impl TestInstructionVerbose {
+    pub fn from_instruction(instruction: TestInstruction, account_keys: Vec<u8>) -> Self {
+        match instruction {
+            TestInstruction::Transfer { lamports } => TestInstructionVerbose::Transfer {
+                funding_account: account_keys[0],
+                recipient_account: account_keys[1],
+                lamports,
+            }
+            TestInstruction::Multisig => TestInstructionVerbose::Multisig {
+                data_account: account_keys[0],
+                signers: account_keys[1..],
+            }
+            TestInstruction::AdvanceNonceAccount => TestInstructionVerbose::AdvanceNonceAccount {
+                nonce_account: account_keys[0],
+                recent_blockhashes_sysvar: account_keys[1],
+                nonce_authority: &account_keys.get(2),
+            }
+        }
+    }
+}
+
+----------------------------------------
+
+TITLE: Starting the Solana Test Validator
+DESCRIPTION: Demonstrates how to start the Solana Test Validator with default settings.
+
+LANGUAGE: bash
+CODE:
+solana-test-validator
+
+----------------------------------------
+
+TITLE: Checking Solana Cluster Version
+DESCRIPTION: Command to retrieve the software version running on the currently connected Solana cluster.
+
+LANGUAGE: bash
+CODE:
+solana cluster-version
+
+----------------------------------------
+
+TITLE: Optimizing Linux System Settings
+DESCRIPTION: Configures sysctl knobs to optimize the system for running a Solana validator.
+
+LANGUAGE: bash
+CODE:
+sudo bash -c "cat >/etc/sysctl.d/21-agave-validator.conf <<EOF
+# Increase max UDP buffer sizes
+net.core.rmem_max = 134217728
+net.core.wmem_max = 134217728
+
+# Increase memory mapped files limit
+vm.max_map_count = 1000000
+
+# Increase number of allowed open file descriptors
+fs.nr_open = 1000000
+EOF"
+
+sudo sysctl -p /etc/sysctl.d/21-agave-validator.conf
+
+----------------------------------------
+
+TITLE: Building Solana from Source
+DESCRIPTION: These commands build Solana from source code and set up the PATH for the compiled binaries.
+
+LANGUAGE: bash
+CODE:
+./scripts/cargo-install-all.sh .
+export PATH=$PWD/bin:$PATH
+
+----------------------------------------
+
+TITLE: Displaying Solana Public Key
+DESCRIPTION: Command to extract and display the public key from a Solana keypair file, which serves as the wallet address.
+
+LANGUAGE: bash
+CODE:
+solana-keygen pubkey ~/my-solana-wallet/my-keypair.json
+
+----------------------------------------
+
+TITLE: Updating Validator Identity for Solana Vote Account
+DESCRIPTION: This command updates the validator identity associated with a Solana vote account. It requires the vote account keypair, new validator keypair, and authorized withdrawer keypair.
+
+LANGUAGE: bash
+CODE:
+solana vote-update-validator ~/vote-account-keypair.json ~/new-validator-keypair.json ~/authorized_withdrawer.json
+
+----------------------------------------
+
+TITLE: Demonstrating Extended Switching Proofs
+DESCRIPTION: This snippet shows a scenario where extended switching proofs are needed to include vote hashes from different versions of the same slot. It illustrates the challenge of building switching proofs when multiple versions of a slot exist.
+
+LANGUAGE: text
+CODE:
+    |-------- 2
+    |
+0------------- 1 ------ 2'
+    |
+    |---------- 6
+
+
+----------------------------------------
+
+TITLE: Installing Rust Toolchain
+DESCRIPTION: Commands to install the Rust compiler, Cargo package manager and rustfmt code formatter.
+
+LANGUAGE: bash
+CODE:
+$ curl https://sh.rustup.rs -sSf | sh
+$ source $HOME/.cargo/env
+$ rustup component add rustfmt
+
+----------------------------------------
+
+TITLE: Checking Leader Schedule
+DESCRIPTION: Command to view the full leader schedule for an epoch to determine block production slots.
+
+LANGUAGE: bash
+CODE:
+solana leader-schedule
+
+----------------------------------------
+
+TITLE: Running Solana Beta Docker Container
+DESCRIPTION: Launches a Solana beta node in a Docker container with JSON RPC port 8899 exposed and increased file descriptor limits. The container is automatically removed when stopped.
+
+LANGUAGE: bash
+CODE:
+docker run --rm -p 8899:8899 --ulimit nofile=1000000 solanalabs/solana:beta
+
+----------------------------------------
+
+TITLE: Deriving Public Key from Seed Phrase
+DESCRIPTION: Derives a public key from a seed phrase and optional passphrase using the prompt URI scheme
+
+LANGUAGE: bash
+CODE:
+solana-keygen pubkey prompt://
+
+LANGUAGE: bash
+CODE:
+solana-keygen pubkey prompt:// --skip-seed-phrase-validation
+
+LANGUAGE: bash
+CODE:
+solana-keygen pubkey ASK
+
+----------------------------------------
+
+TITLE: Offline Signing Session 2 for Solana Transfer
+DESCRIPTION: Second offline signing session for a Solana transfer. This session signs with the 'from' account's keypair and specifies the fee payer's public key.
+
+LANGUAGE: bash
+CODE:
+solana transfer Fdri24WUGtrCXZ55nXiewAj6RM18hRHPGAjZk3o6vBut 10 \
+    --blockhash 7ALDjLv56a8f6sH6upAZALQKkXyjAwwENH9GomyM8Dbc \
+    --sign-only \
+    --keypair from.json \
+    --fee-payer 3bo5YiRagwmRikuH6H1d2gkKef5nFZXE3gJeoHxJbPjy
+
+----------------------------------------
+
+TITLE: Withdrawing from Vote Account
+DESCRIPTION: Command to withdraw funds from a vote account to a separate keypair using the authorized withdrawer.
+
+LANGUAGE: bash
+CODE:
+solana withdraw-from-vote-account \
+   vote-account-keypair.json \
+   person-keypair.json ALL \
+   --authorized-withdrawer authorized-withdrawer-keypair.json
+
+----------------------------------------
+
+TITLE: Checking Current Solana CLI Cluster Configuration
+DESCRIPTION: Command to display the current cluster configuration settings for the Solana CLI.
+
+LANGUAGE: bash
+CODE:
+solana config get
+
+----------------------------------------
+
+TITLE: Visualizing Fork Structure in Agave Ledger
+DESCRIPTION: This ASCII diagram illustrates the structure of forks in the Agave ledger, showing how different sequences of slots can form separate forks from a common root.
+
+LANGUAGE: plaintext
+CODE:
+      2 - 4 - 6 - 8
+     /
+0 - 1       12 - 13
+     \     /
+      3 - 5
+           \
+            7 - 9 - 10 - 11
+
+----------------------------------------
+
+TITLE: Making JSON-RPC Request to Solana Node
+DESCRIPTION: Example of making a JSON-RPC request to a Solana node to get epoch information using curl.
+
+LANGUAGE: bash
+CODE:
+curl -X POST -H "Content-Type: application/json" -d '{"jsonrpc":"2.0","id":1, "method":"getEpochInfo"}' http://localhost:8899
+
+----------------------------------------
+
+TITLE: Signing Off-Chain Message with Ledger Hardware Wallet
+DESCRIPTION: Signs an off-chain message using a Ledger hardware wallet. Requires Ledger firmware and Solana Ledger App version 1.3.0 or later.
+
+LANGUAGE: bash
+CODE:
+solana sign-offchain-message -k usb://ledger <MESSAGE>
+
+----------------------------------------
+
+TITLE: Illustrating Competing Forks in Markdown Table
+DESCRIPTION: This markdown table shows an example of competing forks in Solana, where different leaders choose to chain blocks in different ways across slots.
+
+LANGUAGE: markdown
+CODE:
+|        | Slot 1  | Slot 2  | Slot 3  | Slot 4  | Slot 5  |
+| ------ | ------- | ------- | ------- | ------- | ------- |
+| Fork 1 | Block 1 |         | Block 3 |         | Block 5 |
+| Fork 2 | Block 1 |         | Block 3 | Block 4 |         |
+| Fork 3 | Block 1 | Block 2 |         |         |         |
+
+----------------------------------------
+
+TITLE: Manual Snapshot Download
+DESCRIPTION: Commands to manually download validator snapshots from a known validator IP address.
+
+LANGUAGE: bash
+CODE:
+wget --trust-server-names http://139.178.68.207:80/snapshot.tar.bz2
+wget --trust-server-names http://139.178.68.207:80/incremental-snapshot.tar.bz2
+
+----------------------------------------
+
+TITLE: Generating New Solana Keypair
+DESCRIPTION: Command to create a new Solana keypair without passphrase or output file.
+
+LANGUAGE: bash
+CODE:
+solana-keygen new --no-passphrase --no-outfile
+
+----------------------------------------
+
+TITLE: Installing Solana with Custom Arguments
+DESCRIPTION: Installation process with additional initialization arguments passed to the installer
+
+LANGUAGE: bash
+CODE:
+$ init_args=.... # arguments for `agave-install-init ...`
+$ curl -sSf https://raw.githubusercontent.com/solana-labs/solana/v1.0.0/install/agave-install-init.sh | sh -s - ${init_args}
+
+----------------------------------------
+
+TITLE: Installing Solana on Windows
+DESCRIPTION: These commands download and execute the Solana installer on Windows systems using the Command Prompt.
+
+LANGUAGE: bash
+CODE:
+cmd /c "curl https://release.anza.xyz/LATEST_AGAVE_RELEASE_VERSION/agave-install-init-x86_64-pc-windows-msvc.exe --output C:\agave-install-tmp\agave-install-init.exe --create-dirs"
+
+LANGUAGE: bash
+CODE:
+C:\agave-install-tmp\agave-install-init.exe LATEST_AGAVE_RELEASE_VERSION
+
+----------------------------------------
+
+TITLE: Running Solana Benchmark Client
+DESCRIPTION: Executes a benchmark client that sends a large number of transactions to the testnet to measure its performance and transaction processing capabilities.
+
+LANGUAGE: bash
+CODE:
+NDEBUG=1 ./multinode-demo/bench-tps.sh
+
+----------------------------------------
+
+TITLE: Listing RocksDB Column Families in Solana Validator
+DESCRIPTION: Command to list all column families in a validator's RocksDB blockstore database. This is useful when troubleshooting database issues or preparing for version upgrades/downgrades.
+
+LANGUAGE: bash
+CODE:
+ldb --db=<validator ledger path>/rocksdb/ list_column_families
+
+----------------------------------------
+
+TITLE: Setting Solana CLI Devnet Cluster Connection
+DESCRIPTION: Command to configure the Solana CLI to target the Devnet cluster for all subsequent operations.
+
+LANGUAGE: bash
+CODE:
+solana config set --url https://api.devnet.solana.com
+
+----------------------------------------
+
+TITLE: Creating Nonce Account in Solana CLI
+DESCRIPTION: Commands to generate a new keypair and create a nonce account on chain with minimum balance for rent exemption.
+
+LANGUAGE: bash
+CODE:
+solana-keygen new -o nonce-keypair.json
+solana create-nonce-account nonce-keypair.json 1
+
+----------------------------------------
+
+TITLE: Monitoring Solana On-Chain Program Output
+DESCRIPTION: Starts monitoring the logs for msg!() output from on-chain programs in the local Solana cluster.
+
+LANGUAGE: bash
+CODE:
+solana logs
+
+----------------------------------------
+
+TITLE: Creating Identity Symlinks for Inactive Validator
+DESCRIPTION: Command to create symbolic link for unstaked identity on the inactive non-voting validator
+
+LANGUAGE: bash
+CODE:
+ln -sf /home/sol/unstaked-identity.json /home/sol/identity.json
+
+----------------------------------------
+
+TITLE: Inactive Validator Transition Script
+DESCRIPTION: Script for transitioning the inactive validator to staked identity with tower requirement
+
+LANGUAGE: bash
+CODE:
+#!/bin/bash
+
+# example script of the above steps
+agave-validator -l /mnt/ledger set-identity --require-tower /home/sol/staked-identity.json
+ln -sf /home/sol/staked-identity.json /home/sol/identity.json
+
+----------------------------------------
+
+TITLE: Deactivating Specific Solana Runtime Features
+DESCRIPTION: Demonstrates how to start the test validator with specific runtime features deactivated.
+
+LANGUAGE: bash
+CODE:
+solana-test-validator --deactivate-feature <FEATURE_PUBKEY_1> --deactivate-feature <FEATURE_PUBKEY_2>
+
+----------------------------------------
+
+TITLE: Configuring Testnet RPC Node for Agave
+DESCRIPTION: Bash script for running an Agave validator node in RPC mode on testnet. Includes configuration for full RPC API access, no voting participation, private RPC, and ledger management. Uses known validators and specific network endpoints for testnet.
+
+LANGUAGE: bash
+CODE:
+#!/bin/bash
+exec agave-validator \
+    --identity /home/sol/validator-keypair.json \
+    --known-validator 5D1fNXzvv5NjV1ysLjirC4WY92RNsVH18vjmcszZd8on \
+    --known-validator dDzy5SR3AXdYWVqbDEkVFdvSPCtS9ihF5kJkHCtXoFs \
+    --known-validator eoKpUABi59aT4rR9HGS3LcMecfut9x7zJyodWWP43YQ \
+    --known-validator 7XSY3MrYnK8vq693Rju17bbPkCN3Z7KvvfvJx4kdrsSY \
+    --known-validator Ft5fbkqNa76vnsjYNwjDZUXoTWpP7VYm3mtsaQckQADN \
+    --known-validator 9QxCLckBiJc783jnMvXZubK4wH86Eqqvashtrwvcsgkv \
+    --only-known-rpc \
+    --full-rpc-api \
+    --no-voting \
+    --ledger /mnt/ledger \
+    --accounts /mnt/accounts \
+    --log /home/sol/solana-rpc.log \
+    --rpc-port 8899 \
+    --rpc-bind-address 0.0.0.0 \
+    --private-rpc \
+    --dynamic-port-range 8000-8020 \
+    --entrypoint entrypoint.testnet.solana.com:8001 \
+    --entrypoint entrypoint2.testnet.solana.com:8001 \
+    --entrypoint entrypoint3.testnet.solana.com:8001 \
+    --expected-genesis-hash 4uhcVJyU9pJkvQyS88uRDiswHXSCkY3zQawwpjk2NsNY \
+    --wal-recovery-mode skip_any_corrupted_record \
+    --limit-ledger-size
+
+----------------------------------------
+
+TITLE: Checking Cluster Connectivity
+DESCRIPTION: Verifies that the Solana cluster is reachable by fetching the transaction count.
+
+LANGUAGE: bash
+CODE:
+solana transaction-count
+
+----------------------------------------
+
+TITLE: Specifying Tools Version in Cargo.toml
+DESCRIPTION: Example of how to specify a custom tools version for building on-chain programs in a package or workspace Cargo.toml file.
+
+LANGUAGE: toml
+CODE:
+[package.metadata.solana]
+tools-version = "1.43"
+
+LANGUAGE: toml
+CODE:
+[workspace.metadata.solana]
+tools-version = "1.43"
+
+----------------------------------------
+
+TITLE: Building Installer from Source
+DESCRIPTION: Instructions for building the installer from source code when pre-built binaries are not available
+
+LANGUAGE: bash
+CODE:
+$ git clone https://github.com/solana-labs/solana.git
+$ cd solana/install
+$ cargo run -- --help
+
+----------------------------------------
+
+TITLE: GCP Project Configuration
+DESCRIPTION: Commands to authenticate and set up GCP project for test network deployment
+
+LANGUAGE: bash
+CODE:
+$ gcloud auth login
+gcloud config set project principal-lane-200702
+
+----------------------------------------
+
+TITLE: Creating and Managing Git Feature Branches - Bash
+DESCRIPTION: Commands for creating feature branches, cherry-picking commits, and managing PR workflows in Git. Shows the process of isolating fixes into separate PRs.
+
+LANGUAGE: bash
+CODE:
+$ git commit -am "Fix foo, needed by bar"
+$ git checkout master
+$ git checkout -b fix-foo
+$ git cherry-pick fix-bar
+$ git push --set-upstream origin fix-foo
+
+----------------------------------------
+
+TITLE: Active Validator Transition Script
+DESCRIPTION: Script for transitioning the active validator to unstaked identity and copying tower file to inactive validator
+
+LANGUAGE: bash
+CODE:
+#!/bin/bash
+
+# example script of the above steps - change specifics such as user / IP / ledger path
+agave-validator -l /mnt/ledger wait-for-restart-window --min-idle-time 2 --skip-new-snapshot-check
+agave-validator -l /mnt/ledger set-identity /home/sol/unstaked-identity.json
+ln -sf /home/sol/unstaked-identity.json /home/sol/identity.json
+scp /mnt/ledger/tower-1_9-$(solana-keygen pubkey /home/sol/staked-identity.json).bin <user>@<IP>/mnt/ledger
+
+----------------------------------------
+
+TITLE: Monitoring Docker Containers
+DESCRIPTION: Commands to monitor the logs of InfluxDB and Grafana Docker containers
+
+LANGUAGE: sh
+CODE:
+$ docker logs -f influxdb
+$ docker logs -f grafana
+
+----------------------------------------
+
+TITLE: Installing Ubuntu Dependencies
+DESCRIPTION: Commands to install required system dependencies on Ubuntu Linux.
+
+LANGUAGE: bash
+CODE:
+$ sudo apt-get update
+$ sudo apt-get install libssl-dev libudev-dev pkg-config zlib1g-dev llvm clang cmake make libprotobuf-dev protobuf-compiler libclang-dev
+
+----------------------------------------
+
+TITLE: Vote and Stake Account Structure
+DESCRIPTION: Definition of VoteState and StakeStateV2 data structures used to track validator votes and stake delegation state.
+
+LANGUAGE: markdown
+CODE:
+### VoteState
+- votes - The submitted votes data structure
+- credits - Total number of rewards generated
+- root_slot - Last slot reaching full lockout commitment
+- commission - Commission percentage for rewards
+- Account::lamports - Accumulated commission lamports
+- authorized_voter - Identity authorized to submit votes
+- node_pubkey - Solana node that votes
+- authorized_withdrawer - Entity controlling account lamports
+
+### StakeStateV2::Stake
+- Account::lamports - Lamports available for staking
+- stake - Staked amount subject to warmup/cooldown
+- voter_pubkey - VoteState pubkey for delegation
+- credits_observed - Total lifetime credits claimed
+- activated - Epoch of stake activation
+- deactivated - Epoch of stake deactivation
+- authorized_staker - Entity that must sign stake actions
+- authorized_withdrawer - Entity controlling withdrawals
+
+----------------------------------------
+
+TITLE: Setting Up Benchmarking
+DESCRIPTION: Commands to install nightly Rust and run benchmarks.
+
+LANGUAGE: bash
+CODE:
+$ rustup install nightly
+$ cargo +nightly bench
+
+----------------------------------------
+
+TITLE: Network Partition Configuration
+DESCRIPTION: JSON configuration example for creating network partitions with specified loss and delay parameters.
+
+LANGUAGE: json
+CODE:
+{
+      "partitions":[
+         34,
+         33,
+         33
+      ],
+      "interconnects":[
+         {
+            "a":0,
+            "b":1,
+            "config":"loss 15% delay 25ms"
+         },
+         {
+            "a":1,
+            "b":0,
+            "config":"loss 15% delay 25ms"
+         },
+         {
+            "a":0,
+            "b":2,
+            "config":"loss 10% delay 15ms"
+         },
+         {
+            "a":2,
+            "b":0,
+            "config":"loss 10% delay 15ms"
+         },
+         {
+            "a":2,
+            "b":1,
+            "config":"loss 5% delay 5ms"
+         },
+         {
+            "a":1,
+            "b":2,
+            "config":"loss 5% delay 5ms"
+         }
+      ]
+}
+
+----------------------------------------
+
+TITLE: Checking Solana Wallet Balance
+DESCRIPTION: Command to check the SOL balance of a specific wallet address on devnet.
+
+LANGUAGE: bash
+CODE:
+solana balance <ACCOUNT_ADDRESS> --url https://api.devnet.solana.com
+
+----------------------------------------
+
+TITLE: Checking Solana Wallet Balance
+DESCRIPTION: Command to check the SOL balance of a specific wallet address on devnet.
+
+LANGUAGE: bash
+CODE:
+solana balance <ACCOUNT_ADDRESS> --url https://api.devnet.solana.com
+
+----------------------------------------
+
+TITLE: Updating Rust Version
+DESCRIPTION: Commands to update Rust to latest stable version or install a specific version.
+
+LANGUAGE: bash
+CODE:
+$ rustup update
+
+LANGUAGE: bash
+CODE:
+$ rustup install VERSION
+
+----------------------------------------
+
+TITLE: Calculating Snapshot Hash with Epoch Accounts Hash
+DESCRIPTION: Pseudo-code for calculating the snapshot hash, incorporating the Epoch Accounts Hash (EAH) if the slot is within the calculation window.
+
+LANGUAGE: pseudo
+CODE:
+if slot is in calculation window
+    let snapshot hash = hash(accounts hash, epoch accounts hash)
+else
+    let snapshot hash = accounts hash
+endif
+
+----------------------------------------
+
+TITLE: Checking Account Balance
+DESCRIPTION: Command to check the balance of a validator's identity account.
+
+LANGUAGE: bash
+CODE:
+solana balance validator-keypair.json
+
+----------------------------------------
+
+TITLE: Configuring Rust Logging for Solana Debugging
+DESCRIPTION: Sets up environment variables to enable debug logging for specific Solana modules, useful for troubleshooting and development.
+
+LANGUAGE: bash
+CODE:
+export RUST_LOG=solana=info,solana::banking_stage=debug
+export RUST_LOG=solana_bpf_loader=trace
+
+----------------------------------------
+
+TITLE: Running Performance-Enhanced Solana Validator with CUDA
+DESCRIPTION: Starts a performance-enhanced validator using CUDA for improved transaction processing. Requires CUDA 10.0 to be installed on the system.
+
+LANGUAGE: bash
+CODE:
+./fetch-perf-libs.sh
+NDEBUG=1 SOLANA_CUDA=1 ./multinode-demo/bootstrap-validator.sh
+NDEBUG=1 SOLANA_CUDA=1 ./multinode-demo/validator.sh
+
+----------------------------------------
+
+TITLE: Checking Solana Keygen Version
+DESCRIPTION: Verifies the installation of solana-keygen tool by checking its version
+
+LANGUAGE: bash
+CODE:
+solana-keygen --version
+
+----------------------------------------
+
+TITLE: Starting Additional Solana Validator Nodes
+DESCRIPTION: Launches additional validator nodes to create a multi-node testnet. These nodes participate in consensus and help validate transactions.
+
+LANGUAGE: bash
+CODE:
+NDEBUG=1 ./multinode-demo/validator-x.sh
+
+----------------------------------------
+
+TITLE: Querying Stored Nonce Value
+DESCRIPTION: Command to retrieve the currently stored nonce value from a nonce account.
+
+LANGUAGE: bash
+CODE:
+solana nonce nonce-keypair.json
+
+----------------------------------------
+
+TITLE: Building Solana Validator Docs Locally
+DESCRIPTION: Command to build the Solana validator documentation locally, generating static content in the 'build' directory.
+
+LANGUAGE: bash
+CODE:
+./build.sh
+
+----------------------------------------
+
+TITLE: Building Solana in Release Mode
+DESCRIPTION: Compiles the Solana codebase in release mode for optimal performance. This step is crucial before starting any nodes to ensure all necessary programs are built.
+
+LANGUAGE: bash
+CODE:
+cargo build --release
+
+----------------------------------------
+
+TITLE: Running Solana Benchmark on Developer Testnet
+DESCRIPTION: Executes a benchmark test against the public Solana developer testnet, demonstrating how to connect to and interact with a remote network.
+
+LANGUAGE: bash
+CODE:
+NDEBUG=1 ./multinode-demo/bench-tps.sh --entrypoint entrypoint.devnet.solana.com:8001 --faucet api.devnet.solana.com:9900 --duration 60 --tx_count 50
+
+----------------------------------------
+
+TITLE: Loading Instruction Data in Rust Smart Contracts
+DESCRIPTION: Helper functions for accessing instruction data from the Message object. load_current_index_checked retrieves the current instruction index, while load_instruction_at_checked loads instruction data at a specific index from the sysvar account.
+
+LANGUAGE: rust
+CODE:
+fn load_current_index_checked(instruction_data: &[u8]) -> u16;
+fn load_instruction_at_checked(instruction_index: usize, instruction_sysvar_account_info: &AccountInfo) -> Result<Instruction>;
+
+----------------------------------------
+
+TITLE: Starting Solana Faucet for Test Tokens
+DESCRIPTION: Launches the Solana faucet service, which provides test tokens for validators and clients to use in transactions on the testnet.
+
+LANGUAGE: bash
+CODE:
+NDEBUG=1 ./multinode-demo/faucet.sh
+
+----------------------------------------
+
+TITLE: Launching Solana Bootstrap Validator
+DESCRIPTION: Starts the bootstrap validator node, which is the initial node in the Solana testnet. This node is crucial for initializing the network.
+
+LANGUAGE: bash
+CODE:
+NDEBUG=1 ./multinode-demo/bootstrap-validator.sh
+
+----------------------------------------
+
+TITLE: Configuring Core Affinity in TOML
+DESCRIPTION: Configuration snippet for setting core affinity to pin a thread pool to specific CPU cores (cores 16-64)
+
+LANGUAGE: toml
+CODE:
+core_allocation.DedicatedCoreSet = { min = 16, max = 64 }
+
+----------------------------------------
+
+TITLE: PropTest Seed Configuration Entry
+DESCRIPTION: A saved PropTest failure case with seed value and test parameters. The seed is recorded with parameters for coding_indices, data_indices, and slot that triggered a test failure.
+
+LANGUAGE: plaintext
+CODE:
+cc d28b14f167a3950cfc2a5b82dff1e15c65e9ac23a5c249f812e69af96c3489ed # shrinks to coding_indices = 0..0, data_indices = 2984..15152, slot = 0
+
+----------------------------------------
+
+TITLE: Metrics Validation Script
+DESCRIPTION: Script to validate metrics database and environment configuration.
+
+LANGUAGE: bash
+CODE:
+cd ./scripts/
+source  ./configure-metrics.sh
+  INFLUX_HOST=https://internal-metrics.solana.com:8086
+  INFLUX_DATABASE=testnet-dev-solana
+  INFLUX_USERNAME=solana
+  INFLUX_PASSWORD=********
+./metrics-write-datapoint.sh "testnet-deploy net-create-begin=1"
+
+----------------------------------------
+
+TITLE: Augmented Block Commitment Calculation
+DESCRIPTION: Enhanced version of the commitment calculation that includes a ForkCommitmentCache to track BlockCommitment structs. This version processes vote pairs to determine ancestry differences.
+
+LANGUAGE: text
+CODE:
+   let output: HashMap<b, Stake> = HashMap::new();
+   let fork_commitment_cache = ForkCommitmentCache::default();
+   for vote_account in b.vote_accounts {
+       // vote stack is sorted from oldest vote to newest vote
+       for (v1, v2) in vote_account.vote_stack.windows(2) {
+           for a in ancestors(v1).difference(ancestors(v2)) {
+               f'(*output.get_mut(a), *fork_commitment_cache.get_mut(a), vote_account, v);
+           }
+       }
+   }
+
+----------------------------------------
+
+TITLE: Querying Validator Information
+DESCRIPTION: Command to retrieve published validator information from the Solana blockchain.
+
+LANGUAGE: bash
+CODE:
+solana validator-info get
+
+----------------------------------------
+
+TITLE: Network Automation Script
+DESCRIPTION: Script for automated test network creation and configuration with specific node sizes.
+
+LANGUAGE: bash
+CODE:
+# Create the testnet with reasonable node sizes for a small test
+# This particular one will have 7 nodes: 1 bootstrap validator, 4 regular validators, and 2 clients
+./gce.sh create -n4 -c2 --custom-machine-type "--machine-type n1-standard-16" --client-machine-type "--machine-type n1-standard-4"
+# Patch metrics config from env into config file
+./init-metrics.sh -e
+# Enable metrics and start the network (this will also build software)
+RUST_LOG=info ./net.sh start  -c bench-tps=2="--tx_count 25000"
+
+----------------------------------------
+
+TITLE: Specifying Program ID in Cargo.toml
+DESCRIPTION: Example of how to specify a program's ID in the Cargo.toml file for easy consumption by downstream users and tools.
+
+LANGUAGE: toml
+CODE:
+[package.metadata.solana]
+program-id = "MyProgram1111111111111111111111111111111111"
+
+----------------------------------------
+
+TITLE: Calculating Bounty Split for Duplicate Reports
+DESCRIPTION: This code snippet demonstrates the equation used to calculate the share of the bounty for duplicate vulnerability reports. It takes into account the total number of reports and the priority of each report.
+
+LANGUAGE: markdown
+CODE:
+R: total reports
+ri: report priority
+bi: bounty share
+
+bi = 2 ^ (R - ri) / ((2^R) - 1)
+
+----------------------------------------
+
+TITLE: Displaying Nonce Account Details
+DESCRIPTION: Command to display nonce account information in human-readable format.
+
+LANGUAGE: bash
+CODE:
+solana nonce-account nonce-keypair.json
+
+----------------------------------------
+
+TITLE: Enabling Metrics Collection
+DESCRIPTION: Command to enable metrics collection in the current shell session
+
+LANGUAGE: bash
+CODE:
+$ source ./enable.sh
+
+----------------------------------------
+
+TITLE: Proposed Binary Data Logging in Solidity
+DESCRIPTION: This snippet shows the proposed format for logging binary data in Solidity using base64 encoding. It includes an example of how the encoded data would look in the program log.
+
+LANGUAGE: plaintext
+CODE:
+program data: 3fJSrRviyJtpwrBo/DeNqpUrpFjxKEWKPVaTfUjs8AAAAAAAAAAAAAAACC+JDWOEeNIR7yII88FGa1q/g1UQAAAAAAAAAAAAAAAKEkMdC522QANLDN/O75zOFh5ivk AAAAAAAAAAAAAAAAAAAAAAAAAAAAAACgMNzrvS9MAAA=
+
+----------------------------------------
+
+TITLE: Calculating Canary Update Schedule - Bash
+DESCRIPTION: Script to calculate when a canary node last updated and when it will update next based on configured update frequency.
+
+LANGUAGE: bash
+CODE:
+DAYS_BETWEEN_UPDATES=8; d=$(expr $(date +%s) / 86400 % $DAYS_BETWEEN_UPDATES); n=$(expr $DAYS_BETWEEN_UPDATES - $d); echo "Updated $d day(s) ago. Will update $n day(s) from now"
+
+----------------------------------------
+
+TITLE: Querying InfluxDB Airdrop Measurements
+DESCRIPTION: Example command showing how to query airdrop measurements from the testnet database using InfluxDB CLI
+
+LANGUAGE: sh
+CODE:
+$ influx -database testnet -username read -password read -execute 'SELECT * FROM "faucet-airdrop"'
+
+----------------------------------------
+
+TITLE: Displaying Agave Validator Help Command
+DESCRIPTION: Shows how to access the help documentation for the agave-validator command.
+
+LANGUAGE: bash
+CODE:
+agave-validator --help
+
+----------------------------------------
+
+TITLE: Querying Latest Optimistic Slots in Solana
+DESCRIPTION: Command to find the latest optimistically confirmed slot using agave-ledger-tool for Agave 1.14 or greater.
+
+LANGUAGE: bash
+CODE:
+agave-ledger-tool -l ledger latest-optimistic-slots
+
+----------------------------------------
+
+TITLE: Testing Metrics Setup
+DESCRIPTION: Command to send a test airdrop data point to verify metrics collection
+
+LANGUAGE: bash
+CODE:
+$ ./test.sh
+
+----------------------------------------
+
+TITLE: Building and Publishing Agave CI Docker Image
+DESCRIPTION: This bash command builds and publishes the updated Docker image for Agave CI. It requires Docker Hub credentials and membership in the Anza Docker Hub Organization.
+
+LANGUAGE: bash
+CODE:
+ci/docker/build.sh
+
+----------------------------------------
+
+TITLE: Setting Telegram Bot Token for agave-watchtower in Bash
+DESCRIPTION: Command to set the TELEGRAM_BOT_TOKEN environment variable for agave-watchtower. This is required to enable Telegram notifications for validator health updates.
+
+LANGUAGE: bash
+CODE:
+export TELEGRAM_BOT_TOKEN=<HTTP API Token>
+
+----------------------------------------
+
+TITLE: Example Solana Public Key Output
+DESCRIPTION: Example output showing the format of a Solana public key address.
+
+LANGUAGE: text
+CODE:
+ErRr1caKzK8L8nn4xmEWtimYRiTCAZXjBtVphuZ5vMKy
+
+----------------------------------------
+
+TITLE: Running Solana Edge Docker Container
+DESCRIPTION: Launches a Solana edge node in a Docker container with JSON RPC port 8899 exposed and increased file descriptor limits. The container is automatically removed when stopped.
+
+LANGUAGE: bash
+CODE:
+docker run --rm -p 8899:8899 --ulimit nofile=1000000 solanalabs/solana:edge
+
+----------------------------------------
+
+TITLE: Configuring Solana CLI for Devnet
+DESCRIPTION: Sets the Solana CLI configuration to use the Devnet cluster URL.
+
+LANGUAGE: bash
+CODE:
+solana config set --url http://api.devnet.solana.com
+
+----------------------------------------
+
+TITLE: Checking Solana Account Balance
+DESCRIPTION: Commands to check the balance of a Solana account address.
+
+LANGUAGE: bash
+CODE:
+solana balance SOME_WALLET_ADDRESS
+solana balance 7cvkjYAkUYs4W8XcXsca7cBrEGFeSUjeZmKoNBvEwyri
+
+----------------------------------------
+
+TITLE: Command Line Version Comparison in Bash
+DESCRIPTION: Demonstrates command-line usage of semver.sh script to compare two version strings and display their parsed components and relationships.
+
+LANGUAGE: bash
+CODE:
+./semver.sh "3.2.1" "3.2.1-alpha"
+
+----------------------------------------
+
+TITLE: Querying Canary Node Versions - Solana CLI
+DESCRIPTION: Commands to check current versions running on mainnet-beta and testnet canary nodes using Solana gossip command.
+
+LANGUAGE: bash
+CODE:
+solana gossip -um | grep -E " (edge|beta|mc[ebs]\d)"
+
+solana gossip -ut | grep -E " (tc[eb]\d)"
+
+----------------------------------------
+
+TITLE: Resolving Ledger Signer Path
+DESCRIPTION: Command to resolve the fully qualified URL for a Ledger hardware wallet signer.
+
+LANGUAGE: bash
+CODE:
+solana resolve-signer usb://ledger?key=0/0
+
+----------------------------------------
+
+TITLE: Defining LockedPubkey Enum in Rust
+DESCRIPTION: This code snippet defines an enum LockedPubkey used to represent read and write locks on account public keys in the scheduler implementation.
+
+LANGUAGE: rust
+CODE:
+enum LockedPubkey {
+    Read(Pubkey),
+    Write(Pubkey),
+}
+
+----------------------------------------
+
+TITLE: Example Validator Info Publication
+DESCRIPTION: Example command showing how to publish validator information with a name, website URL, and icon URL.
+
+LANGUAGE: bash
+CODE:
+solana validator-info publish "Elvis Validator" -w "https://elvis-validates.com" -i "https://elvis-validates.com/my-icon.png"
+
+----------------------------------------
+
+TITLE: Specifying Keypair URL Format for Solana Hardware Wallets
+DESCRIPTION: This snippet demonstrates the format for specifying a keypair URL to uniquely identify a Solana keypair on a connected hardware wallet. It includes optional fields for wallet ID and derivation path.
+
+LANGUAGE: text
+CODE:
+usb://<MANUFACTURER>[/<WALLET_ID>][?key=<DERIVATION_PATH>]
+
+----------------------------------------
+
+TITLE: Criterion Unit Test Example for Solana Program
+DESCRIPTION: Example unit test setup using the Criterion testing framework. Shows basic test case structure and assertion usage for Solana program testing.
+
+LANGUAGE: c
+CODE:
+#include <criterion/criterion.h>
+#include "../src/program.c"
+
+Test(test_suite_name, test_case_name) {
+  cr_assert(true);
+}
+
+----------------------------------------
+
+TITLE: Git Rebase Workflow - Bash
+DESCRIPTION: Commands for rebasing feature branches and keeping them up to date with master. Demonstrates interactive rebase and upstream synchronization.
+
+LANGUAGE: bash
+CODE:
+$ git checkout fix-bar
+$ git rebase -i master <Move fix-foo to top>
+
+----------------------------------------
+
+TITLE: Solana Program Interface Reference
+DESCRIPTION: Reference to the standard Solana program interface mentioned in context, highlighting the program entry point pattern that demonstrates Solana-specific mechanisms.
+
+LANGUAGE: rust
+CODE:
+process_instruction(KeyedAccounts)
+
+----------------------------------------
+
+TITLE: Running JSON RPC Server for Solana Transaction Simulation
+DESCRIPTION: Command to start the json-rpc-server using cargo. It requires a ledger path and an accounts file.
+
+LANGUAGE: bash
+CODE:
+cargo run --manifest-path json-rpc-server/Cargo.toml -- -l test-ledger -a accounts.json
+
+----------------------------------------
+
+TITLE: ZSH Configuration for Ledger URLs
+DESCRIPTION: Configuration to fix question mark handling in ZSH shell when using Ledger keypair URLs.
+
+LANGUAGE: bash
+CODE:
+unsetopt nomatch
+
+----------------------------------------
+
+TITLE: Invalid Gossip Nodes Test Implementation in Rust
+DESCRIPTION: Complete test implementation demonstrating how to test cluster resilience against invalid gossip node flooding.
+
+LANGUAGE: rust
+CODE:
+pub fn test_large_invalid_gossip_nodes(
+    entry_point_info: &ContactInfo,
+    funding_keypair: &Keypair,
+    num_nodes: usize,
+) {
+    let cluster = discover_nodes(&entry_point_info, num_nodes);
+
+    // Poison the cluster.
+    let client = create_client(entry_point_info.client_facing_addr(), VALIDATOR_PORT_RANGE);
+    for _ in 0..(num_nodes * 100) {
+        client.gossip_push(
+            cluster_info::invalid_contact_info()
+        );
+    }
+    sleep(Durration::from_millis(1000));
+
+    // Force refresh of the active set.
+    for node in &cluster {
+        let client = create_client(node.client_facing_addr(), VALIDATOR_PORT_RANGE);
+        client.gossip_refresh_active_set();
+    }
+
+    // Verify that spends still work.
+    verify_spends(&cluster);
+}
+
+----------------------------------------
+
+TITLE: Move Program ID Declaration
+DESCRIPTION: Constant identifier used to reference the Move VM loader in Solana's runtime.
+
+LANGUAGE: rust
+CODE:
+MOVE_PROGRAM_ID
+
+----------------------------------------
+
+TITLE: Computing Security Complexity for XOR Collision Resistance
+DESCRIPTION: Mathematical formula showing the computational complexity required to achieve 128-bit security for the XOR-based snapshot verification system. Uses parameters of 2^40 accounts and 440-byte images.
+
+LANGUAGE: text
+CODE:
+O(k * 2^(n/(1+lg(k)))
+k=2^40 accounts
+n=440
+2^(40) * 2^(448 * 8 / 41) ~= O(2^(128))
+
+----------------------------------------
+
+TITLE: Authorizing New Nonce Account Authority
+DESCRIPTION: Command to reassign authority of a nonce account to a new account.
+
+LANGUAGE: bash
+CODE:
+solana authorize-nonce-account nonce-keypair.json nonce-authority.json
+
+----------------------------------------
+
+TITLE: Binding Multiple TVU Sockets in Solana Validator
+DESCRIPTION: This snippet demonstrates how a Solana validator binds multiple TVU sockets to a single port using SO_REUSEPORT. It allows for efficient packet distribution by the kernel across multiple threads.
+
+LANGUAGE: rust
+CODE:
+let (tvu_port, tvu_sockets) = multi_bind_in_range_with_config(
+    bind_ip_addr,
+    port_range,
+    socket_config_reuseport,
+    num_tvu_sockets.get(),
+)
+.expect("tvu multi_bind");
+
+----------------------------------------
+
+TITLE: Ethereum Transaction with Event Log Example
+DESCRIPTION: This JSON snippet shows an example of an Ethereum transaction that includes an event log. It demonstrates the structure of a transaction with topics and data in the logs array.
+
+LANGUAGE: json
+CODE:
+{
+  "tx": {
+    "nonce": "0x2",
+    "gasPrice": "0xf224d4a00",
+    "gas": "0xc350",
+    "to": "0x6B175474E89094C44Da98b954EedeAC495271d0F",
+    "value": "0x0",
+    "input": "0xa9059cbb000000000000000000000000a12431d0b9db640034b0cdfceef9cce161e62be40000000000000000000000000000000000000000000000a030dcebbd2f4c0000",
+    "hash": "0x98a67f0a35ebc0ac068acf0885d38419c632ffa4354e96641d6d5103a7681910",
+    "blockNumber": "0xc96431",
+    "from": "0x82f890D638478d211eF2208f3c1466B5Abf83551",
+    "transactionIndex": "0xe1"
+  },
+  "receipt": {
+    "gasUsed": "0x74d2",
+    "status": "0x1",
+    "logs": [
+      {
+        "address": "0x6B175474E89094C44Da98b954EedeAC495271d0F",
+        "topics": [
+          "0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef",
+          "0x00000000000000000000000082f890d638478d211ef2208f3c1466b5abf83551",
+          "0x000000000000000000000000a12431d0b9db640034b0cdfceef9cce161e62be4"
+        ],
+        "data": "0x0000000000000000000000000000000000000000000000a030dcebbd2f4c0000"
+      }
+    ]
+  }
+}
+
+----------------------------------------
+
+TITLE: Restarting Solana Validator with Local Ledger
+DESCRIPTION: Command to restart a Solana validator using the local ledger with specific parameters for supermajority waiting and bank hash verification.
+
+LANGUAGE: bash
+CODE:
+agave-validator
+  --wait-for-supermajority SLOT_X     # <-- NEW! IMPORTANT! REMOVE AFTER THIS RESTART
+  --expected-bank-hash NEW_BANK_HASH  # <-- NEW! IMPORTANT! REMOVE AFTER THIS RESTART
+  --hard-fork SLOT_X                  # <-- NEW! IMPORTANT! REMOVE AFTER THIS RESTART
+  --no-snapshot-fetch                 # <-- NEW! IMPORTANT! REMOVE AFTER THIS RESTART
+  --entrypoint entrypoint.testnet.solana.com:8001
+  --known-validator 5D1fNXzvv5NjV1ysLjirC4WY92RNsVH18vjmcszZd8on
+  --expected-genesis-hash 4uhcVJyU9pJkvQyS88uRDiswHXSCkY3zQawwpjk2NsNY
+  --only-known-rpc
+  --limit-ledger-size
+  ...
+
+----------------------------------------
+
+TITLE: Retrieving TVU Sockets in Solana Peer Node
+DESCRIPTION: This snippet demonstrates how a peer node retrieves the TVU socket information from a received ContactInfo struct. It uses a macro to access the stored socket data for both UDP and QUIC protocols.
+
+LANGUAGE: rust
+CODE:
+get_socket!(tvu, SOCKET_TAG_TVU, SOCKET_TAG_TVU_QUIC);
+
+----------------------------------------
+
+TITLE: AWS Credentials Configuration
+DESCRIPTION: Command to configure AWS CLI credentials for test network deployment
+
+LANGUAGE: bash
+CODE:
+$ aws configure
+
+----------------------------------------
+
+TITLE: Account Loading Function Signature
+DESCRIPTION: Function signature for loading an account from a specific fork with fallback to parent forks. Takes a fork ID and public key as parameters and returns an optional Account reference.
+
+LANGUAGE: text
+CODE:
+/// Load the account for the pubkey.
+/// This function will load the account from the specified fork, falling back to the fork's parents
+/// * fork - a virtual Accounts instance, keyed by Fork.  Accounts keep track of their parents with Forks,
+///       the persistent store
+/// * pubkey - The Account's public key.
+pub fn load_slow(&self, id: Fork, pubkey: &Pubkey) -> Option<&Account>
+
+----------------------------------------
+
+TITLE: Listing Valid Forks in Agave Ledger
+DESCRIPTION: This code snippet enumerates the valid fork sequences based on the previously illustrated fork structure.
+
+LANGUAGE: plaintext
+CODE:
+- {0, 1, 2, 4, 6, 8}
+- {0, 1, 3, 5, 12, 13}
+- {0, 1, 3, 5, 7, 9, 10, 11}
+
+----------------------------------------
+
+TITLE: Creating Solana Vote Account
+DESCRIPTION: Creates a vote account on the Solana testnet using the generated keypairs.
+
+LANGUAGE: bash
+CODE:
+solana create-vote-account -ut \
+    --fee-payer ./validator-keypair.json \
+    ./vote-account-keypair.json \
+    ./validator-keypair.json \
+    ./authorized-withdrawer-keypair.json
+
+----------------------------------------
+
+TITLE: Branch Creation and Push Commands
+DESCRIPTION: Git commands for creating and pushing a new branch to the Agave repository
+
+LANGUAGE: bash
+CODE:
+git checkout -b <branchname>\ngit push -u origin <branchname>
+
+----------------------------------------
+
+TITLE: Generating Unstaked Secondary Identity for Agave Validator
+DESCRIPTION: Command to generate a new unstaked identity for secondary validator nodes without using a BIP39 passphrase
+
+LANGUAGE: bash
+CODE:
+solana-keygen new -s --no-bip39-passphrase -o unstaked-identity.json
+
+----------------------------------------
+
+TITLE: Visualizing Pruned Fork Structure in Agave Ledger
+DESCRIPTION: This ASCII diagram shows the pruned fork structure after applying Tower BFT root and super majority root (SMR) concepts, with a max lockout depth of 3.
+
+LANGUAGE: plaintext
+CODE:
+SMR
+ 0 - 1       12 - 13
+      \     /
+       3 - 5
+     ROOT   \
+             7 - 9 - 10 - 11
+
+----------------------------------------
+
+TITLE: Creating Hard Fork Snapshot in Solana
+DESCRIPTION: Command to create a new snapshot at a specific slot with hard fork parameters, generating new shred version and bank hash values.
+
+LANGUAGE: bash
+CODE:
+agave-ledger-tool -l <LEDGER_PATH> --snapshot-archive-path <SNAPSHOTS_PATH> --incremental-snapshot-archive-path <INCREMENTAL_SNAPSHOTS_PATH> create-snapshot SLOT_X <SNAPSHOTS_PATH> --hard-fork SLOT_X
+
+----------------------------------------
+
+TITLE: Computing Block Commitments in Agave
+DESCRIPTION: Main algorithm for computing block commitments by iterating through vote accounts and their vote stacks to build a commitment map. The code tracks stake levels and confirmations for each bank in the ancestry.
+
+LANGUAGE: text
+CODE:
+   let output: HashMap<b, Stake> = HashMap::new();
+   for vote_account in b.vote_accounts {
+       for v in vote_account.vote_stack {
+           for a in ancestors(v) {
+               f(*output.get_mut(a), vote_account, v);
+           }
+       }
+   }
+
+----------------------------------------
+
+TITLE: Representing Time-Divided Ledger in Markdown Table
+DESCRIPTION: This markdown table illustrates the concept of time division in leader rotation, showing how different leaders encode state for the cluster across slots.
+
+LANGUAGE: markdown
+CODE:
+| leader slot      | L1  | L2  | L3  | L4  | L5  |
+| :--------------- | :-- | :-- | :-- | :-- | :-- |
+| data             | E1  | E2  | E3  | E4  | E5  |
+| ticks since prev |     |     |     | x   | xx  |
+
+----------------------------------------
+
+TITLE: Splitting Stake with Solana CLI
+DESCRIPTION: Split tokens from an existing stake account into a new stake account. This is useful for delegating to multiple validators or managing stake that is currently locked or cooling down.
+
+LANGUAGE: bash
+CODE:
+solana split-stake --stake-authority <KEYPAIR> <STAKE_ACCOUNT_ADDRESS> <NEW_STAKE_ACCOUNT_KEYPAIR> <AMOUNT> \
+    --fee-payer <KEYPAIR>
+
+----------------------------------------
+
+TITLE: Visualizing Further Pruned Fork Structure in Agave Ledger
+DESCRIPTION: This ASCII diagram illustrates the further pruned fork structure after voting on slot 10, which roots slot 5, and updating the SMR to slot 3.
+
+LANGUAGE: plaintext
+CODE:
+             12 - 13
+            /
+       3 - 5 ROOT
+      SMR   \
+             7 - 9 - 10 - 11
+
+----------------------------------------
+
+TITLE: Distribute Tokens Command
+DESCRIPTION: Command to distribute tokens to recipients specified in a CSV file using keypairs for authorization.
+
+LANGUAGE: bash
+CODE:
+solana-tokens distribute-tokens --from <KEYPAIR> --input-csv <RECIPIENTS_CSV> --fee-payer <KEYPAIR>
+
+----------------------------------------
+
+TITLE: Introducing PayTube State Channel for Solana
+DESCRIPTION: Markdown description of PayTube, an off-chain state channel implementation using Anza's SVM API. It explains the concept, potential use cases, and its relationship to Agave 2.0.
+
+LANGUAGE: markdown
+CODE:
+# PayTube
+
+A reference implementation of an off-chain [state channel](https://ethereum.org/en/developers/docs/scaling/state-channels/)
+built using [Anza's SVM API](https://www.anza.xyz/blog/anzas-new-svm-api).
+
+With the release of Agave 2.0, we've decoupled the SVM API from the rest of the
+runtime, which means it can be used outside the validator. This unlocks
+SVM-based solutions such as sidecars, channels, rollups, and more. This project
+demonstrates everything you need to know about bootstrapping with this new API.
+
+PayTube is a state channel (more specifically a payment channel), designed to
+allow multiple parties to transact amongst each other in SOL or SPL tokens
+off-chain. When the channel is closed, the resulting changes in each user's
+balances are posted to the base chain (Solana).
+
+Although this project is for demonstration purposes, a payment channel similar
+to PayTube could be created that scales to handle massive bandwidth of
+transfers, saving the overhead of posting transactions to the chain for last.
+
+----------------------------------------
+
+TITLE: Viewing Multiple Ledger Wallet Addresses
+DESCRIPTION: Commands to display different wallet addresses associated with different keypair paths on the Ledger device.
+
+LANGUAGE: bash
+CODE:
+solana-keygen pubkey usb://ledger
+solana-keygen pubkey usb://ledger?key=0
+solana-keygen pubkey usb://ledger?key=1
+solana-keygen pubkey usb://ledger?key=2
+
+----------------------------------------
+
+TITLE: SPL Token Balance Check Command
+DESCRIPTION: Command to check SPL token balances for recipients before distribution.
+
+LANGUAGE: bash
+CODE:
+solana-tokens spl-token-balances --mint <ADDRESS> --input-csv <RECIPIENTS_CSV>
+
+----------------------------------------
+
+TITLE: Metrics Validation Script
+DESCRIPTION: Script to validate metrics database and environment configuration
+
+LANGUAGE: bash
+CODE:
+cd ./scripts/
+source  ./configure-metrics.sh
+  INFLUX_HOST=https://internal-metrics.solana.com:8086
+  INFLUX_DATABASE=testnet-dev-solana
+  INFLUX_USERNAME=solana
+  INFLUX_PASSWORD=********
+./metrics-write-datapoint.sh "testnet-deploy net-create-begin=1"
+
+----------------------------------------
+
+TITLE: Configuring Solana CLI for Local Cluster
+DESCRIPTION: Sets the Solana CLI to target the local test validator cluster by default.
+
+LANGUAGE: bash
+CODE:
+solana config set --url http://127.0.0.1:8899
+
+----------------------------------------
+
+TITLE: Distribute SPL Tokens Command
+DESCRIPTION: Command to distribute SPL tokens to recipients with automatic Associated Token Account creation.
+
+LANGUAGE: bash
+CODE:
+solana-tokens distribute-spl-tokens --from <ADDRESS> --owner <KEYPAIR> \
+    --input-csv <RECIPIENTS_CSV> --fee-payer <KEYPAIR>
+
+----------------------------------------
+
+TITLE: Setting TVU Sockets in Solana ContactInfo
+DESCRIPTION: This code shows how TVU socket information is set in the ContactInfo struct for both QUIC and UDP protocols. It uses the set_tvu method created by a macro to update socket information.
+
+LANGUAGE: rust
+CODE:
+info.set_tvu(QUIC, (addr, tvu_quic_port)).unwrap();
+info.set_tvu(UDP, (addr, tvu_udp_port)).unwrap();
+
+----------------------------------------
+
+TITLE: Validator Info Query Output
+DESCRIPTION: Example output from querying validator information, showing the validator's public key and associated metadata.
+
+LANGUAGE: text
+CODE:
+Validator info from 8WdJvDz6obhADdxpGCiJKZsDYwTLNEDFizayqziDc9ah
+  Validator pubkey: 6dMH3u76qZ7XG4bVboVRnBHR2FfrxEqTTTyj4xmyDMWo
+  Info: {"iconUrl":"elvis","name":"Elvis Validator","website":"https://elvis-validates.com"}
+
+----------------------------------------
+
+TITLE: Basic Token Distribution CSV Format
+DESCRIPTION: Example CSV format for specifying token recipients and amounts with optional lockup dates.
+
+LANGUAGE: text
+CODE:
+recipient,amount,lockup_date
+3ihfUy1n9gaqihM5bJCiTAGLgWc5zo3DqVUS6T736NLM,42.0,
+CYRJWqiSjLitBAcRxPvWpgX3s5TvmN2SuRY3eEYypFvT,43.0,
+
+----------------------------------------
+
+TITLE: Launching Agave Validator for Devnet
+DESCRIPTION: Complete command-line configuration for launching an Agave validator node on Solana's Devnet with specified keypairs, ports, and known validators.
+
+LANGUAGE: bash
+CODE:
+agave-validator \
+    --identity validator-keypair.json \
+    --vote-account vote-account-keypair.json \
+    --known-validator dv1ZAGvdsz5hHLwWXsVnM94hWf1pjbKVau1QVkaMJ92 \
+    --known-validator dv2eQHeP4RFrJZ6UeiZWoc3XTtmtZCUKxxCApCDcRNV \
+    --known-validator dv4ACNkpYPcE3aKmYDqZm9G5EB3J4MRoeE7WNDRBVJB \
+    --known-validator dv3qDFk1DTF36Z62bNvrCXe9sKATA6xvVy6A798xxAS \
+    --only-known-rpc \
+    --ledger ledger \
+    --rpc-port 8899 \
+    --dynamic-port-range 8000-8020 \
+    --entrypoint entrypoint.devnet.solana.com:8001 \
+    --entrypoint entrypoint2.devnet.solana.com:8001 \
+    --entrypoint entrypoint3.devnet.solana.com:8001 \
+    --entrypoint entrypoint4.devnet.solana.com:8001 \
+    --entrypoint entrypoint5.devnet.solana.com:8001 \
+    --expected-genesis-hash EtWTRABZaYq6iMfeYKouRu166VU2xqa1wcaWoxPkrZBG \
+    --wal-recovery-mode skip_any_corrupted_record \
+    --limit-ledger-size
+
+----------------------------------------
+
+TITLE: Generating Code Coverage
+DESCRIPTION: Commands to generate and view code coverage statistics.
+
+LANGUAGE: bash
+CODE:
+$ scripts/coverage.sh
+$ open target/cov/lcov-local/index.html
+
+----------------------------------------
+
+TITLE: Implementing Durable Nonce Contract Flow in Solana
+DESCRIPTION: This code snippet outlines the flow of operations for implementing a durable nonce contract in Solana. It includes steps for account creation, nonce initialization, nonce advancement, and withdrawal operations.
+
+LANGUAGE: text
+CODE:
+Start
+Create Account
+  state = Uninitialized
+NonceInstruction
+  if state == Uninitialized
+    if account.balance < rent_exempt
+      error InsufficientFunds
+    state = Initialized
+  elif state != Initialized
+    error BadState
+  if sysvar.recent_blockhashes.is_empty()
+    error EmptyRecentBlockhashes
+  if !sysvar.recent_blockhashes.contains(stored_nonce)
+    error NotReady
+  stored_hash = sysvar.recent_blockhashes[0]
+  success
+WithdrawInstruction(to, lamports)
+  if state == Uninitialized
+    if !signers.contains(owner)
+      error MissingRequiredSignatures
+  elif state == Initialized
+    if !sysvar.recent_blockhashes.contains(stored_nonce)
+      error NotReady
+    if lamports != account.balance && lamports + rent_exempt > account.balance
+      error InsufficientFunds
+  account.balance -= lamports
+  to.balance += lamports
+  success
+
+----------------------------------------
+
+TITLE: Viewing Ledger Wallet Public Key
+DESCRIPTION: Command to display the wallet ID/public key of a connected Ledger device.
+
+LANGUAGE: bash
+CODE:
+solana-keygen pubkey usb://ledger
+
+----------------------------------------
+
+TITLE: Network Partition Configuration
+DESCRIPTION: JSON configuration for creating network partitions with specific loss and delay parameters
+
+LANGUAGE: json
+CODE:
+{
+      "partitions":[
+         34,
+         33,
+         33
+      ],
+      "interconnects":[
+         {
+            "a":0,
+            "b":1,
+            "config":"loss 15% delay 25ms"
+         },
+         {
+            "a":1,
+            "b":0,
+            "config":"loss 15% delay 25ms"
+         },
+         {
+            "a":0,
+            "b":2,
+            "config":"loss 10% delay 15ms"
+         },
+         {
+            "a":2,
+            "b":0,
+            "config":"loss 10% delay 15ms"
+         },
+         {
+            "a":2,
+            "b":1,
+            "config":"loss 5% delay 5ms"
+         },
+         {
+            "a":1,
+            "b":2,
+            "config":"loss 5% delay 5ms"
+         }
+      ]
+}
+
+----------------------------------------
+
+TITLE: Withdrawing Funds from Nonce Account
+DESCRIPTION: Command to withdraw funds from a nonce account to a specified recipient.
+
+LANGUAGE: bash
+CODE:
+solana withdraw-from-nonce-account nonce-keypair.json ~/.config/solana/id.json 0.5
+
+----------------------------------------
+
+TITLE: Returning Multiple Values and Structs in Solidity
+DESCRIPTION: Shows a Solidity function returning multiple values, including arrays and structs. This example highlights the complex return types possible in Solidity, which pose challenges when implementing similar functionality in Solana SBF programs.
+
+LANGUAGE: solidity
+CODE:
+struct S {
+    int f1;
+    bool f2
+};
+
+function foo2() public returns (string, int[], S) {
+    return (a, b, c);
+}
+
+----------------------------------------
+
+TITLE: Creating Stake Keypair in Solana
+DESCRIPTION: Generate a new staking keypair for your Solana validator. This keypair will be used for stake delegation.
+
+LANGUAGE: bash
+CODE:
+solana-keygen new -o ~/validator-stake-keypair.json
+
+----------------------------------------
+
+TITLE: Running Auto-updating Validator Node
+DESCRIPTION: Configuration and execution of a validator node with automatic updates
+
+LANGUAGE: bash
+CODE:
+$ agave-install init --pubkey 92DMonmBYXwEMHJ99c9ceRSpAmk9v6i3RdvDdXaVcrfj
+$ export PATH=~/.local/share/agave-install/bin:$PATH
+$ solana-keygen ...
+$ agave-install run agave-validator ...
+
+----------------------------------------
+
+TITLE: Defining Test Instructions using Attribute Macros in Rust
+DESCRIPTION: Example of instruction enum using the new accounts format with attribute macros to specify account permissions and documentation. Demonstrates how to define transfer, multisig, and nonce account instructions with proper account metadata.
+
+LANGUAGE: rust
+CODE:
+#[instructions(test_program::id())]
+pub enum TestInstruction {
+    /// Transfer lamports
+    #[accounts(
+        from_account(SIGNER, WRITABLE, desc = "Funding account"),
+        to_account(WRITABLE, desc = "Recipient account"),
+    )]
+    Transfer {
+        lamports: u64,
+    },
+
+    /// Provide M of N required signatures
+    #[accounts(
+        data_account(WRITABLE, desc = "Data account"),
+        signers(SIGNER, multiple, desc = "Signer"),
+    )]
+    Multisig,
+
+    /// Consumes a stored nonce, replacing it with a successor
+    #[accounts(
+        nonce_account(SIGNER, WRITABLE, desc = "Nonce account"),
+        recent_blockhashes_sysvar(desc = "RecentBlockhashes sysvar"),
+        nonce_authority(SIGNER, optional, desc = "Nonce authority"),
+    )]
+    AdvanceNonceAccount,
+}
+
+----------------------------------------
+
+TITLE: Publishing Validator Info using Solana CLI
+DESCRIPTION: Command to publish validator information to the Solana blockchain using a validator keypair. Allows setting validator name and optional information arguments.
+
+LANGUAGE: bash
+CODE:
+solana validator-info publish --keypair ~/validator-keypair.json <VALIDATOR_INFO_ARGS> <VALIDATOR_NAME>
+
+----------------------------------------
+
+TITLE: Publishing Validator Info using Solana CLI
+DESCRIPTION: Command to publish validator information to the Solana blockchain using a validator keypair. Allows setting validator name and optional information arguments.
+
+LANGUAGE: bash
+CODE:
+solana validator-info publish --keypair ~/validator-keypair.json <VALIDATOR_INFO_ARGS> <VALIDATOR_NAME>
+
+----------------------------------------
+
+TITLE: Configuring Solana Devnet Metrics and RPC
+DESCRIPTION: Configuration commands for setting up Solana metrics and RPC connection for the Devnet environment.
+
+LANGUAGE: bash
+CODE:
+export SOLANA_METRICS_CONFIG="host=https://metrics.solana.com:8086,db=devnet,u=scratch_writer,p=topsecret"
+solana config set --url https://api.devnet.solana.com
+
+----------------------------------------
+
+TITLE: Extracting Prebuilt Binaries on MacOS
+DESCRIPTION: These commands download, extract, and set up the PATH for prebuilt Solana binaries on MacOS systems.
+
+LANGUAGE: bash
+CODE:
+tar jxf solana-release-x86_64-apple-darwin.tar.bz2
+cd solana-release/
+export PATH=$PWD/bin:$PATH
+
+----------------------------------------
+
+TITLE: Installing fail2ban Security Tool
+DESCRIPTION: Command to install fail2ban, a network security tool that protects against brute force attacks by monitoring logs and banning suspicious IP addresses.
+
+LANGUAGE: bash
+CODE:
+sudo apt install fail2ban
+
+----------------------------------------
+
+TITLE: Verifying Solana CLI Configuration
+DESCRIPTION: Checks the genesis hash to verify the CLI is configured correctly for the local cluster.
+
+LANGUAGE: bash
+CODE:
+solana genesis-hash
+
+----------------------------------------
+
+TITLE: Configuring GCP Project
+DESCRIPTION: Commands to authenticate and set up GCP project for test network deployment.
+
+LANGUAGE: bash
+CODE:
+$ gcloud auth login
+gcloud config set project principal-lane-200702
+
+----------------------------------------
+
+TITLE: Verifying Solana Keypair
+DESCRIPTION: Command to verify that a public key matches the private key in a keypair file.
+
+LANGUAGE: bash
+CODE:
+solana-keygen verify <PUBKEY> ~/my-solana-wallet/my-keypair.json
+
+----------------------------------------
+
+TITLE: Creating a Vote Account in Solana CLI
+DESCRIPTION: This command creates a new vote account using the Solana CLI. It demonstrates the basic syntax for the create-vote-account command.
+
+LANGUAGE: bash
+CODE:
+solana create-vote-account
+
+----------------------------------------
+
+TITLE: Updating Solana Storage Protobufs
+DESCRIPTION: This snippet describes the process of updating solana-storage-proto structs. It explains that these structs are auto-generated from protobuf definitions during the build process, and can be updated by editing the proto/*.proto files.
+
+LANGUAGE: Markdown
+CODE:
+# Storage Protobufs
+
+The `solana-storage-proto` structs used in `src/convert.rs` and elsewhere are
+auto-generated from protobuf definitions on build. To update these structs,
+simply make the desired edits to `proto/*.proto` files.
+
+----------------------------------------
+
+TITLE: Setting Up PATH for Windows Prebuilt Binaries
+DESCRIPTION: This command sets up the PATH environment variable for Solana binaries on Windows systems.
+
+LANGUAGE: bash
+CODE:
+cd solana-release/
+set PATH=%cd%/bin;%PATH%
+
+----------------------------------------
+
+TITLE: Deactivating Stake in Solana
+DESCRIPTION: Deactivate previously delegated stake before detaching the validator from the cluster.
+
+LANGUAGE: bash
+CODE:
+solana deactivate-stake ~/validator-stake-keypair.json
+
+----------------------------------------
+
+TITLE: Accessing Sysvar via get() Method in Solana
+DESCRIPTION: Demonstrates how to query a sysvar at runtime using the get() function, which is supported by Clock, EpochSchedule, Fees, Rent, and EpochRewards sysvars.
+
+LANGUAGE: rust
+CODE:
+let clock = Clock::get()
+
+----------------------------------------
+
+TITLE: Clippy Lint Configuration - Rust
+DESCRIPTION: Example of using attribute macros to configure Clippy lint behavior in Rust code.
+
+LANGUAGE: rust
+CODE:
+#[allow(clippy::too_many_arguments)]
+
+----------------------------------------
+
+TITLE: Re-delegating Stake in Solana
+DESCRIPTION: Re-delegate stake to another validator node. This can be done once per epoch.
+
+LANGUAGE: bash
+CODE:
+solana delegate-stake ~/validator-stake-keypair.json ~/some-other-vote-account-keypair.json
+
+----------------------------------------
+
+TITLE: Defining TransactionProcessingCallback Trait in Rust
+DESCRIPTION: This code snippet defines the TransactionProcessingCallback trait, which must be implemented by downstream consumers of the SVM to provide account loading and retrieval functionality.
+
+LANGUAGE: rust
+CODE:
+pub trait TransactionProcessingCallback {
+    fn account_matches_owners(&self, account: &Pubkey, owners: &[Pubkey]) -> Option<usize>;
+
+    fn get_account_shared_data(&self, pubkey: &Pubkey) -> Option<AccountSharedData>;
+
+    fn add_builtin_account(&self, _name: &str, _program_id: &Pubkey) {}
+
+    fn get_current_epoch_vote_account_stake(&self, _vote_address: &Pubkey) -> u64;
+}
+
+----------------------------------------
+
+TITLE: Launching Agave Validator for Testnet
+DESCRIPTION: Complete command-line configuration for launching an Agave validator node on Solana's Testnet with specified keypairs, ports, and known validators.
+
+LANGUAGE: bash
+CODE:
+agave-validator \
+    --identity validator-keypair.json \
+    --vote-account vote-account-keypair.json \
+    --known-validator 5D1fNXzvv5NjV1ysLjirC4WY92RNsVH18vjmcszZd8on \
+    --known-validator dDzy5SR3AXdYWVqbDEkVFdvSPCtS9ihF5kJkHCtXoFs \
+    --known-validator Ft5fbkqNa76vnsjYNwjDZUXoTWpP7VYm3mtsaQckQADN \
+    --known-validator eoKpUABi59aT4rR9HGS3LcMecfut9x7zJyodWWP43YQ \
+    --known-validator 9QxCLckBiJc783jnMvXZubK4wH86Eqqvashtrwvcsgkv \
+    --only-known-rpc \
+    --ledger ledger \
+    --rpc-port 8899 \
+    --dynamic-port-range 8000-8020 \
+    --entrypoint entrypoint.testnet.solana.com:8001 \
+    --entrypoint entrypoint2.testnet.solana.com:8001 \
+    --entrypoint entrypoint3.testnet.solana.com:8001 \
+    --expected-genesis-hash 4uhcVJyU9pJkvQyS88uRDiswHXSCkY3zQawwpjk2NsNY \
+    --wal-recovery-mode skip_any_corrupted_record \
+    --limit-ledger-size
+
+----------------------------------------
+
+TITLE: Setting New Stake Authority with Solana CLI
+DESCRIPTION: Change the stake authority of a stake account using the existing stake authority to authorize the change.
+
+LANGUAGE: bash
+CODE:
+solana stake-authorize <STAKE_ACCOUNT_ADDRESS> \
+    --stake-authority <KEYPAIR> --new-stake-authority <PUBKEY> \
+    --fee-payer <KEYPAIR>
+
+----------------------------------------
+
+TITLE: Configuring Agave Validator Startup Script
+DESCRIPTION: Example configuration for validator startup script showing identity, vote account, and authorized voter settings
+
+LANGUAGE: bash
+CODE:
+exec /home/sol/bin/agave-validator \
+    --identity /home/sol/identity.json \
+    --vote-account /home/sol/vote.json \
+    --authorized-voter /home/sol/staked-identity.json \
+
+----------------------------------------
+
+TITLE: Viewing Stake Account Information with Solana CLI
+DESCRIPTION: Display information about a stake account using its address.
+
+LANGUAGE: bash
+CODE:
+solana stake-account <STAKE_ACCOUNT_ADDRESS>
+
+----------------------------------------
+
+TITLE: Authorizing New Vote Authority in Solana
+DESCRIPTION: This command authorizes a new vote authority for a Solana vote account. It requires the vote account keypair, current validator keypair, and new vote authority keypair.
+
+LANGUAGE: bash
+CODE:
+solana vote-authorize-voter-checked ~/vote-account-keypair.json ~/validator-keypair.json ~/new-vote-authority.json
+
+----------------------------------------
+
+TITLE: Withdrawing Stake with Solana CLI
+DESCRIPTION: Transfer tokens from a stake account to another address using the withdraw authority.
+
+LANGUAGE: bash
+CODE:
+solana withdraw-stake --withdraw-authority <KEYPAIR> <STAKE_ACCOUNT_ADDRESS> <RECIPIENT_ADDRESS> <AMOUNT> \
+    --fee-payer <KEYPAIR>
+
+----------------------------------------
+
+TITLE: Submitting Offline Signed Solana Transaction
+DESCRIPTION: Example of submitting a Solana transaction that was signed offline. The command includes the blockhash and signer information used during the offline signing process.
+
+LANGUAGE: bash
+CODE:
+solana transfer --blockhash 5Tx8F3jgSHx21CbtjwmdaKPLM5tWmreWAnPrbqHomSJF \
+    --signer FhtzLVsmcV7S5XqGD79ErgoseCLhZYmEZnz9kQg1Rp7j=4vC38p4bz7XyiXrk6HtaooUqwxTWKocf45cstASGtmrD398biNJnmTcUCVEojE7wVQvgdYbjHJqRFZPpzfCQpmUN
+    recipient-keypair.json 1
+
+----------------------------------------
+
+TITLE: Signing Off-Chain Message with Version Specification
+DESCRIPTION: Signs an off-chain message with a specified version number, allowing for different message format versions when they become available.
+
+LANGUAGE: bash
+CODE:
+solana sign-offchain-message -k <KEYPAIR> --version <VERSION> <MESSAGE>
+
+----------------------------------------
+
+TITLE: Installing Dependencies for Solana Validator Docs
+DESCRIPTION: Command to install the necessary dependencies for the Solana validator documentation using npm.
+
+LANGUAGE: bash
+CODE:
+npm install
+
+----------------------------------------
+
+TITLE: Verifying Off-Chain Message Signature with Custom Signer
+DESCRIPTION: Verifies the signature of an off-chain message using a specified public key instead of the default CLI signer.
+
+LANGUAGE: bash
+CODE:
+solana verify-offchain-signature --signer <PUBKEY> <MESSAGE> <SIGNATURE>
+
+----------------------------------------
+
+TITLE: Building the Project
+DESCRIPTION: Command to build debug version of the project.
+
+LANGUAGE: bash
+CODE:
+$ ./cargo build
+
+----------------------------------------
+
+TITLE: Verifying Off-Chain Message Signature
+DESCRIPTION: Verifies the signature of an off-chain message using the default CLI signer's public key.
+
+LANGUAGE: bash
+CODE:
+solana verify-offchain-signature <MESSAGE> <SIGNATURE>
+
+----------------------------------------
+
+TITLE: Version Update Commands
+DESCRIPTION: Commands for updating version numbers and pushing changes to master
+
+LANGUAGE: bash
+CODE:
+$ scripts/increment-cargo-version.sh minor\n\ngit co -b version_update\ngit ls-files -m | xargs git add\ngit commit -m 'Bump version to X.Y+1.0'\ngit push -u origin version_update
+
+----------------------------------------
+
+TITLE: Defining Signing Domain Specifier in Solana
+DESCRIPTION: Defines the binary prefix used to uniquely identify off-chain message signatures in Solana. The prefix starts with 0xff to prevent transaction signature conflicts and includes descriptive text.
+
+LANGUAGE: plaintext
+CODE:
+b"\xffsolana offchain"
+
+----------------------------------------
+
+TITLE: Initializing KaTeX with HTML5 Template
+DESCRIPTION: This HTML5 template demonstrates how to include KaTeX in a web page, including the required CSS and JavaScript files. It also shows how to set up auto-rendering of math in text elements.
+
+LANGUAGE: html
+CODE:
+<!DOCTYPE html>
+<!-- KaTeX requires the use of the HTML5 doctype. Without it, KaTeX may not render properly -->
+<html>
+  <head>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.12.0/dist/katex.min.css" integrity="sha384-AfEj0r4/OFrOo5t7NnNe46zW/tFgW6x/bCJG8FqQCEo3+Aro6EYUG4+cU+KJWu/X" crossorigin="anonymous">
+
+    <!-- The loading of KaTeX is deferred to speed up page rendering -->
+    <script defer src="https://cdn.jsdelivr.net/npm/katex@0.12.0/dist/katex.min.js" integrity="sha384-g7c+Jr9ZivxKLnZTDUhnkOnsh30B4H0rpLUpJ4jAIKs4fnJI+sEnkvrMWph2EDg4" crossorigin="anonymous"></script>
+
+    <!-- To automatically render math in text elements, include the auto-render extension: -->
+    <script defer src="https://cdn.jsdelivr.net/npm/katex@0.12.0/dist/contrib/auto-render.min.js" integrity="sha384-mll67QQFJfxn0IYznZYonOWZ644AWYC+Pt2cHqMaRhXVrursRwvLnLaebdGIlYNa" crossorigin="anonymous"
+        onload="renderMathInElement(document.body);"></script>
+  </head>
+  ...
+</html>
+
+----------------------------------------
+
+TITLE: Airdropping SOL Tokens on Devnet
+DESCRIPTION: Command to request an airdrop of SOL tokens to a specified wallet address on Solana's devnet.
+
+LANGUAGE: bash
+CODE:
+solana airdrop 1 <RECIPIENT_ACCOUNT_ADDRESS> --url https://api.devnet.solana.com
+
+----------------------------------------
+
+TITLE: Creating Identity Symlinks for Active Validator
+DESCRIPTION: Command to create symbolic link for staked identity on the active voting validator
+
+LANGUAGE: bash
+CODE:
+ln -sf /home/sol/staked-identity.json /home/sol/identity.json
+
+----------------------------------------
+
+TITLE: Setting Up Solana CLI and Checking Balance
+DESCRIPTION: Configures Solana CLI connection and checks account balance
+
+LANGUAGE: bash
+CODE:
+solana config set --url <CLUSTER URL>
+
+LANGUAGE: bash
+CODE:
+solana balance <PUBKEY>
+
+----------------------------------------
+
+TITLE: Adding frozen_abi attribute to Rust struct
+DESCRIPTION: Example of adding the #[frozen_abi] attribute to a Rust struct to enforce ABI stability. The attribute includes a digest value derived from the struct's field types.
+
+LANGUAGE: rust
+CODE:
++#[frozen_abi(digest="eXSMM7b89VY72V...")]
+ #[derive(Serialize, Default, Deserialize, Debug, PartialEq, Eq, Clone)]
+ pub struct Vote {
+     /// A stack of votes starting with the oldest vote
+     pub slots: Vec<Slot>,
+     /// signature of the bank's state at the last slot
+     pub hash: Hash,
+ }
+
+----------------------------------------
+
+TITLE: Hierarchical Key Derivation
+DESCRIPTION: Demonstrates BIP32/BIP44 hierarchical derivation of keys using custom derivation paths
+
+LANGUAGE: bash
+CODE:
+solana-keygen pubkey 'prompt://?key=0/1'
+
+LANGUAGE: bash
+CODE:
+solana-keygen pubkey 'prompt://?full-path=m/44/2017/0/1'
+
+----------------------------------------
+
+TITLE: Stopping Metric Services
+DESCRIPTION: Command to stop the local metric services
+
+LANGUAGE: bash
+CODE:
+$ ./stop.sh
+
+----------------------------------------
+
+TITLE: Generating New Solana Paper Wallet
+DESCRIPTION: Creates a new paper wallet without saving the keypair to disk using the solana-keygen tool
+
+LANGUAGE: bash
+CODE:
+solana-keygen new --no-outfile
+
+----------------------------------------
+
+TITLE: Setting Telegram Chat ID for agave-watchtower in Bash
+DESCRIPTION: Command to set the TELEGRAM_CHAT_ID environment variable for agave-watchtower. This specifies the Telegram group where notifications will be sent.
+
+LANGUAGE: bash
+CODE:
+export TELEGRAM_CHAT_ID=<negative chat id number>
+
+----------------------------------------
+
+TITLE: Running BigTable Emulator and Initializing Environment in Bash
+DESCRIPTION: Commands to start the Cloud BigTable emulator, set up the environment variable, and initialize the emulator for development and testing purposes.
+
+LANGUAGE: bash
+CODE:
+gcloud beta emulators bigtable start
+
+LANGUAGE: bash
+CODE:
+$(gcloud beta emulators bigtable env-init)
+
+LANGUAGE: bash
+CODE:
+./init-bigtable.sh
+
+----------------------------------------
+
+TITLE: Installing Solana Using Bootstrap Script
+DESCRIPTION: Downloads and runs the agave-install-init binary using a bootstrap curl script from GitHub releases
+
+LANGUAGE: bash
+CODE:
+$ curl -sSf https://raw.githubusercontent.com/solana-labs/solana/v1.0.0/install/agave-install-init.sh | sh
+
+----------------------------------------
+
+TITLE: Setting Linux Capabilities for Thread Priority
+DESCRIPTION: Bash command to grant the necessary capabilities for adjusting thread priorities, required when using custom scheduling policies
+
+LANGUAGE: bash
+CODE:
+sudo setcap cap_sys_nice+ep
+
+----------------------------------------
+
+TITLE: Cluster Discovery Implementation in Rust
+DESCRIPTION: Shows how to discover cluster nodes using the gossip service over a period of time.
+
+LANGUAGE: rust
+CODE:
+use crate::gossip_service::discover_nodes;
+
+// Discover the cluster over a few seconds.
+let cluster_nodes = discover_nodes(&entry_point_info, num_nodes);
+
+----------------------------------------
+
+TITLE: Initializing Makefile for Solana Program
+DESCRIPTION: Basic makefile configuration to include the Solana Build Framework (SBF) for program compilation.
+
+LANGUAGE: make
+CODE:
+include path/to/sbf.mk
+
+----------------------------------------
+
+TITLE: Example of a Fully Qualified Keypair URL for Ledger Device
+DESCRIPTION: This snippet shows an example of a complete keypair URL for a Ledger hardware wallet, including the manufacturer, wallet ID, and derivation path.
+
+LANGUAGE: text
+CODE:
+usb://ledger/BsNsvfXqQTtJnagwFWdBS7FBXgnsK8VZ5CmuznN85swK?key=0/0
+
+----------------------------------------
+
+TITLE: Block Commitment Update Function
+DESCRIPTION: Helper function that updates both stake and block commitment values for a given ancestor. Updates the commitment array based on vote confirmations and account stake.
+
+LANGUAGE: text
+CODE:
+    fn f`(
+        stake: &mut Stake,
+        some_ancestor: &mut BlockCommitment,
+        vote_account: VoteAccount,
+        v: Vote, total_stake: u64
+    ){
+        f(stake, vote_account, v);
+        *some_ancestor.commitment[v.num_confirmations] += vote_account.stake;
+    }
+
+----------------------------------------
+
+TITLE: Installing Specific Agave Version
+DESCRIPTION: Command to install a specific version of Agave using the agave-install utility.
+
+LANGUAGE: bash
+CODE:
+agave-install init 2.0.15
+
+----------------------------------------
+
+TITLE: Calculating Timestamp Slot in Solana
+DESCRIPTION: Formula for determining the most recently timestamped slot based on the current slot and timestamp interval
+
+LANGUAGE: text
+CODE:
+let timestamp_slot = floor(current_slot / timestamp_interval);
+
+----------------------------------------
+
+TITLE: Checking Solana CLI Version
+DESCRIPTION: Command to display the version of the locally installed Solana CLI.
+
+LANGUAGE: bash
+CODE:
+solana --version
+
+----------------------------------------
+
+TITLE: Implementing Fork Choice Loop in Solana's Tower BFT
+DESCRIPTION: This pseudocode implements the main loop of the fork choice algorithm used in Solana's Tower BFT consensus. It iteratively selects the heaviest child block until reaching a leaf node.
+
+LANGUAGE: pseudocode
+CODE:
+*While* `finish == 0`
+*Do*:
+    *If*: `i` has received no children of `B` then set `finish := 1` and return
+    `B`.
+    *Else*: Let `B′` be the child of `B` (amongst those received by `i`) with
+    most the most stake-weighted votes in `V`, breaking ties by the smallest
+    slot. Set `B` equal to `B'`.
+
+----------------------------------------
+
+TITLE: Generated Test Instruction Documentation in Rust
+DESCRIPTION: Auto-generated documentation for the TestInstruction enum showing formatted docs for each variant including account permissions and descriptions.
+
+LANGUAGE: rust
+CODE:
+pub enum TestInstruction {
+    /// Transfer lamports
+    ///
+    /// * Accounts expected by this instruction:
+    ///   0. `[WRITABLE, SIGNER]` Funding account
+    ///   1. `[WRITABLE]` Recipient account
+    Transfer {
+        lamports: u64,
+    },
+
+    /// Provide M of N required signatures
+    ///
+    /// * Accounts expected by this instruction:
+    ///   0. `[WRITABLE]` Data account
+    ///   * (Multiple) `[SIGNER]` Signers
+    Multisig,
+
+    /// Consumes a stored nonce, replacing it with a successor
+    ///
+    /// * Accounts expected by this instruction:
+    ///   0. `[WRITABLE, SIGNER]` Nonce account
+    ///   1. `[]` RecentBlockhashes sysvar
+    ///   2. (Optional) `[SIGNER]` Nonce authority
+    AdvanceNonceAccount,
+}
+
+----------------------------------------
+
+TITLE: Implementing Validator Loop in Solana
+DESCRIPTION: Pseudocode outlining the main loop of a Solana validator, including transitions between validation and slot leader roles. It describes the process of querying the leader schedule, running the TVU, starting the TPU when selected as a slot leader, and producing entries.
+
+LANGUAGE: pseudocode
+CODE:
+1. Query the LeaderScheduler for the next assigned slot.
+2. Run the TVU over all the forks.
+   1. TVU will send votes to what it believes is the "best" fork.
+   2. After each vote, restart the PoH Recorder to run until the next assigned slot.
+3. When time to be a slot leader, start the TPU. Point it to the last fork the TVU voted on.
+4. Produce entries until the end of the slot.
+   1. For the duration of the slot, the TVU must not vote on other forks.
+   2. After the slot ends, the TPU freezes its BankFork. After freezing, the TVU may resume voting.
+5. Goto 1.
+
+----------------------------------------
+
+TITLE: Calculating Block Success Rate in Turbine Propagation
+DESCRIPTION: This code snippet demonstrates the calculation of block success rate in Turbine propagation using different FEC rates. It includes formulas for packet failure probability, shred group failure rate, and overall block success rate.
+
+LANGUAGE: markdown
+CODE:
+Probability of a block succeeding in turbine:
+
+- Probability of packet failure: `P = 1 - (1 - network_packet_loss_rate)^2`
+- FEC rate: `K:M`
+- Number of trials: `N = K + M`
+- Shred group failure rate: `S = 1 - (SUM of i=0 -> M for binomial(prob_failure = P, trials = N, failures = i))`
+- Shreds per block: `G`
+- Block success rate: `B = (1 - S) ^ (G / N)`
+- Binomial distribution for exactly `i` results with probability of P in N trials is defined as `(N choose i) * P^i * (1 - P)^(N-i)`
+
+For example:
+
+- Network packet loss rate is 15%.
+- 50k tps network generates 6400 shreds per second.
+- FEC rate increases the total shreds per block by the FEC ratio.
+
+With a FEC rate: `16:4`
+
+- `G = 8000`
+- `P = 1 - 0.85 * 0.85 = 1 - 0.7225 = 0.2775`
+- `S = 1 - (SUM of i=0 -> 4 for binomial(prob_failure = 0.2775, trials = 20, failures = i)) = 0.689414`
+- `B = (1 - 0.689) ^ (8000 / 20) = 10^-203`
+
+With FEC rate of `16:16`
+
+- `G = 12800`
+- `S = 1 - (SUM of i=0 -> 16 for binomial(prob_failure = 0.2775, trials = 32, failures = i)) = 0.002132`
+- `B = (1 - 0.002132) ^ (12800 / 32) = 0.42583`
+
+With FEC rate of `32:32`
+
+- `G = 12800`
+- `S = 1 - (SUM of i=0 -> 32 for binomial(prob_failure = 0.2775, trials = 64, failures = i)) = 0.000048`
+- `B = (1 - 0.000048) ^ (12800 / 64) = 0.99045`
+
+----------------------------------------
+
+TITLE: Generating Deterministic Seed for Shred Retransmission in Rust
+DESCRIPTION: This code snippet demonstrates how a deterministic seed is generated for shred retransmission based on the slot, index, and leader public key. It's used when the 'enable_deterministic_seed' feature is enabled.
+
+LANGUAGE: rust
+CODE:
+if enable_deterministic_seed(self.slot(), root_bank) {
+    hashv(&[
+        &self.slot().to_le_bytes(),
+        &self.index().to_le_bytes(),
+        &leader_pubkey.to_bytes(),
+    ])
+}
+
+----------------------------------------
+
+TITLE: Running JSON RPC Client for Solana Transaction Simulation
+DESCRIPTION: Command to run the json-rpc-client using cargo. It requires a configuration file, a keypair file, and a server URL.
+
+LANGUAGE: bash
+CODE:
+cargo run --manifest-path json-rpc-client/Cargo.toml -- -C config.yml -k json-rpc-program/target/deploy/helloworld-keypair.json -u localhost
+
+----------------------------------------
+
+TITLE: Illustrating Epoch Boundary and Reward Calculation Requests
+DESCRIPTION: This ASCII diagram illustrates the relationship between blocks at an epoch boundary and how reward calculation requests are sent for different forks.
+
+LANGUAGE: plaintext
+CODE:
+N-1 -- N -- N+1
+     \
+      \
+        N+2
+
+----------------------------------------
+
+TITLE: Slashable Votes Diagram - ASCII Art Example
+DESCRIPTION: Visual representation showing an example of slashable votes vote(X', S') and vote(X, S) demonstrating overlapping vote ranges that would trigger slashing conditions.
+
+LANGUAGE: text
+CODE:
+                                  +-------+
+                                  |       |
+                        +---------+       +--------+
+                        |         |       |        |
+                        |         +-------+        |
+                        |                          |
+                        |                          |
+                        |                          |
+                    +---+---+                      |
+                    |       |                      |
+                X   |       |                      |
+                    |       |                      |
+                    +---+---+                      |
+                        |                          |
+                        |                      +---+---+
+                        |                      |       |
+                        |                      |       |  X'
+                        |                      |       |
+                        |                      +---+---+
+                        |                          |
+                        |                          |
+                        |                          |
+                        |                          |
+                        |                      +---+---+
+                        |                      |       |
+                        |                      |       |  S'.last
+                        |                      |       |
+                        |                      +-------+
+                        |
+                    +---+---+
+                    |       |
+                 s  |       |
+                    |       |
+                    +---+---+
+                        |
+                        |
+                        |
+                        |
+                    +---+---+
+                    |       |
+             S.last |       |
+                    |       |
+                    +-------+
+
+----------------------------------------
+
+TITLE: Returning String from Solidity Function
+DESCRIPTION: Demonstrates a Solidity function that returns a variable-length string. This example illustrates the flexibility of return types in Solidity, which is not directly supported in Solana SBF programs.
+
+LANGUAGE: solidity
+CODE:
+function foo1() public returns (string) {
+    return "Hello, world!\n";
+}
+
+----------------------------------------
+
+TITLE: Configuring Geyser Plugin in JSON5
+DESCRIPTION: Example configuration file for a Geyser plugin, specifying database connection details and account selection criteria.
+
+LANGUAGE: json
+CODE:
+{
+	"libpath": "/solana/target/release/libsolana_geyser_plugin_postgres.so",
+	"host": "postgres-server",
+	"user": "solana",
+	"port": 5433,
+	"threads": 20,
+	"batch_size": 20,
+	"panic_on_db_errors": true,
+	"accounts_selector" : {
+		"accounts" : ["*"]
+	}
+}
+
+----------------------------------------
+
+TITLE: Error Handling in Solidity Functions
+DESCRIPTION: Demonstrates error handling in Solidity using 'require' and 'revert' statements. These examples show how Ethereum contracts can return descriptive error messages, which is a feature that needs to be addressed differently in Solana SBF programs.
+
+LANGUAGE: solidity
+CODE:
+function withdraw() public {
+    require(msg.sender == owner, "Permission denied");
+}
+
+function failure() public {
+    revert("I afraid I can't do that dave");
+}
+
+----------------------------------------
+
+TITLE: Checking Solana CLI Version
+DESCRIPTION: Verifies the installed version of the Solana command-line interface.
+
+LANGUAGE: bash
+CODE:
+solana --version
+
+----------------------------------------
+
+TITLE: Updating TransportError in Rust for Solana Client
+DESCRIPTION: Modifies the TransportError enum to use a boxed dynamic Error trait instead of a String for custom errors. This change enhances error handling flexibility in the Client implementation.
+
+LANGUAGE: rust
+CODE:
+Custom(Box<dyn Error>)
+
+----------------------------------------
+
+TITLE: Basic Solana Program Structure in C
+DESCRIPTION: Minimal Solana program implementation showing the required entrypoint function with input deserialization and parameter handling. Demonstrates basic account info processing and error handling.
+
+LANGUAGE: c
+CODE:
+#include <solana_sdk.h>
+
+extern uint64_t entrypoint(const uint8_t *input) {
+  SolAccountInfo ka[1];
+  SolParameters params = (SolParameters) { .ka = ka };
+
+  if (!sol_deserialize(input, &params, SOL_ARRAY_SIZE(ka))) {
+    return ERROR_INVALID_ARGUMENT;
+  }
+  return SUCCESS;
+}
+
+----------------------------------------
+
+TITLE: Calculating Bank Hash in Solana
+DESCRIPTION: This code snippet shows how the bank hash is calculated in Solana. It combines the parent hash, accounts delta hash, signature count, and latest blockhash to create a unique identifier for the bank state.
+
+LANGUAGE: rust
+CODE:
+let mut hash = hashv(&[
+    // bank hash of the parent block
+    self.parent_hash.as_ref(),
+    // hash of all the modified accounts
+    accounts_delta_hash.hash.as_ref(),
+    // Number of signatures processed in this block
+    &signature_count_buf,
+    // Last PoH hash in this block
+    self.latest_blockhash().as_ref(),
+]);
+
+----------------------------------------
+
+TITLE: Displaying Solana CLI Help
+DESCRIPTION: Shows how to view all available Solana CLI commands and get help for specific commands.
+
+LANGUAGE: bash
+CODE:
+solana --help
+
+LANGUAGE: bash
+CODE:
+solana <COMMAND> --help
+
+----------------------------------------
+
+TITLE: Calculating Vote Lockout Duration in PoS System
+DESCRIPTION: Mathematical formula for calculating the lockout duration for validator votes. The lockout period is determined by the initial vote PoH count and subsequent vote PoH counts, using an exponential function to determine the lockout duration.
+
+LANGUAGE: text
+CODE:
+Lockouti(PoHi, PoHj) = PoHj + K * exp((PoHj - PoHi) / K)
+
+----------------------------------------
+
+TITLE: Visualizing Final Pruned Fork Structure in Agave Ledger
+DESCRIPTION: This ASCII diagram shows the final pruned fork structure after voting on slot 11, which roots slot 7 and eliminates the remaining fork.
+
+LANGUAGE: plaintext
+CODE:
+       3 - 5 - 7 - 9 - 10 - 11
+      SMR     ROOT
+
+----------------------------------------
+
+TITLE: Implementing Versioned Transaction Format - Rust
+DESCRIPTION: New transaction format structures to support address table lookups, including versioned transaction wrapper, message formats, and address table lookup definitions.
+
+LANGUAGE: rust
+CODE:
+#[derive(Serialize, Deserialize)]
+pub struct VersionedTransaction {
+    /// List of signatures
+    #[serde(with = "short_vec")]
+    pub signatures: Vec<Signature>,
+    /// Message to sign.
+    pub message: VersionedMessage,
+}
+
+pub enum VersionedMessage {
+    Legacy(LegacyMessage),
+    V0(v0::Message),
+}
+
+#[derive(Serialize, Deserialize)]
+pub struct Message {
+  pub header: MessageHeader,
+  #[serde(with = "short_vec")]
+  pub account_keys: Vec<Pubkey>,
+  pub recent_blockhash: Hash,
+  #[serde(with = "short_vec")]
+  pub instructions: Vec<CompiledInstruction>,
+  #[serde(with = "short_vec")]
+  pub address_table_lookups: Vec<MessageAddressTableLookup>,
+}
+
+#[derive(Serialize, Deserialize)]
+pub struct MessageAddressTableLookup {
+  /// Address lookup table account key
+  pub account_key: Pubkey,
+  /// List of indexes used to load writable account addresses
+  #[serde(with = "short_vec")]
+  pub writable_indexes: Vec<u8>,
+  /// List of indexes used to load readonly account addresses
+  #[serde(with = "short_vec")]
+  pub readonly_indexes: Vec<u8>,
+}
+
+----------------------------------------
+
+TITLE: Creating Hard Fork Snapshot with Destaked Validators
+DESCRIPTION: Command to create a new snapshot while destaking specific validator vote accounts when insufficient stake participation occurs during restart.
+
+LANGUAGE: bash
+CODE:
+agave-ledger-tool -l ledger create-snapshot SLOT_X ledger --hard-fork SLOT_X \
+    --destake-vote-account <VOTE_ACCOUNT_1> \
+    --destake-vote-account <VOTE_ACCOUNT_2> \
+    .
+    .
+    --destake-vote-account <VOTE_ACCOUNT_N> \
+
+----------------------------------------
+
+TITLE: Illustrating Fork Choice with Duplicate Blocks
+DESCRIPTION: This code snippet illustrates a scenario where a duplicate block at slot 2 affects fork choice. It shows how validators voting on the duplicate block may need to switch to a different fork for network progress.
+
+LANGUAGE: text
+CODE:
+    |-------- 2 (51% voted, then detected this slot was a duplicate and removed this slot from fork choice)
+0---|
+    |---------- 6 (39%)
+
+
+----------------------------------------
+
+TITLE: Signing Basic Off-Chain Message with Solana CLI
+DESCRIPTION: Signs an arbitrary off-chain message using the CLI's default private key. The message will be encoded and signed, with the signature printed to output.
+
+LANGUAGE: bash
+CODE:
+solana sign-offchain-message <MESSAGE>
+
+----------------------------------------
+
+TITLE: Defining and Emitting Events in Solidity
+DESCRIPTION: This snippet demonstrates how to define an event and emit it within a Solidity contract. It shows the structure of an event and how it can be used to log data.
+
+LANGUAGE: solidity
+CODE:
+event PaymentReceived {
+    address sender;
+    uint amount;
+}
+
+contract c {
+    function pay() public payable {
+        emit PaymentReceived(msg.sender, msg.value);
+    }
+}
+
+----------------------------------------
+
+TITLE: RPC Service Configuration in Rust
+DESCRIPTION: Shows how to configure the RPC service with specific gossip-related settings.
+
+LANGUAGE: rust
+CODE:
+let mut validator_config = ValidatorConfig::default_for_test();
+validator_config.rpc_config.enable_rpc_gossip_push = true;
+validator_config.rpc_config.enable_rpc_gossip_refresh_active_set = true;
+
+----------------------------------------
+
+TITLE: Proposed System Call for Binary Data Logging in Solidity
+DESCRIPTION: This snippet shows the proposed system call signature for implementing binary data logging in Solidity. It defines a new function 'sol_log_data' that takes a pointer to SolBytes and a length parameter.
+
+LANGUAGE: c
+CODE:
+void sol_log_data(SolBytes *fields, uint64_t length);
+
+----------------------------------------
+
+TITLE: Account Index Data Structure Definition
+DESCRIPTION: Defines the core data structures used for account indexing, including AccountsFileId, Fork, AccountMap, and AccountIndex types. These structures enable tracking account data across different forks.
+
+LANGUAGE: text
+CODE:
+type AccountsFileId = usize;
+
+type Fork = u64;
+
+struct AccountMap(Hashmap<Fork, (AccountsFileId, u64)>);
+
+type AccountIndex = HashMap<Pubkey, AccountMap>;
+
+----------------------------------------
+
+TITLE: Vote Instructions Implementation
+DESCRIPTION: Core instructions for managing vote accounts including initialization, authorization and vote submission.
+
+LANGUAGE: markdown
+CODE:
+### Initialize(VoteInit)
+- account[0] - RW - The VoteState
+
+### Authorize(Pubkey, VoteAuthorize)
+- account[0] - RW - The VoteState
+
+### AuthorizeWithSeed(VoteAuthorizeWithSeedArgs)
+- account[0] - RW - The VoteState
+
+### Vote(Vote)
+- account[0] - RW - The VoteState
+- account[1] - RO - sysvar::slot_hashes
+- account[2] - RO - sysvar::clock
+
+----------------------------------------
+
+TITLE: Referencing Solana ZK ElGamal Proof Program ID
+DESCRIPTION: The unique identifier for the Solana ZK ElGamal Proof program on the Solana blockchain.
+
+LANGUAGE: plaintext
+CODE:
+ZkE1Gama1Proof11111111111111111111111111111
+
+----------------------------------------
+
+TITLE: Importing ProofInstruction in Rust
+DESCRIPTION: Import statement for the ProofInstruction struct from the Solana ZK ElGamal Proof program's instruction module.
+
+LANGUAGE: rust
+CODE:
+https://github.com/anza-xyz/agave/blob/master/zk-sdk/src/zk_elgamal_proof_program/instruction.rs
+
+----------------------------------------
+
+TITLE: Creating New Branch Commands
+DESCRIPTION: Git commands for checking out master and creating a new version branch
+
+LANGUAGE: bash
+CODE:
+git fetch --all\ngit checkout upstream/master
+
+----------------------------------------
+
+TITLE: Downloading Source Code
+DESCRIPTION: Git commands to clone the Agave repository.
+
+LANGUAGE: bash
+CODE:
+$ git clone https://github.com/anza-xyz/agave.git
+$ cd agave
+
+----------------------------------------
+
+TITLE: Running Tests
+DESCRIPTION: Command to run the full test suite.
+
+LANGUAGE: bash
+CODE:
+$ ./cargo test
+
+----------------------------------------
+
+TITLE: Git Pull Rebase - Bash
+DESCRIPTION: Command for pulling and rebasing against upstream master to remove cherry-picked commits.
+
+LANGUAGE: bash
+CODE:
+$ git pull --rebase upstream master
+
+----------------------------------------
+
+TITLE: Consuming Program ID in Rust Code
+DESCRIPTION: Example of how to consume the program ID specified in Cargo.toml within the program's Rust code.
+
+LANGUAGE: rust
+CODE:
+solana_package_metadata::declare_id_with_package_metadata!("solana.program-id");
+
+LANGUAGE: rust
+CODE:
+solana_pubkey::declare_id!("MyProgram1111111111111111111111111111111111");
+
+----------------------------------------
+
+TITLE: Displaying Repository Update Notice in Markdown
+DESCRIPTION: This markdown snippet provides a clear message to visitors that the Solana SDK is no longer maintained in this repository and directs them to the new location where it is currently being developed.
+
+LANGUAGE: markdown
+CODE:
+# PLEASE READ: This repo no longer contains the Solana SDK
+
+The solana-sdk is currently developed at https://github.com/anza-xyz/solana-sdk
+
+----------------------------------------
+
+TITLE: Automation Script Example
+DESCRIPTION: Script for automated test network deployment with custom configuration
+
+LANGUAGE: bash
+CODE:
+./gce.sh create -n4 -c2 --custom-machine-type "--machine-type n1-standard-16" --client-machine-type "--machine-type n1-standard-4"
+./init-metrics.sh -e
+RUST_LOG=info ./net.sh start  -c bench-tps=2="--tx_count 25000"
+
+----------------------------------------
+
+TITLE: Rendering TeX Expression with KaTeX API
+DESCRIPTION: This JavaScript snippet demonstrates how to use the KaTeX API to render a TeX expression directly into a DOM element. It uses the 'throwOnError' option to handle invalid inputs gracefully.
+
+LANGUAGE: javascript
+CODE:
+katex.render("c = \\pm\\sqrt{a^2 + b^2}", element, {
+    throwOnError: false
+});
+
+----------------------------------------
+
+TITLE: Generating HTML String of Rendered Math with KaTeX
+DESCRIPTION: This JavaScript example shows how to use KaTeX to generate an HTML string of rendered math, which can be useful for server-side rendering. It also uses the 'throwOnError' option for error handling.
+
+LANGUAGE: javascript
+CODE:
+var html = katex.renderToString("c = \\pm\\sqrt{a^2 + b^2}", {
+    throwOnError: false
+});
+// '<span class="katex">...</span>'

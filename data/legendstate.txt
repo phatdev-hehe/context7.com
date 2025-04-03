@@ -1,0 +1,130 @@
+TITLE: Basic Legend-State Usage with React
+DESCRIPTION: Demonstrates core functionality including observable creation, state updates, computed values, and React component integration. Shows how to get/set values and create reactive components.
+
+LANGUAGE: jsx
+CODE:
+import { observable, observe } from "@legendapp/state"
+import { observer } from "@legendapp/state/react"
+
+const settings$ = observable({ theme: 'dark' })
+
+// get returns the raw data
+settings$.theme.get() // 'dark'
+// set sets
+settings$.theme.set('light')
+
+// Computed observables with just a function
+const isDark$ = observable(() => settings$.theme.get() === 'dark')
+
+// observing contexts re-run when tracked observables change
+observe(() => {
+  console.log(settings$.theme.get())
+})
+
+const Component = observer(function Component() {
+    const theme = state$.settings.theme.get()
+
+    return <div>Theme: {theme}</div>
+})
+
+----------------------------------------
+
+TITLE: Fine-Grained Reactivity Example
+DESCRIPTION: Shows how to implement fine-grained updates in React components using Legend-State, demonstrating efficient rendering with minimal component updates.
+
+LANGUAGE: jsx
+CODE:
+function FineGrained() {
+    const count$ = useObservable(0)
+
+    useInterval(() => {
+        count$.set(v => v + 1)
+    }, 600)
+
+    // The text updates itself so the component doesn't re-render
+    return (
+        <div>
+            Count: <Memo>{count$}</Memo>
+        </div>
+    )
+}
+
+----------------------------------------
+
+TITLE: Sync and Persistence Configuration
+DESCRIPTION: Demonstrates setting up syncing and persistence with backend services using Legend-State, including retry logic and change tracking.
+
+LANGUAGE: js
+CODE:
+const state$ = observable(
+    users: syncedKeel({
+        list: queries.getUsers,
+        create: mutations.createUsers,
+        update: mutations.updateUsers,
+        delete: mutations.deleteUsers,
+        persist: { name: 'users', retrySync: true },
+        debounceSet: 500,
+        retry: {
+            infinite: true,
+        },
+        changesSince: 'last-sync',
+    }),
+    // direct link to my user within the users observable
+    me: () => state$.users['myuid']
+)
+
+observe(() => {
+    // get() activates through to state$.users and starts syncing.
+    // it updates itself and re-runs observers when name changes
+    const name = me$.name.get()
+})
+
+// Setting a value goes through to state$.users and saves update to server
+me$.name.set('Annyong')
+
+----------------------------------------
+
+TITLE: Configuring Persistence in Legend State
+DESCRIPTION: Example of how to configure persistence at the beginning of your application after the breaking change in version 0.22.0.
+
+LANGUAGE: javascript
+CODE:
+import { configureObservablePersistence } from '@legendapp/state/persist';
+import { ObservablePersistLocalStorage } from '@legendapp/state/persist-plugins/local-storage';
+
+configureObservablePersistence({
+  // Use Local Storage
+  pluginLocal: ObservablePersistLocalStorage,
+});
+
+----------------------------------------
+
+TITLE: Using the New 'observe' Function in Legend State
+DESCRIPTION: Example of using the new 'observe' function with a callback parameter, introduced in version 0.20.0.
+
+LANGUAGE: javascript
+CODE:
+import { observe } from '@legendapp/state';
+
+observe(someObservable, (e) => {
+  console.log('Value changed:', e.value);
+  console.log('Previous value:', e.previous);
+  console.log('Number of times run:', e.num);
+  
+  // Cancel observing
+  e.cancel = true;
+  
+  // Cleanup function
+  e.onCleanup = () => {
+    // Cleanup code here
+  };
+});
+
+----------------------------------------
+
+TITLE: Running Benchmarks with Hyperfine
+DESCRIPTION: Instructions for executing performance benchmarks using Hyperfine benchmarking tool. The benchmarks are organized by optimization category with each having its own directory containing implementation files and a bench.sh script.
+
+LANGUAGE: shell
+CODE:
+bench.sh

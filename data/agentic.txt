@@ -1,0 +1,3325 @@
+TITLE: Multiple Tool Integration Example
+DESCRIPTION: Demonstrates how to combine multiple AI tools from different sources, including search, Wikipedia, custom functions, and specialized clients using the Agentic framework.
+
+LANGUAGE: typescript
+CODE:
+import { SerperClient, WikipediaClient, FirecrawlClient } from '@agentic/stdlib'
+import { createAIFunction } from '@agentic/core'
+import { z } from 'zod'
+
+const googleSearch = new SerperClient()
+const wikipedia = new WikipediaClient()
+const firecrawl = new FirecrawlClient()
+
+const result = await generateText({
+  model: openai('gpt-4o-mini'),
+  // This example uses tools from 4 different sources. You can pass as many
+  // AIFunctionLike objects as you want.
+  tools: createAISDKTools(
+    googleSearch,
+    wikipedia,
+    // Pick a single function from the firecrawl client's set of AI functions
+    firecrawl.functions.pick('firecrawl_search'),
+    // Create a custom AI function (based off of Anthropic's think tool: https://www.anthropic.com/engineering/claude-think-tool)
+    createAIFunction({
+      name: 'think',
+      description: `Use this tool to think about something. It will not obtain new information or change the database, but just append the thought to the log. Use it when complex reasoning or some cache memory is needed.`,
+      inputSchema: z.object({
+        thought: z.string().describe('A thought to think about.')
+      }),
+      execute: ({ thought }) => thought
+    })
+  ),
+  prompt:
+    'What year did Jurassic Park the movie come out, and what else happened that year?'
+})
+
+----------------------------------------
+
+TITLE: Running the OpenAI Chat Completions Example
+DESCRIPTION: Instructions for setting up and running the OpenAI chat completions example, including cloning the repository and setting up environment variables.
+
+LANGUAGE: bash
+CODE:
+git clone git@github.com:transitive-bullshit/agentic.git
+cd agentic
+pnpm install
+echo 'WEATHER_API_KEY=your-key' >> .env
+echo 'OPENAI_API_KEY=your-key' >> .env
+npx tsx examples/openai/bin/weather.ts
+
+----------------------------------------
+
+TITLE: Using Multiple AI Tools Together
+DESCRIPTION: Example showing how to combine multiple AI tools and custom functions together using the AIFunctionLike interface.
+
+LANGUAGE: typescript
+CODE:
+import { SerperClient, WikipediaClient, FirecrawlClient } from '@agentic/stdlib'
+import { createAIFunction } from '@agentic/core'
+import { z } from 'zod'
+
+const googleSearch = new SerperClient()
+const wikipedia = new WikipediaClient()
+const firecrawl = new FirecrawlClient()
+
+const result = await generateText({
+  model: openai('gpt-4o-mini'),
+  // This example uses tools from 4 different sources. You can pass as many
+  // AIFunctionLike objects as you want.
+  tools: createAISDKTools(
+    googleSearch,
+    wikipedia,
+    // Pick a single function from the firecrawl client's set of AI functions
+    firecrawl.functions.pick('firecrawl_search'),
+    // Create a custom AI function (based off of Anthropic's think tool: https://www.anthropic.com/engineering/claude-think-tool)
+    createAIFunction({
+      name: 'think',
+      description: `Use this tool to think about something. It will not obtain new information or change the database, but just append the thought to the log. Use it when complex reasoning or some cache memory is needed.`,
+      inputSchema: z.object({
+        thought: z.string().describe('A thought to think about.')
+      }),
+      execute: ({ thought }) => thought
+    })
+  ),
+  prompt:
+    'What year did Jurassic Park the movie come out, and what else happened that year?'
+})
+
+----------------------------------------
+
+TITLE: Implementing LangChain Weather Agent
+DESCRIPTION: Example implementation of a LangChain agent that uses Weather API integration. Shows how to create tools, configure the agent, and execute weather queries using OpenAI's GPT model.
+
+LANGUAGE: typescript
+CODE:
+import { createLangChainTools } from '@agentic/langchain'
+import { WeatherClient } from '@agentic/stdlib'
+import { ChatPromptTemplate } from '@langchain/core/prompts'
+import { ChatOpenAI } from '@langchain/openai'
+import { AgentExecutor, createToolCallingAgent } from 'langchain/agents'
+
+async function main() {
+  const weather = new WeatherClient()
+
+  const tools = createLangChainTools(weather)
+  const agent = createToolCallingAgent({
+    llm: new ChatOpenAI({ model: 'gpt-4o-mini', temperature: 0 }),
+    tools,
+    prompt: ChatPromptTemplate.fromMessages([
+      ['system', 'You are a helpful assistant. Be as concise as possible.'],
+      ['placeholder', '{chat_history}'],
+      ['human', '{input}'],
+      ['placeholder', '{agent_scratchpad}']
+    ])
+  })
+
+  const agentExecutor = new AgentExecutor({
+    agent,
+    tools
+    // verbose: true
+  })
+
+  const result = await agentExecutor.invoke({
+    input: 'What is the weather in San Francisco?'
+  })
+
+  console.log(result.output)
+}
+
+await main()
+
+----------------------------------------
+
+TITLE: Using MidjourneyClient to Generate Images
+DESCRIPTION: This example demonstrates how to use the MidjourneyClient to generate an image based on a given prompt. It imports the client, initializes it, and calls the imagine method with a prompt describing a beautiful sunset.
+
+LANGUAGE: typescript
+CODE:
+import { MidjourneyClient } from '@agentic/midjourney'
+
+const midjourney = new MidjourneyClient()
+const res = await midjourney.imagine({
+  prompt: 'beautiful sunset over the ocean, oil painting, monet'
+})
+
+----------------------------------------
+
+TITLE: Using Agentic with OpenAI Chat Completions
+DESCRIPTION: Demonstrates how to use Agentic's WeatherClient with OpenAI's chat completions API. It sets up the client, sends a weather query, and processes the response.
+
+LANGUAGE: typescript
+CODE:
+import { WeatherClient } from '@agentic/stdlib'
+import OpenAI from 'openai'
+
+const weather = new WeatherClient()
+const openai = new OpenAI()
+
+const messages: OpenAI.ChatCompletionMessageParam[] = [
+  {
+    role: 'system',
+    content: 'You are a helpful assistant. Be as concise as possible.'
+  },
+  { role: 'user', content: 'What is the weather in San Francisco?' }
+]
+
+const res = await openai.chat.completions.create({
+  messages,
+  model: 'gpt-4o-mini',
+  temperature: 0,
+  tools: weather.functions.toolSpecs,
+  tool_choice: 'required'
+})
+const message = res.choices[0]?.message!
+console.log(JSON.stringify(message, null, 2))
+assert(message.tool_calls?.[0]?.function?.name === 'get_current_weather')
+
+const fn = weather.functions.get('get_current_weather')!
+
+const toolArgs = message.tool_calls[0].function.arguments
+const toolResult = await fn(toolArgs)
+console.log(JSON.stringify(toolResult, null, 2))
+
+----------------------------------------
+
+TITLE: Basic E2B Code Execution
+DESCRIPTION: Example of using the E2B function to execute Python code in the sandbox environment. Demonstrates the minimal setup required for running a simple print statement.
+
+LANGUAGE: typescript
+CODE:
+import { e2b } from '@agentic/e2b'
+
+const res = await e2b({ code: 'print("Hello, World")' })
+
+----------------------------------------
+
+TITLE: Using Agentic AI SDK with OpenAI and Weather API
+DESCRIPTION: TypeScript example demonstrating how to use the Agentic AI SDK with OpenAI's GPT model and a weather API to generate weather information for San Francisco.
+
+LANGUAGE: typescript
+CODE:
+import 'dotenv/config'
+
+import { createAISDKTools } from '@agentic/ai-sdk'
+import { WeatherClient } from '@agentic/weather'
+import { openai } from '@ai-sdk/openai'
+import { generateText } from 'ai'
+
+async function main() {
+  const weather = new WeatherClient()
+
+  const result = await generateText({
+    model: openai('gpt-4o-mini'),
+    tools: createAISDKTools(weather),
+    toolChoice: 'required',
+    temperature: 0,
+    system: 'You are a helpful assistant. Be as concise as possible.',
+    prompt: 'What is the weather in San Francisco?'
+  })
+
+  console.log(result.toolResults[0])
+}
+
+await main()
+
+----------------------------------------
+
+TITLE: Basic Firecrawl URL Scraping Example
+DESCRIPTION: Demonstrates how to initialize the FirecrawlClient and perform a basic URL scraping operation. Requires FIRECRAWL_API_KEY environment variable to be set.
+
+LANGUAGE: typescript
+CODE:
+import { FirecrawlClient } from '@agentic/firecrawl'
+
+const firecrawl = new FirecrawlClient()
+const res = await firecrawl.scrapeUrl('https://example.com')
+
+----------------------------------------
+
+TITLE: Implementing Weather Query with LlamaIndex and OpenAI
+DESCRIPTION: Example implementation showing how to create an OpenAI agent with LlamaIndex tools to query weather information using the WeatherClient
+
+LANGUAGE: typescript
+CODE:
+import 'dotenv/config'
+
+import { createLlamaIndexTools } from '@agentic/llamaindex'
+import { WeatherClient } from '@agentic/stdlib'
+import { OpenAI, OpenAIAgent } from 'llamaindex'
+
+async function main() {
+  const weather = new WeatherClient()
+
+  const tools = createLlamaIndexTools(weather)
+  const agent = new OpenAIAgent({
+    llm: new OpenAI({ model: 'gpt-4o-mini', temperature: 0 }),
+    systemPrompt: 'You are a helpful assistant. Be as concise as possible.',
+    tools
+  })
+
+  const response = await agent.chat({
+    message: 'What is the weather in San Francisco?'
+  })
+
+  console.log(response.message.content)
+}
+
+await main()
+
+----------------------------------------
+
+TITLE: Using DuckDuckGoClient for searching
+DESCRIPTION: Demonstrates how to import and use the DuckDuckGoClient class to perform a search query. No API key is required to use the DuckDuckGo API.
+
+LANGUAGE: typescript
+CODE:
+import { DuckDuckGoClient } from '@agentic/duck-duck-go'
+
+// No API is required to use the DuckDuckGo API
+const duckDuckGo = new DuckDuckGoClient()
+const results = await duckDuckGo.search({
+  query: 'latest news about AI'
+})
+
+----------------------------------------
+
+TITLE: Implementing Weather Query with Genkit and OpenAI
+DESCRIPTION: Example implementation showing how to use Genkit with OpenAI integration to query weather information. Demonstrates configuration of Genkit tools, OpenAI plugin setup, and weather API integration.
+
+LANGUAGE: typescript
+CODE:
+import 'dotenv/config'
+
+import { createGenkitTools } from '@agentic/genkit'
+import { WeatherClient } from '@agentic/stdlib'
+import { genkit } from 'genkit'
+import { gpt4oMini, openAI } from 'genkitx-openai'
+
+async function main() {
+  const weather = new WeatherClient()
+
+  const ai = genkit({
+    plugins: [openAI()]
+  })
+
+  const result = await ai.generate({
+    model: gpt4oMini,
+    tools: createGenkitTools(ai, weather),
+    system: 'You are a helpful assistant. Be as concise as possible.',
+    prompt: 'What is the weather in San Francisco?'
+  })
+
+  console.log(result)
+}
+
+await main()
+
+----------------------------------------
+
+TITLE: Using TwitterClient to Create a Tweet
+DESCRIPTION: Example of how to use the TwitterClient class to create a tweet. It demonstrates initializing the client with OAuth support via Nango and making an API call to post a tweet.
+
+LANGUAGE: typescript
+CODE:
+import { TwitterClient, createTwitterV2Client } from '@agentic/twitter'
+
+// Requires Nango connection ID and callback URL environment variables
+const rawClient = await createTwitterV2Client()
+
+const twitter = new TwitterClient({ client: rawClient })
+const res = await twitter.createTweet({
+  text: 'hello, world'
+})
+
+----------------------------------------
+
+TITLE: Using Dexter with Weather API in TypeScript
+DESCRIPTION: Example demonstrating how to use the Dexter adapter with a WeatherClient to create an AI runner for answering weather-related questions. It utilizes the ChatModel from @dexaai/dexter and createDexterFunctions from @agentic/dexter.
+
+LANGUAGE: typescript
+CODE:
+import 'dotenv/config'
+
+import { createDexterFunctions } from '@agentic/dexter'
+import { WeatherClient } from '@agentic/weather'
+import { ChatModel, createAIRunner } from '@dexaai/dexter'
+
+async function main() {
+  const weather = new WeatherClient()
+
+  const runner = createAIRunner({
+    chatModel: new ChatModel({
+      params: { model: 'gpt-4o-mini', temperature: 0 }
+      // debug: true
+    }),
+    functions: createDexterFunctions(weather),
+    systemMessage: 'You are a helpful assistant. Be as concise as possible.'
+  })
+
+  const result = await runner('What is the weather in San Francisco?')
+  console.log(result)
+}
+
+await main()
+
+----------------------------------------
+
+TITLE: Using Diffbot Client in TypeScript
+DESCRIPTION: Basic example demonstrating how to import and initialize the DiffbotClient class and analyze a URL using the Diffbot API.
+
+LANGUAGE: typescript
+CODE:
+import { DiffbotClient } from '@agentic/diffbot'
+
+const diffbot = new DiffbotClient()
+const res = await diffbot.analyzeUrl('https://example.com')
+
+----------------------------------------
+
+TITLE: Using Mastra with Agentic and OpenAI
+DESCRIPTION: Example of creating a weather agent using Mastra, Agentic, and OpenAI. It demonstrates how to set up the agent with custom instructions and tools, and generate a response to a weather query.
+
+LANGUAGE: typescript
+CODE:
+import 'dotenv/config'
+
+import { createMastraTools } from '@agentic/mastra'
+import { WeatherClient } from '@agentic/weather'
+import { openai } from '@ai-sdk/openai'
+import { Agent } from '@mastra/core/agent'
+
+async function main() {
+  const weather = new WeatherClient()
+
+  const weatherAgent = new Agent({
+    name: 'Weather Agent',
+    instructions: 'You are a helpful assistant. Be as concise as possible.',
+    model: openai('gpt-4o-mini'),
+    tools: createMastraTools(weather)
+  })
+
+  const res = await weatherAgent.generate(
+    'What is the weather in San Francisco?'
+  )
+  console.log(res.text)
+}
+
+await main()
+
+----------------------------------------
+
+TITLE: Using ProxycurlClient to Fetch LinkedIn Data
+DESCRIPTION: Example of how to use the ProxycurlClient to retrieve company and person data from LinkedIn. It demonstrates instantiating the client and making API calls to fetch data for a company and an individual.
+
+LANGUAGE: typescript
+CODE:
+import { ProxycurlClient } from '@agentic/proxycurl'
+
+const proxycurl = new ProxycurlClient()
+const company = await proxycurl.getLinkedInCompany({
+  url: 'https://linkedin.com/company/apple'
+})
+
+const person = await proxycurl.getLinkedInPerson({
+  url: 'https://linkedin.com/in/fisch2'
+})
+
+----------------------------------------
+
+TITLE: LLM Tool Integration with Vercel AI SDK
+DESCRIPTION: Shows how to use Agentic clients as LLM-based tools using Vercel's AI SDK. Demonstrates integration of the WeatherClient with AI text generation.
+
+LANGUAGE: typescript
+CODE:
+// sdk-specific imports
+import { openai } from '@ai-sdk/openai'
+import { generateText } from 'ai'
+import { createAISDKTools } from '@agentic/ai-sdk'
+
+// sdk-agnostic imports
+import { WeatherClient } from '@agentic/stdlib'
+
+const weather = new WeatherClient()
+
+const result = await generateText({
+  model: openai('gpt-4o-mini'),
+  // this is the key line which uses the `@agentic/ai-sdk` adapter
+  tools: createAISDKTools(weather),
+  toolChoice: 'required',
+  prompt: 'What is the weather in San Francisco?'
+})
+
+console.log(result.toolResults[0])
+
+----------------------------------------
+
+TITLE: Using Google Custom Search in TypeScript
+DESCRIPTION: Example of how to use the GoogleCustomSearchClient to perform a search. Requires GOOGLE_API_KEY and GOOGLE_CSE_ID environment variables to be set or passed as constructor options.
+
+LANGUAGE: typescript
+CODE:
+import { GoogleCustomSearchClient } from '@agentic/google-custom-search'
+
+const googleCustomSearch = new GoogleCustomSearchClient()
+const results = await googleCustomSearch.search('latest news about openai')
+
+----------------------------------------
+
+TITLE: Basic Weather Client Usage in TypeScript
+DESCRIPTION: Demonstrates how to use the WeatherClient class to fetch current weather data. Requires a Weather API key stored in environment variables.
+
+LANGUAGE: typescript
+CODE:
+import { WeatherClient } from '@agentic/stdlib'
+
+// Requires `process.env.WEATHER_API_KEY` (free from weatherapi.com)
+const weather = new WeatherClient()
+
+const result = await weather.getCurrentWeather({
+  q: 'San Francisco'
+})
+console.log(result)
+
+----------------------------------------
+
+TITLE: Initializing Notion Client in TypeScript
+DESCRIPTION: Example of importing and initializing the NotionClient class and retrieving authenticated user information. Requires NOTION_API_KEY environment variable to be set.
+
+LANGUAGE: typescript
+CODE:
+import { NotionClient } from '@agentic/notion'
+
+const notion = new NotionClient()
+const authenticatedUser = await notion.getSelf()
+
+----------------------------------------
+
+TITLE: Using BraveSearchClient in TypeScript
+DESCRIPTION: Example of how to import and use the BraveSearchClient class to perform a search query. This snippet demonstrates the basic usage of the Brave Search integration.
+
+LANGUAGE: typescript
+CODE:
+import { BraveSearchClient } from '@agentic/brave-search'
+
+const braveSearch = new BraveSearchClient()
+const res = await braveSearch.search('latest news about openai')
+
+----------------------------------------
+
+TITLE: Using OpenMeteoClient for Weather Forecasts
+DESCRIPTION: Example of how to initialize the OpenMeteoClient and fetch a weather forecast for a specific location. This demonstrates the basic usage pattern for getting weather data using the client.
+
+LANGUAGE: typescript
+CODE:
+import { OpenMeteoClient } from '@agentic/open-meteo'
+
+const openMeteo = new OpenMeteoClient()
+const res = await openMeteo.getForecast({
+  location: {
+    name: 'San Francisco'
+  }
+})
+
+----------------------------------------
+
+TITLE: Using TavilyClient for Web Search in TypeScript
+DESCRIPTION: Demonstrates how to import and use the TavilyClient class to perform a web search. It creates a new TavilyClient instance and uses the search method to query for 'latest news'.
+
+LANGUAGE: typescript
+CODE:
+import { TavilyClient } from '@agentic/tavily'
+
+const tavily = new TavilyClient()
+const res = await tavily.search('latest news')
+
+----------------------------------------
+
+TITLE: Initializing and Using Perigon Client
+DESCRIPTION: Example of importing the PerigonClient class, instantiating a client instance, and performing a search query for articles about Elon Musk and Tesla. Requires PERIGON_API_KEY environment variable to be set.
+
+LANGUAGE: typescript
+CODE:
+import { PerigonClient } from '@agentic/perigon'
+
+const perigon = new PerigonClient()
+const res = await perigon.searchArticles({
+  q: '"elon musk" AND tesla'
+})
+
+----------------------------------------
+
+TITLE: Using WikidataClient in TypeScript
+DESCRIPTION: Example showing how to initialize WikidataClient and fetch an entity by ID. Uses the optional WIKIDATA_API_USER_AGENT environment variable.
+
+LANGUAGE: typescript
+CODE:
+import { WikidataClient } from '@agentic/wikidata'
+
+const wikidata = new WikidataClient()
+const res = await wikidata.getEntityById('Q317521') // elon musk
+
+----------------------------------------
+
+TITLE: Using ClearbitClient for Company Enrichment
+DESCRIPTION: Demonstrates how to import and use the ClearbitClient class to perform company enrichment. Requires the CLEARBIT_API_KEY environment variable to be set.
+
+LANGUAGE: typescript
+CODE:
+import { ClearbitClient } from '@agentic/clearbit'
+
+const clearbit = new ClearbitClient()
+const res = await clearbit.companyEnrichment({ domain: 'apple.com' })
+
+----------------------------------------
+
+TITLE: Using Searxng Client for Multi-Engine Search
+DESCRIPTION: Example of initializing the Searxng client and performing a search across multiple engines including Google, Reddit, and Hacker News.
+
+LANGUAGE: typescript
+CODE:
+import { SearxngClient } from '@agentic/searxng'
+
+const searxng = new SearxngClient()
+const res = await searxng.search({
+  query: 'us election',
+  engines: ['google', 'reddit', 'hackernews']
+})
+
+----------------------------------------
+
+TITLE: Using Hunter Client for Email Search
+DESCRIPTION: Example demonstrating how to initialize the HunterClient and use it to search for email addresses by domain and personal information. Shows domain search and email finder functionality.
+
+LANGUAGE: typescript
+CODE:
+import { HunterClient } from '@agentic/hunter'
+
+const hunter = new HunterClient()
+const res0 = await hunter.domainSearch('apple.com')
+const res1 = await hunter.emailFinder({
+  domain: 'transitivebullsh.it',
+  first_name: 'travis',
+  last_name: 'fischer'
+})
+
+----------------------------------------
+
+TITLE: Using WikipediaClient for Searching and Retrieving Summaries
+DESCRIPTION: Example of how to use the WikipediaClient class to search for a query and retrieve a page summary. It demonstrates instantiation of the client and calling search and getPageSummary methods.
+
+LANGUAGE: typescript
+CODE:
+import { WikipediaClient } from '@agentic/wikipedia'
+
+const wikipedia = new WikipediaClient()
+const res0 = await wikipedia.search({ query: 'steve jobs' })
+const res1 = await wikipedia.getPageSummary({ title: 'Elon_Musk' })
+
+----------------------------------------
+
+TITLE: Using Wolfram Alpha Client - Basic Search
+DESCRIPTION: Example of initializing the Wolfram Alpha client and performing a basic search query. Requires WOLFRAM_APP_ID environment variable to be set.
+
+LANGUAGE: typescript
+CODE:
+import { WolframAlphaClient } from '@agentic/wolfram-alpha'
+
+const wolframAlpha = new WolframAlphaClient()
+const res = await wolframAlpha.search('latest news')
+
+----------------------------------------
+
+TITLE: Using ArXivClient for Searching Articles
+DESCRIPTION: Example of how to use the ArXivClient to search for machine learning articles. No API key is required for using the ArXiv API.
+
+LANGUAGE: typescript
+CODE:
+import { ArXivClient } from '@agentic/arxiv'
+
+// No API is required to use the ArXiv API
+const arxiv = new ArXivClient()
+const results = await arxiv.search({
+  query: 'machine learning',
+  maxResults: 10
+})
+
+----------------------------------------
+
+TITLE: Using People Data Labs Client for Company Lookup
+DESCRIPTION: Example of initializing the PDL client and performing a company lookup by website domain. Requires PEOPLE_DATA_LABS_API_KEY environment variable to be set.
+
+LANGUAGE: typescript
+CODE:
+import { PeopleDataLabsClient } from '@agentic/people-data-labs'
+
+const pdl = new PeopleDataLabsClient()
+const res = await pdl.companyLookup({
+  query: {
+    website: 'apple.com'
+  }
+})
+
+----------------------------------------
+
+TITLE: Using the Calculator Function in TypeScript
+DESCRIPTION: Example of how to import and use the calculator function from the @agentic/calculator package. The function takes an object with an 'expr' property containing the mathematical expression to evaluate.
+
+LANGUAGE: typescript
+CODE:
+import { calculator } from '@agentic/calculator'
+
+const res = await calculator({ expr: '1 + 1' })
+
+----------------------------------------
+
+TITLE: Using PolygonClient in TypeScript
+DESCRIPTION: Example of how to import and use the PolygonClient class to fetch ticker details for a stock (AAPL in this case).
+
+LANGUAGE: typescript
+CODE:
+import { PolygonClient } from '@agentic/polygon'
+
+const polygon = new PolygonClient()
+const res = await polygon.tickerDetails({ ticker: 'AAPL' })
+
+----------------------------------------
+
+TITLE: Using Weather API Client in TypeScript
+DESCRIPTION: Example of how to import and use the WeatherClient class to fetch current weather data for a location.
+
+LANGUAGE: typescript
+CODE:
+import { WeatherClient } from '@agentic/weather'
+
+const weather = new WeatherClient()
+const res = await weather.getCurrentWeather('new york')
+
+----------------------------------------
+
+TITLE: Using HackerNewsClient in TypeScript
+DESCRIPTION: Demonstrates how to import and use the HackerNewsClient to search for items with specific criteria.
+
+LANGUAGE: typescript
+CODE:
+import { HackerNewsClient } from '@agentic/hacker-news'
+
+const hn = new HackerNewsClient()
+const res = await hn.searchItems({
+  query: 'example query',
+  tags: ['story'],
+  numericFilters: ['points>100']
+})
+
+----------------------------------------
+
+TITLE: Using BingClient for Web Search in TypeScript
+DESCRIPTION: This snippet demonstrates how to import and use the BingClient class from the @agentic/bing package to perform a web search. It creates a new BingClient instance and uses it to search for 'latest news'.
+
+LANGUAGE: typescript
+CODE:
+import { BingClient } from '@agentic/bing'
+
+const bing = new BingClient()
+const res = await bing.search('latest news')
+
+----------------------------------------
+
+TITLE: Using LeadMagic Client in TypeScript
+DESCRIPTION: Example of how to import and use the LeadMagicClient to perform a profile search. This snippet demonstrates the basic usage of the API client to search for a profile using a LinkedIn username.
+
+LANGUAGE: typescript
+CODE:
+import { LeadMagicClient } from '@agentic/leadmagic'
+
+const leadmagic = new LeadMagicClient()
+const res = await leadmagic.profileSearch({
+  linkedinUsername: 'fisch2'
+})
+
+----------------------------------------
+
+TITLE: Installing All Agentic AI Tools via stdlib
+DESCRIPTION: Commands to install all Agentic AI tools using the @agentic/stdlib package. Installation is shown for npm, yarn, and pnpm package managers.
+
+LANGUAGE: bash
+CODE:
+npm install @agentic/stdlib
+
+LANGUAGE: bash
+CODE:
+yarn add @agentic/stdlib
+
+LANGUAGE: bash
+CODE:
+pnpm add @agentic/stdlib
+
+----------------------------------------
+
+TITLE: Using JinaClient for URL Reading and Search
+DESCRIPTION: Example demonstrating how to initialize the JinaClient and use it for reading URLs and performing searches. Shows basic usage of readUrl and search methods with JSON response option.
+
+LANGUAGE: typescript
+CODE:
+import { JinaClient } from '@agentic/jina'
+
+const jina = new JinaClient()
+const res0 = await jina.readUrl('https://example.com')
+const res1 = await jina.search({ query: 'latest news', json: true })
+
+----------------------------------------
+
+TITLE: Installing OpenAI SDK for Agentic
+DESCRIPTION: Commands to install the OpenAI SDK for use with Agentic. No separate adapter is needed as Agentic tools are compatible with OpenAI by default. Installation is shown for npm, yarn, and pnpm package managers.
+
+LANGUAGE: bash
+CODE:
+npm install openai
+
+LANGUAGE: bash
+CODE:
+yarn add openai
+
+LANGUAGE: bash
+CODE:
+pnpm add openai
+
+----------------------------------------
+
+TITLE: Basic Exa Search Usage
+DESCRIPTION: Example showing how to initialize the ExaClient and perform a basic search query. Requires EXA_API_KEY environment variable to be set.
+
+LANGUAGE: typescript
+CODE:
+import { ExaClient } from '@agentic/exa'
+
+const exa = new ExaClient()
+const res = await exa.search('latest news')
+
+----------------------------------------
+
+TITLE: Installing Firebase Genkit Adapter for Agentic
+DESCRIPTION: Commands to install the Firebase Genkit adapter for Agentic, including the necessary dependencies. Installation is shown for npm, yarn, and pnpm package managers.
+
+LANGUAGE: bash
+CODE:
+npm install @agentic/genkit genkit
+
+LANGUAGE: bash
+CODE:
+yarn add @agentic/genkit genkit
+
+LANGUAGE: bash
+CODE:
+pnpm add @agentic/genkit genkit
+
+----------------------------------------
+
+TITLE: Using PredictLeadsClient in TypeScript
+DESCRIPTION: Example of how to import and use the PredictLeadsClient to fetch company events. This snippet demonstrates creating a client instance and calling the getCompanyEvents method with a domain parameter.
+
+LANGUAGE: typescript
+CODE:
+import { PredictLeadsClient } from '@agentic/predict-leads'
+
+const predictLeads = new PredictLeadsClient()
+const res = await predictLeads.getCompanyEvents({ domain: 'apple.com' })
+
+----------------------------------------
+
+TITLE: Installing LangChain Adapter for Agentic
+DESCRIPTION: Commands to install the LangChain adapter for Agentic, including the necessary dependencies. Installation is shown for npm, yarn, and pnpm package managers.
+
+LANGUAGE: bash
+CODE:
+npm install @agentic/langchain @langchain/core langchain
+
+LANGUAGE: bash
+CODE:
+yarn add @agentic/langchain @langchain/core langchain
+
+LANGUAGE: bash
+CODE:
+pnpm add @agentic/langchain @langchain/core langchain
+
+----------------------------------------
+
+TITLE: Initializing and Using Novu API Client in TypeScript
+DESCRIPTION: Example of how to import, initialize, and use the NovuClient class from the @agentic/novu package. This snippet demonstrates creating a client instance and performing a search operation.
+
+LANGUAGE: typescript
+CODE:
+import { NovuClient } from '@agentic/novu'
+
+const novu = new NovuClient()
+const res = await novu.search('latest news')
+
+----------------------------------------
+
+TITLE: Installing Mastra Adapter for Agentic
+DESCRIPTION: Commands to install the Mastra adapter for Agentic, including the necessary dependencies. Installation is shown for npm, yarn, and pnpm package managers.
+
+LANGUAGE: bash
+CODE:
+npm install @agentic/mastra @mastra/core
+
+LANGUAGE: bash
+CODE:
+yarn add @agentic/mastra @mastra/core
+
+LANGUAGE: bash
+CODE:
+pnpm add @agentic/mastra @mastra/core
+
+----------------------------------------
+
+TITLE: Using RocketReach Client for Person Lookup
+DESCRIPTION: Example of initializing the RocketReach client and performing a person lookup using a LinkedIn URL. Requires ROCKETREACH_API_KEY environment variable to be set.
+
+LANGUAGE: typescript
+CODE:
+import { RocketReachClient } from '@agentic/rocketreach'
+
+const rocketreach = new RocketReachClient()
+const res = await rocketreach.lookupPerson({
+  linkedin_url: 'https://www.linkedin.com/in/fisch2'
+})
+
+----------------------------------------
+
+TITLE: Installing Vercel AI SDK Adapter for Agentic
+DESCRIPTION: Commands to install the Vercel AI SDK adapter for Agentic, including the necessary dependencies. Installation is shown for npm, yarn, and pnpm package managers.
+
+LANGUAGE: bash
+CODE:
+npm install @agentic/ai-sdk ai
+
+LANGUAGE: bash
+CODE:
+yarn add @agentic/ai-sdk ai
+
+LANGUAGE: bash
+CODE:
+pnpm add @agentic/ai-sdk ai
+
+----------------------------------------
+
+TITLE: Initializing and Using DexaClient in TypeScript
+DESCRIPTION: Example of importing DexaClient, creating an instance, and performing a search operation. This snippet demonstrates basic usage of the Dexa API.
+
+LANGUAGE: typescript
+CODE:
+import { DexaClient } from '@agentic/dexa'
+
+const dexa = new DexaClient()
+const res = await dexa.search('latest news')
+
+----------------------------------------
+
+TITLE: Installing Individual Agentic AI Tool (Weather)
+DESCRIPTION: Example commands to install an individual Agentic AI tool, specifically the Weather tool. Installation is shown for npm, yarn, and pnpm package managers.
+
+LANGUAGE: bash
+CODE:
+npm install @agentic/weather
+
+LANGUAGE: bash
+CODE:
+yarn add @agentic/weather
+
+LANGUAGE: bash
+CODE:
+pnpm add @agentic/weather
+
+----------------------------------------
+
+TITLE: Using WeatherClient with Vercel AI SDK
+DESCRIPTION: Example demonstrating how to use WeatherClient as an LLM-based tool with Vercel's AI SDK for natural language weather queries.
+
+LANGUAGE: typescript
+CODE:
+// sdk-specific imports
+import { openai } from '@ai-sdk/openai'
+import { generateText } from 'ai'
+import { createAISDKTools } from '@agentic/ai-sdk'
+
+// sdk-agnostic imports
+import { WeatherClient } from '@agentic/stdlib'
+
+const weather = new WeatherClient()
+
+const result = await generateText({
+  model: openai('gpt-4o-mini'),
+  // this is the key line which uses the `@agentic/ai-sdk` adapter
+  tools: createAISDKTools(weather),
+  toolChoice: 'required',
+  prompt: 'What is the weather in San Francisco?'
+})
+
+console.log(result.toolResults[0])
+
+----------------------------------------
+
+TITLE: Installing Zod Dependency for Agentic
+DESCRIPTION: Commands to install the Zod dependency, which is a prerequisite for Agentic. Installation is shown for npm, yarn, and pnpm package managers.
+
+LANGUAGE: bash
+CODE:
+npm install zod
+
+LANGUAGE: bash
+CODE:
+yarn add zod
+
+LANGUAGE: bash
+CODE:
+pnpm add zod
+
+----------------------------------------
+
+TITLE: Using WeatherClient with TypeScript
+DESCRIPTION: Example showing how to use the WeatherClient class directly in TypeScript to fetch current weather data for a location.
+
+LANGUAGE: typescript
+CODE:
+import { WeatherClient } from '@agentic/stdlib'
+
+// Requires `process.env.WEATHER_API_KEY` (free from weatherapi.com)
+const weather = new WeatherClient()
+
+const result = await weather.getCurrentWeather({
+  q: 'San Francisco'
+})
+console.log(result)
+
+----------------------------------------
+
+TITLE: Installing Wolfram Alpha Client - NPM
+DESCRIPTION: Install the Wolfram Alpha client package using NPM package manager.
+
+LANGUAGE: bash
+CODE:
+npm install @agentic/wolfram-alpha
+
+----------------------------------------
+
+TITLE: Using MCP Tools with OpenAI and Filesystem Access
+DESCRIPTION: Example demonstrating how to create and use MCP tools with OpenAI integration to access local filesystem
+
+LANGUAGE: typescript
+CODE:
+import 'dotenv/config'
+
+import { createAISDKTools } from '@agentic/ai-sdk'
+import { createMcpTools } from '@agentic/mcp'
+import { openai } from '@ai-sdk/openai'
+import { generateText } from 'ai'
+
+async function main() {
+  const mcpTools = await createMcpTools({
+    name: 'agentic-mcp-filesystem',
+    serverProcess: {
+      command: 'npx',
+      args: [
+        '-y',
+        '@modelcontextprotocol/server-filesystem',
+        process.cwd()
+      ]
+    }
+  })
+
+  const result = await generateText({
+    model: openai('gpt-4o-mini'),
+    tools: createAISDKTools(mcpTools),
+    toolChoice: 'required',
+    temperature: 0,
+    system: 'You are a helpful assistant. Be as concise as possible.',
+    prompt: 'What files are in the current directory?'
+  })
+
+  console.log(result.toolResults[0])
+}
+
+await main()
+
+----------------------------------------
+
+TITLE: Installing Wolfram Alpha Client - Yarn
+DESCRIPTION: Install the Wolfram Alpha client package using Yarn package manager.
+
+LANGUAGE: bash
+CODE:
+yarn add @agentic/wolfram-alpha
+
+----------------------------------------
+
+TITLE: Installing Wolfram Alpha Client - PNPM
+DESCRIPTION: Install the Wolfram Alpha client package using PNPM package manager.
+
+LANGUAGE: bash
+CODE:
+pnpm add @agentic/wolfram-alpha
+
+----------------------------------------
+
+TITLE: Using GravatarClient in TypeScript
+DESCRIPTION: Example of importing and using the GravatarClient class to fetch a Gravatar profile by email identifier.
+
+LANGUAGE: typescript
+CODE:
+import { GravatarClient } from '@agentic/gravatar'
+
+const gravatar = new GravatarClient()
+const profile = await gravatar.getProfileByIdentifier('my-email@example.com')
+
+----------------------------------------
+
+TITLE: Installing Brave Search Package
+DESCRIPTION: Commands for installing the @agentic/brave-search package using different package managers.
+
+LANGUAGE: bash
+CODE:
+npm install @agentic/brave-search
+
+LANGUAGE: bash
+CODE:
+yarn add @agentic/brave-search
+
+LANGUAGE: bash
+CODE:
+pnpm add @agentic/brave-search
+
+----------------------------------------
+
+TITLE: Installing @agentic/duck-duck-go package
+DESCRIPTION: Commands to install the @agentic/duck-duck-go package using different package managers (npm, yarn, pnpm).
+
+LANGUAGE: bash
+CODE:
+npm install @agentic/duck-duck-go
+
+LANGUAGE: bash
+CODE:
+yarn add @agentic/duck-duck-go
+
+LANGUAGE: bash
+CODE:
+pnpm add @agentic/duck-duck-go
+
+----------------------------------------
+
+TITLE: Installing @agentic/tavily Package
+DESCRIPTION: Shows how to install the @agentic/tavily package using different package managers: npm, yarn, and pnpm.
+
+LANGUAGE: bash
+CODE:
+npm install @agentic/tavily
+
+LANGUAGE: bash
+CODE:
+yarn add @agentic/tavily
+
+LANGUAGE: bash
+CODE:
+pnpm add @agentic/tavily
+
+----------------------------------------
+
+TITLE: Installing Firecrawl Package with Package Managers
+DESCRIPTION: Installation commands for adding the @agentic/firecrawl package using different Node.js package managers (npm, yarn, and pnpm).
+
+LANGUAGE: bash
+CODE:
+npm install @agentic/firecrawl
+
+LANGUAGE: bash
+CODE:
+yarn add @agentic/firecrawl
+
+LANGUAGE: bash
+CODE:
+pnpm add @agentic/firecrawl
+
+----------------------------------------
+
+TITLE: Installing Wikidata Client Package
+DESCRIPTION: Package installation commands using different Node.js package managers (npm, yarn, pnpm).
+
+LANGUAGE: bash
+CODE:
+npm install @agentic/wikidata
+
+LANGUAGE: bash
+CODE:
+yarn add @agentic/wikidata
+
+LANGUAGE: bash
+CODE:
+pnpm add @agentic/wikidata
+
+----------------------------------------
+
+TITLE: Installing LeadMagic Package
+DESCRIPTION: Commands to install the @agentic/leadmagic package using different package managers (npm, yarn, pnpm).
+
+LANGUAGE: bash
+CODE:
+npm install @agentic/leadmagic
+
+LANGUAGE: bash
+CODE:
+yarn add @agentic/leadmagic
+
+LANGUAGE: bash
+CODE:
+pnpm add @agentic/leadmagic
+
+----------------------------------------
+
+TITLE: Installing Searxng Client Package
+DESCRIPTION: Different package manager commands for installing the @agentic/searxng package.
+
+LANGUAGE: bash
+CODE:
+npm install @agentic/searxng
+
+LANGUAGE: bash
+CODE:
+yarn add @agentic/searxng
+
+LANGUAGE: bash
+CODE:
+pnpm add @agentic/searxng
+
+----------------------------------------
+
+TITLE: Installing Diffbot Client Package
+DESCRIPTION: Installation commands for adding the @agentic/diffbot package using different package managers (npm, yarn, pnpm).
+
+LANGUAGE: bash
+CODE:
+npm install @agentic/diffbot
+
+LANGUAGE: bash
+CODE:
+yarn add @agentic/diffbot
+
+LANGUAGE: bash
+CODE:
+pnpm add @agentic/diffbot
+
+----------------------------------------
+
+TITLE: Installing @agentic/wikipedia Package
+DESCRIPTION: Commands for installing the @agentic/wikipedia package using different package managers.
+
+LANGUAGE: bash
+CODE:
+npm install @agentic/wikipedia
+
+LANGUAGE: bash
+CODE:
+yarn add @agentic/wikipedia
+
+LANGUAGE: bash
+CODE:
+pnpm add @agentic/wikipedia
+
+----------------------------------------
+
+TITLE: Installing Notion Client Package
+DESCRIPTION: Different package manager commands for installing the @agentic/notion package.
+
+LANGUAGE: bash
+CODE:
+npm install @agentic/notion
+
+LANGUAGE: bash
+CODE:
+yarn add @agentic/notion
+
+LANGUAGE: bash
+CODE:
+pnpm add @agentic/notion
+
+----------------------------------------
+
+TITLE: Installing ArXiv API Client Package
+DESCRIPTION: Commands for installing the @agentic/arxiv package using different package managers.
+
+LANGUAGE: bash
+CODE:
+npm install @agentic/arxiv
+
+LANGUAGE: bash
+CODE:
+yarn add @agentic/arxiv
+
+LANGUAGE: bash
+CODE:
+pnpm add @agentic/arxiv
+
+----------------------------------------
+
+TITLE: Installing Serper Package with yarn
+DESCRIPTION: Command to install the @agentic/serper package using yarn package manager.
+
+LANGUAGE: bash
+CODE:
+yarn add @agentic/serper
+
+----------------------------------------
+
+TITLE: Installing @agentic/calculator Package
+DESCRIPTION: Commands to install the @agentic/calculator package using different package managers. The package can be installed using npm, yarn, or pnpm.
+
+LANGUAGE: bash
+CODE:
+npm install @agentic/calculator
+
+LANGUAGE: bash
+CODE:
+yarn add @agentic/calculator
+
+LANGUAGE: bash
+CODE:
+pnpm add @agentic/calculator
+
+----------------------------------------
+
+TITLE: Installing Perigon Client Package
+DESCRIPTION: Multiple package manager commands for installing the @agentic/perigon package using npm, yarn, or pnpm.
+
+LANGUAGE: bash
+CODE:
+npm install @agentic/perigon
+
+LANGUAGE: bash
+CODE:
+yarn add @agentic/perigon
+
+LANGUAGE: bash
+CODE:
+pnpm add @agentic/perigon
+
+----------------------------------------
+
+TITLE: Installing Weather API Client Package
+DESCRIPTION: Commands for installing the @agentic/weather package using different package managers.
+
+LANGUAGE: bash
+CODE:
+npm install @agentic/weather
+
+LANGUAGE: bash
+CODE:
+yarn add @agentic/weather
+
+LANGUAGE: bash
+CODE:
+pnpm add @agentic/weather
+
+----------------------------------------
+
+TITLE: Installing @agentic/clearbit Package
+DESCRIPTION: Commands for installing the @agentic/clearbit package using different package managers. Supports npm, yarn, and pnpm.
+
+LANGUAGE: bash
+CODE:
+npm install @agentic/clearbit
+
+LANGUAGE: bash
+CODE:
+yarn add @agentic/clearbit
+
+LANGUAGE: bash
+CODE:
+pnpm add @agentic/clearbit
+
+----------------------------------------
+
+TITLE: Installing @agentic/bing Package
+DESCRIPTION: Commands to install the @agentic/bing package using different package managers. This snippet shows how to install the package using npm, yarn, or pnpm.
+
+LANGUAGE: bash
+CODE:
+npm install @agentic/bing
+
+LANGUAGE: bash
+CODE:
+yarn add @agentic/bing
+
+LANGUAGE: bash
+CODE:
+pnpm add @agentic/bing
+
+----------------------------------------
+
+TITLE: Installing Hunter Client Package
+DESCRIPTION: Commands for installing the @agentic/hunter package using different package managers (npm, yarn, and pnpm).
+
+LANGUAGE: bash
+CODE:
+npm install @agentic/hunter
+
+LANGUAGE: bash
+CODE:
+yarn add @agentic/hunter
+
+LANGUAGE: bash
+CODE:
+pnpm add @agentic/hunter
+
+----------------------------------------
+
+TITLE: Installing Agentic AI SDK and dependencies
+DESCRIPTION: Commands for installing the Agentic AI SDK and its dependencies using npm, yarn, or pnpm package managers.
+
+LANGUAGE: bash
+CODE:
+npm install @agentic/ai-sdk ai
+
+LANGUAGE: bash
+CODE:
+yarn add @agentic/ai-sdk ai
+
+LANGUAGE: bash
+CODE:
+pnpm add @agentic/ai-sdk ai
+
+----------------------------------------
+
+TITLE: Installing Jina Client Package
+DESCRIPTION: Commands to install the @agentic/jina package using different package managers (npm, yarn, pnpm).
+
+LANGUAGE: bash
+CODE:
+npm install @agentic/jina
+
+LANGUAGE: bash
+CODE:
+yarn add @agentic/jina
+
+LANGUAGE: bash
+CODE:
+pnpm add @agentic/jina
+
+----------------------------------------
+
+TITLE: Installing LlamaIndex Dependencies
+DESCRIPTION: Package installation commands for different Node.js package managers to install @agentic/llamaindex and its dependencies
+
+LANGUAGE: bash
+CODE:
+npm install @agentic/llamaindex llamaindex
+
+LANGUAGE: bash
+CODE:
+yarn add @agentic/llamaindex llamaindex
+
+LANGUAGE: bash
+CODE:
+pnpm add @agentic/llamaindex llamaindex
+
+----------------------------------------
+
+TITLE: Installing @agentic/proxycurl Package
+DESCRIPTION: Commands for installing the @agentic/proxycurl package using npm, yarn, or pnpm package managers.
+
+LANGUAGE: bash
+CODE:
+npm install @agentic/proxycurl
+
+LANGUAGE: bash
+CODE:
+yarn add @agentic/proxycurl
+
+LANGUAGE: bash
+CODE:
+pnpm add @agentic/proxycurl
+
+----------------------------------------
+
+TITLE: Installing Genkit Dependencies
+DESCRIPTION: Package installation commands for different package managers (npm, yarn, pnpm) to install @agentic/genkit and genkit dependencies.
+
+LANGUAGE: bash
+CODE:
+npm install @agentic/genkit genkit
+
+LANGUAGE: bash
+CODE:
+yarn add @agentic/genkit genkit
+
+LANGUAGE: bash
+CODE:
+pnpm add @agentic/genkit genkit
+
+----------------------------------------
+
+TITLE: Installing Exa Package
+DESCRIPTION: Different package manager commands to install the @agentic/exa package.
+
+LANGUAGE: bash
+CODE:
+npm install @agentic/exa
+
+LANGUAGE: bash
+CODE:
+yarn add @agentic/exa
+
+LANGUAGE: bash
+CODE:
+pnpm add @agentic/exa
+
+----------------------------------------
+
+TITLE: Installing @agentic/dexter and @dexaai/dexter packages
+DESCRIPTION: Commands for installing the required packages using npm, yarn, or pnpm package managers.
+
+LANGUAGE: bash
+CODE:
+npm install @agentic/dexter @dexaai/dexter
+
+LANGUAGE: bash
+CODE:
+yarn add @agentic/dexter @dexaai/dexter
+
+LANGUAGE: bash
+CODE:
+pnpm add @agentic/dexter @dexaai/dexter
+
+----------------------------------------
+
+TITLE: Installing People Data Labs Client Package
+DESCRIPTION: Different package manager commands for installing the @agentic/people-data-labs client library.
+
+LANGUAGE: bash
+CODE:
+npm install @agentic/people-data-labs
+
+LANGUAGE: bash
+CODE:
+yarn add @agentic/people-data-labs
+
+LANGUAGE: bash
+CODE:
+pnpm add @agentic/people-data-labs
+
+----------------------------------------
+
+TITLE: Installing @agentic/mastra and @mastra/core
+DESCRIPTION: Commands for installing the required packages using npm, yarn, or pnpm.
+
+LANGUAGE: bash
+CODE:
+npm install @agentic/mastra @mastra/core
+
+LANGUAGE: bash
+CODE:
+yarn add @agentic/mastra @mastra/core
+
+LANGUAGE: bash
+CODE:
+pnpm add @agentic/mastra @mastra/core
+
+----------------------------------------
+
+TITLE: Installing E2B Dependencies
+DESCRIPTION: Commands for installing the E2B package and code interpreter using different package managers (npm, yarn, pnpm).
+
+LANGUAGE: bash
+CODE:
+npm install @agentic/e2b @e2b/code-interpreter
+
+LANGUAGE: bash
+CODE:
+yarn add @agentic/e2b @e2b/code-interpreter
+
+LANGUAGE: bash
+CODE:
+pnpm add @agentic/e2b @e2b/code-interpreter
+
+----------------------------------------
+
+TITLE: Installing LangChain Dependencies
+DESCRIPTION: Package installation commands for different Node.js package managers to set up LangChain integration.
+
+LANGUAGE: bash
+CODE:
+npm install @agentic/langchain @langchain/core langchain
+
+LANGUAGE: bash
+CODE:
+yarn add @agentic/langchain @langchain/core langchain
+
+LANGUAGE: bash
+CODE:
+pnpm add @agentic/langchain @langchain/core langchain
+
+----------------------------------------
+
+TITLE: Installing HackerNews API Client with Package Managers
+DESCRIPTION: Shows how to install the @agentic/hacker-news package using npm, yarn, or pnpm.
+
+LANGUAGE: bash
+CODE:
+npm install @agentic/hacker-news
+
+LANGUAGE: bash
+CODE:
+yarn add @agentic/hacker-news
+
+LANGUAGE: bash
+CODE:
+pnpm add @agentic/hacker-news
+
+----------------------------------------
+
+TITLE: Using Agentic with OpenAI Responses API
+DESCRIPTION: Demonstrates how to use Agentic's WeatherClient with OpenAI's Responses API. It sets up the client, sends a weather query, and processes the response using the Responses API format.
+
+LANGUAGE: typescript
+CODE:
+import 'dotenv/config'
+
+import { WeatherClient } from '@agentic/stdlib'
+import OpenAI from 'openai'
+
+async function main() {
+  const weather = new WeatherClient()
+  const openai = new OpenAI()
+
+  const messages: OpenAI.Responses.ResponseInput = [
+    {
+      role: 'system',
+      content: 'You are a helpful assistant. Be as concise as possible.'
+    },
+    { role: 'user', content: 'What is the weather in San Francisco?' }
+  ]
+
+  {
+    // Call to OpenAI to invoke the weather tool
+    const res = await openai.responses.create({
+      model: 'gpt-4o-mini',
+      temperature: 0,
+      tools: weather.functions.responsesToolSpecs,
+      tool_choice: 'required',
+      input: messages
+    })
+
+    const message = res.output[0]
+    console.log(JSON.stringify(message, null, 2))
+    assert(message?.type === 'function_call')
+    assert(message.name === 'get_current_weather')
+
+    const fn = weather.functions.get('get_current_weather')!
+    const toolResult = await fn(message.arguments)
+
+    messages.push(message)
+    messages.push({
+      type: 'function_call_output',
+      call_id: message.call_id,
+      output: JSON.stringify(toolResult)
+    })
+  }
+}
+
+await main()
+
+----------------------------------------
+
+TITLE: Installing @agentic/twitter Package
+DESCRIPTION: Commands for installing the @agentic/twitter package using npm, yarn, or pnpm package managers.
+
+LANGUAGE: bash
+CODE:
+npm install @agentic/twitter
+
+LANGUAGE: bash
+CODE:
+yarn add @agentic/twitter
+
+LANGUAGE: bash
+CODE:
+pnpm add @agentic/twitter
+
+----------------------------------------
+
+TITLE: Running the OpenAI Responses API Example
+DESCRIPTION: Instructions for setting up and running the OpenAI Responses API example, including cloning the repository and setting up environment variables.
+
+LANGUAGE: bash
+CODE:
+git clone git@github.com:transitive-bullshit/agentic.git
+cd agentic
+pnpm install
+echo 'WEATHER_API_KEY=your-key' >> .env
+echo 'OPENAI_API_KEY=your-key' >> .env
+npx tsx examples/openai/bin/weather-responses.ts
+
+----------------------------------------
+
+TITLE: Installing @agentic/polygon Package
+DESCRIPTION: Commands for installing the @agentic/polygon package using different package managers (npm, yarn, pnpm).
+
+LANGUAGE: bash
+CODE:
+npm install @agentic/polygon
+
+LANGUAGE: bash
+CODE:
+yarn add @agentic/polygon
+
+LANGUAGE: bash
+CODE:
+pnpm add @agentic/polygon
+
+----------------------------------------
+
+TITLE: Installing additional dependencies for the example
+DESCRIPTION: Commands for installing additional dependencies required for the example, including the AI SDK's OpenAI provider, Agentic weather tool, and dotenv.
+
+LANGUAGE: bash
+CODE:
+npm install @ai-sdk/openai @agentic/weather dotenv
+
+LANGUAGE: bash
+CODE:
+yarn add @ai-sdk/openai @agentic/weather dotenv
+
+LANGUAGE: bash
+CODE:
+pnpm add @ai-sdk/openai @agentic/weather dotenv
+
+----------------------------------------
+
+TITLE: Installing Open-Meteo Client with Package Managers
+DESCRIPTION: Commands for installing the @agentic/open-meteo package using different Node.js package managers (npm, yarn, and pnpm).
+
+LANGUAGE: bash
+CODE:
+npm install @agentic/open-meteo
+
+LANGUAGE: bash
+CODE:
+yarn add @agentic/open-meteo
+
+LANGUAGE: bash
+CODE:
+pnpm add @agentic/open-meteo
+
+----------------------------------------
+
+TITLE: Setting up and running the example
+DESCRIPTION: Bash commands for cloning the repository, installing dependencies, setting up environment variables, and running the example script.
+
+LANGUAGE: bash
+CODE:
+git clone git@github.com:transitive-bullshit/agentic.git
+cd agentic
+pnpm install
+echo 'WEATHER_API_KEY=your-key' >> .env
+echo 'OPENAI_API_KEY=your-key' >> .env
+npx tsx examples/ai-sdk/bin/weather.ts
+
+----------------------------------------
+
+TITLE: Installing @agentic/midjourney Package
+DESCRIPTION: This snippet shows how to install the @agentic/midjourney package using different package managers: npm, yarn, and pnpm.
+
+LANGUAGE: bash
+CODE:
+npm install @agentic/midjourney
+
+LANGUAGE: bash
+CODE:
+yarn add @agentic/midjourney
+
+LANGUAGE: bash
+CODE:
+pnpm add @agentic/midjourney
+
+----------------------------------------
+
+TITLE: Setting Up Project Environment
+DESCRIPTION: Commands for cloning the repository, installing dependencies, and configuring environment variables for the weather and OpenAI APIs
+
+LANGUAGE: sh
+CODE:
+git clone git@github.com:transitive-bullshit/agentic.git
+cd agentic
+pnpm install
+echo 'WEATHER_API_KEY=your-key' >> .env
+echo 'OPENAI_API_KEY=your-key' >> .env
+npx tsx examples/llamaindex/bin/weather.ts
+
+----------------------------------------
+
+TITLE: Installing Novu API Client using Package Managers
+DESCRIPTION: Commands to install the @agentic/novu package using npm, yarn, or pnpm. This package provides the Novu API client for multi-channel notifications.
+
+LANGUAGE: bash
+CODE:
+npm install @agentic/novu
+
+LANGUAGE: bash
+CODE:
+yarn add @agentic/novu
+
+LANGUAGE: bash
+CODE:
+pnpm add @agentic/novu
+
+----------------------------------------
+
+TITLE: Setting Up Example Environment
+DESCRIPTION: Commands for cloning the repository, installing dependencies, and setting up environment variables for WeatherAPI and OpenAI API keys.
+
+LANGUAGE: sh
+CODE:
+git clone git@github.com:transitive-bullshit/agentic.git
+cd agentic
+pnpm install
+echo 'WEATHER_API_KEY=your-key' >> .env
+echo 'OPENAI_API_KEY=your-key' >> .env
+npx tsx examples/genkit/bin/weather.ts
+
+----------------------------------------
+
+TITLE: Installing Dexa Package using NPM
+DESCRIPTION: Command to install the @agentic/dexa package using NPM package manager.
+
+LANGUAGE: bash
+CODE:
+npm install @agentic/dexa
+
+----------------------------------------
+
+TITLE: Setting up and running the Dexter example
+DESCRIPTION: Bash commands for cloning the repository, installing dependencies, setting up environment variables, and running the example script. Requires API keys for weatherapi.com and OpenAI.
+
+LANGUAGE: bash
+CODE:
+git clone git@github.com:transitive-bullshit/agentic.git
+cd agentic
+pnpm install
+echo 'WEATHER_API_KEY=your-key' >> .env
+echo 'OPENAI_API_KEY=your-key' >> .env
+npx tsx examples/dexter/bin/weather.ts
+
+----------------------------------------
+
+TITLE: Installing @agentic/gravatar Package
+DESCRIPTION: Commands for installing the @agentic/gravatar package using npm, yarn, or pnpm package managers.
+
+LANGUAGE: bash
+CODE:
+npm install @agentic/gravatar
+
+LANGUAGE: bash
+CODE:
+yarn add @agentic/gravatar
+
+LANGUAGE: bash
+CODE:
+pnpm add @agentic/gravatar
+
+----------------------------------------
+
+TITLE: Installing additional dependencies
+DESCRIPTION: Commands for installing the AI SDK's OpenAI provider, the Agentic weather tool, and dotenv using npm, yarn, or pnpm.
+
+LANGUAGE: bash
+CODE:
+npm install @ai-sdk/openai @agentic/weather dotenv
+
+LANGUAGE: bash
+CODE:
+yarn add @ai-sdk/openai @agentic/weather dotenv
+
+LANGUAGE: bash
+CODE:
+pnpm add @ai-sdk/openai @agentic/weather dotenv
+
+----------------------------------------
+
+TITLE: Installing RocketReach Client Package
+DESCRIPTION: Different package manager commands for installing the @agentic/rocketreach package. Supports npm, yarn, and pnpm installation methods.
+
+LANGUAGE: bash
+CODE:
+npm install @agentic/rocketreach
+
+LANGUAGE: bash
+CODE:
+yarn add @agentic/rocketreach
+
+LANGUAGE: bash
+CODE:
+pnpm add @agentic/rocketreach
+
+----------------------------------------
+
+TITLE: Running the Mastra example
+DESCRIPTION: Steps to clone the repository, install dependencies, set up environment variables, and run the example script.
+
+LANGUAGE: bash
+CODE:
+git clone git@github.com:transitive-bullshit/agentic.git
+cd agentic
+pnpm install
+echo 'WEATHER_API_KEY=your-key' >> .env
+echo 'OPENAI_API_KEY=your-key' >> .env
+npx tsx examples/mastra/bin/weather.ts
+
+----------------------------------------
+
+TITLE: Installing Predict Leads Package
+DESCRIPTION: Commands to install the @agentic/predict-leads package using npm, yarn, or pnpm package managers.
+
+LANGUAGE: bash
+CODE:
+npm install @agentic/predict-leads
+
+LANGUAGE: bash
+CODE:
+yarn add @agentic/predict-leads
+
+LANGUAGE: bash
+CODE:
+pnpm add @agentic/predict-leads
+
+----------------------------------------
+
+TITLE: Setting Up Example Environment
+DESCRIPTION: Commands to clone the repository, install dependencies, and set up required API keys for weather and OpenAI services in the environment configuration.
+
+LANGUAGE: sh
+CODE:
+git clone git@github.com:transitive-bullshit/agentic.git
+cd agentic
+pnpm install
+echo 'WEATHER_API_KEY=your-key' >> .env
+echo 'OPENAI_API_KEY=your-key' >> .env
+npx tsx examples/langchain/bin/weather.ts
+
+----------------------------------------
+
+TITLE: Installing Google Custom Search Package
+DESCRIPTION: Commands for installing the @agentic/google-custom-search package using different package managers.
+
+LANGUAGE: bash
+CODE:
+npm install @agentic/google-custom-search
+
+LANGUAGE: bash
+CODE:
+yarn add @agentic/google-custom-search
+
+LANGUAGE: bash
+CODE:
+pnpm add @agentic/google-custom-search
+
+----------------------------------------
+
+TITLE: Installing Serper Package with npm
+DESCRIPTION: Command to install the @agentic/serper package using npm package manager.
+
+LANGUAGE: bash
+CODE:
+npm install @agentic/serper
+
+----------------------------------------
+
+TITLE: Installing Dexa Package using Yarn
+DESCRIPTION: Command to install the @agentic/dexa package using Yarn package manager.
+
+LANGUAGE: bash
+CODE:
+yarn add @agentic/dexa
+
+----------------------------------------
+
+TITLE: Installing Serper Package with pnpm
+DESCRIPTION: Command to install the @agentic/serper package using pnpm package manager.
+
+LANGUAGE: bash
+CODE:
+pnpm add @agentic/serper
+
+----------------------------------------
+
+TITLE: Installing Dexa Package using PNPM
+DESCRIPTION: Command to install the @agentic/dexa package using PNPM package manager.
+
+LANGUAGE: bash
+CODE:
+pnpm add @agentic/dexa
+
+----------------------------------------
+
+TITLE: Using SerperClient for Google Search in TypeScript
+DESCRIPTION: Example of how to use the SerperClient class to perform a Google search. It demonstrates importing the class, creating an instance, and making a search request.
+
+LANGUAGE: typescript
+CODE:
+import { SerperClient } from '@agentic/serper'
+
+const serper = new SerperClient()
+const res = await serper.search('latest news')
+
+----------------------------------------
+
+TITLE: Installing MCP Tools Package
+DESCRIPTION: Package installation commands for different Node.js package managers
+
+LANGUAGE: bash
+CODE:
+npm install @agentic/mcp
+
+LANGUAGE: bash
+CODE:
+yarn add @agentic/mcp
+
+LANGUAGE: bash
+CODE:
+pnpm add @agentic/mcp
+
+----------------------------------------
+
+TITLE: Installing SerpAPI Client Package
+DESCRIPTION: Different package manager commands for installing the @agentic/serpapi package.
+
+LANGUAGE: bash
+CODE:
+npm install @agentic/serpapi
+
+LANGUAGE: bash
+CODE:
+yarn add @agentic/serpapi
+
+LANGUAGE: bash
+CODE:
+pnpm add @agentic/serpapi
+
+----------------------------------------
+
+TITLE: HTML Project Header
+DESCRIPTION: HTML markup for the project header image and metadata badges including build status, NPM version, license and code style
+
+LANGUAGE: HTML
+CODE:
+<p align="center">
+  <a href="https://agentic.so">
+    <img alt="Agentic" src="https://raw.githubusercontent.com/transitive-bullshit/agentic/main/docs/media/agentic-header.jpg" width="308">
+  </a>
+</p>
+
+<p align="center">
+  <em>AI agent stdlib that works with any LLM and TypeScript AI SDK.</em>
+</p>
+
+<p align="center">
+  <a href="https://github.com/transitive-bullshit/agentic/actions/workflows/main.yml"><img alt="Build Status" src="https://github.com/transitive-bullshit/agentic/actions/workflows/main.yml/badge.svg" /></a>
+  <a href="https://www.npmjs.com/package/@agentic/stdlib"><img alt="NPM" src="https://img.shields.io/npm/v/@agentic/stdlib.svg" /></a>
+  <a href="https://github.com/transitive-bullshit/agentic/blob/main/license"><img alt="MIT License" src="https://img.shields.io/badge/license-MIT-blue" /></a>
+  <a href="https://prettier.io"><img alt="Prettier Code Formatting" src="https://img.shields.io/badge/code_style-prettier-brightgreen.svg" /></a>
+</p>
+
+----------------------------------------
+
+TITLE: Using SerpAPI Client
+DESCRIPTION: Example of how to initialize the SerpAPI client and perform a basic search query. Requires SERPAPI_API_KEY environment variable to be set.
+
+LANGUAGE: typescript
+CODE:
+import { SerpAPIClient } from '@agentic/serpapi'
+
+const serpapi = new SerpAPIClient()
+const res = await serpapi.search('latest news')
+
+----------------------------------------
+
+TITLE: HTML Project Header with Logo
+DESCRIPTION: Centered HTML markup for displaying the project logo, description and status badges.
+
+LANGUAGE: html
+CODE:
+<p align="center">
+  <a href="https://agentic.so">
+    <img alt="Agentic" src="https://raw.githubusercontent.com/transitive-bullshit/agentic/main/docs/media/agentic-header.jpg" width="308">
+  </a>
+</p>
+
+<p align="center">
+  <em>AI agent stdlib that works with any LLM and TypeScript AI SDK.</em>
+</p>
+
+<p align="center">
+  <a href="https://github.com/transitive-bullshit/agentic/actions/workflows/main.yml"><img alt="Build Status" src="https://github.com/transitive-bullshit/agentic/actions/workflows/main.yml/badge.svg" /></a>
+  <a href="https://www.npmjs.com/package/@agentic/stdlib"><img alt="NPM" src="https://img.shields.io/npm/v/@agentic/stdlib.svg" /></a>
+  <a href="https://github.com/transitive-bullshit/agentic/blob/main/license"><img alt="MIT License" src="https://img.shields.io/badge/license-MIT-blue" /></a>
+  <a href="https://prettier.io"><img alt="Prettier Code Formatting" src="https://img.shields.io/badge/code_style-prettier-brightgreen.svg" /></a>
+</p>
+
+----------------------------------------
+
+TITLE: Installing @agentic/social-data Package
+DESCRIPTION: Commands to install the @agentic/social-data package using different package managers. Users can choose between npm, yarn, or pnpm based on their project setup.
+
+LANGUAGE: bash
+CODE:
+npm install @agentic/social-data
+
+LANGUAGE: bash
+CODE:
+yarn add @agentic/social-data
+
+LANGUAGE: bash
+CODE:
+pnpm add @agentic/social-data
+
+----------------------------------------
+
+TITLE: Displaying Project Status Badges in Markdown
+DESCRIPTION: Centers and displays various status badges for the Agentic project, including build status, NPM version, license, and code style.
+
+LANGUAGE: markdown
+CODE:
+<p align="center">
+  <a href="https://github.com/transitive-bullshit/agentic/actions/workflows/main.yml"><img alt="Build Status" src="https://github.com/transitive-bullshit/agentic/actions/workflows/main.yml/badge.svg" /></a>
+  <a href="https://www.npmjs.com/package/@agentic/stdlib"><img alt="NPM" src="https://img.shields.io/npm/v/@agentic/stdlib.svg" /></a>
+  <a href="https://github.com/transitive-bullshit/agentic/blob/main/license"><img alt="MIT License" src="https://img.shields.io/badge/license-MIT-blue" /></a>
+  <a href="https://prettier.io"><img alt="Prettier Code Formatting" src="https://img.shields.io/badge/code_style-prettier-brightgreen.svg" /></a>
+</p>
+
+----------------------------------------
+
+TITLE: Using SocialDataClient in TypeScript
+DESCRIPTION: Demonstrates how to import and use the SocialDataClient class from the @agentic/social-data package. This example shows how to create a client instance and fetch user data by username.
+
+LANGUAGE: typescript
+CODE:
+import { SocialDataClient } from '@agentic/social-data'
+
+const sd = new SocialDataClient()
+const res = await sd.getUserByUsername('transitive_bs')
+
+----------------------------------------
+
+TITLE: HTML Project Header with Logo
+DESCRIPTION: Centered HTML layout for project logo, description and status badges including build status, NPM version, license and code style.
+
+LANGUAGE: HTML
+CODE:
+<p align="center">
+  <a href="https://agentic.so">
+    <img alt="Agentic" src="https://raw.githubusercontent.com/transitive-bullshit/agentic/main/docs/media/agentic-header.jpg" width="308">
+  </a>
+</p>
+
+<p align="center">
+  <em>AI agent stdlib that works with any LLM and TypeScript AI SDK.</em>
+</p>
+
+<p align="center">
+  <a href="https://github.com/transitive-bullshit/agentic/actions/workflows/main.yml"><img alt="Build Status" src="https://github.com/transitive-bullshit/agentic/actions/workflows/main.yml/badge.svg" /></a>
+  <a href="https://www.npmjs.com/package/@agentic/stdlib"><img alt="NPM" src="https://img.shields.io/npm/v/@agentic/stdlib.svg" /></a>
+  <a href="https://github.com/transitive-bullshit/agentic/blob/main/license"><img alt="MIT License" src="https://img.shields.io/badge/license-MIT-blue" /></a>
+  <a href="https://prettier.io"><img alt="Prettier Code Formatting" src="https://img.shields.io/badge/code_style-prettier-brightgreen.svg" /></a>
+</p>
+
+----------------------------------------
+
+TITLE: Using SlackClient to Send a Message
+DESCRIPTION: Demonstrates how to import the SlackClient, create an instance, and send a message to a Slack channel. Requires the SLACK_API_KEY environment variable to be set.
+
+LANGUAGE: typescript
+CODE:
+import { SlackClient } from '@agentic/slack'
+
+const slack = new SlackClient()
+const res = await slack.sendMessage({
+  text: 'hello',
+  channel: 'general'
+})
+
+----------------------------------------
+
+TITLE: HTML Project Header with Centered Layout
+DESCRIPTION: HTML markup for the project header including centered logo, description, and status badges.
+
+LANGUAGE: html
+CODE:
+<p align="center">
+  <a href="https://agentic.so">
+    <img alt="Agentic" src="https://raw.githubusercontent.com/transitive-bullshit/agentic/main/docs/media/agentic-header.jpg" width="308">
+  </a>
+</p>
+
+<p align="center">
+  <em>AI agent stdlib that works with any LLM and TypeScript AI SDK.</em>
+</p>
+
+<p align="center">
+  <a href="https://github.com/transitive-bullshit/agentic/actions/workflows/main.yml"><img alt="Build Status" src="https://github.com/transitive-bullshit/agentic/actions/workflows/main.yml/badge.svg" /></a>
+  <a href="https://www.npmjs.com/package/@agentic/stdlib"><img alt="NPM" src="https://img.shields.io/npm/v/@agentic/stdlib.svg" /></a>
+  <a href="https://github.com/transitive-bullshit/agentic/blob/main/license"><img alt="MIT License" src="https://img.shields.io/badge/license-MIT-blue" /></a>
+  <a href="https://prettier.io"><img alt="Prettier Code Formatting" src="https://img.shields.io/badge/code_style-prettier-brightgreen.svg" /></a>
+</p>
+
+----------------------------------------
+
+TITLE: Using ZoomInfoClient for Contact Enrichment
+DESCRIPTION: Example of how to use the ZoomInfoClient to enrich contact information. It demonstrates importing the client, initializing it, and making an API call to enrich a contact's data using an email address.
+
+LANGUAGE: typescript
+CODE:
+import { ZoomInfoClient } from '@agentic/zoominfo'
+
+const zoomInfo = new ZoomInfoClient()
+const res = await zoomInfo.enrichContact({
+  emailAddress: 'travis@transitivebullsh.it'
+})
+
+----------------------------------------
+
+TITLE: Displaying Project Status Badges in Markdown
+DESCRIPTION: Shows a series of status badges for build status, NPM version, license, and code style.
+
+LANGUAGE: markdown
+CODE:
+<p align="center">
+  <a href="https://github.com/transitive-bullshit/agentic/actions/workflows/main.yml"><img alt="Build Status" src="https://github.com/transitive-bullshit/agentic/actions/workflows/main.yml/badge.svg" /></a>
+  <a href="https://www.npmjs.com/package/@agentic/stdlib"><img alt="NPM" src="https://img.shields.io/npm/v/@agentic/stdlib.svg" /></a>
+  <a href="https://github.com/transitive-bullshit/agentic/blob/main/license"><img alt="MIT License" src="https://img.shields.io/badge/license-MIT-blue" /></a>
+  <a href="https://prettier.io"><img alt="Prettier Code Formatting" src="https://img.shields.io/badge/code_style-prettier-brightgreen.svg" /></a>
+</p>
+
+----------------------------------------
+
+TITLE: Installing Twilio Package using Package Managers
+DESCRIPTION: Commands to install the @agentic/twilio package using npm, yarn, or pnpm. This package is required for using the Twilio conversation API in the project.
+
+LANGUAGE: bash
+CODE:
+npm install @agentic/twilio
+
+LANGUAGE: bash
+CODE:
+yarn add @agentic/twilio
+
+LANGUAGE: bash
+CODE:
+pnpm add @agentic/twilio
+
+----------------------------------------
+
+TITLE: Adding Project Description in HTML/Markdown
+DESCRIPTION: This snippet demonstrates how to add a centered, italicized project description using HTML within a Markdown file.
+
+LANGUAGE: markdown
+CODE:
+<p align="center">
+  <em>AI agent stdlib that works with any LLM and TypeScript AI SDK.</em>
+</p>
+
+----------------------------------------
+
+TITLE: Installing Apollo Client Package
+DESCRIPTION: Commands to install the @agentic/apollo package using different package managers (npm, yarn, pnpm).
+
+LANGUAGE: bash
+CODE:
+npm install @agentic/apollo
+
+LANGUAGE: bash
+CODE:
+yarn add @agentic/apollo
+
+LANGUAGE: bash
+CODE:
+pnpm add @agentic/apollo
+
+----------------------------------------
+
+TITLE: HTML Description and Badges
+DESCRIPTION: HTML markup for project description and status badges including build status, NPM version, license, and code style.
+
+LANGUAGE: html
+CODE:
+<p align="center">
+  <em>AI agent stdlib that works with any LLM and TypeScript AI SDK.</em>
+</p>
+
+<p align="center">
+  <a href="https://github.com/transitive-bullshit/agentic/actions/workflows/main.yml"><img alt="Build Status" src="https://github.com/transitive-bullshit/agentic/actions/workflows/main.yml/badge.svg" /></a>
+  <a href="https://www.npmjs.com/package/@agentic/stdlib"><img alt="NPM" src="https://img.shields.io/npm/v/@agentic/stdlib.svg" /></a>
+  <a href="https://github.com/transitive-bullshit/agentic/blob/main/license"><img alt="MIT License" src="https://img.shields.io/badge/license-MIT-blue" /></a>
+  <a href="https://prettier.io"><img alt="Prettier Code Formatting" src="https://img.shields.io/badge/code_style-prettier-brightgreen.svg" /></a>
+</p>
+
+----------------------------------------
+
+TITLE: Using Apollo Client for Person Enrichment
+DESCRIPTION: Example demonstrating how to initialize the Apollo client and use it to enrich person data using a LinkedIn URL.
+
+LANGUAGE: typescript
+CODE:
+import { ApolloClient } from '@agentic/apollo'
+
+const apollo = new ApolloClient()
+const res = await apollo.enrichPerson({
+  linkedin_url: 'https://linkedin.com/in/fisch2'
+})
+
+----------------------------------------
+
+TITLE: Displaying Project Badges in Markdown
+DESCRIPTION: This code snippet shows how to display various project badges (build status, npm version, license, code style) with links using Markdown syntax.
+
+LANGUAGE: markdown
+CODE:
+<p align="center">
+  <a href="https://github.com/transitive-bullshit/agentic/actions/workflows/main.yml"><img alt="Build Status" src="https://github.com/transitive-bullshit/agentic/actions/workflows/main.yml/badge.svg" /></a>
+  <a href="https://www.npmjs.com/package/@agentic/stdlib"><img alt="NPM" src="https://img.shields.io/npm/v/@agentic/stdlib.svg" /></a>
+  <a href="https://github.com/transitive-bullshit/agentic/blob/main/license"><img alt="MIT License" src="https://img.shields.io/badge/license-MIT-blue" /></a>
+  <a href="https://prettier.io"><img alt="Prettier Code Formatting" src="https://img.shields.io/badge/code_style-prettier-brightgreen.svg" /></a>
+</p>
+
+----------------------------------------
+
+TITLE: Installing xsAI SDK Adapter and Dependencies
+DESCRIPTION: Commands for installing the xsAI SDK adapter and its dependencies using different package managers.
+
+LANGUAGE: bash
+CODE:
+npm install @agentic/xsai xsai @xsai/tool
+
+LANGUAGE: bash
+CODE:
+yarn add @agentic/xsai xsai @xsai/tool
+
+LANGUAGE: bash
+CODE:
+pnpm add @agentic/xsai xsai @xsai/tool
+
+----------------------------------------
+
+TITLE: Displaying Agentic Project Header in Markdown
+DESCRIPTION: This snippet shows how to create a centered header image with a link and description for the Agentic project using Markdown and HTML.
+
+LANGUAGE: markdown
+CODE:
+<p align="center">
+  <a href="https://agentic.so">
+    <img alt="Agentic" src="https://raw.githubusercontent.com/transitive-bullshit/agentic/main/docs/media/agentic-header.jpg" width="308">
+  </a>
+</p>
+
+<p align="center">
+  <em>Agentic adapter for LangChain's JS SDK.</em>
+</p>
+
+----------------------------------------
+
+TITLE: Using xsAI SDK Adapter with Weather Client
+DESCRIPTION: Example of using the xsAI SDK adapter with a WeatherClient to generate text based on weather information. Requires OpenAI API key and weather API key.
+
+LANGUAGE: typescript
+CODE:
+import 'dotenv/config'
+
+import { WeatherClient } from '@agentic/weather'
+import { createXSAITools } from '@agentic/xsai'
+import { generateText } from 'xsai'
+
+async function main() {
+  const weather = new WeatherClient()
+
+  const result = await generateText({
+    apiKey: process.env.OPENAI_API_KEY!,
+    baseURL: 'https://api.openai.com/v1/',
+    model: 'gpt-4o-mini',
+    tools: await createXSAITools(weather),
+    toolChoice: 'required',
+    temperature: 0,
+    messages: [
+      {
+        role: 'system',
+        content: 'You are a helpful assistant. Be as concise as possible.'
+      },
+      { role: 'user', content: 'What is the weather in San Francisco?' }
+    ]
+  })
+
+  console.log(JSON.stringify(result, null, 2))
+}
+
+await main()
+
+----------------------------------------
+
+TITLE: Centering Project Description in Markdown
+DESCRIPTION: Centers a brief description of the Agentic project using HTML within a Markdown file.
+
+LANGUAGE: markdown
+CODE:
+<p align="center">
+  <em>AI agent stdlib that works with any LLM and TypeScript AI SDK.</em>
+</p>
+
+----------------------------------------
+
+TITLE: Installing Additional Dependencies for Example
+DESCRIPTION: Commands for installing the Agentic weather tool and dotenv, which are required for the example.
+
+LANGUAGE: bash
+CODE:
+npm install @agentic/weather dotenv
+
+LANGUAGE: bash
+CODE:
+yarn add @agentic/weather dotenv
+
+LANGUAGE: bash
+CODE:
+pnpm add @agentic/weather dotenv
+
+----------------------------------------
+
+TITLE: Displaying Agentic Logo in Markdown
+DESCRIPTION: Creates a centered image link to the Agentic website, displaying the project logo.
+
+LANGUAGE: markdown
+CODE:
+<p align="center">
+  <a href="https://agentic.so">
+    <img alt="Agentic" src="https://raw.githubusercontent.com/transitive-bullshit/agentic/main/docs/media/agentic-header.jpg" width="308">
+  </a>
+</p>
+
+----------------------------------------
+
+TITLE: Running the xsAI SDK Adapter Example
+DESCRIPTION: Steps to clone the repository, install dependencies, set up environment variables, and run the example script. Requires both weather API and OpenAI API keys.
+
+LANGUAGE: bash
+CODE:
+git clone git@github.com:transitive-bullshit/agentic.git
+cd agentic
+pnpm install
+echo 'WEATHER_API_KEY=your-key' >> .env
+echo 'OPENAI_API_KEY=your-key' >> .env
+npx tsx examples/xsai/bin/weather.ts
+
+----------------------------------------
+
+TITLE: Displaying Project Status Badges in HTML/Markdown
+DESCRIPTION: This snippet shows how to display various project status badges (build status, NPM version, license, code style) using HTML within a Markdown file.
+
+LANGUAGE: markdown
+CODE:
+<p align="center">
+  <a href="https://github.com/transitive-bullshit/agentic/actions/workflows/main.yml"><img alt="Build Status" src="https://github.com/transitive-bullshit/agentic/actions/workflows/main.yml/badge.svg" /></a>
+  <a href="https://www.npmjs.com/package/@agentic/stdlib"><img alt="NPM" src="https://img.shields.io/npm/v/@agentic/stdlib.svg" /></a>
+  <a href="https://github.com/transitive-bullshit/agentic/blob/main/license"><img alt="MIT License" src="https://img.shields.io/badge/license-MIT-blue" /></a>
+  <a href="https://prettier.io"><img alt="Prettier Code Formatting" src="https://img.shields.io/badge/code_style-prettier-brightgreen.svg" /></a>
+</p>
+
+----------------------------------------
+
+TITLE: Importing and Using Calculator Tool in TypeScript
+DESCRIPTION: Shows how to import the calculator tool from @agentic/calculator package and use it to solve arithmetic problems using natural language processing.
+
+LANGUAGE: typescript
+CODE:
+import { calculator } from '@agentic/calculator'
+defTool(calculator)
+
+$`Answer the following arithmetic question: How much is 11 + 4? then divide by 3?`
+
+----------------------------------------
+
+TITLE: Displaying Agentic Project Header in Markdown
+DESCRIPTION: This snippet shows how to create a centered project header with an image and description using Markdown and HTML.
+
+LANGUAGE: markdown
+CODE:
+<p align="center">
+  <a href="https://agentic.so">
+    <img alt="Agentic" src="https://raw.githubusercontent.com/transitive-bullshit/agentic/main/docs/media/agentic-header.jpg" width="308">
+  </a>
+</p>
+
+<p align="center">
+  <em>AI agent stdlib that works with any LLM and TypeScript AI SDK.</em>
+</p>
+
+----------------------------------------
+
+TITLE: Project Setup and Environment Configuration
+DESCRIPTION: Shell commands for setting up the project locally, including cloning the repository, installing dependencies, and configuring the OpenAI API key.
+
+LANGUAGE: shell
+CODE:
+git clone git@github.com:transitive-bullshit/agentic.git
+cd agentic
+pnpm install
+echo 'OPENAI_API_KEY=your-key' >> .env
+npx genaiscript examples/genaiscript/calculator.genai.mts
+
+----------------------------------------
+
+TITLE: Displaying Project Description in Markdown
+DESCRIPTION: This code snippet demonstrates how to center-align and emphasize the project's description using Markdown syntax.
+
+LANGUAGE: markdown
+CODE:
+<p align="center">
+  <em>AI agent stdlib that works with any LLM and TypeScript AI SDK.</em>
+</p>
+
+----------------------------------------
+
+TITLE: HTML Project Header with Logo
+DESCRIPTION: HTML markup for displaying the project logo, description and status badges in a centered layout
+
+LANGUAGE: HTML
+CODE:
+<p align="center">
+  <a href="https://agentic.so">
+    <img alt="Agentic" src="https://raw.githubusercontent.com/transitive-bullshit/agentic/main/docs/media/agentic-header.jpg" width="308">
+  </a>
+</p>
+
+<p align="center">
+  <em>AI agent stdlib that works with any LLM and TypeScript AI SDK.</em>
+</p>
+
+<p align="center">
+  <a href="https://github.com/transitive-bullshit/agentic/actions/workflows/main.yml"><img alt="Build Status" src="https://github.com/transitive-bullshit/agentic/actions/workflows/main.yml/badge.svg" /></a>
+  <a href="https://www.npmjs.com/package/@agentic/stdlib"><img alt="NPM" src="https://img.shields.io/npm/v/@agentic/stdlib.svg" /></a>
+  <a href="https://github.com/transitive-bullshit/agentic/blob/main/license"><img alt="MIT License" src="https://img.shields.io/badge/license-MIT-blue" /></a>
+  <a href="https://prettier.io"><img alt="Prettier Code Formatting" src="https://img.shields.io/badge/code_style-prettier-brightgreen.svg" /></a>
+</p>
+
+----------------------------------------
+
+TITLE: Using @agentic/openapi-to-ts CLI for OpenAPI to TypeScript Conversion
+DESCRIPTION: Demonstrates various ways to use the @agentic/openapi-to-ts tool, including local development, npx execution, and globally installed usage. The tool converts an OpenAPI spec file to a TypeScript client in a specified output directory.
+
+LANGUAGE: sh
+CODE:
+# local development
+tsx bin/openapi-to-ts.ts fixtures/openapi/3.0/notion.json -o fixtures/generated
+
+# published version
+npx @agentic/openapi-to-ts fixtures/openapi/3.0/notion.json -o fixtures/generated
+
+# npm install -g version
+npm install -g @agentic/openapi-to-ts
+openapi-to-ts fixtures/openapi/3.0/notion.json -o fixtures/generated
+
+----------------------------------------
+
+TITLE: Displaying Agentic Header Image in Markdown
+DESCRIPTION: This code snippet shows how to center-align and display the Agentic header image with a link to the project website.
+
+LANGUAGE: markdown
+CODE:
+<p align="center">
+  <a href="https://agentic.so">
+    <img alt="Agentic" src="https://raw.githubusercontent.com/transitive-bullshit/agentic/main/docs/media/agentic-header.jpg" width="308">
+  </a>
+</p>
+
+----------------------------------------
+
+TITLE: Displaying Agentic Project Header in Markdown
+DESCRIPTION: This snippet shows how to create a centered header for the Agentic project using Markdown and HTML. It includes the project logo and a brief description.
+
+LANGUAGE: markdown
+CODE:
+<p align="center">
+  <a href="https://agentic.so">
+    <img alt="Agentic" src="https://raw.githubusercontent.com/transitive-bullshit/agentic/main/docs/media/agentic-header.jpg" width="308">
+  </a>
+</p>
+
+<p align="center">
+  <em>Agentic adapter for the LlamaIndex JS SDK.</em>
+</p>
+
+----------------------------------------
+
+TITLE: Adding Project Badges in Markdown
+DESCRIPTION: This snippet demonstrates how to add various project badges (build status, NPM version, license, code style) using Markdown and HTML.
+
+LANGUAGE: markdown
+CODE:
+<p align="center">
+  <a href="https://github.com/transitive-bullshit/agentic/actions/workflows/main.yml"><img alt="Build Status" src="https://github.com/transitive-bullshit/agentic/actions/workflows/main.yml/badge.svg" /></a>
+  <a href="https://www.npmjs.com/package/@agentic/stdlib"><img alt="NPM" src="https://img.shields.io/npm/v/@agentic/stdlib.svg" /></a>
+  <a href="https://github.com/transitive-bullshit/agentic/blob/main/license"><img alt="MIT License" src="https://img.shields.io/badge/license-MIT-blue" /></a>
+  <a href="https://prettier.io"><img alt="Prettier Code Formatting" src="https://img.shields.io/badge/code_style-prettier-brightgreen.svg" /></a>
+</p>
+
+----------------------------------------
+
+TITLE: Adding Project Status Badges in Markdown
+DESCRIPTION: This snippet demonstrates how to add various status badges to a project README using Markdown. It includes badges for build status, NPM version, license, and code style.
+
+LANGUAGE: markdown
+CODE:
+<p align="center">
+  <a href="https://github.com/transitive-bullshit/agentic/actions/workflows/main.yml"><img alt="Build Status" src="https://github.com/transitive-bullshit/agentic/actions/workflows/main.yml/badge.svg" /></a>
+  <a href="https://www.npmjs.com/package/@agentic/stdlib"><img alt="NPM" src="https://img.shields.io/npm/v/@agentic/stdlib.svg" /></a>
+  <a href="https://github.com/transitive-bullshit/agentic/blob/main/license"><img alt="MIT License" src="https://img.shields.io/badge/license-MIT-blue" /></a>
+  <a href="https://prettier.io"><img alt="Prettier Code Formatting" src="https://img.shields.io/badge/code_style-prettier-brightgreen.svg" /></a>
+</p>
+
+----------------------------------------
+
+TITLE: Displaying Project Logo in Markdown
+DESCRIPTION: Centers and displays the Agentic project logo using HTML within a Markdown file. The image is linked to the project website.
+
+LANGUAGE: markdown
+CODE:
+<p align="center">
+  <a href="https://agentic.so">
+    <img alt="Agentic" src="https://raw.githubusercontent.com/transitive-bullshit/agentic/main/docs/media/agentic-header.jpg" width="308">
+  </a>
+</p>
+
+----------------------------------------
+
+TITLE: Displaying Agentic Logo in HTML/Markdown
+DESCRIPTION: This snippet shows how to display the Agentic logo using HTML within a Markdown file. It includes centering the image and adding a link to the project website.
+
+LANGUAGE: markdown
+CODE:
+<p align="center">
+  <a href="https://agentic.so">
+    <img alt="Agentic" src="https://raw.githubusercontent.com/transitive-bullshit/agentic/main/docs/media/agentic-header.jpg" width="308">
+  </a>
+</p>
+
+----------------------------------------
+
+TITLE: HTML Project Header and Badges
+DESCRIPTION: HTML markup for the project header including logo, description, and status badges for build, NPM version, license and code formatting.
+
+LANGUAGE: HTML
+CODE:
+<p align="center">
+  <a href="https://agentic.so">
+    <img alt="Agentic" src="https://raw.githubusercontent.com/transitive-bullshit/agentic/main/docs/media/agentic-header.jpg" width="308">
+  </a>
+</p>
+
+<p align="center">
+  <em>AI agent stdlib that works with any LLM and TypeScript AI SDK.</em>
+</p>
+
+<p align="center">
+  <a href="https://github.com/transitive-bullshit/agentic/actions/workflows/main.yml"><img alt="Build Status" src="https://github.com/transitive-bullshit/agentic/actions/workflows/main.yml/badge.svg" /></a>
+  <a href="https://www.npmjs.com/package/@agentic/stdlib"><img alt="NPM" src="https://img.shields.io/npm/v/@agentic/stdlib.svg" /></a>
+  <a href="https://github.com/transitive-bullshit/agentic/blob/main/license"><img alt="MIT License" src="https://img.shields.io/badge/license-MIT-blue" /></a>
+  <a href="https://prettier.io"><img alt="Prettier Code Formatting" src="https://img.shields.io/badge/code_style-prettier-brightgreen.svg" /></a>
+</p>
+
+----------------------------------------
+
+TITLE: HTML Project Header with Images and Badges
+DESCRIPTION: HTML markup for the project header section including logo, description, and status badges for build, npm, license and code formatting.
+
+LANGUAGE: html
+CODE:
+<p align="center">
+  <a href="https://agentic.so">
+    <img alt="Agentic" src="https://raw.githubusercontent.com/transitive-bullshit/agentic/main/docs/media/agentic-header.jpg" width="308">
+  </a>
+</p>
+
+<p align="center">
+  <em>AI agent stdlib that works with any LLM and TypeScript AI SDK.</em>
+</p>
+
+<p align="center">
+  <a href="https://github.com/transitive-bullshit/agentic/actions/workflows/main.yml"><img alt="Build Status" src="https://github.com/transitive-bullshit/agentic/actions/workflows/main.yml/badge.svg" /></a>
+  <a href="https://www.npmjs.com/package/@agentic/stdlib"><img alt="NPM" src="https://img.shields.io/npm/v/@agentic/stdlib.svg" /></a>
+  <a href="https://github.com/transitive-bullshit/agentic/blob/main/license"><img alt="MIT License" src="https://img.shields.io/badge/license-MIT-blue" /></a>
+  <a href="https://prettier.io"><img alt="Prettier Code Formatting" src="https://img.shields.io/badge/code_style-prettier-brightgreen.svg" /></a>
+</p>
+
+----------------------------------------
+
+TITLE: HTML Header with Project Logo
+DESCRIPTION: Centered HTML markup displaying the Agentic project logo and GitHub badges for build status, NPM version, license and code formatting.
+
+LANGUAGE: html
+CODE:
+<p align="center">
+  <a href="https://agentic.so">
+    <img alt="Agentic" src="https://raw.githubusercontent.com/transitive-bullshit/agentic/main/docs/media/agentic-header.jpg" width="308">
+  </a>
+</p>
+
+<p align="center">
+  <em>AI agent stdlib that works with any LLM and TypeScript AI SDK.</em>
+</p>
+
+<p align="center">
+  <a href="https://github.com/transitive-bullshit/agentic/actions/workflows/main.yml"><img alt="Build Status" src="https://github.com/transitive-bullshit/agentic/actions/workflows/main.yml/badge.svg" /></a>
+  <a href="https://www.npmjs.com/package/@agentic/stdlib"><img alt="NPM" src="https://img.shields.io/npm/v/@agentic/stdlib.svg" /></a>
+  <a href="https://github.com/transitive-bullshit/agentic/blob/main/license"><img alt="MIT License" src="https://img.shields.io/badge/license-MIT-blue" /></a>
+  <a href="https://prettier.io"><img alt="Prettier Code Formatting" src="https://img.shields.io/badge/code_style-prettier-brightgreen.svg" /></a>
+</p>
+
+----------------------------------------
+
+TITLE: HTML Header with Project Logo
+DESCRIPTION: HTML markup for displaying the Agentic project logo and header image with alignment and styling.
+
+LANGUAGE: html
+CODE:
+<p align="center">
+  <a href="https://agentic.so">
+    <img alt="Agentic" src="https://raw.githubusercontent.com/transitive-bullshit/agentic/main/docs/media/agentic-header.jpg" width="308">
+  </a>
+</p>
+
+----------------------------------------
+
+TITLE: Displaying Agentic Header Image in Markdown
+DESCRIPTION: This code snippet shows how to display the Agentic header image centered in a markdown file, with a link to the project website.
+
+LANGUAGE: markdown
+CODE:
+<p align="center">
+  <a href="https://agentic.so">
+    <img alt="Agentic" src="https://raw.githubusercontent.com/transitive-bullshit/agentic/main/docs/media/agentic-header.jpg" width="308">
+  </a>
+</p>
+
+----------------------------------------
+
+TITLE: Displaying Agentic Logo in Markdown
+DESCRIPTION: This snippet shows how to display the Agentic project logo using HTML within a Markdown file. It includes alignment and sizing attributes.
+
+LANGUAGE: markdown
+CODE:
+<p align="center">
+  <a href="https://agentic.so">
+    <img alt="Agentic" src="https://raw.githubusercontent.com/transitive-bullshit/agentic/main/docs/media/agentic-header.jpg" width="308">
+  </a>
+</p>
+
+----------------------------------------
+
+TITLE: HTML Project Header with Logo and Badges
+DESCRIPTION: HTML markup for the project header, including centered logo, description, and status badges for build status, NPM version, license and code style.
+
+LANGUAGE: html
+CODE:
+<p align="center">
+  <a href="https://agentic.so">
+    <img alt="Agentic" src="https://raw.githubusercontent.com/transitive-bullshit/agentic/main/docs/media/agentic-header.jpg" width="308">
+  </a>
+</p>
+
+<p align="center">
+  <em>AI agent stdlib that works with any LLM and TypeScript AI SDK.</em>
+</p>
+
+<p align="center">
+  <a href="https://github.com/transitive-bullshit/agentic/actions/workflows/main.yml"><img alt="Build Status" src="https://github.com/transitive-bullshit/agentic/actions/workflows/main.yml/badge.svg" /></a>
+  <a href="https://www.npmjs.com/package/@agentic/stdlib"><img alt="NPM" src="https://img.shields.io/npm/v/@agentic/stdlib.svg" /></a>
+  <a href="https://github.com/transitive-bullshit/agentic/blob/main/license"><img alt="MIT License" src="https://img.shields.io/badge/license-MIT-blue" /></a>
+  <a href="https://prettier.io"><img alt="Prettier Code Formatting" src="https://img.shields.io/badge/code_style-prettier-brightgreen.svg" /></a>
+</p>
+
+----------------------------------------
+
+TITLE: Adding Project Description in Markdown
+DESCRIPTION: This snippet demonstrates how to add a centered, italicized project description using HTML within a Markdown file.
+
+LANGUAGE: markdown
+CODE:
+<p align="center">
+  <em>AI agent stdlib that works with any LLM and TypeScript AI SDK.</em>
+</p>
+
+----------------------------------------
+
+TITLE: HTML Project Description
+DESCRIPTION: HTML markup for the centered project description and status badges.
+
+LANGUAGE: HTML
+CODE:
+<p align="center">
+  <em>AI agent stdlib that works with any LLM and TypeScript AI SDK.</em>
+</p>
+
+<p align="center">
+  <a href="https://github.com/transitive-bullshit/agentic/actions/workflows/main.yml"><img alt="Build Status" src="https://github.com/transitive-bullshit/agentic/actions/workflows/main.yml/badge.svg" /></a>
+  <a href="https://www.npmjs.com/package/@agentic/stdlib"><img alt="NPM" src="https://img.shields.io/npm/v/@agentic/stdlib.svg" /></a>
+  <a href="https://github.com/transitive-bullshit/agentic/blob/main/license"><img alt="MIT License" src="https://img.shields.io/badge/license-MIT-blue" /></a>
+  <a href="https://prettier.io"><img alt="Prettier Code Formatting" src="https://img.shields.io/badge/code_style-prettier-brightgreen.svg" /></a>
+</p>
+
+----------------------------------------
+
+TITLE: Displaying Project Badges in Markdown
+DESCRIPTION: This snippet shows how to display various project badges (build status, NPM version, license, code style) using HTML within a Markdown file.
+
+LANGUAGE: markdown
+CODE:
+<p align="center">
+  <a href="https://github.com/transitive-bullshit/agentic/actions/workflows/main.yml"><img alt="Build Status" src="https://github.com/transitive-bullshit/agentic/actions/workflows/main.yml/badge.svg" /></a>
+  <a href="https://www.npmjs.com/package/@agentic/stdlib"><img alt="NPM" src="https://img.shields.io/npm/v/@agentic/stdlib.svg" /></a>
+  <a href="https://github.com/transitive-bullshit/agentic/blob/main/license"><img alt="MIT License" src="https://img.shields.io/badge/license-MIT-blue" /></a>
+  <a href="https://prettier.io"><img alt="Prettier Code Formatting" src="https://img.shields.io/badge/code_style-prettier-brightgreen.svg" /></a>
+</p>
+
+----------------------------------------
+
+TITLE: HTML Header with Project Branding
+DESCRIPTION: HTML markup for the project header including logo, description, and status badges for build, npm, license and code formatting.
+
+LANGUAGE: html
+CODE:
+<p align="center">
+  <a href="https://agentic.so">
+    <img alt="Agentic" src="https://raw.githubusercontent.com/transitive-bullshit/agentic/main/docs/media/agentic-header.jpg" width="308">
+  </a>
+</p>
+
+<p align="center">
+  <em>AI agent stdlib that works with any LLM and TypeScript AI SDK.</em>
+</p>
+
+<p align="center">
+  <a href="https://github.com/transitive-bullshit/agentic/actions/workflows/main.yml"><img alt="Build Status" src="https://github.com/transitive-bullshit/agentic/actions/workflows/main.yml/badge.svg" /></a>
+  <a href="https://www.npmjs.com/package/@agentic/stdlib"><img alt="NPM" src="https://img.shields.io/npm/v/@agentic/stdlib.svg" /></a>
+  <a href="https://github.com/transitive-bullshit/agentic/blob/main/license"><img alt="MIT License" src="https://img.shields.io/badge/license-MIT-blue" /></a>
+  <a href="https://prettier.io"><img alt="Prettier Code Formatting" src="https://img.shields.io/badge/code_style-prettier-brightgreen.svg" /></a>
+</p>
+
+----------------------------------------
+
+TITLE: HTML Project Header Configuration
+DESCRIPTION: HTML markup for the project header including centered logo, description, and status badges
+
+LANGUAGE: html
+CODE:
+<p align="center">
+  <a href="https://agentic.so">
+    <img alt="Agentic" src="https://raw.githubusercontent.com/transitive-bullshit/agentic/main/docs/media/agentic-header.jpg" width="308">
+  </a>
+</p>
+
+<p align="center">
+  <em>Agentic adapter for the Vercel AI SDK.</em>
+</p>
+
+<p align="center">
+  <a href="https://github.com/transitive-bullshit/agentic/actions/workflows/main.yml"><img alt="Build Status" src="https://github.com/transitive-bullshit/agentic/actions/workflows/main.yml/badge.svg" /></a>
+  <a href="https://www.npmjs.com/package/@agentic/stdlib"><img alt="NPM" src="https://img.shields.io/npm/v/@agentic/stdlib.svg" /></a>
+  <a href="https://github.com/transitive-bullshit/agentic/blob/main/license"><img alt="MIT License" src="https://img.shields.io/badge/license-MIT-blue" /></a>
+  <a href="https://prettier.io"><img alt="Prettier Code Formatting" src="https://img.shields.io/badge/code_style-prettier-brightgreen.svg" /></a>
+</p>
+
+----------------------------------------
+
+TITLE: Adding Project Badges in Markdown
+DESCRIPTION: This snippet demonstrates how to add various project badges (build status, NPM version, license, code style) using Markdown and HTML.
+
+LANGUAGE: markdown
+CODE:
+<p align="center">
+  <a href="https://github.com/transitive-bullshit/agentic/actions/workflows/main.yml"><img alt="Build Status" src="https://github.com/transitive-bullshit/agentic/actions/workflows/main.yml/badge.svg" /></a>
+  <a href="https://www.npmjs.com/package/@agentic/stdlib"><img alt="NPM" src="https://img.shields.io/npm/v/@agentic/stdlib.svg" /></a>
+  <a href="https://github.com/transitive-bullshit/agentic/blob/main/license"><img alt="MIT License" src="https://img.shields.io/badge/license-MIT-blue" /></a>
+  <a href="https://prettier.io"><img alt="Prettier Code Formatting" src="https://img.shields.io/badge/code_style-prettier-brightgreen.svg" /></a>
+</p>
+
+----------------------------------------
+
+TITLE: Displaying Agentic Project Header in Markdown
+DESCRIPTION: This code snippet uses HTML within Markdown to create a centered header with the Agentic logo and project description. It also includes badges for build status, NPM version, license, and code style.
+
+LANGUAGE: markdown
+CODE:
+<p align="center">
+  <a href="https://agentic.so">
+    <img alt="Agentic" src="https://raw.githubusercontent.com/transitive-bullshit/agentic/main/docs/media/agentic-header.jpg" width="308">
+  </a>
+</p>
+
+<p align="center">
+  <em>AI agent stdlib that works with any LLM and TypeScript AI SDK.</em>
+</p>
+
+<p align="center">
+  <a href="https://github.com/transitive-bullshit/agentic/actions/workflows/main.yml"><img alt="Build Status" src="https://github.com/transitive-bullshit/agentic/actions/workflows/main.yml/badge.svg" /></a>
+  <a href="https://www.npmjs.com/package/@agentic/stdlib"><img alt="NPM" src="https://img.shields.io/npm/v/@agentic/stdlib.svg" /></a>
+  <a href="https://github.com/transitive-bullshit/agentic/blob/main/license"><img alt="MIT License" src="https://img.shields.io/badge/license-MIT-blue" /></a>
+  <a href="https://prettier.io"><img alt="Prettier Code Formatting" src="https://img.shields.io/badge/code_style-prettier-brightgreen.svg" /></a>
+</p>
+
+----------------------------------------
+
+TITLE: HTML Header with Project Logo
+DESCRIPTION: HTML markup for displaying the project logo, description and status badges in a centered layout.
+
+LANGUAGE: html
+CODE:
+<p align="center">
+  <a href="https://agentic.so">
+    <img alt="Agentic" src="https://raw.githubusercontent.com/transitive-bullshit/agentic/main/docs/media/agentic-header.jpg" width="308">
+  </a>
+</p>
+
+<p align="center">
+  <em>AI agent stdlib that works with any LLM and TypeScript AI SDK.</em>
+</p>
+
+<p align="center">
+  <a href="https://github.com/transitive-bullshit/agentic/actions/workflows/main.yml"><img alt="Build Status" src="https://github.com/transitive-bullshit/agentic/actions/workflows/main.yml/badge.svg" /></a>
+  <a href="https://www.npmjs.com/package/@agentic/stdlib"><img alt="NPM" src="https://img.shields.io/npm/v/@agentic/stdlib.svg" /></a>
+  <a href="https://github.com/transitive-bullshit/agentic/blob/main/license"><img alt="MIT License" src="https://img.shields.io/badge/license-MIT-blue" /></a>
+  <a href="https://prettier.io"><img alt="Prettier Code Formatting" src="https://img.shields.io/badge/code_style-prettier-brightgreen.svg" /></a>
+</p>
+
+----------------------------------------
+
+TITLE: HTML Project Header with Logo
+DESCRIPTION: Centered project header with logo image and descriptive text using HTML paragraph and anchor tags. Includes alignment attributes and styling for the project's main visual elements.
+
+LANGUAGE: HTML
+CODE:
+<p align="center">
+  <a href="https://agentic.so">
+    <img alt="Agentic" src="https://raw.githubusercontent.com/transitive-bullshit/agentic/main/docs/media/agentic-header.jpg" width="308">
+  </a>
+</p>
+
+<p align="center">
+  <em>AI agent stdlib that works with any LLM and TypeScript AI SDK.</em>
+</p>
+
+<p align="center">
+  <a href="https://github.com/transitive-bullshit/agentic/actions/workflows/main.yml"><img alt="Build Status" src="https://github.com/transitive-bullshit/agentic/actions/workflows/main.yml/badge.svg" /></a>
+  <a href="https://www.npmjs.com/package/@agentic/stdlib"><img alt="NPM" src="https://img.shields.io/npm/v/@agentic/stdlib.svg" /></a>
+  <a href="https://github.com/transitive-bullshit/agentic/blob/main/license"><img alt="MIT License" src="https://img.shields.io/badge/license-MIT-blue" /></a>
+  <a href="https://prettier.io"><img alt="Prettier Code Formatting" src="https://img.shields.io/badge/code_style-prettier-brightgreen.svg" /></a>
+</p>
+
+----------------------------------------
+
+TITLE: Displaying Project Status Badges in Markdown
+DESCRIPTION: Centers and displays various status badges for the Agentic project, including build status, NPM version, license, and code style.
+
+LANGUAGE: markdown
+CODE:
+<p align="center">
+  <a href="https://github.com/transitive-bullshit/agentic/actions/workflows/main.yml"><img alt="Build Status" src="https://github.com/transitive-bullshit/agentic/actions/workflows/main.yml/badge.svg" /></a>
+  <a href="https://www.npmjs.com/package/@agentic/stdlib"><img alt="NPM" src="https://img.shields.io/npm/v/@agentic/stdlib.svg" /></a>
+  <a href="https://github.com/transitive-bullshit/agentic/blob/main/license"><img alt="MIT License" src="https://img.shields.io/badge/license-MIT-blue" /></a>
+  <a href="https://prettier.io"><img alt="Prettier Code Formatting" src="https://img.shields.io/badge/code_style-prettier-brightgreen.svg" /></a>
+</p>
+
+----------------------------------------
+
+TITLE: Displaying Agentic Logo and Description in Markdown
+DESCRIPTION: This snippet uses Markdown to create a centered layout for the Agentic logo, project description, and various status badges. It includes links to the project website, GitHub repository, and npm package.
+
+LANGUAGE: markdown
+CODE:
+<p align="center">
+  <a href="https://agentic.so">
+    <img alt="Agentic" src="https://raw.githubusercontent.com/transitive-bullshit/agentic/main/docs/media/agentic-header.jpg" width="308">
+  </a>
+</p>
+
+<p align="center">
+  <em>AI agent stdlib that works with any LLM and TypeScript AI SDK.</em>
+</p>
+
+<p align="center">
+  <a href="https://github.com/transitive-bullshit/agentic/actions/workflows/main.yml"><img alt="Build Status" src="https://github.com/transitive-bullshit/agentic/actions/workflows/main.yml/badge.svg" /></a>
+  <a href="https://www.npmjs.com/package/@agentic/stdlib"><img alt="NPM" src="https://img.shields.io/npm/v/@agentic/stdlib.svg" /></a>
+  <a href="https://github.com/transitive-bullshit/agentic/blob/main/license"><img alt="MIT License" src="https://img.shields.io/badge/license-MIT-blue" /></a>
+  <a href="https://prettier.io"><img alt="Prettier Code Formatting" src="https://img.shields.io/badge/code_style-prettier-brightgreen.svg" /></a>
+</p>
+
+----------------------------------------
+
+TITLE: HTML Header with Project Logo
+DESCRIPTION: HTML markup for the project header section including centered logo image and project description.
+
+LANGUAGE: HTML
+CODE:
+<p align="center">
+  <a href="https://agentic.so">
+    <img alt="Agentic" src="https://raw.githubusercontent.com/transitive-bullshit/agentic/main/docs/media/agentic-header.jpg" width="308">
+  </a>
+</p>
+
+----------------------------------------
+
+TITLE: HTML Center-Aligned Header with Logo
+DESCRIPTION: HTML markup for center-aligned project logo and description with links to project resources and status badges.
+
+LANGUAGE: html
+CODE:
+<p align="center">
+  <a href="https://agentic.so">
+    <img alt="Agentic" src="https://raw.githubusercontent.com/transitive-bullshit/agentic/main/docs/media/agentic-header.jpg" width="308">
+  </a>
+</p>
+
+<p align="center">
+  <em>AI agent stdlib that works with any LLM and TypeScript AI SDK.</em>
+</p>
+
+<p align="center">
+  <a href="https://github.com/transitive-bullshit/agentic/actions/workflows/main.yml"><img alt="Build Status" src="https://github.com/transitive-bullshit/agentic/actions/workflows/main.yml/badge.svg" /></a>
+  <a href="https://www.npmjs.com/package/@agentic/stdlib"><img alt="NPM" src="https://img.shields.io/npm/v/@agentic/stdlib.svg" /></a>
+  <a href="https://github.com/transitive-bullshit/agentic/blob/main/license"><img alt="MIT License" src="https://img.shields.io/badge/license-MIT-blue" /></a>
+  <a href="https://prettier.io"><img alt="Prettier Code Formatting" src="https://img.shields.io/badge/code_style-prettier-brightgreen.svg" /></a>
+</p>
+
+----------------------------------------
+
+TITLE: Adding Project Badges in Markdown
+DESCRIPTION: This code demonstrates how to add various project badges (build status, NPM version, license, code style) using markdown syntax. These badges provide quick visual information about the project's status and characteristics.
+
+LANGUAGE: markdown
+CODE:
+<p align="center">
+  <a href="https://github.com/transitive-bullshit/agentic/actions/workflows/main.yml"><img alt="Build Status" src="https://github.com/transitive-bullshit/agentic/actions/workflows/main.yml/badge.svg" /></a>
+  <a href="https://www.npmjs.com/package/@agentic/stdlib"><img alt="NPM" src="https://img.shields.io/npm/v/@agentic/stdlib.svg" /></a>
+  <a href="https://github.com/transitive-bullshit/agentic/blob/main/license"><img alt="MIT License" src="https://img.shields.io/badge/license-MIT-blue" /></a>
+  <a href="https://prettier.io"><img alt="Prettier Code Formatting" src="https://img.shields.io/badge/code_style-prettier-brightgreen.svg" /></a>
+</p>
+
+----------------------------------------
+
+TITLE: Displaying Agentic Project Header in HTML
+DESCRIPTION: This HTML snippet centers and displays the Agentic project logo with a link to the project website. It also includes a brief description of the project and various status badges.
+
+LANGUAGE: html
+CODE:
+<p align="center">
+  <a href="https://agentic.so">
+    <img alt="Agentic" src="https://raw.githubusercontent.com/transitive-bullshit/agentic/main/docs/media/agentic-header.jpg" width="308">
+  </a>
+</p>
+
+<p align="center">
+  <em>AI agent stdlib that works with any LLM and TypeScript AI SDK.</em>
+</p>
+
+<p align="center">
+  <a href="https://github.com/transitive-bullshit/agentic/actions/workflows/main.yml"><img alt="Build Status" src="https://github.com/transitive-bullshit/agentic/actions/workflows/main.yml/badge.svg" /></a>
+  <a href="https://www.npmjs.com/package/@agentic/stdlib"><img alt="NPM" src="https://img.shields.io/npm/v/@agentic/stdlib.svg" /></a>
+  <a href="https://github.com/transitive-bullshit/agentic/blob/main/license"><img alt="MIT License" src="https://img.shields.io/badge/license-MIT-blue" /></a>
+  <a href="https://prettier.io"><img alt="Prettier Code Formatting" src="https://img.shields.io/badge/code_style-prettier-brightgreen.svg" /></a>
+</p>
+
+----------------------------------------
+
+TITLE: HTML Project Header Configuration
+DESCRIPTION: HTML markup for configuring the project header with logo, description, and status badges for build, NPM version, license and code style.
+
+LANGUAGE: HTML
+CODE:
+<p align="center">
+  <a href="https://agentic.so">
+    <img alt="Agentic" src="https://raw.githubusercontent.com/transitive-bullshit/agentic/main/docs/media/agentic-header.jpg" width="308">
+  </a>
+</p>
+
+<p align="center">
+  <em>AI agent stdlib that works with any LLM and TypeScript AI SDK.</em>
+</p>
+
+<p align="center">
+  <a href="https://github.com/transitive-bullshit/agentic/actions/workflows/main.yml"><img alt="Build Status" src="https://github.com/transitive-bullshit/agentic/actions/workflows/main.yml/badge.svg" /></a>
+  <a href="https://www.npmjs.com/package/@agentic/stdlib"><img alt="NPM" src="https://img.shields.io/npm/v/@agentic/stdlib.svg" /></a>
+  <a href="https://github.com/transitive-bullshit/agentic/blob/main/license"><img alt="MIT License" src="https://img.shields.io/badge/license-MIT-blue" /></a>
+  <a href="https://prettier.io"><img alt="Prettier Code Formatting" src="https://img.shields.io/badge/code_style-prettier-brightgreen.svg" /></a>
+</p>
+
+----------------------------------------
+
+TITLE: Adding Project Description in Markdown
+DESCRIPTION: Displays a centered, italicized description of the Agentic project.
+
+LANGUAGE: markdown
+CODE:
+<p align="center">
+  <em>AI agent stdlib that works with any LLM and TypeScript AI SDK.</em>
+</p>
+
+----------------------------------------
+
+TITLE: Centering Project Description in Markdown
+DESCRIPTION: Centers and emphasizes the main description of the Agentic project.
+
+LANGUAGE: markdown
+CODE:
+<p align="center">
+  <em>AI agent stdlib that works with any LLM and TypeScript AI SDK.</em>
+</p>
+
+----------------------------------------
+
+TITLE: Centering Project Description in Markdown
+DESCRIPTION: This snippet demonstrates how to center and emphasize the project description using markdown syntax.
+
+LANGUAGE: markdown
+CODE:
+<p align="center">
+  <em>AI agent stdlib that works with any LLM and TypeScript AI SDK.</em>
+</p>
+
+----------------------------------------
+
+TITLE: HTML Center-Aligned Project Header
+DESCRIPTION: HTML markup for the project header section, including centered logo image, description and status badges.
+
+LANGUAGE: html
+CODE:
+<p align="center">
+  <a href="https://agentic.so">
+    <img alt="Agentic" src="https://raw.githubusercontent.com/transitive-bullshit/agentic/main/docs/media/agentic-header.jpg" width="308">
+  </a>
+</p>
+
+<p align="center">
+  <em>AI agent stdlib that works with any LLM and TypeScript AI SDK.</em>
+</p>
+
+<p align="center">
+  <a href="https://github.com/transitive-bullshit/agentic/actions/workflows/main.yml"><img alt="Build Status" src="https://github.com/transitive-bullshit/agentic/actions/workflows/main.yml/badge.svg" /></a>
+  <a href="https://www.npmjs.com/package/@agentic/stdlib"><img alt="NPM" src="https://img.shields.io/npm/v/@agentic/stdlib.svg" /></a>
+  <a href="https://github.com/transitive-bullshit/agentic/blob/main/license"><img alt="MIT License" src="https://img.shields.io/badge/license-MIT-blue" /></a>
+  <a href="https://prettier.io"><img alt="Prettier Code Formatting" src="https://img.shields.io/badge/code_style-prettier-brightgreen.svg" /></a>
+</p>
+
+----------------------------------------
+
+TITLE: Displaying Project Badges in Markdown
+DESCRIPTION: This code block shows how to display various project badges (build status, NPM version, license, code style) centered in a markdown file.
+
+LANGUAGE: markdown
+CODE:
+<p align="center">
+  <a href="https://github.com/transitive-bullshit/agentic/actions/workflows/main.yml"><img alt="Build Status" src="https://github.com/transitive-bullshit/agentic/actions/workflows/main.yml/badge.svg" /></a>
+  <a href="https://www.npmjs.com/package/@agentic/stdlib"><img alt="NPM" src="https://img.shields.io/npm/v/@agentic/stdlib.svg" /></a>
+  <a href="https://github.com/transitive-bullshit/agentic/blob/main/license"><img alt="MIT License" src="https://img.shields.io/badge/license-MIT-blue" /></a>
+  <a href="https://prettier.io"><img alt="Prettier Code Formatting" src="https://img.shields.io/badge/code_style-prettier-brightgreen.svg" /></a>
+</p>
+
+----------------------------------------
+
+TITLE: HTML Project Header and Badges
+DESCRIPTION: HTML markup for the project header including logo, description, and status badges for build, npm, license and code style.
+
+LANGUAGE: html
+CODE:
+<p align="center">
+  <a href="https://agentic.so">
+    <img alt="Agentic" src="https://raw.githubusercontent.com/transitive-bullshit/agentic/main/docs/media/agentic-header.jpg" width="308">
+  </a>
+</p>
+
+<p align="center">
+  <em>AI agent stdlib that works with any LLM and TypeScript AI SDK.</em>
+</p>
+
+<p align="center">
+  <a href="https://github.com/transitive-bullshit/agentic/actions/workflows/main.yml"><img alt="Build Status" src="https://github.com/transitive-bullshit/agentic/actions/workflows/main.yml/badge.svg" /></a>
+  <a href="https://www.npmjs.com/package/@agentic/stdlib"><img alt="NPM" src="https://img.shields.io/npm/v/@agentic/stdlib.svg" /></a>
+  <a href="https://github.com/transitive-bullshit/agentic/blob/main/license"><img alt="MIT License" src="https://img.shields.io/badge/license-MIT-blue" /></a>
+  <a href="https://prettier.io"><img alt="Prettier Code Formatting" src="https://img.shields.io/badge/code_style-prettier-brightgreen.svg" /></a>
+</p>
+
+----------------------------------------
+
+TITLE: HTML Project Header with Links and Badges
+DESCRIPTION: HTML markup for the project header section including centered logo, description, and status badges for build, npm, license and code style.
+
+LANGUAGE: html
+CODE:
+<p align="center">
+  <a href="https://agentic.so">
+    <img alt="Agentic" src="https://raw.githubusercontent.com/transitive-bullshit/agentic/main/docs/media/agentic-header.jpg" width="308">
+  </a>
+</p>
+
+<p align="center">
+  <em>AI agent stdlib that works with any LLM and TypeScript AI SDK.</em>
+</p>
+
+<p align="center">
+  <a href="https://github.com/transitive-bullshit/agentic/actions/workflows/main.yml"><img alt="Build Status" src="https://github.com/transitive-bullshit/agentic/actions/workflows/main.yml/badge.svg" /></a>
+  <a href="https://www.npmjs.com/package/@agentic/stdlib"><img alt="NPM" src="https://img.shields.io/npm/v/@agentic/stdlib.svg" /></a>
+  <a href="https://github.com/transitive-bullshit/agentic/blob/main/license"><img alt="MIT License" src="https://img.shields.io/badge/license-MIT-blue" /></a>
+  <a href="https://prettier.io"><img alt="Prettier Code Formatting" src="https://img.shields.io/badge/code_style-prettier-brightgreen.svg" /></a>
+</p>
+
+----------------------------------------
+
+TITLE: HTML Project Header with Logo and Badges
+DESCRIPTION: HTML markup for the project header including centered logo, description, and status badges for build status, NPM version, license and code formatting.
+
+LANGUAGE: HTML
+CODE:
+<p align="center">
+  <a href="https://agentic.so">
+    <img alt="Agentic" src="https://raw.githubusercontent.com/transitive-bullshit/agentic/main/docs/media/agentic-header.jpg" width="308">
+  </a>
+</p>
+
+<p align="center">
+  <em>AI agent stdlib that works with any LLM and TypeScript AI SDK.</em>
+</p>
+
+<p align="center">
+  <a href="https://github.com/transitive-bullshit/agentic/actions/workflows/main.yml"><img alt="Build Status" src="https://github.com/transitive-bullshit/agentic/actions/workflows/main.yml/badge.svg" /></a>
+  <a href="https://www.npmjs.com/package/@agentic/stdlib"><img alt="NPM" src="https://img.shields.io/npm/v/@agentic/stdlib.svg" /></a>
+  <a href="https://github.com/transitive-bullshit/agentic/blob/main/license"><img alt="MIT License" src="https://img.shields.io/badge/license-MIT-blue" /></a>
+  <a href="https://prettier.io"><img alt="Prettier Code Formatting" src="https://img.shields.io/badge/code_style-prettier-brightgreen.svg" /></a>
+</p>
+
+----------------------------------------
+
+TITLE: Displaying Agentic Project Header in Markdown
+DESCRIPTION: This snippet shows how to create a centered header with an image and description for the Agentic project using Markdown and HTML. It includes the project logo, a brief description, and various badges for build status, npm version, license, and code style.
+
+LANGUAGE: markdown
+CODE:
+<p align="center">
+  <a href="https://agentic.so">
+    <img alt="Agentic" src="https://raw.githubusercontent.com/transitive-bullshit/agentic/main/docs/media/agentic-header.jpg" width="308">
+  </a>
+</p>
+
+<p align="center">
+  <em>AI agent stdlib that works with any LLM and TypeScript AI SDK.</em>
+</p>
+
+<p align="center">
+  <a href="https://github.com/transitive-bullshit/agentic/actions/workflows/main.yml"><img alt="Build Status" src="https://github.com/transitive-bullshit/agentic/actions/workflows/main.yml/badge.svg" /></a>
+  <a href="https://www.npmjs.com/package/@agentic/stdlib"><img alt="NPM" src="https://img.shields.io/npm/v/@agentic/stdlib.svg" /></a>
+  <a href="https://github.com/transitive-bullshit/agentic/blob/main/license"><img alt="MIT License" src="https://img.shields.io/badge/license-MIT-blue" /></a>
+  <a href="https://prettier.io"><img alt="Prettier Code Formatting" src="https://img.shields.io/badge/code_style-prettier-brightgreen.svg" /></a>
+</p>
+
+----------------------------------------
+
+TITLE: HTML Structure for Project Header
+DESCRIPTION: HTML markup for the project header including centered logo, description and status badges from various services.
+
+LANGUAGE: html
+CODE:
+<p align="center">
+  <a href="https://agentic.so">
+    <img alt="Agentic" src="https://raw.githubusercontent.com/transitive-bullshit/agentic/main/docs/media/agentic-header.jpg" width="308">
+  </a>
+</p>
+
+<p align="center">
+  <em>Agentic adapter for the Mastra AI Agent SDK.</em>
+</p>
+
+<p align="center">
+  <a href="https://github.com/transitive-bullshit/agentic/actions/workflows/main.yml"><img alt="Build Status" src="https://github.com/transitive-bullshit/agentic/actions/workflows/main.yml/badge.svg" /></a>
+  <a href="https://www.npmjs.com/package/@agentic/stdlib"><img alt="NPM" src="https://img.shields.io/npm/v/@agentic/stdlib.svg" /></a>
+  <a href="https://github.com/transitive-bullshit/agentic/blob/main/license"><img alt="MIT License" src="https://img.shields.io/badge/license-MIT-blue" /></a>
+  <a href="https://prettier.io"><img alt="Prettier Code Formatting" src="https://img.shields.io/badge/code_style-prettier-brightgreen.svg" /></a>
+</p>
+
+----------------------------------------
+
+TITLE: Header HTML Layout
+DESCRIPTION: HTML markup for the project header including logo, badges and links
+
+LANGUAGE: html
+CODE:
+<p align="center">
+  <a href="https://agentic.so">
+    <img alt="Agentic" src="https://raw.githubusercontent.com/transitive-bullshit/agentic/main/docs/media/agentic-header.jpg" width="308">
+  </a>
+</p>
+
+<p align="center">
+  <em>Agentic adapter for Firebase Genkit.</em>
+</p>
+
+<p align="center">
+  <a href="https://github.com/transitive-bullshit/agentic/actions/workflows/main.yml"><img alt="Build Status" src="https://github.com/transitive-bullshit/agentic/actions/workflows/main.yml/badge.svg" /></a>
+  <a href="https://www.npmjs.com/package/@agentic/stdlib"><img alt="NPM" src="https://img.shields.io/npm/v/@agentic/stdlib.svg" /></a>
+  <a href="https://github.com/transitive-bullshit/agentic/blob/main/license"><img alt="MIT License" src="https://img.shields.io/badge/license-MIT-blue" /></a>
+  <a href="https://prettier.io"><img alt="Prettier Code Formatting" src="https://img.shields.io/badge/code_style-prettier-brightgreen.svg" /></a>
+</p>
+
+----------------------------------------
+
+TITLE: HTML Project Header with Links
+DESCRIPTION: Project header HTML that displays the Agentic logo, description, and status badges for build, npm, license and code formatting.
+
+LANGUAGE: HTML
+CODE:
+<p align="center">
+  <a href="https://agentic.so">
+    <img alt="Agentic" src="https://raw.githubusercontent.com/transitive-bullshit/agentic/main/docs/media/agentic-header.jpg" width="308">
+  </a>
+</p>
+
+<p align="center">
+  <em>AI agent stdlib that works with any LLM and TypeScript AI SDK.</em>
+</p>
+
+<p align="center">
+  <a href="https://github.com/transitive-bullshit/agentic/actions/workflows/main.yml"><img alt="Build Status" src="https://github.com/transitive-bullshit/agentic/actions/workflows/main.yml/badge.svg" /></a>
+  <a href="https://www.npmjs.com/package/@agentic/stdlib"><img alt="NPM" src="https://img.shields.io/npm/v/@agentic/stdlib.svg" /></a>
+  <a href="https://github.com/transitive-bullshit/agentic/blob/main/license"><img alt="MIT License" src="https://img.shields.io/badge/license-MIT-blue" /></a>
+  <a href="https://prettier.io"><img alt="Prettier Code Formatting" src="https://img.shields.io/badge/code_style-prettier-brightgreen.svg" /></a>
+</p>
+
+----------------------------------------
+
+TITLE: Displaying Project Header in Markdown
+DESCRIPTION: This snippet shows how to create a centered header for the Agentic project using markdown syntax. It includes the project logo and a brief description.
+
+LANGUAGE: markdown
+CODE:
+<p align="center">
+  <a href="https://agentic.so">
+    <img alt="Agentic" src="https://raw.githubusercontent.com/transitive-bullshit/agentic/main/docs/media/agentic-header.jpg" width="308">
+  </a>
+</p>
+
+<p align="center">
+  <em>AI agent stdlib that works with any LLM and TypeScript AI SDK.</em>
+</p>
+
+----------------------------------------
+
+TITLE: Displaying Project Header Image in Markdown
+DESCRIPTION: Centers and displays the Agentic project header image with a link to the project website.
+
+LANGUAGE: markdown
+CODE:
+<p align="center">
+  <a href="https://agentic.so">
+    <img alt="Agentic" src="https://raw.githubusercontent.com/transitive-bullshit/agentic/main/docs/media/agentic-header.jpg" width="308">
+  </a>
+</p>

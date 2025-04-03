@@ -1,0 +1,2443 @@
+TITLE: Runtime Validation with ArkType
+DESCRIPTION: This code demonstrates how to use ArkType for runtime data validation, including error handling and type narrowing. It shows how to check unknown data against a defined type and handle validation errors.
+
+LANGUAGE: typescript
+CODE:
+const user = type({
+	name: "string",
+	device: {
+		platform: "'android' | 'ios'",
+		"versions?": "(number | string)[]"
+	}
+})
+
+interface RuntimeErrors extends type.errors {
+	/**device.platform must be "android" or "ios" (was "enigma")
+device.versions[2] must be a number or a string (was bigint)*/
+	summary: string
+}
+
+const narrowMessage = (e: type.errors): e is RuntimeErrors => true
+
+const out = user({
+	name: "Alan Turing",
+	device: {
+		platform: "enigma",
+		versions: [0, "1", 0n]
+	}
+})
+
+if (out instanceof type.errors) {
+	// hover out.summary to see validation errors
+	console.error(out.summary)
+} else {
+	// hover out to see your validated data
+	console.log(`Hello, ${out.name}`)
+}
+
+----------------------------------------
+
+TITLE: Defining a Basic User Type in ArkType
+DESCRIPTION: This snippet shows how to define a simple user type using ArkType's 'type' function. It includes string, union, and optional array properties.
+
+LANGUAGE: typescript
+CODE:
+import { type } from "arktype"
+
+const user = type({
+	name: "string",
+	platform: "'android' | 'ios'",
+	"versions?": "(number | string)[]"
+})
+
+// extract the type if needed
+type User = typeof user.infer
+
+----------------------------------------
+
+TITLE: Type System Structure Definition in TypeScript
+DESCRIPTION: Defines the fundamental structure of ArkType's type system, including domain types, proto types, unit types, and various constraints. The system implements type relationships where L extends R if and only if L & R equals L.
+
+LANGUAGE: typescript
+CODE:
+// Domain types
+"string" | "number" | "bigint" | "object" | "symbol"
+
+// Constraint types
+type Required = {
+  key: string | symbol;
+  value: Union | Intersection;
+}
+
+type Optional = Required | KeyNotPresent;
+
+type Index = {
+  keyType: IndexType;
+  valueType: ValueType;
+}
+
+----------------------------------------
+
+TITLE: Defining Constraints for a Contact Type in TypeScript with ArkType
+DESCRIPTION: This snippet demonstrates how to create a 'contact' type with email and score constraints using ArkType's type function and constraint syntax.
+
+LANGUAGE: typescript
+CODE:
+const contact = type({
+	// many common constraints are available as builtin keywords
+	email: "string.email",
+	// others can be written as type-safe expressions
+	score: "number.integer < 100"
+})
+
+// if you need the TS type, just infer it out as normal
+type Contact = typeof contact.infer
+
+----------------------------------------
+
+TITLE: Narrowing Types with Custom Validation in TypeScript using ArkType
+DESCRIPTION: This snippet demonstrates how to narrow types using custom validation logic in ArkType, including error handling and type checking.
+
+LANGUAGE: typescript
+CODE:
+interface RuntimeErrors extends type.errors {
+	/**even must be even (was 7)
+odd must be odd (was 8)*/
+	summary: string
+}
+
+const narrowMessage = (e: type.errors): e is RuntimeErrors => true
+
+// there's no "not divisible" expression - need to narrow
+const odd = type("number").narrow((n, ctx) =>
+	// if even, add a customizable error and return false
+	n % 2 === 0 ? ctx.mustBe("odd") : true
+)
+
+const favoriteNumbers = type({
+	even: "number % 2",
+	odd
+})
+
+const out = favoriteNumbers({
+	even: 7,
+	odd: 8
+})
+
+if (out instanceof type.errors) {
+	if (!narrowMessage(out)) throw new Error()
+	// hover summary to see validation errors
+	console.error(out.summary)
+} else {
+	console.log(out.odd)
+}
+
+----------------------------------------
+
+TITLE: Safe JSON Parsing with Error Handling in ArkType
+DESCRIPTION: Illustrates how to use ArkType's pipe.try function for safe JSON parsing with error handling. It demonstrates catching parsing errors and type checking the result.
+
+LANGUAGE: typescript
+CODE:
+const parseJson = type("string").pipe.try((s): object => JSON.parse(s))
+
+// Now returns an introspectable error instead of crashing 🎉
+const badOut = parseJson('{ unquoted: "keys" }')
+
+const out = parseJson('{ "ark": "type" }')
+
+if (out instanceof type.errors) out.throw()
+// Unfortunately, a validated `object` still isn't very useful...
+else console.log(out)
+
+----------------------------------------
+
+TITLE: Defining Types with TypeScript Keywords in ArkType
+DESCRIPTION: Demonstrates how to use TypeScript keywords to define types in ArkType using both string and fluent syntax. Common keywords are directly available on the 'type' object in fluent syntax.
+
+LANGUAGE: typescript
+CODE:
+const keywords = type({
+	string: "string",
+	date: "Date"
+})
+
+LANGUAGE: typescript
+CODE:
+const keywords = type({
+	string: type.string,
+	date: type.Date
+})
+
+----------------------------------------
+
+TITLE: Configuring VSCode Settings for ArkType
+DESCRIPTION: VSCode workspace settings configuration to enable ArkType's autocomplete capabilities and optimize auto-imports. These settings enable string-based autocomplete and prioritize ArkType's type imports.
+
+LANGUAGE: json
+CODE:
+{
+"editor.quickSuggestions": {
+	"strings": "on"
+},
+"typescript.preferences.autoImportSpecifierExcludeRegexes": [
+	"^(node:)?os$"
+]
+}
+
+----------------------------------------
+
+TITLE: Composing Nested Types in ArkType
+DESCRIPTION: This example demonstrates how to create nested type definitions in ArkType, moving the 'platform' and 'version' properties into a 'device' object.
+
+LANGUAGE: typescript
+CODE:
+const user = type({
+	name: "string",
+	// nested definitions don't need to be wrapped
+	device: {
+		platform: "'android' | 'ios'",
+		"versions?": "(number | string)[]"
+	}
+})
+
+----------------------------------------
+
+TITLE: Decoupling Nested Types in ArkType
+DESCRIPTION: This snippet shows how to separate nested types into their own definitions for better reusability and modularity in ArkType.
+
+LANGUAGE: typescript
+CODE:
+const device = type({
+	platform: "'android' | 'ios'",
+	"versions?": "(number | string)[]"
+})
+
+const user = type({
+	name: "string",
+	device: device
+})
+
+----------------------------------------
+
+TITLE: Implementing Type-Safe Switch with Case Record API in TypeScript
+DESCRIPTION: Demonstrates how to use the match function with ArkType definition strings as keys and corresponding handlers as values. It shows handling of string, array, number, and bigint inputs.
+
+LANGUAGE: typescript
+CODE:
+import { match } from "arktype"
+
+const sizeOf = match({
+	"string | Array": v => v.length,
+	number: v => v,
+	bigint: v => v,
+	default: "assert"
+})
+
+// a match definition is complete once a `default` has been specified,
+// either as a case or via the .default() method
+
+sizeOf("abc") // 3
+sizeOf([1, 2, 3, 4]) // 4
+sizeOf(5n) // 5n
+// ArkErrors: must be an object, a string, a number or a bigint (was boolean)
+sizeOf(true)
+
+----------------------------------------
+
+TITLE: Defining String Types with Keywords in TypeScript
+DESCRIPTION: Demonstrates how to use string keywords in ArkType type definitions. It shows examples of email, JSON, and UUID string types.
+
+LANGUAGE: typescript
+CODE:
+const email = type("string.email")
+
+const user = type({
+	data: "string.json.parse",
+	ids: "string.uuid.v4[]"
+})
+
+----------------------------------------
+
+TITLE: Defining Required Object Properties in ArkType
+DESCRIPTION: Demonstrates how to define required properties in an object type using ArkType's string and fluent syntaxes. Includes an example with a symbolic key and nested definitions.
+
+LANGUAGE: typescript
+CODE:
+const symbolicKey = Symbol()
+
+const myObject = type({
+	requiredKey: "string",
+	// Nested definitions don't require additional `type` calls!
+	[symbolicKey]: {
+		nested: "unknown"
+	}
+})
+
+LANGUAGE: typescript
+CODE:
+const symbolicKey = Symbol()
+
+const myObject = type({
+	requiredKey: type.string,
+	// Nested definitions don't require additional `type` calls!
+	[symbolicKey]: {
+		nested: type.unknown
+	}
+})
+
+----------------------------------------
+
+TITLE: Defining Intersection Types in arktype
+DESCRIPTION: Demonstrates how to create intersection types using different syntax options in arktype. Intersections combine two existing Types to create a new Type that enforces the constraints of both.
+
+LANGUAGE: typescript
+CODE:
+const myObject = type({
+	// an email address with the domain arktype.io
+	intersected: "string.email & /@arktype\\.io$/"
+})
+
+LANGUAGE: typescript
+CODE:
+const fooObject = type({
+	foo: "string"
+})
+
+// an object requiring both foo and bar
+const foobarObject = fooObject.and({
+	bar: "number"
+})
+
+LANGUAGE: typescript
+CODE:
+const fooObject = type({
+	foo: "string"
+})
+
+// accepts ...definitions
+const foobarObject = type.and(
+	fooObject,
+	{
+		bar: "number"
+	},
+	{
+		baz: "string"
+	}
+)
+
+LANGUAGE: typescript
+CODE:
+// an object requiring both foo and bar
+const foobarObject = type([
+	{
+		foo: "string"
+	},
+	"&",
+	{
+		bar: "number"
+	}
+])
+
+LANGUAGE: typescript
+CODE:
+// an object requiring both foo and bar
+const foobarObject = type(
+	{
+		foo: "string"
+	},
+	"&",
+	{
+		bar: "number"
+	}
+)
+
+----------------------------------------
+
+TITLE: Integrating ArkType with react-hook-form in TypeScript
+DESCRIPTION: This snippet shows how to use ArkType with react-hook-form via @hookform/resolvers. It defines a user schema and sets up the form with ArkType validation.
+
+LANGUAGE: typescript
+CODE:
+import { useForm } from "react-hook-form"
+import { arktypeResolver } from "@hookform/resolvers/arktype"
+import { type } from "arktype"
+
+const user = type({
+	firstName: "string",
+	age: "number.integer > 0"
+})
+
+// in your component
+const {
+	register,
+	handleSubmit,
+	formState: { errors }
+} = useForm({
+	resolver: arktypeResolver(user)
+})
+
+----------------------------------------
+
+TITLE: Basic Scope Definition in TypeScript
+DESCRIPTION: Demonstrates how to create a basic scope with custom type definitions using the scope function from ArkType.
+
+LANGUAGE: typescript
+CODE:
+import { scope } from "arktype"
+
+const coolScope = scope({
+	id: "string",
+	user: { id: "id", friends: "id[]" },
+	usersById: {
+		"[id]": "user | undefined"
+	}
+})
+
+----------------------------------------
+
+TITLE: Using Record Generic in ArkType
+DESCRIPTION: Demonstrates how to use the built-in Record generic type keyword in ArkType for creating string record types.
+
+LANGUAGE: typescript
+CODE:
+import { type } from "arktype"
+
+const stringRecord = type("Record<string, string>")
+
+----------------------------------------
+
+TITLE: Implementing Narrow Expressions in arktype
+DESCRIPTION: Demonstrates how to use narrow expressions in arktype to add custom validation logic and error messages. Narrow expressions allow for more complex validation scenarios.
+
+LANGUAGE: typescript
+CODE:
+const form = type({
+	password: "string",
+	confirmPassword: "string"
+}).narrow((data, ctx) => {
+	if (data.password === data.confirmPassword) {
+		return true
+	}
+	return ctx.reject({
+		expected: "identical to password",
+		// don't display the password in the error message!
+		actual: "",
+		path: ["confirmPassword"]
+	})
+})
+
+// ArkErrors: confirmPassword must be identical to password
+const out = form({
+	password: "arktype",
+	confirmPassword: "artkype"
+})
+
+LANGUAGE: typescript
+CODE:
+const form = type([
+	{
+		password: "string",
+		confirmPassword: "string"
+	},
+	":",
+	(data, ctx) => {
+		if (data.password === data.confirmPassword) {
+			return true
+		}
+		return ctx.reject({
+			expected: "identical to password",
+			// don't display the password in the error message!
+			actual: "",
+			path: ["confirmPassword"]
+		})
+	}
+])
+
+// ArkErrors: confirmPassword must be identical to password
+const out = form({
+	password: "arktype",
+	confirmPassword: "artkype"
+})
+
+LANGUAGE: typescript
+CODE:
+const form = type(
+	{
+		password: "string",
+		confirmPassword: "string"
+	},
+	":",
+	(data, ctx) => {
+		if (data.password === data.confirmPassword) {
+			return true
+		}
+		return ctx.reject({
+			expected: "identical to password",
+			// don't display the password in the error message!
+			actual: "",
+			path: ["confirmPassword"]
+		})
+	}
+)
+
+// ArkErrors: confirmPassword must be identical to password
+const out = form({
+	password: "arktype",
+	confirmPassword: "artkype"
+})
+
+----------------------------------------
+
+TITLE: Integrating ArkType with tRPC in TypeScript
+DESCRIPTION: This snippet demonstrates how to use ArkType with tRPC for input validation. It utilizes the 'assert' property of the ArkType schema.
+
+LANGUAGE: typescript
+CODE:
+t.procedure.input(
+	type({
+		name: "string",
+		"age?": "number"
+	}).assert
+)
+
+----------------------------------------
+
+TITLE: Defining Optional Object Properties in ArkType
+DESCRIPTION: Shows how to define optional properties in an object type using ArkType's string, fluent, and tuple syntaxes. Includes a warning about optional properties and undefined values.
+
+LANGUAGE: typescript
+CODE:
+const symbolicKey = Symbol()
+
+const myObject = type({
+	"optionalKey?": "number[]",
+	[symbolicKey]: "string?"
+})
+
+LANGUAGE: typescript
+CODE:
+const symbolicKey = Symbol()
+
+const myObject = type({
+	optionalKey: type.number.array().optional(),
+	[symbolicKey]: type.string.optional()
+})
+
+LANGUAGE: typescript
+CODE:
+const symbolicKey = Symbol()
+
+const myObject = type({
+	optionalKey: [{ type: "'script'" }, "?"],
+	[symbolicKey]: [{ ark: "'type'" }, "?"]
+})
+
+----------------------------------------
+
+TITLE: Defining Defaultable Object Properties in ArkType
+DESCRIPTION: Illustrates how to define defaultable properties in an object type using ArkType's string, fluent, and tuple syntaxes.
+
+LANGUAGE: typescript
+CODE:
+const myObject = type({
+	defaultableKey: "boolean = false"
+})
+
+LANGUAGE: typescript
+CODE:
+const myObject = type({
+	defaultableKey: type.boolean.default(false)
+})
+
+LANGUAGE: typescript
+CODE:
+const myObject = type({
+	defaultableKey: ["boolean", "=", false]
+})
+
+----------------------------------------
+
+TITLE: Scope-Level Configuration in TypeScript
+DESCRIPTION: Demonstrates how to configure validation behavior within a specific scope
+
+LANGUAGE: typescript
+CODE:
+const myScope = scope(
+	{ user: { age: "number < 100" } },
+	{
+		max: {
+			actual: () => "unacceptably large"
+		}
+	}
+)
+
+----------------------------------------
+
+TITLE: Defining Index Signatures in ArkType Objects
+DESCRIPTION: Shows how to define index signatures in an object type using ArkType's string syntax.
+
+LANGUAGE: typescript
+CODE:
+const myObject = type({
+	// index signatures do not require a label
+	"[string]": "number.integer",
+	// arbitrary string or symbolic expressions are allowed
+	"[string | symbol]": "number"
+})
+
+----------------------------------------
+
+TITLE: Handling Undeclared Properties in ArkType Objects
+DESCRIPTION: Demonstrates different ways to handle undeclared properties in ArkType objects, including rejecting, deleting, or ignoring them.
+
+LANGUAGE: typescript
+CODE:
+// fail if any key other than "onlyAllowedKey" is present
+const myClosedObject = type({
+	"+": "reject",
+	onlyAllowedKey: "string"
+})
+
+// delete all non-symbolic keys other than "onlyPreservedStringKey"
+const myStrippedObject = type({
+	"+": "delete",
+	"[symbol]": "unknown",
+	onlyPreservedStringKey: "string"
+})
+
+// allow and preserve undeclared keys (the default behavior)
+const myOpenObject = type({
+	// only specify "ignore" if you explicitly configured the default elsewhere
+	"+": "ignore",
+	nonexclusiveKey: "number"
+})
+
+LANGUAGE: typescript
+CODE:
+// fail if any key other than "onlyAllowedKey" is present
+const myClosedObject = type({
+	onlyAllowedKey: "string"
+}).onUndeclaredKey("reject")
+
+// delete all non-symbolic keys other than "onlyPreservedStringKey"
+const myStrippedObject = type({
+	"[symbol]": "unknown",
+	onlyPreservedStringKey: "string"
+}).onUndeclaredKey("delete")
+
+// allow and preserve undeclared keys (the default behavior)
+const myOpenObject = type({
+	nonexclusiveKey: "number"
+	// only specify "ignore" if you explicitly configured the default elsewhere
+}).onUndeclaredKey("ignore")
+
+// there is also a method for altering nested objects recursively
+const myDeeplyStrippedObject = type({
+	preserved: "string",
+	nested: {
+		preserved: "string"
+	}
+}).onDeepUndeclaredKey("delete")
+
+----------------------------------------
+
+TITLE: Using Spread Operator in ArkType Objects
+DESCRIPTION: Explains how to use the spread operator to merge sets of properties in ArkType objects, and compares it to the Merge keyword.
+
+LANGUAGE: typescript
+CODE:
+const user = type({ isAdmin: "false", name: "string" })
+
+// hover to see the newly merged object
+const admin = type({
+	"...": user,
+	// in an intersection, non-overlapping values at isAdmin would result in a ParseError
+	isAdmin: "true",
+	permissions: "string[]"
+})
+
+LANGUAGE: typescript
+CODE:
+const types = type.module({
+	base: {
+		"foo?": "0",
+		"bar?": "0"
+	},
+	merged: {
+		bar: "1",
+		"baz?": "1"
+	},
+	result: "Merge<base, merged>"
+})
+
+// hover to see the inferred result
+type Result = typeof types.result.infer
+
+----------------------------------------
+
+TITLE: Generic Box Type Creation in ArkType
+DESCRIPTION: Shows how to create and use generic box types with type safety checks and constraints.
+
+LANGUAGE: typescript
+CODE:
+import { type, type Type } from "arktype"
+
+const createBox = <T extends string>(of: type.Any<T>) =>
+	type({
+		box: of
+	})
+
+const boxType = createBox(type("string"))
+
+// @ts-expect-error
+const badBox = createBox(type("number"))
+
+console.log(boxType({ box: 5 }).toString())
+console.log(boxType({ box: "foo" }))
+
+----------------------------------------
+
+TITLE: Using keyof Operator in ArkType
+DESCRIPTION: Demonstrates how to use the keyof operator to extract keys from an object type in ArkType, using different syntaxes.
+
+LANGUAGE: typescript
+CODE:
+const usedCar = type({
+	originallyPurchased: "string.date",
+	remainingWheels: "number"
+})
+
+const usedCarKey = usedCar.keyof()
+
+type UsedCarKey = typeof usedCarKey.infer
+
+LANGUAGE: typescript
+CODE:
+const types = type.module({
+	usedCar: {
+		originallyPurchased: "string.date",
+		remainingWheels: "number"
+	},
+	usedCarKey: "keyof usedCar"
+})
+
+type UsedCarKey = typeof types.usedCarKey.infer
+
+LANGUAGE: typescript
+CODE:
+const usedCar = type({
+	originallyPurchased: "string.date",
+	remainingWheels: "number"
+})
+
+const usedCarKey = type(["keyof", usedCar])
+
+type UsedCarKey = typeof usedCarKey.infer
+
+----------------------------------------
+
+TITLE: Using get Operator in ArkType
+DESCRIPTION: Shows how to use the get operator to extract the Type of a value based on a specified key definition from an object in ArkType.
+
+LANGUAGE: typescript
+CODE:
+const snorfUsage = type.enumerated("eating plants", "looking adorable")
+
+const manatee = type({
+	isFriendly: "true",
+	snorf: {
+		uses: snorfUsage.array()
+	}
+})
+
+const trueType = manatee.get("isFriendly")
+
+// nested properties can be accessed directly by passing additional args
+const snorfUsageArray = manatee.get("snorf", "uses")
+
+----------------------------------------
+
+TITLE: Defining Arrays in ArkType
+DESCRIPTION: Demonstrates how to define arrays in ArkType using different syntaxes, including string, fluent, tuple, and args.
+
+LANGUAGE: typescript
+CODE:
+const arrays = type({
+	key: "string[]"
+})
+
+LANGUAGE: typescript
+CODE:
+const arrays = type({
+	key: type.string.array()
+})
+
+LANGUAGE: typescript
+CODE:
+const arrays = type({
+	key: [{ name: "string" }, "[]"]
+})
+
+LANGUAGE: typescript
+CODE:
+const arrays = type({
+	key: type({ name: "string" }, "[]")
+})
+
+----------------------------------------
+
+TITLE: Defining Array Lengths in ArkType
+DESCRIPTION: Shows how to constrain array lengths in ArkType using both string and fluent syntaxes, including inclusive and exclusive min/max lengths.
+
+LANGUAGE: typescript
+CODE:
+const bounded = type({
+	nonEmptyStringArray: "string[] > 0",
+	atLeast3Integers: "number.integer[] >= 3",
+	lessThan10Emails: "string.email[] < 10",
+	atMost5Booleans: "boolean[] <= 5"
+})
+
+LANGUAGE: typescript
+CODE:
+const bounded = type({
+	nonEmptyStringArray: type.string.array().moreThanLength(0),
+	atLeast3Integers: type.keywords.number.integer.array().atLeastLength(3),
+	lessThan10Emails: type.keywords.string.email.array().lessThanLength(10),
+	atMost5Booleans: type.boolean.array().atMostLength(5)
+})
+
+LANGUAGE: typescript
+CODE:
+const range = type({
+	nonEmptyStringArrayAtMostLength10: "0 < string[] <= 10",
+	twoToFiveIntegers: "2 <= number.integer[] < 6"
+})
+
+LANGUAGE: typescript
+CODE:
+const range = type({
+	nonEmptyStringArrayAtMostLength10: type.string
+		.array()
+		.moreThanLength(0)
+		.atMostLength(10),
+	twoToFiveIntegers: type.keywords.number.integer
+		.array()
+		.atLeastLength(2)
+		.lessThanLength(6)
+})
+
+----------------------------------------
+
+TITLE: Defining String Length Ranges in TypeScript
+DESCRIPTION: Demonstrates how to define string length ranges in ArkType using both inclusive and exclusive bounds.
+
+LANGUAGE: typescript
+CODE:
+const range = type({
+	nonEmptyAtMostLength10: "0 < string <= 10",
+	integerStringWith2To5Digits: "2 <= string.integer < 6"
+})
+
+----------------------------------------
+
+TITLE: Defining Tuples in ArkType
+DESCRIPTION: Illustrates how to define tuples in ArkType, including prefix elements, defaultable elements, optional elements, variadic elements, and postfix elements.
+
+LANGUAGE: typescript
+CODE:
+const myTuple = type([
+	"string",
+	// Object definitions can be nested in tuples- and vice versa!
+	{
+		coordinates: ["number", "number"]
+	}
+])
+
+LANGUAGE: typescript
+CODE:
+const myTuple = type(["string", "boolean = false", "number = 0"])
+
+LANGUAGE: typescript
+CODE:
+const myTuple = type(["string", "bigint = 999n", "boolean?", "number?"])
+
+LANGUAGE: typescript
+CODE:
+// allows a string followed by zero or more numbers
+const myTuple = type(["string", "...", "number[]"])
+
+LANGUAGE: typescript
+CODE:
+// allows zero or more numbers followed by a boolean, then a string
+const myTuple = type(["...", "number[]", "boolean", "string"])
+
+----------------------------------------
+
+TITLE: Working with Dates in ArkType
+DESCRIPTION: Demonstrates how to work with Date literals and ranges in ArkType, including constraining dates with inclusive or exclusive min/max values.
+
+LANGUAGE: typescript
+CODE:
+const literals = type({
+	singleQuoted: "d'01-01-1970'",
+	doubleQuoted: 'd"01-01-1970"'
+})
+
+LANGUAGE: typescript
+CODE:
+const bounded = type({
+	dateInThePast: `Date < ${Date.now()}`,
+	dateAfter2000: "Date > d'2000-01-01'",
+	dateAtOrAfter1970: "Date >= 0"
+})
+
+LANGUAGE: typescript
+CODE:
+const bounded = type({
+	dateInThePast: type.Date.earlierThan(Date.now()),
+	dateAfter2000: type.Date.laterThan("2000-01-01"),
+	dateAtOrAfter1970: type.Date.atOrAfter(0)
+})
+
+LANGUAGE: typescript
+CODE:
+const tenYearsAgo = new Date()
+	.setFullYear(new Date().getFullYear() - 10)
+	.valueOf()
+
+const bounded = type({
+	dateInTheLast10Years: `${tenYearsAgo} <= Date < ${Date.now()}`
+})
+
+----------------------------------------
+
+TITLE: Using instanceof in ArkType
+DESCRIPTION: Shows how to use the instanceof operator in ArkType to constrain a type to a specific class instance, using fluent, tuple, and args syntaxes.
+
+LANGUAGE: typescript
+CODE:
+class MyClass {}
+
+const instances = type.instanceOf(MyClass)
+
+LANGUAGE: typescript
+CODE:
+class MyClass {}
+
+const instances = type({
+	key: ["instanceof", MyClass]
+})
+
+LANGUAGE: typescript
+CODE:
+class MyClass {}
+
+const instances = type({
+	key: type("instanceof", MyClass)
+})
+
+----------------------------------------
+
+TITLE: Defining String Literals in TypeScript
+DESCRIPTION: Shows how to define string literals in ArkType using both single and double quotes.
+
+LANGUAGE: typescript
+CODE:
+const literals = type({
+	singleQuoted: "'typescript'",
+	doubleQuoted: '"arktype"'
+})
+
+----------------------------------------
+
+TITLE: Rendering Type API Table in JSX
+DESCRIPTION: React/JSX component that renders an API documentation table for the Type group of functionality in arktype.
+
+LANGUAGE: jsx
+CODE:
+<ApiTable group="Type" />
+
+----------------------------------------
+
+TITLE: Defining String Patterns with Regular Expressions in TypeScript
+DESCRIPTION: Demonstrates how to use regular expressions to define string patterns in ArkType, using both string-embedded and RegExp literal syntax.
+
+LANGUAGE: typescript
+CODE:
+const literals = type({
+	stringEmbedded: "/^a.*z$/",
+	regexLiteral: /^a.*z$/
+})
+
+----------------------------------------
+
+TITLE: Constraining String Lengths in TypeScript
+DESCRIPTION: Shows various ways to constrain string lengths in ArkType, including minimum and maximum length constraints.
+
+LANGUAGE: typescript
+CODE:
+const bounded = type({
+	nonEmpty: "string > 0",
+	atLeastLength3: "string.alphanumeric >= 3",
+	lessThanLength10: "string < 10",
+	atMostLength5: "string <= 5"
+})
+
+----------------------------------------
+
+TITLE: Defining Number Types with Keywords in TypeScript
+DESCRIPTION: Shows how to use number keywords in ArkType type definitions, including epoch timestamps and non-negative integers.
+
+LANGUAGE: typescript
+CODE:
+const user = type({
+	createdAt: "number.epoch",
+	age: "number.integer >= 0"
+})
+
+----------------------------------------
+
+TITLE: Defining Number Literals in TypeScript
+DESCRIPTION: Demonstrates how to define number literals in ArkType.
+
+LANGUAGE: typescript
+CODE:
+const literals = type({
+	number: "1337"
+})
+
+----------------------------------------
+
+TITLE: Setting up Attest with Mocha
+DESCRIPTION: Configuration for using Attest with Mocha, including package.json settings and setup/teardown in setupMocha.ts.
+
+LANGUAGE: json
+CODE:
+"mocha": {
+	"require": "./setupMocha.ts"
+}
+
+LANGUAGE: typescript
+CODE:
+import { setup, teardown } from "@ark/attest"
+
+// config options can be passed here
+export const mochaGlobalSetup = () => setup({})
+
+export const mochaGlobalTeardown = teardown
+
+----------------------------------------
+
+TITLE: Constraining Number Ranges in TypeScript
+DESCRIPTION: Shows various ways to constrain number ranges in ArkType, including minimum and maximum value constraints.
+
+LANGUAGE: typescript
+CODE:
+const bounded = type({
+	positive: "number > 0",
+	atLeast3: "number.integer >= 3",
+	lessThanPi: "number < 3.14159",
+	atMost5: "number <= 5"
+})
+
+----------------------------------------
+
+TITLE: Defining Number Ranges in TypeScript
+DESCRIPTION: Demonstrates how to define number ranges in ArkType using both inclusive and exclusive bounds.
+
+LANGUAGE: typescript
+CODE:
+const range = type({
+	positiveAtMostE: "0 < number <= 2.71828",
+	evenNumberAbsoluteValueLessThan50: "-50 < (number % 2) < 50"
+})
+
+----------------------------------------
+
+TITLE: Defining Number Divisors in TypeScript
+DESCRIPTION: Shows how to constrain numbers to be divisible by a specific integer in ArkType.
+
+LANGUAGE: typescript
+CODE:
+const evens = type({
+	key: "number % 2"
+})
+
+----------------------------------------
+
+TITLE: Defining BigInt Types in TypeScript
+DESCRIPTION: Demonstrates how to define BigInt types in ArkType, including literals and general BigInt values.
+
+LANGUAGE: typescript
+CODE:
+const bigints = type({
+	foo: "bigint"
+})
+
+const literals = type({
+	bigint: "1337n"
+})
+
+----------------------------------------
+
+TITLE: Defining Symbol Types in TypeScript
+DESCRIPTION: Shows how to define Symbol types in ArkType, allowing any Symbol value.
+
+LANGUAGE: typescript
+CODE:
+const symbols = type({
+	key: "symbol"
+})
+
+----------------------------------------
+
+TITLE: Defining Boolean Types in TypeScript
+DESCRIPTION: Demonstrates how to define Boolean types in ArkType, including specific boolean values and general boolean type.
+
+LANGUAGE: typescript
+CODE:
+const booleans = type({
+	key: "boolean"
+})
+
+const specificBooleans = type({
+	a: "true",
+	b: "false",
+	c: "true | false"
+})
+
+----------------------------------------
+
+TITLE: Using Null and Undefined in Union Types in TypeScript
+DESCRIPTION: Shows how to use null and undefined in union types with ArkType, demonstrating the difference between optional properties and properties that allow undefined.
+
+LANGUAGE: typescript
+CODE:
+const myObj = type({
+	foo: "number | null"
+})
+
+const myObjWithUndefined = type({
+	requiredKey: "number | undefined",
+	"optionalKey?": "number | undefined"
+})
+
+----------------------------------------
+
+TITLE: Generic Type Definition Syntax
+DESCRIPTION: Demonstrates the syntax for defining generic types with parameters in ArkType.
+
+LANGUAGE: typescript
+CODE:
+import { type } from "arktype"
+
+const boxOf = type("<t>", { box: "t" })
+
+// hover me!
+const schrodingersBox = boxOf({ cat: { isAlive: "boolean" } })
+
+----------------------------------------
+
+TITLE: Configuring Grammars for TS with ArkType Highlighting in package.json
+DESCRIPTION: JSON configuration for testing standalone rules for TypeScript with ArkType highlighting in package.json. This replaces the default 'grammars' section to use the custom tsWithArkType.tmLanguage.json file.
+
+LANGUAGE: json
+CODE:
+"grammars": {
+	"scopeName": "source.ts",
+	"language": "typescript",
+	"path": "tsWithArkType.tmLanguage.json"
+}
+
+----------------------------------------
+
+TITLE: Constrained Generic Parameters
+DESCRIPTION: Shows how to use constrained generic parameters with array length validation.
+
+LANGUAGE: typescript
+CODE:
+import { type } from "arktype"
+
+const nonEmpty = type("<arr extends unknown[]>", "arr > 0")
+
+const nonEmptyNumberArray = nonEmpty("number[]")
+
+----------------------------------------
+
+TITLE: Scoped Generic Types
+DESCRIPTION: Illustrates how to define and use generic types within a scope using the scope utility.
+
+LANGUAGE: typescript
+CODE:
+import { scope } from "arktype"
+
+const types = scope({
+	"box<t, u>": {
+		box: "t | u"
+	},
+	bitBox: "box<0, 1>"
+}).export()
+
+const out = types.bitBox({ box: 0 })
+
+----------------------------------------
+
+TITLE: Generic Type Invocation
+DESCRIPTION: Shows different ways to invoke generic types including Extract utility type.
+
+LANGUAGE: typescript
+CODE:
+import { type } from "arktype"
+
+const one = type("Extract<0 | 1, 1>")
+
+----------------------------------------
+
+TITLE: Chained Generic Operations
+DESCRIPTION: Demonstrates chaining generic operations using pick utility on a user type.
+
+LANGUAGE: typescript
+CODE:
+import { type } from "arktype"
+
+const user = type({
+	name: "string",
+	"age?": "number",
+	isAdmin: "boolean"
+})
+
+// hover me!
+const basicUser = user.pick("name", "age")
+
+----------------------------------------
+
+TITLE: Higher-Kinded Types Implementation
+DESCRIPTION: Shows the internal implementation of Partial generic using Higher-Kinded Types (HKT).
+
+LANGUAGE: typescript
+CODE:
+import { generic, Hkt } from "arktype"
+
+const Partial = generic(["T", "object"])(
+	args => args.T.partial(),
+	class PartialHkt extends Hkt<[object]> {
+		declare body: Partial<this[0]>
+	}
+)
+
+----------------------------------------
+
+TITLE: Creating Union Types in arktype
+DESCRIPTION: Shows how to define union types using various syntax options in arktype. All unions are automatically discriminated to optimize check time and error message clarity.
+
+LANGUAGE: typescript
+CODE:
+const unions = type({
+	key: "string | number"
+})
+
+LANGUAGE: typescript
+CODE:
+const unions = type({
+	key: type.string.or(type.number)
+})
+
+LANGUAGE: typescript
+CODE:
+// accepts ...definitions
+const union = type.or(type.string, "number", { key: "unknown" })
+
+LANGUAGE: typescript
+CODE:
+const unions = type({
+	key: ["string", "|", { name: "string" }]
+})
+
+LANGUAGE: typescript
+CODE:
+const unions = type({
+	key: type("string", "|", { name: "string" })
+})
+
+----------------------------------------
+
+TITLE: Snapshotting Alphabetized Completions in TypeScript
+DESCRIPTION: Demonstrates how completions are now alphabetized when snapshotted in TypeScript. This improves stability, especially for large completion lists.
+
+LANGUAGE: typescript
+CODE:
+attest(() => type([""])).completions({
+	"": [
+		"...",
+		"===",
+		"Array",
+		"Date",
+		"Error",
+		"Function",
+		"Map",
+		"Promise",
+		"Record",
+		"RegExp",
+		"Set",
+		"WeakMap",
+		"WeakSet",
+		"alpha",
+		"alphanumeric",
+		"any",
+		"bigint",
+		"boolean",
+		"creditCard",
+		"digits",
+		"email",
+		"false",
+		"format",
+		"instanceof",
+		"integer",
+		"ip",
+		"keyof",
+		"lowercase",
+		"never",
+		"null",
+		"number",
+		"object",
+		"parse",
+		"semver",
+		"string",
+		"symbol",
+		"this",
+		"true",
+		"undefined",
+		"unknown",
+		"uppercase",
+		"url",
+		"uuid",
+		"void"
+	]
+})
+
+----------------------------------------
+
+TITLE: Using Brand Types in arktype
+DESCRIPTION: Explains how to use brand types in arktype to add a type-only symbol to an existing type. This ensures that only directly validated values satisfy the type.
+
+LANGUAGE: typescript
+CODE:
+// @noErrors
+const even = type("(number % 2)#even")
+type Even = typeof even.infer
+
+const good: Even = even.assert(2)
+// TypeScript: Type 'number' is not assignable to type 'Brand<number, "even">'
+const bad: Even = 5
+
+LANGUAGE: typescript
+CODE:
+// @noErrors
+const even = type.number.divisibleBy(2).brand("even")
+type Even = typeof even.infer
+
+const good: Even = even.assert(2)
+// TypeScript: Type 'number' is not assignable to type 'Brand<number, "even">'
+const bad: Even = 5
+
+----------------------------------------
+
+TITLE: Applying Morphs in arktype
+DESCRIPTION: Shows how to use morphs in arktype to transform data after validation. Morphs allow for data manipulation and chaining of transformations.
+
+LANGUAGE: typescript
+CODE:
+// hover to see how morphs are represented at a type-level
+const trimStringStart = type("string").pipe(str => str.trimStart())
+
+LANGUAGE: typescript
+CODE:
+// accepts ...morphsOrTypes
+const trimStartToNonEmpty = type.pipe(
+	type.string,
+	s => s.trimStart(),
+	type.string.atLeastLength(1)
+)
+
+LANGUAGE: typescript
+CODE:
+// hover to see how morphs are represented at a type-level
+const trimStringStart = type(["string", "=>", str => str.trimStart()])
+
+LANGUAGE: typescript
+CODE:
+// hover to see how morphs are represented at a type-level
+const trimStringStart = type("string", "=>", str => str.trimStart())
+
+----------------------------------------
+
+TITLE: Using Unit and Enumerated Types in arktype
+DESCRIPTION: Demonstrates how to use unit and enumerated types in arktype for defining exact primitive values and sets of allowed values.
+
+LANGUAGE: typescript
+CODE:
+const mySymbol = Symbol()
+
+const exactValue = type.unit(mySymbol)
+
+LANGUAGE: typescript
+CODE:
+const mySymbol = Symbol()
+
+const exactValue = type(["===", mySymbol])
+
+LANGUAGE: typescript
+CODE:
+const mySymbol = Symbol()
+
+const exactValue = type("===", mySymbol)
+
+LANGUAGE: typescript
+CODE:
+const mySymbol = Symbol()
+
+const exactValueFromSet = type.enumerated(1337, true, mySymbol)
+
+LANGUAGE: typescript
+CODE:
+const mySymbol = Symbol()
+
+const exactValueFromSet = type(["===", 1337, true, mySymbol])
+
+LANGUAGE: typescript
+CODE:
+const mySymbol = Symbol()
+
+const exactValueFromSet = type("===", 1337, true, mySymbol)
+
+----------------------------------------
+
+TITLE: Adding Metadata to Types in arktype
+DESCRIPTION: Shows how to associate metadata with types in arktype. Some metadata is used internally by arktype, while other properties are introspectable but not used by default.
+
+LANGUAGE: typescript
+CODE:
+// this validator's error message will now start with "must be a special string"
+const specialString = type("string").configure({
+	description: "a special string"
+})
+
+// sugar for adding description metadata
+const specialNumber = type("number").describe("a special number")
+
+LANGUAGE: typescript
+CODE:
+// this validator's error message will now start with "must be a special string"
+const specialString = type([
+	"string",
+	"@",
+	{
+		description: "a special string"
+	}
+])
+
+// sugar for adding description metadata
+const specialNumber = type(["number", "@", "a special number"])
+
+LANGUAGE: typescript
+CODE:
+// this validator's error message will now start with "must be a special string"
+const specialString = type("string", "@", {
+	description: "a special string"
+})
+
+// sugar for adding description metadata
+const specialNumber = type("number", "@", "a special number")
+
+----------------------------------------
+
+TITLE: Using Cast Expressions in arktype
+DESCRIPTION: Demonstrates how to use cast expressions in arktype to directly specify how a Type should be inferred without affecting runtime behavior.
+
+LANGUAGE: typescript
+CODE:
+// allow any string, but suggest "foo" and "bar"
+type AutocompletedString = "foo" | "bar" | (string & {})
+
+const myObject = type({
+	autocompletedString: "string" as type.cast<AutocompletedString>
+})
+
+LANGUAGE: typescript
+CODE:
+// allow any string, but suggest "foo" and "bar"
+type AutocompletedString = "foo" | "bar" | (string & {})
+
+const myObject = type({
+	autocompletedString: type.string.as<AutocompletedString>()
+})
+
+----------------------------------------
+
+TITLE: Creating Recursive Types with 'this' in arktype
+DESCRIPTION: Shows how to use the 'this' keyword in arktype to create recursive types that reference the root of the current definition.
+
+LANGUAGE: typescript
+CODE:
+const disappointingGift = type({
+	label: "string",
+	"box?": "this"
+})
+
+const out = disappointingGift({
+	label: "foo",
+	box: { label: "bar", box: {} }
+})
+
+if (out instanceof type.errors) {
+	// ArkErrors: box.box.label must be a string (was missing)
+	console.error(out.summary)
+} else {
+	// narrowed inference to arbitrary depth
+	console.log(out.box?.box?.label)
+	//                         ^?
+}
+
+LANGUAGE: typescript
+CODE:
+// boxes now expects an array of our gift object
+const disappointingGifts = type({ label: "string", boxes: "this" }, "[]")
+
+LANGUAGE: typescript
+CODE:
+const types = scope({
+	disappointingGift: {
+		label: "string",
+		// Resolves correctly to the root of the current type
+		"box?": "disappointingGift"
+	}
+}).export()
+
+----------------------------------------
+
+TITLE: Scope Usage Example in TypeScript
+DESCRIPTION: Shows how to use a defined scope to create and chain type definitions.
+
+LANGUAGE: typescript
+CODE:
+const group = coolScope.type({
+	name: "string",
+	members: "user[]"
+})
+
+const ownedGroup = group.and({
+	ownerId: "id"
+})
+
+----------------------------------------
+
+TITLE: Scope Export and Validation in TypeScript
+DESCRIPTION: Demonstrates exporting a scope to a module and performing runtime type validation.
+
+LANGUAGE: typescript
+CODE:
+const coolModule = coolScope.export()
+
+const out = coolModule.user({
+	id: "99",
+	friends: ["7", 8, "9"]
+})
+
+if (out instanceof type.errors) {
+	console.error(out.summary)
+}
+
+----------------------------------------
+
+TITLE: Cyclic Types Definition in TypeScript
+DESCRIPTION: Shows how to create and use recursive type definitions within a scope.
+
+LANGUAGE: typescript
+CODE:
+export const types = scope({
+	package: {
+		name: "string",
+		"dependencies?": "package[]",
+		"contributors?": "contributor[]"
+	},
+	contributor: {
+		email: "string.email",
+		"packages?": "package[]"
+	}
+}).export()
+
+----------------------------------------
+
+TITLE: Submodules and Nested Types in TypeScript
+DESCRIPTION: Illustrates how to create and use submodules for organizing type definitions.
+
+LANGUAGE: typescript
+CODE:
+const subAliases = type.module({ alias: "number" })
+
+const rootScope = scope({
+	a: "string",
+	b: "sub.alias",
+	sub: subAliases
+})
+
+const myType = rootScope.type({
+	someKey: "sub.alias[]"
+})
+
+----------------------------------------
+
+TITLE: Combining Case Record and Fluent APIs for Matching in TypeScript
+DESCRIPTION: Shows how to combine the Case Record and Fluent APIs of the match function. It handles string, number, and bigint inputs, as well as objects with a numeric length property.
+
+LANGUAGE: typescript
+CODE:
+import { match } from "arktype"
+
+// the Case Record and Fluent APIs can be easily combined
+const sizeOf = match({
+	string: v => v.length,
+	number: v => v,
+	bigint: v => v
+})
+	// match any object with a numeric length property and extract it
+	.case({ length: "number" }, o => o.length)
+	// return 0 for all other data
+	.default(() => 0)
+
+sizeOf("abc") // 3
+sizeOf({ name: "David", length: 5 }) // 5
+sizeOf(null) // 0
+
+----------------------------------------
+
+TITLE: Input Narrowing and Property Matching with match Function in TypeScript
+DESCRIPTION: Demonstrates input narrowing using .in<> and property matching using .at() with the match function. It handles a union type with discriminated fields.
+
+LANGUAGE: typescript
+CODE:
+// @errors: 2345
+import { match } from "arktype"
+
+type Data =
+	| {
+			id: 1
+			oneValue: number
+	  }
+	| {
+			id: 2
+			twoValue: string
+	  }
+
+const discriminateValue = match
+	// .in allows you to specify the input TypeScript allows for your matcher
+	.in<Data>()
+	// .at allows you to specify a key at which your input will be matched
+	.at("id")
+	.match({
+		1: o => `${o.oneValue}!`,
+		2: o => o.twoValue.length,
+		default: "assert"
+	})
+
+discriminateValue({ id: 1, oneValue: 1 }) // "1!"
+discriminateValue({ id: 2, twoValue: "two" }) // 3
+discriminateValue({ oneValue: 3 })
+
+----------------------------------------
+
+TITLE: Configuring Global Settings in TypeScript
+DESCRIPTION: Example of setting global configuration options using the arktype/config entrypoint
+
+LANGUAGE: typescript
+CODE:
+import { configure } from "arktype/config"
+configure({ numberAllowsNaN: true })
+
+----------------------------------------
+
+TITLE: Type-Level Password Validation Configuration
+DESCRIPTION: Shows how to configure error messages for password validation
+
+LANGUAGE: typescript
+CODE:
+const password = type("string >= 8").configure({ actual: () => "" })
+const user = type({
+	email: "string.email",
+	password
+})
+
+----------------------------------------
+
+TITLE: Custom Error Messages by Error Code
+DESCRIPTION: Example of configuring error messages based on error codes
+
+LANGUAGE: typescript
+CODE:
+const mod = type.module(
+	{ isEven: "number%2" },
+	{
+		divisor: {
+			expected: ctx => `% ${ctx.rule} !== 0`,
+			problem: ctx => `${ctx.actual} ${ctx.expected}`
+		}
+	}
+)
+
+----------------------------------------
+
+TITLE: Configuring Custom Clone Behavior
+DESCRIPTION: Shows how to customize object cloning behavior during validation
+
+LANGUAGE: typescript
+CODE:
+import { configure } from "arktype/config"
+
+configure({ clone: structuredClone })
+
+----------------------------------------
+
+TITLE: Using Subtype Keywords in ArkType
+DESCRIPTION: Illustrates the use of subtype keywords to refine or transform root types in ArkType. Examples include date formatting, parsing, and ISO string handling using both string and fluent syntax.
+
+LANGUAGE: typescript
+CODE:
+const keywords = type({
+	dateFormattedString: "string.date",
+	transformStringToDate: "string.date.parse",
+	isoFormattedString: "string.date.iso",
+	transformIsoFormattedStringToDate: "string.date.iso.parse"
+})
+
+LANGUAGE: typescript
+CODE:
+const keywords = type({
+	dateFormattedString: type.keywords.string.date.root,
+	isoFormattedString: type.keywords.string.date.iso.root,
+	transformStringToDate: type.keywords.string.date.parse,
+	transformIsoFormattedStringToDate: type.keywords.string.date.iso.parse
+})
+
+----------------------------------------
+
+TITLE: Converting JSON Schema to ArkType Type in JavaScript
+DESCRIPTION: This snippet demonstrates how to use the parseJsonSchema function from @ark/jsonschema to convert a JSON Schema definition to an ArkType type. It creates a string type with minimum and maximum length constraints.
+
+LANGUAGE: javascript
+CODE:
+import { parseJsonSchema } from "@ark/jsonschema"
+
+const t = parseJsonSchema({ type: "string", minLength: 5, maxLength: 10 })
+
+----------------------------------------
+
+TITLE: Equivalent ArkType Definition in JavaScript
+DESCRIPTION: This snippet shows the equivalent ArkType definition for the JSON Schema converted in the previous example. It directly uses the ArkType library to create a string type with length constraints.
+
+LANGUAGE: javascript
+CODE:
+import { type } from "arktype"
+
+const t = type("5<=string<=10")
+
+----------------------------------------
+
+TITLE: TypeScript Type Inference with ArkType Assertion
+DESCRIPTION: This TypeScript snippet demonstrates how the library provides type inference. It defines a function that asserts an unknown input as a string using the previously defined ArkType type.
+
+LANGUAGE: typescript
+CODE:
+const assertIsString = (data: unknown)
+    return t.assert(data)
+
+----------------------------------------
+
+TITLE: Ensuring JSON Schema Validity for Numeric Types in TypeScript
+DESCRIPTION: This snippet shows how to use TypeScript types to ensure JSON Schema validity for numeric types. It imports the JsonSchema type from arktype and demonstrates a type error when an invalid schema is defined.
+
+LANGUAGE: typescript
+CODE:
+import type { JsonSchema } from "arktype"
+
+const integerSchema: JsonSchema.Numeric = {
+	type: "integer",
+	multipleOf: "3" // errors stating that 'multipleOf' must be a number
+}
+
+----------------------------------------
+
+TITLE: Ensuring JSON Schema Validity for String Types in TypeScript
+DESCRIPTION: This snippet demonstrates how to ensure JSON Schema validity for string types using TypeScript. It imports the StringSchema type from @ark/jsonschema and shows a type error for an invalid schema definition.
+
+LANGUAGE: typescript
+CODE:
+import type { StringSchema } from "@ark/jsonschema"
+const stringSchema: StringSchema = {
+	type: "string",
+	minLength: "3" // errors stating that 'minLength' must be a number
+}
+
+----------------------------------------
+
+TITLE: Integrating ArkType with Hono in TypeScript
+DESCRIPTION: This snippet demonstrates how to use ArkType with Hono for request validation. It uses the @hono/arktype-validator middleware to validate JSON input against an ArkType schema.
+
+LANGUAGE: typescript
+CODE:
+const user = type({
+	name: "string",
+	age: "number"
+})
+
+app.post("/author", arktypeValidator("json", user), c => {
+	const data = c.req.valid("json")
+	return c.json({
+		success: true,
+		message: `${data.name} is ${data.age}`
+	})
+})
+
+----------------------------------------
+
+TITLE: Integrating ArkType with oRPC in TypeScript
+DESCRIPTION: This snippet shows how to use ArkType with oRPC for input validation. It leverages oRPC's built-in support for Standard Schema, making ArkType integration seamless.
+
+LANGUAGE: typescript
+CODE:
+os.input(
+	type({
+		name: "string",
+		"age?": "number"
+	})
+)
+
+----------------------------------------
+
+TITLE: Implementing JSON Conversion with Pattern Matching in TypeScript
+DESCRIPTION: Comparison between ArkType and ts-pattern implementations of JSON conversion with performance benchmarks. Shows the speed advantages of ArkType's pattern matching.
+
+LANGUAGE: typescript
+CODE:
+const toJsonArkType = match({
+	"string | number | boolean | null": v => v,
+	bigint: b => `${b}n`,
+	object: o => {
+		for (const k in o) {
+			o[k] = toJsonArkType(o[k])
+		}
+		return o
+	},
+	default: "assert"
+})
+
+const toJsonTsPattern = (value: unknown) =>
+	tsPatternMatch(value)
+		.with(P.union(P.string, P.number, P.boolean, null), v => v)
+		.with(P.bigint, v => `${v}n`)
+		.with({}, o => {
+			for (const k in o) {
+				o[k] = toJsonTsPattern(o[k])
+			}
+			return o
+		})
+		.otherwise(() => {
+			throw new Error("value is not valid JSON")
+		})
+
+----------------------------------------
+
+TITLE: Basic Pattern Matching with ArkType Match Function
+DESCRIPTION: Demonstrates the basic usage of ArkType's match function using case record API to handle different input types and return corresponding outputs.
+
+LANGUAGE: typescript
+CODE:
+import { match } from "arktype"
+
+const sizeOf = match({
+	"string | Array": v => v.length,
+	number: v => v,
+	bigint: v => v,
+	default: "assert"
+})
+
+----------------------------------------
+
+TITLE: Fluent API Pattern Matching in ArkType
+DESCRIPTION: Shows how to use ArkType's fluent API for pattern matching, combining case record and method chaining approaches.
+
+LANGUAGE: typescript
+CODE:
+const sizeOf = match({
+	string: v => v.length,
+	number: v => v,
+	bigint: v => v
+})
+	.case({ length: "number" }, o => o.length)
+	.default(() => 0)
+
+----------------------------------------
+
+TITLE: ArkType Configuration and Error Handling
+DESCRIPTION: Demonstrates how to configure ArkType keywords globally and customize error messages.
+
+LANGUAGE: typescript
+CODE:
+import { configure } from "arktype/config"
+
+configure({
+	keywords: {
+		string: "shorthand description",
+		"string.email": {
+			actual: () => "definitely fake"
+		}
+	}
+})
+
+----------------------------------------
+
+TITLE: Rendering LinkCard Components for ArkType Blog Posts in JSX
+DESCRIPTION: This code snippet demonstrates the use of LinkCard components to display blog post information for ArkType version announcements. Each LinkCard includes a title, description, link, and publication date.
+
+LANGUAGE: jsx
+CODE:
+<LinkCard
+	title="Announcing ArkType 2.1"
+	description="Optimized pattern matching from type syntax"
+	href="/docs/blog/2.1"
+	date="February 27, 2025"
+/>
+
+<LinkCard
+	title="Announcing ArkType 2.0"
+	description="100x faster validation with DX that will blow your mind"
+	href="/docs/blog/2.0"
+	date="January 17, 2025"
+/>
+
+----------------------------------------
+
+TITLE: Configuring Error Messages in TypeScript
+DESCRIPTION: Demonstrates how to configure custom error messages for ArkType validations using the 'configure' function.
+
+LANGUAGE: typescript
+CODE:
+import { configure } from "arktype/config"
+
+configure({
+	keywords: {
+		string: "shorthand description",
+		"string.email": {
+			actual: () => "definitely fake"
+		}
+	}
+})
+
+----------------------------------------
+
+TITLE: Using Match Function for Type-Safe Switching in TypeScript
+DESCRIPTION: Shows how to use the 'match' function to handle different types of input and return corresponding outputs based on the input type.
+
+LANGUAGE: typescript
+CODE:
+import { match } from "arktype"
+
+const sizeOf = match({
+	"string | Array": v => v.length,
+	number: v => v,
+	bigint: v => v,
+	default: "assert"
+})
+
+sizeOf("abc") // 3
+sizeOf([1, 2, 3, 4]) // 4
+sizeOf(5n) // 5n
+// ArkErrors: must be an object, a string, a number or a bigint (was boolean)
+sizeOf(true)
+
+----------------------------------------
+
+TITLE: Piping Output to Another Type in TypeScript
+DESCRIPTION: Demonstrates how to use the '|>' operator to pipe output to another Type parsed from a definition.
+
+LANGUAGE: typescript
+CODE:
+const trimToNonEmpty = type("string.trim |> string > 0")
+
+const equivalent = type("string.trim").to("string > 0")
+
+----------------------------------------
+
+TITLE: Installing Attest via npm
+DESCRIPTION: Command to install the Attest library using npm package manager.
+
+LANGUAGE: bash
+CODE:
+npm install @ark/attest
+
+----------------------------------------
+
+TITLE: Configuring Vitest for Attest
+DESCRIPTION: Configuration for Vitest to use Attest, including global setup in vitest.config.ts and setupVitest.ts files.
+
+LANGUAGE: typescript
+CODE:
+import { defineConfig } from "vitest/config"
+
+export default defineConfig({
+	test: {
+		globalSetup: ["setupVitest.ts"]
+	}
+})
+
+LANGUAGE: typescript
+CODE:
+import { setup } from "@ark/attest"
+
+// config options can be passed here
+export default () => setup({})
+
+----------------------------------------
+
+TITLE: Demonstrating Attest Features in TypeScript Tests
+DESCRIPTION: Examples of using Attest for type assertions, error checking, completion snapshotting, JSDoc snapshotting, and performance benchmarking in TypeScript tests.
+
+LANGUAGE: typescript
+CODE:
+describe("attest features", () => {
+	it("type and value assertions", () => {
+		const even = type("number%2")
+		// asserts even.infer is exactly number
+		attest<number>(even.infer)
+		// make assertions about types and values seamlessly
+		attest(even.infer).type.toString.snap("number")
+		// including object literals- no more long inline strings!
+		attest(even.json).snap({
+			intersection: [{ domain: "number" }, { divisor: 2 }]
+		})
+	})
+
+	it("error assertions", () => {
+		// Check type errors, runtime errors, or both at the same time!
+		// @ts-expect-error
+		attest(() => type("number%0")).throwsAndHasTypeError(
+			"% operator must be followed by a non-zero integer literal (was 0)"
+		)
+		// @ts-expect-error
+		attest(() => type({ "[object]": "string" })).type.errors(
+			"Indexed key definition 'object' must be a string, number or symbol"
+		)
+	})
+
+	it("completion snapshotting", () => {
+		// snapshot expected completions for any string literal!
+		// @ts-expect-error (if your expression would throw, prepend () =>)
+		attest(() => type({ a: "a", b: "b" })).completions({
+			a: ["any", "alpha", "alphanumeric"],
+			b: ["bigint", "boolean"]
+		})
+		type Legends = { faker?: "🐐"; [others: string]: unknown }
+		// works for keys or index access as well (may need prettier-ignore to avoid removing quotes)
+		// prettier-ignore
+		attest({ "f": "🐐" } as Legends).completions({ "f": ["faker"] })
+	})
+
+	it("jsdoc snapshotting", () => {
+		// match or snapshot expected jsdoc associated with the value passed to attest
+		const t = type({
+			/** FOO */
+			foo: "string"
+		})
+
+		const out = t.assert({ foo: "foo" })
+
+		attest(out.foo).jsdoc.snap("FOO")
+	})
+
+	it("integrate runtime logic with type assertions", () => {
+		const arrayOf = type("<t>", "t[]")
+		const numericArray = arrayOf("number | bigint")
+		// flexibly combine runtime logic with type assertions to customize your
+		// tests beyond what is possible from pure static-analysis based type testing tools
+		if (getTsVersionUnderTest().startsWith("5")) {
+			// this assertion will only occur when testing TypeScript 5+!
+			attest<(number | bigint)[]>(numericArray.infer)
+		}
+	})
+
+	it("integrated type performance benchmarking", () => {
+		const user = type({
+			kind: "'admin'",
+			"powers?": "string[]"
+		})
+			.or({
+				kind: "'superadmin'",
+				"superpowers?": "string[]"
+			})
+			.or({
+				kind: "'pleb'"
+			})
+		attest.instantiations([7574, "instantiations"])
+	})
+})
+
+----------------------------------------
+
+TITLE: Configuring Attest Options in TypeScript
+DESCRIPTION: Example of setting up Attest with custom options in a TypeScript configuration file.
+
+LANGUAGE: typescript
+CODE:
+import * as attest from "@ark/attest"
+
+export const setup = () =>
+	attest.setup({
+		skipTypes: true,
+		benchPercentThreshold: 10
+	})
+
+----------------------------------------
+
+TITLE: Default Attest Configuration in TypeScript
+DESCRIPTION: The default configuration options for Attest, showing all available settings and their default values.
+
+LANGUAGE: typescript
+CODE:
+export const getDefaultAttestConfig = (): BaseAttestConfig => ({
+	tsconfig:
+		existsSync(fromCwd("tsconfig.json")) ? fromCwd("tsconfig.json") : undefined,
+	attestAliases: ["attest", "attestInternal"],
+	updateSnapshots: false,
+	skipTypes: false,
+	skipInlineInstantiations: false,
+	tsVersions: "typescript",
+	benchPercentThreshold: 20,
+	benchErrorOnThresholdExceeded: true,
+	filter: undefined,
+	testDeclarationAliases: ["bench", "it", "test"],
+	formatter: `npm exec --no -- prettier --write`,
+	shouldFormat: true,
+	typeToStringFormat: {}
+})
+
+----------------------------------------
+
+TITLE: Configuring Test Scripts in package.json
+DESCRIPTION: Example of configuring test scripts in package.json to run tests with and without type checking using Attest.
+
+LANGUAGE: json
+CODE:
+{
+	"test": "ATTEST_skipTypes=1 vitest run",
+	"testWithTypes": "vitest run"
+}
+
+----------------------------------------
+
+TITLE: Benchmarking Complex Types with Attest
+DESCRIPTION: Example of using Attest to benchmark complex TypeScript types and runtime performance.
+
+LANGUAGE: typescript
+CODE:
+// Combinatorial template literals often result in expensive types- let's benchmark this one!
+type makeComplexType<s extends string> =
+	s extends `${infer head}${infer tail}` ? head | tail | makeComplexType<tail>
+	:	s
+
+bench("bench type", () => {
+	return {} as makeComplexType<"defenestration">
+	// This is an inline snapshot that will be populated or compared when you run the file
+}).types([169, "instantiations"])
+
+bench(
+	"bench runtime and type",
+	() => {
+		return {} as makeComplexType<"antidisestablishmentarianism">
+	},
+	fakeCallOptions
+)
+	// Average time it takes the function execute
+	.mean([2, "ms"])
+	// Seems like our type is O(n) with respect to the length of the input- not bad!
+	.types([337, "instantiations"])
+
+----------------------------------------
+
+TITLE: Benchmarking with Baseline Expression in TypeScript
+DESCRIPTION: Demonstrates how to use a baseline expression when benchmarking an API to avoid noise from initial type instantiations.
+
+LANGUAGE: typescript
+CODE:
+import { bench } from "@ark/attest"
+import { type } from "arktype"
+
+// baseline expression
+type("boolean")
+
+bench("single-quoted", () => {
+	const _ = type("'nineteen characters'")
+	// would be 2697 without baseline
+}).types([610, "instantiations"])
+
+bench("keyword", () => {
+	const _ = type("string")
+	// would be 2507 without baseline
+}).types([356, "instantiations"])
+
+----------------------------------------
+
+TITLE: Setting Up Custom Assertions with Attest
+DESCRIPTION: Example of how to set up custom assertions using Attest's APIs for library authors.
+
+LANGUAGE: typescript
+CODE:
+import { getTypeAssertionsAtPosition, caller } from "@ark/attest"
+
+const yourCustomAssert = <expectedType>(actualValue: expectedType) => {
+	const position = caller()
+	const types = getTypeAssertionsAtPosition(position)
+	// assert that the type of actualValue is the same as the type of expectedType
+	const relationship = types[0].args[0].relationships.typeArgs[0]
+	if (relationship === undefined) {
+		throw new Error(
+			`yourCustomAssert requires a type arg representing the expected type, e.g. 'yourCustomAssert<"foo">("foo")'`
+		)
+	}
+	if (relationship !== "equality") {
+		throw new Error(
+			`Expected ${types.typeArgs[0].type}, got ${types.args[0].type} with relationship ${relationship}`
+		)
+	}
+}
+
+----------------------------------------
+
+TITLE: Using Custom Assertions with Attest
+DESCRIPTION: Demonstrates how users can utilize custom assertions created with Attest in their tests.
+
+LANGUAGE: typescript
+CODE:
+import { yourCustomAssert } from "your-package"
+
+test("my code", () => {
+	// Ok
+	yourCustomAssert<"foo">(`${"f"}oo` as const)
+	// Error: `Expected boolean, got true with relationship subtype`
+	yourCustomAssert<boolean>(true)
+	// Error: `Expected 5, got number with relationship supertype`
+	yourCustomAssert<5>(2 + 3)
+})
+
+----------------------------------------
+
+TITLE: Asserting JSDoc Content with attest in TypeScript
+DESCRIPTION: Demonstrates how to use attest to assert the JSDoc content associated with a value in TypeScript. This feature allows for checking the documentation of typed objects.
+
+LANGUAGE: typescript
+CODE:
+const t = type({
+	/** FOO */
+	foo: "string"
+})
+
+const out = t.assert({ foo: "foo" })
+
+// match or snapshot expected jsdoc associated with the value passed to attest
+attest(out.foo).jsdoc.snap("FOO")
+
+----------------------------------------
+
+TITLE: Using Regex for Type ToString Assertions in TypeScript
+DESCRIPTION: Shows how to use regex or partial matching for toString assertions on types in TypeScript. This allows for more flexible type checking.
+
+LANGUAGE: typescript
+CODE:
+// ok
+attest({ ark: "type" }).type.toString(/^{.*}$/)
+
+// AssertionError: Actual string 'string[]' did not match regex '^{.*}$'
+attest(["ark", "type"]).type.toString(/^{.*}$/)
+
+----------------------------------------
+
+TITLE: Using satisfies for Type Assertions in TypeScript
+DESCRIPTION: Demonstrates how to use the satisfies method for asserting that a value matches an arktype Type instance in TypeScript. This allows for more complex type checking.
+
+LANGUAGE: typescript
+CODE:
+// ok
+attest({ ark: "type" }).type.toString.satisfies(/^{.*}$/)
+
+// AssertionError: ark must be a number (was string)
+attest({ ark: "type" }).satisfies({ ark: "number" })
+
+----------------------------------------
+
+TITLE: Formatting Serialized Types with Prettier in TypeScript
+DESCRIPTION: Shows how serialized types are formatted using Prettier in TypeScript. This improves readability for long serialized types in assertions.
+
+LANGUAGE: typescript
+CODE:
+attest({
+	ark: "type",
+	type: "script",
+	vali: "dator",
+	opti: "mized",
+	from: "editor",
+	to: "runtime"
+}).type.toString.snap(`{
+	ark: string
+	type: string
+	vali: string
+	opti: string
+	from: string
+	to: string
+}`)
+
+----------------------------------------
+
+TITLE: Using satisfies for ArkType Definition Comparison in TypeScript
+DESCRIPTION: Demonstrates how to use the satisfies method to compare a value to an ArkType definition in TypeScript. This allows for more precise type checking.
+
+LANGUAGE: typescript
+CODE:
+attest({ foo: "bar" }).satisfies({ foo: "string" })
+
+// Error: foo must be a number (was string)
+attest({ foo: "bar" }).satisfies({ foo: "number" })
+
+----------------------------------------
+
+TITLE: Snapshotting Instantiations with Threshold in TypeScript
+DESCRIPTION: Shows how to use attest.instantiations() to snapshot the number of instantiations and throw an error if it exceeds a specified threshold in TypeScript.
+
+LANGUAGE: typescript
+CODE:
+it("can snap instantiations", () => {
+	type Z = makeComplexType<"asbsdfsaodisfhsda">
+	// will throw here as the actual number of instantiations is more
+	// than 20% higher than the snapshotted value
+	attest.instantiations([1, "instantiations"])
+})
+
+----------------------------------------
+
+TITLE: Basic JSON Parsing with ArkType Morph in TypeScript
+DESCRIPTION: Demonstrates a simple JSON parsing morph using ArkType's pipe function. It shows basic usage and potential issues with unsafe parsing.
+
+LANGUAGE: typescript
+CODE:
+const parseJson = type("string").pipe((s): object => JSON.parse(s))
+
+// object: { ark: "type" }
+const out = parseJson('{ "ark": "type" }')
+
+// ArkErrors: must be a string (was object)
+const badOut = parseJson(out)
+
+LANGUAGE: typescript
+CODE:
+const parseJson = type("string").pipe((s): object => JSON.parse(s))
+// ---cut---
+
+// Uncaught SyntaxError: Expected property name ☠️ // [!code error]
+const badOut = parseJson('{ unquoted: "keys" }')
+
+----------------------------------------
+
+TITLE: Advanced JSON Parsing with Validation in ArkType
+DESCRIPTION: Shows how to combine JSON parsing with object structure validation using ArkType's pipe function. It demonstrates parsing JSON and then validating the resulting object structure.
+
+LANGUAGE: typescript
+CODE:
+const parseJson = type("string").pipe.try(
+	(s): object => JSON.parse(s),
+	type({
+		name: "string",
+		version: "string.semver"
+	})
+)
+
+const out = parseJson('{ "name": "arktype", "version": "2.0.0" }')
+
+if (!(out instanceof type.errors)) {
+	// Logs "arktype:2.0.0"
+	console.log(`${out.name}:${out.version}`)
+}
+
+----------------------------------------
+
+TITLE: Simplified JSON Parsing with Built-in ArkType Function
+DESCRIPTION: Demonstrates the use of ArkType's built-in string.json.parse function for simplified JSON parsing and validation. It showcases error handling and type inference.
+
+LANGUAGE: typescript
+CODE:
+interface RuntimeErrors extends type.errors {
+	/**name must be a string (was true) 
+version must be a semantic version (see https://semver.org/) (was "v2.0.0")*/
+	summary: string
+}
+
+const narrowMessage = (e: type.errors): e is RuntimeErrors => true
+
+// ---cut---
+// .to is a sugared .pipe for a single parsed output validator
+const parseJson = type("string.json.parse").to({
+	name: "string",
+	version: "string.semver"
+})
+
+const out = parseJson('{ "name": true, "version": "v2.0.0" }')
+
+if (out instanceof type.errors) {
+	// ---cut-start---
+	if (!narrowMessage(out)) throw new Error()
+	// ---cut-end---
+	// hover out.summary to see the default error message
+	console.error(out.summary)
+}
+
+----------------------------------------
+
+TITLE: Composing Constrained Types in TypeScript with ArkType
+DESCRIPTION: This snippet shows how to compose a new type 'contacts' representing a non-empty list of Contact types using ArkType's chaining syntax.
+
+LANGUAGE: typescript
+CODE:
+const _contact = type({
+	email: "string.email",
+	score: "number.integer < 100"
+})
+
+type _Contact = typeof _contact.t
+
+interface Contact extends _Contact {}
+
+export const contact: type<Contact> = _contact
+// a non-empty list of Contact
+const contacts = contact.array().atLeastLength(1)
+
+----------------------------------------
+
+TITLE: Configuring TypeScript for ArkType Compatibility
+DESCRIPTION: Demonstrates the recommended TypeScript configuration setting to avoid type errors in node_modules and improve editor performance when using ArkType packages.
+
+LANGUAGE: typescript
+CODE:
+{
+  "skipLibCheck": true
+}
+
+----------------------------------------
+
+TITLE: Starting Next.js Development Server
+DESCRIPTION: Commands to start the Next.js development server using different package managers (npm, pnpm, or yarn). After running the server, the application will be accessible at http://localhost:3000.
+
+LANGUAGE: bash
+CODE:
+npm run dev
+# or
+pnpm dev
+# or
+yarn dev

@@ -1,0 +1,2009 @@
+TITLE: Defining Proto with gRPC-Gateway Annotations
+DESCRIPTION: Proto file definition showing how to add gRPC-Gateway annotations to map HTTP endpoints to gRPC methods. Includes service definition with HTTP routing options.
+
+LANGUAGE: protobuf
+CODE:
+syntax = "proto3";
+
+package helloworld;
+
+import "google/api/annotations.proto";
+
+service Greeter {
+  rpc SayHello (HelloRequest) returns (HelloReply) {
+    option (google.api.http) = {
+      post: "/v1/example/echo"
+      body: "*"
+    };
+  }
+}
+
+message HelloRequest {
+  string name = 1;
+}
+
+message HelloReply {
+  string message = 1;
+}
+
+----------------------------------------
+
+TITLE: Configuring Buf Generation
+DESCRIPTION: Example buf.gen.yaml configuration for generating gRPC and gateway code.
+
+LANGUAGE: yaml
+CODE:
+version: v2
+plugins:
+  - local: protoc-gen-go
+    out: gen/go
+    opt:
+      - paths=source_relative
+  - local: protoc-gen-go-grpc
+    out: gen/go
+    opt:
+      - paths=source_relative
+  - local: protoc-gen-grpc-gateway
+    out: gen/go
+    opt:
+      - paths=source_relative
+
+----------------------------------------
+
+TITLE: Implementing HTTP Reverse-Proxy Server
+DESCRIPTION: Example Go code for implementing the HTTP reverse-proxy server using gRPC-Gateway.
+
+LANGUAGE: go
+CODE:
+package main
+
+import (
+  "context"
+  "flag"
+  "net/http"
+
+  "github.com/grpc-ecosystem/grpc-gateway/v2/runtime"
+  "google.golang.org/grpc"
+  "google.golang.org/grpc/credentials/insecure"
+  "google.golang.org/grpc/grpclog"
+)
+
+var (
+  grpcServerEndpoint = flag.String("grpc-server-endpoint", "localhost:9090", "gRPC server endpoint")
+)
+
+func run() error {
+  ctx := context.Background()
+  ctx, cancel := context.WithCancel(ctx)
+  defer cancel()
+
+  mux := runtime.NewServeMux()
+  opts := []grpc.DialOption{grpc.WithTransportCredentials(insecure.NewCredentials())}
+  err := gw.RegisterYourServiceHandlerFromEndpoint(ctx, mux, *grpcServerEndpoint, opts)
+  if err != nil {
+    return err
+  }
+
+  return http.ListenAndServe(":8081", mux)
+}
+
+----------------------------------------
+
+TITLE: Defining Hello World gRPC Service with Protocol Buffers
+DESCRIPTION: Defines a basic gRPC service called Greeter with a SayHello RPC method. The service accepts a HelloRequest message containing a name and returns a HelloReply message with a greeting. Uses proto3 syntax.
+
+LANGUAGE: protobuf
+CODE:
+syntax = "proto3";
+
+package helloworld;
+
+// The greeting service definition
+service Greeter {
+  // Sends a greeting
+  rpc SayHello (HelloRequest) returns (HelloReply) {}
+}
+
+// The request message containing the user's name
+message HelloRequest {
+  string name = 1;
+}
+
+// The response message containing the greetings
+message HelloReply {
+  string message = 1;
+}
+
+----------------------------------------
+
+TITLE: Implementing gRPC Server in Go
+DESCRIPTION: This code snippet demonstrates how to create a gRPC server in Go. It includes the implementation of a Greeter service, server creation, and listening on a TCP port. The server responds to SayHello requests by appending 'world' to the input name.
+
+LANGUAGE: go
+CODE:
+package main
+
+import (
+	"context"
+	"log"
+	"net"
+
+	"google.golang.org/grpc"
+
+	helloworldpb "github.com/myuser/myrepo/proto/helloworld"
+)
+
+type server struct{
+	helloworldpb.UnimplementedGreeterServer
+}
+
+func NewServer() *server {
+	return &server{}
+}
+
+func (s *server) SayHello(ctx context.Context, in *helloworldpb.HelloRequest) (*helloworldpb.HelloReply, error) {
+	return &helloworldpb.HelloReply{Message: in.Name + " world"}, nil
+}
+
+func main() {
+	// Create a listener on TCP port
+	lis, err := net.Listen("tcp", ":8080")
+	if err != nil {
+		log.Fatalln("Failed to listen:", err)
+	}
+
+	// Create a gRPC server object
+	s := grpc.NewServer()
+	// Attach the Greeter service to the server
+	helloworldpb.RegisterGreeterServer(s, &server{})
+	// Serve gRPC Server
+	log.Println("Serving gRPC on 0.0.0.0:8080")
+	log.Fatal(s.Serve(lis))
+}
+
+----------------------------------------
+
+TITLE: Implementing gRPC and Gateway Server in Go
+DESCRIPTION: Go implementation of a server that handles both gRPC and HTTP/JSON requests via gRPC-Gateway. Includes service implementation and gateway proxy setup.
+
+LANGUAGE: go
+CODE:
+package main
+
+import (
+	"context"
+	"log"
+	"net"
+	"net/http"
+
+	"github.com/grpc-ecosystem/grpc-gateway/v2/runtime"
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials/insecure"
+
+	helloworldpb "github.com/myuser/myrepo/proto/helloworld"
+)
+
+type server struct{
+	helloworldpb.UnimplementedGreeterServer
+}
+
+func NewServer() *server {
+	return &server{}
+}
+
+func (s *server) SayHello(ctx context.Context, in *helloworldpb.HelloRequest) (*helloworldpb.HelloReply, error) {
+	return &helloworldpb.HelloReply{Message: in.Name + " world"}, nil
+}
+
+func main() {
+	lis, err := net.Listen("tcp", ":8080")
+	if err != nil {
+		log.Fatalln("Failed to listen:", err)
+	}
+
+	s := grpc.NewServer()
+	helloworldpb.RegisterGreeterServer(s, &server{})
+	log.Println("Serving gRPC on 0.0.0.0:8080")
+	go func() {
+		log.Fatalln(s.Serve(lis))
+	}()
+
+	conn, err := grpc.NewClient(
+		"0.0.0.0:8080",
+		grpc.WithTransportCredentials(insecure.NewCredentials()),
+	)
+	if err != nil {
+		log.Fatalln("Failed to dial server:", err)
+	}
+
+	gwmux := runtime.NewServeMux()
+	err = helloworldpb.RegisterGreeterHandler(context.Background(), gwmux, conn)
+	if err != nil {
+		log.Fatalln("Failed to register gateway:", err)
+	}
+
+	gwServer := &http.Server{
+		Addr:    ":8090",
+		Handler: gwmux,
+	}
+
+	log.Println("Serving gRPC-Gateway on http://0.0.0.0:8090")
+	log.Fatalln(gwServer.ListenAndServe())
+}
+
+----------------------------------------
+
+TITLE: Registering Custom Marshaler in Go
+DESCRIPTION: Demonstrates how to register a custom MessagePack marshaler with gRPC-Gateway using WithMarshalerOption.
+
+LANGUAGE: go
+CODE:
+var m your.MsgPackMarshaler
+mux := runtime.NewServeMux(
+	runtime.WithMarshalerOption("application/x-msgpack", m),
+)
+
+----------------------------------------
+
+TITLE: Implementing Custom Routes in gRPC-Gateway Go Server
+DESCRIPTION: Example showing how to register both generated gRPC routes and custom HTTP routes in a gRPC-Gateway server. Demonstrates setting up a custom GET endpoint alongside standard gRPC service handlers using the runtime.ServeMux.
+
+LANGUAGE: go
+CODE:
+package main
+
+import (
+	"context"
+	"net/http"
+
+	pb "github.com/grpc-ecosystem/grpc-gateway/v2/examples/internal/helloworld"
+	"github.com/grpc-ecosystem/grpc-gateway/v2/runtime"
+)
+
+func main() {
+	ctx := context.TODO()
+	mux := runtime.NewServeMux()
+	// Register generated routes to mux
+	err := pb.RegisterGreeterHandlerServer(ctx, mux, &GreeterServer{})
+	if err != nil {
+		panic(err)
+	}
+	// Register custom route for  GET /hello/{name}
+	err = mux.HandlePath("GET", "/hello/{name}", func(w http.ResponseWriter, r *http.Request, pathParams map[string]string) {
+		w.Write([]byte("hello " + pathParams["name"]))
+	})
+	if err != nil {
+		panic(err)
+	}
+	http.ListenAndServe(":8080", mux)
+}
+
+// GreeterServer is the server API for Greeter service.
+type GreeterServer struct {
+
+}
+
+// SayHello implement to say hello
+func (h *GreeterServer) SayHello(ctx context.Context, req *pb.HelloRequest) (*pb.HelloReply, error) {
+	return &pb.HelloReply{
+		Message: "hello " + req.Name,
+	}, nil
+}
+
+----------------------------------------
+
+TITLE: Implementing HttpBody Service in Go
+DESCRIPTION: Go implementation of the HttpBody service showing both single response and streaming endpoints. Demonstrates how to set content type and data in HttpBody responses.
+
+LANGUAGE: go
+CODE:
+func (*HttpBodyExampleService) Helloworld(ctx context.Context, in *empty.Empty) (*httpbody.HttpBody, error) {
+	return &httpbody.HttpBody{
+		ContentType: "text/html",
+		Data:        []byte("Hello World"),
+	}, nil
+}
+
+func (HttpBodyExampleService) Download(_ *empty.Empty, stream HttpBodyExampleService_DownloadServer) error {
+	msgs := []*httpbody.HttpBody{
+		{
+			ContentType: "text/html",
+			Data:        []byte("Hello 1"),
+		},
+		{
+			ContentType: "text/html",
+			Data:        []byte("Hello 2"),
+		},
+	}
+
+	for _, msg := range msgs {
+		if err := stream.Send(msg); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+----------------------------------------
+
+TITLE: Defining gRPC Service with HttpBody Response
+DESCRIPTION: Protobuf service definition showing how to use google.api.HttpBody as a return type for both single and streaming responses. Includes necessary imports and HTTP endpoint mappings.
+
+LANGUAGE: protobuf
+CODE:
+import "google/api/httpbody.proto";
+import "google/api/annotations.proto";
+import "google/protobuf/empty.proto";
+
+service HttpBodyExampleService {
+	rpc HelloWorld(google.protobuf.Empty) returns (google.api.HttpBody) {
+		option (google.api.http) = {
+			get: "/helloworld"
+		};
+	}
+	rpc Download(google.protobuf.Empty) returns (stream google.api.HttpBody) {
+		option (google.api.http) = {
+			get: "/download"
+		};
+	}
+}
+
+----------------------------------------
+
+TITLE: Configuring JSON Marshaler with Proto Names in Go
+DESCRIPTION: Shows how to configure the JSON marshaler to use exact case from proto files instead of camelCase.
+
+LANGUAGE: go
+CODE:
+mux := runtime.NewServeMux(
+	runtime.WithMarshalerOption(runtime.MIMEWildcard, &runtime.JSONPb{
+		MarshalOptions: protojson.MarshalOptions{
+			UseProtoNames: true,
+		},
+		UnmarshalOptions: protojson.UnmarshalOptions{
+			DiscardUnknown: true,
+		},
+	}),
+)
+
+----------------------------------------
+
+TITLE: Custom Header Matcher in Go
+DESCRIPTION: Shows how to implement a custom header matcher function to control which HTTP headers are passed to gRPC metadata.
+
+LANGUAGE: go
+CODE:
+func CustomMatcher(key string) (string, bool) {
+	switch key {
+	case "X-Custom-Header1":
+		return key, true
+	case "X-Custom-Header2":
+		return "custom-header2", true
+	default:
+		return key, false
+	}
+}
+
+mux := runtime.NewServeMux(
+	runtime.WithIncomingHeaderMatcher(CustomMatcher),
+)
+
+----------------------------------------
+
+TITLE: Configuring Custom OpenAPI Response in Protobuf
+DESCRIPTION: Demonstrates how to configure a custom 400 error response for OpenAPI documentation using protobuf options and message definitions.
+
+LANGUAGE: protobuf
+CODE:
+option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_swagger) = {
+  responses: {
+    key: "400"
+    value: {
+      description: "Returned when the request is malformed."
+      schema: {
+        json_schema: {ref: ".example.service.v1.GenericResponse"}
+      }
+    }
+  }
+};
+
+message GenericResponse {
+  repeated string resources = 1;
+  repeated string errors = 2;
+}
+
+----------------------------------------
+
+TITLE: Custom Routing Error Handler in Go
+DESCRIPTION: Demonstrates how to implement a custom routing error handler to control HTTP status codes for routing errors in gRPC-Gateway.
+
+LANGUAGE: go
+CODE:
+func handleRoutingError(ctx context.Context, mux *runtime.ServeMux, marshaler runtime.Marshaler, w http.ResponseWriter, r *http.Request, httpStatus int) {
+	if httpStatus != http.StatusMethodNotAllowed {
+		runtime.DefaultRoutingErrorHandler(ctx, mux, marshaler, w, r, httpStatus)
+		return
+	}
+
+	err := &runtime.HTTPStatusError{
+		HTTPStatus: httpStatus,
+		Err:        status.Error(codes.Unimplemented, http.StatusText(httpStatus)),
+	}
+
+	runtime.DefaultHTTPErrorHandler(ctx, mux, marshaler, w, r, err)
+}
+
+mux := runtime.NewServeMux(
+	runtime.WithRoutingErrorHandler(handleRoutingError),
+)
+
+----------------------------------------
+
+TITLE: Implementing Check Method for gRPC Health Check in Go
+DESCRIPTION: This snippet shows how to implement the Check method for the gRPC health checking protocol. It returns a HealthCheckResponse with a SERVING status.
+
+LANGUAGE: go
+CODE:
+func (s *serviceServer) Check(ctx context.Context, in *health.HealthCheckRequest) (*health.HealthCheckResponse, error) {
+	return &health.HealthCheckResponse{Status: health.HealthCheckResponse_SERVING}, nil
+}
+
+----------------------------------------
+
+TITLE: Implementing Watch Method for gRPC Health Check in Go
+DESCRIPTION: This snippet demonstrates how to implement the Watch method for the gRPC health checking protocol. In this example, it returns an Unimplemented error status.
+
+LANGUAGE: go
+CODE:
+func (s *serviceServer) Watch(in *health.HealthCheckRequest, _ health.Health_WatchServer) error {
+    // Example of how to register both methods but only implement the Check method.
+	return status.Error(codes.Unimplemented, "unimplemented")
+}
+
+----------------------------------------
+
+TITLE: Configuring Selective Tracing in gRPC-Gateway with OpenCensus in Go
+DESCRIPTION: This code shows how to selectively trace certain paths in gRPC-Gateway using OpenCensus, specifically tracing paths that start with '/api'.
+
+LANGUAGE: go
+CODE:
+gwmux := runtime.NewServeMux()
+
+openCensusHandler := &ochttp.Handler{
+    Handler: gwmux,
+    GetStartOptions: func(r *http.Request) trace.StartOptions {
+        startOptions := trace.StartOptions{}
+        if strings.HasPrefix(r.URL.Path, "/api") {
+            // This example will always trace anything starting with /api.
+            startOptions.Sampler = trace.AlwaysSample()
+        }
+        return startOptions
+    },
+}
+
+----------------------------------------
+
+TITLE: Defining HTTP Path in Proto Annotation for gRPC-Gateway
+DESCRIPTION: This snippet demonstrates how to define an HTTP path in a proto file annotation for a gRPC service. It includes the necessary imports and defines a LoginService with a Login RPC method mapped to a POST request.
+
+LANGUAGE: protobuf
+CODE:
+syntax = "proto3";
+option go_package = "github.com/grpc-ecosystem/grpc-gateway/v2/examples/internal/proto/examplepb";
+package grpc.gateway.examples.internal.proto.examplepb;
+
+import "google/api/annotations.proto";
+
+service LoginService {
+  rpc Login (LoginRequest) returns (LoginReply) {
+    option (google.api.http) = {
+        post: "/v1/example/login"
+        body: "*"
+    };
+  }
+}
+
+message LoginRequest {}
+
+message LoginReply {}
+
+----------------------------------------
+
+TITLE: Implementing Per-Method Tracing in Go with OpenCensus
+DESCRIPTION: This snippet demonstrates how to add tracing to a specific method using OpenCensus, including starting a new span and selecting a sampler.
+
+LANGUAGE: go
+CODE:
+func (s *service) Name(ctx context.Context, req *pb.Request) (*pb.Response, error) {
+    // Here we add the span ourselves.
+    ctx, span := trace.StartSpan(ctx, "name.to.use.in.trace", trace.
+    // Select a sampler that fits your implementation.
+    WithSampler(trace.AlwaysSample()))
+    defer span.End()
+    /// Other stuff goes here.
+}
+
+----------------------------------------
+
+TITLE: Implementing OpenTracing Middleware for gRPC-Gateway in Go
+DESCRIPTION: This code provides a middleware function that adds OpenTracing support to gRPC-Gateway, enabling span propagation through HTTP headers.
+
+LANGUAGE: go
+CODE:
+import (
+	"github.com/opentracing/opentracing-go"
+	"github.com/opentracing/opentracing-go/ext"
+)
+
+var grpcGatewayTag = opentracing.Tag{Key: string(ext.Component), Value: "grpc-gateway"}
+
+func tracingWrapper(h http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		parentSpanContext, err := opentracing.GlobalTracer().Extract(
+			opentracing.HTTPHeaders,
+			opentracing.HTTPHeadersCarrier(r.Header))
+		if err == nil || err == opentracing.ErrSpanContextNotFound {
+			serverSpan := opentracing.GlobalTracer().StartSpan(
+				"ServeHTTP",
+				// this is magical, it attaches the new span to the parent parentSpanContext, and creates an unparented one if empty.
+				ext.RPCServerOption(parentSpanContext),
+				grpcGatewayTag,
+			)
+			r = r.WithContext(opentracing.ContextWithSpan(r.Context(), serverSpan))
+			defer serverSpan.Finish()
+		}
+		h.ServeHTTP(w, r)
+	})
+}
+
+// Then just wrap the mux returned by runtime.NewServeMux() like this
+if err := http.ListenAndServe(":8080", tracingWrapper(mux)); err != nil {
+	log.Fatalf("failed to start gateway server on 8080: %v", err)
+}
+
+----------------------------------------
+
+TITLE: Adding OpenTracing Interceptor to gRPC Service Registration in Go
+DESCRIPTION: This snippet shows how to add an OpenTracing interceptor when registering gRPC services, enabling tracing for gRPC calls.
+
+LANGUAGE: go
+CODE:
+import (
+	"google.golang.org/grpc"
+	"github.com/grpc-ecosystem/go-grpc-middleware/tracing/opentracing"
+)
+
+opts := []grpc.DialOption{
+	grpc.WithUnaryInterceptor(
+		grpc_opentracing.UnaryClientInterceptor(
+			grpc_opentracing.WithTracer(opentracing.GlobalTracer()),
+		),
+	),
+}
+if err := pb.RegisterMyServiceHandlerFromEndpoint(ctx, mux, serviceEndpoint, opts); err != nil {
+	log.Fatalf("could not register HTTP service: %v", err)
+}
+
+----------------------------------------
+
+TITLE: Defining gRPC Service with Nested Message in Protobuf
+DESCRIPTION: This snippet defines a protobuf service with a ListStuff RPC that uses a nested PageOptions message for pagination. It demonstrates the structure that requires custom query parameter parsing.
+
+LANGUAGE: protobuf
+CODE:
+syntax = "proto3";
+
+import "google/api/annotations.proto";
+
+package your.service.v1;
+
+message PageOptions {
+  int32 limit = 1;
+  int32 page = 2;
+}
+
+message ListStuffRequest {
+  string stuff_uuid = 1;
+  PageOptions pagination = 2;
+}
+
+message ListStuffResponse {
+  repeated string stuff = 1;
+}
+
+service MyService {
+  rpc ListStuff(ListStuffRequest) returns (ListStuffResponse) {
+    option (google.api.http) = {
+      get: "/path/to/{stuff_uuid}/stuff"
+    };
+  }
+}
+
+----------------------------------------
+
+TITLE: Implementing Request Body Logging Middleware in Go for gRPC Gateway
+DESCRIPTION: This code defines a middleware that logs the request body when the response status code is not 200. It includes a custom ResponseWriter and a handler function that buffers and logs the request body.
+
+LANGUAGE: go
+CODE:
+type logResponseWriter struct {
+	http.ResponseWriter
+	statusCode int
+}
+
+func (rsp *logResponseWriter) WriteHeader(code int) {
+	rsp.statusCode = code
+	rsp.ResponseWriter.WriteHeader(code)
+}
+
+// Unwrap returns the original http.ResponseWriter. This is necessary
+// to expose Flush() and Push() on the underlying response writer.
+func (rsp *logResponseWriter) Unwrap() http.ResponseWriter {
+	return rsp.ResponseWriter
+}
+
+func newLogResponseWriter(w http.ResponseWriter) *logResponseWriter {
+	return &logResponseWriter{w, http.StatusOK}
+}
+
+// logRequestBody logs the request body when the response status code is not 200.
+func logRequestBody(h http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		lw := newLogResponseWriter(w)
+
+		// Note that buffering the entire request body could consume a lot of memory.
+		body, err := io.ReadAll(r.Body)
+		if err != nil {
+			http.Error(w, fmt.Sprintf("failed to read body: %v", err), http.StatusBadRequest)
+			return
+		}
+		clonedR := r.Clone(r.Context())
+		clonedR.Body = io.NopCloser(bytes.NewReader(body))
+
+		h.ServeHTTP(lw, clonedR)
+
+		if lw.statusCode != http.StatusOK {
+			grpclog.Errorf("http error %+v request body %+v", lw.statusCode, string(body))
+		}
+	})
+}
+
+----------------------------------------
+
+TITLE: Integrating Request Body Logging Middleware with gRPC Gateway Server in Go
+DESCRIPTION: This code snippet demonstrates how to wrap the gRPC Gateway server mux with the logRequestBody middleware. It creates a new ServeMux and sets up an HTTP server with the middleware-wrapped handler.
+
+LANGUAGE: go
+CODE:
+mux := runtime.NewServeMux()
+// Register generated gateway handlers
+
+s := &http.Server{
+    Handler: logRequestBody(mux),
+}
+
+----------------------------------------
+
+TITLE: Configuring Path Parameter Unescaping in Go
+DESCRIPTION: Shows how to configure the unescaping behavior for URL path parameters in gRPC-Gateway.
+
+LANGUAGE: go
+CODE:
+mux := runtime.NewServeMux(
+	runtime.WithUnescapingMode(runtime.UnescapingModeAllExceptReserved),
+)
+
+----------------------------------------
+
+TITLE: Generate Reverse-Proxy Command
+DESCRIPTION: Shell command to generate the gRPC-Gateway reverse proxy using the YAML configuration
+
+LANGUAGE: shell
+CODE:
+protoc -I . \
+  --grpc-gateway_out ./gen/go \
+  --grpc-gateway_opt paths=source_relative \
+  --grpc-gateway_opt grpc_api_configuration=path/to/your_service.yaml \
+  your/service/v1/your_service.proto
+
+----------------------------------------
+
+TITLE: Custom Stream Error Handler in Go
+DESCRIPTION: Demonstrates how to implement a custom stream error handler for gRPC-Gateway to control error responses for streaming RPCs.
+
+LANGUAGE: go
+CODE:
+func handleStreamError(ctx context.Context, err error) *status.Status {
+	code := codes.Internal
+	msg := "unexpected error"
+	if s, ok := status.FromError(err); ok {
+		code = s.Code()
+		msg = s.Message()
+		for _, msg := range s.Details() {
+			if safe, ok := msg.(*SafeMessage); ok {
+				msg = safe.Text
+				break
+			}
+		}
+	}
+	return status.Errorf(code, msg)
+}
+
+mux := runtime.NewServeMux(
+	runtime.WithStreamErrorHandler(handleStreamError),
+)
+
+----------------------------------------
+
+TITLE: Custom HTTP Status Code Setting in Go
+DESCRIPTION: Shows how to set custom HTTP status codes for gRPC responses using metadata and a response modifier function.
+
+LANGUAGE: go
+CODE:
+func httpResponseModifier(ctx context.Context, w http.ResponseWriter, p proto.Message) error {
+	md, ok := runtime.ServerMetadataFromContext(ctx)
+	if !ok {
+		return nil
+	}
+
+	if vals := md.HeaderMD.Get("x-http-code"); len(vals) > 0 {
+		code, err := strconv.Atoi(vals[0])
+		if err != nil {
+			return err
+		}
+		delete(md.HeaderMD, "x-http-code")
+		delete(w.Header(), "Grpc-Metadata-X-Http-Code")
+		w.WriteHeader(code)
+	}
+
+	return nil
+}
+
+gwMux := runtime.NewServeMux(
+	runtime.WithForwardResponseOption(httpResponseModifier),
+)
+
+----------------------------------------
+
+TITLE: Response Modification and Header Setting in Go
+DESCRIPTION: Demonstrates how to modify response messages or set HTTP response headers using a custom filter function.
+
+LANGUAGE: go
+CODE:
+func myFilter(ctx context.Context, w http.ResponseWriter, resp proto.Message) error {
+	t, ok := resp.(*externalpb.Tokenizer)
+	if ok {
+		w.Header().Set("X-My-Tracking-Token", t.Token)
+		t.Token = ""
+	}
+	return nil
+}
+
+mux := runtime.NewServeMux(
+	runtime.WithForwardResponseOption(myFilter),
+)
+
+----------------------------------------
+
+TITLE: Implementing Pretty-Print JSON Support in Go
+DESCRIPTION: Demonstrates how to add support for pretty-printed JSON responses when '?pretty' query parameter is present.
+
+LANGUAGE: go
+CODE:
+mux := runtime.NewServeMux(
+	runtime.WithMarshalerOption("application/json+pretty", &runtime.JSONPb{
+		MarshalOptions: protojson.MarshalOptions{
+			Indent: "  ",
+			Multiline: true,
+		},
+		UnmarshalOptions: protojson.UnmarshalOptions{
+			DiscardUnknown: true,
+		},
+	}),
+)
+prettier := func(h http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if _, ok := r.URL.Query()["pretty"]; ok {
+			r.Header.Set("Accept", "application/json+pretty")
+		}
+		h.ServeHTTP(w, r)
+	})
+}
+http.ListenAndServe(":8080", prettier(mux))
+
+----------------------------------------
+
+TITLE: ListResponseStrings Endpoint Documentation
+DESCRIPTION: HTTP GET endpoint that returns an array of strings. Requires a context and data string parameter. Returns JSON string array with no authorization required.
+
+LANGUAGE: markdown
+CODE:
+# **ResponseBodyServiceListResponseStrings**
+> []string ResponseBodyServiceListResponseStrings(ctx, data)
+
+### Required Parameters
+Name | Type | Description  | Notes
+------------- | ------------- | ------------- | -------------
+ **ctx** | **context.Context** | context for authentication, logging, cancellation, deadlines, tracing, etc.
+ **data** | **string**|  |
+
+----------------------------------------
+
+TITLE: Implementing Custom Query Parameter Parser in Go for gRPC-Gateway
+DESCRIPTION: This Go code implements a custom QueryParameterParser for gRPC-Gateway. It handles parsing of query parameters for the ListStuffRequest, mapping them to the nested PageOptions message.
+
+LANGUAGE: go
+CODE:
+package customparser
+
+import (
+	"net/url"
+	"strconv"
+
+	"github.com/grpc-ecosystem/grpc-gateway/v2/runtime"
+	"github.com/grpc-ecosystem/grpc-gateway/v2/utilities"
+	"google.golang.org/protobuf/proto"
+
+	your_service_v1 "path/to/your/service/v1"
+)
+
+// CustomQueryParameterParser parses query parameters into the appropriate gRPC message fields.
+type CustomQueryParameterParser struct{}
+
+// Parse parses query parameters and populates the appropriate fields in the gRPC request message.
+func (p *CustomQueryParameterParser) Parse(target proto.Message, values url.Values, filter *utilities.DoubleArray) error {
+	switch req := target.(type) {
+	// Different messages/requests can have different parsers, of course
+	case *your_service_v1.ListStuffRequest:
+		return populateListStuffParams(values, req)
+	}
+	
+	return (runtime.DefaultQueryParser{}).Parse(target, values, filter)
+}
+
+// populateListStuffParams populates the ListStuffRequest with query parameters.
+func populateListStuffParams(values url.Values, r *your_service_v1.ListStuffRequest) error {
+	pageOptions := &your_service_v1.PageOptions{}
+	
+	if limit := values.Get("limit"); limit != "" {
+		if parsedLimit, err := strconv.Atoi(limit); err == nil {
+			pageOptions.Limit = int32(parsedLimit)
+		}
+	}
+	if page := values.Get("page"); page != "" {
+		if parsedPage, err := strconv.Atoi(page); err == nil {
+			pageOptions.Page = int32(parsedPage)
+		}
+	}
+
+	r.Pagination = pageOptions
+	return nil
+}
+
+----------------------------------------
+
+TITLE: Integrating Custom Query Parameter Parser in gRPC-Gateway Setup
+DESCRIPTION: This Go code snippet shows how to integrate the custom query parameter parser into the gRPC-Gateway setup. It demonstrates creating a new ServeMux with the custom parser and other runtime options.
+
+LANGUAGE: go
+CODE:
+package main
+
+import (
+	"context"
+	"net/http"
+	
+	"github.com/grpc-ecosystem/grpc-gateway/v2/runtime"
+	"google.golang.org/grpc/metadata"
+	"google.golang.org/protobuf/encoding/protojson"
+
+	"your_module/path/customparser"
+)
+
+// create a new ServeMux with custom parser and other runtime options as needed
+func createGRPCGatewayMux() *runtime.ServeMux {
+	// whatever custom code you may need before you create the mux...
+	
+	return runtime.NewServeMux(
+		// Custom query parameter parser
+		runtime.SetQueryParameterParser(&customparser.CustomQueryParameterParser{}),
+		
+		// other runtime options you may need...
+	)
+}
+
+----------------------------------------
+
+TITLE: Importing AWS X-ray and OpenCensus Libraries in Go
+DESCRIPTION: This snippet shows the necessary import statements for using AWS X-ray exporter and OpenCensus libraries in a Go project.
+
+LANGUAGE: go
+CODE:
+xray "contrib.go.opencensus.io/exporter/aws"
+"go.opencensus.io/plugin/ocgrpc"
+"go.opencensus.io/plugin/ochttp"
+"go.opencensus.io/trace"
+
+----------------------------------------
+
+TITLE: Registering AWS X-ray Exporter for gRPC Server in Go
+DESCRIPTION: This code demonstrates how to set up and register the AWS X-ray exporter for tracing in a gRPC server. It includes error handling and deferred flushing.
+
+LANGUAGE: go
+CODE:
+xrayExporter, err := xray.NewExporter(
+    xray.WithVersion("latest"),
+    // Add your AWS region.
+    xray.WithRegion("ap-southeast-1"),
+)
+if err != nil {
+    // Handle any error.
+}
+// Do not forget to call Flush() before the application terminates.
+defer xrayExporter.Flush()
+
+// Register the trace exporter.
+trace.RegisterExporter(xrayExporter)
+
+----------------------------------------
+
+TITLE: Sending POST request to EchoDelete endpoint in Go
+DESCRIPTION: This snippet illustrates how to send a POST request to the EchoDelete endpoint of the GenerateUnboundMethodsEchoService. It requires a context and a GenerateUnboundMethodsSimpleMessage body. The method returns the same message type.
+
+LANGUAGE: Go
+CODE:
+GenerateUnboundMethodsEchoServiceEchoDelete(ctx context.Context, body ExamplepbGenerateUnboundMethodsSimpleMessage) (ExamplepbGenerateUnboundMethodsSimpleMessage, error)
+
+----------------------------------------
+
+TITLE: Configuring Global Tracing in Go with OpenCensus
+DESCRIPTION: This snippet shows how to set up a global tracing configuration using OpenCensus, which applies to all traces in the application.
+
+LANGUAGE: go
+CODE:
+// Always trace in this example.
+// In production this can be set to a trace.ProbabilitySampler.
+trace.ApplyConfig(trace.Config{DefaultSampler: trace.AlwaysSample()})
+
+----------------------------------------
+
+TITLE: Adding OpenCensus Client Handler for gRPC Client Tracing in Go
+DESCRIPTION: This code shows how to add the OpenCensus client handler to enable tracing of gRPC client calls.
+
+LANGUAGE: go
+CODE:
+conn, err := grpc.NewClient(
+    // Other options goes here.
+    // Add ocgrpc.ClientHandler for tracing the grpc client calls.
+    grpc.WithStatsHandler(&ocgrpc.ClientHandler{}),
+)
+
+----------------------------------------
+
+TITLE: Wrapping gRPC-Gateway Mux with OpenCensus HTTP Handler in Go
+DESCRIPTION: This snippet demonstrates how to wrap the gRPC-Gateway multiplexer with the OpenCensus HTTP handler to enable tracing for HTTP requests.
+
+LANGUAGE: go
+CODE:
+gwmux := runtime.NewServeMux()
+
+openCensusHandler := &ochttp.Handler{
+		Handler: gwmux,
+}
+
+gwServer := &http.Server{
+    Addr: "0.0.0.0:10000",
+    Handler: openCensusHandler,
+    }),
+}
+
+----------------------------------------
+
+TITLE: Defining UpdateV2Request Message in Protobuf
+DESCRIPTION: Defines a protobuf message for update requests, including the resource to be updated and a FieldMask for specifying which fields to update.
+
+LANGUAGE: protobuf
+CODE:
+message UpdateV2Request {
+ ABitOfEverything abe = 1;
+ google.protobuf.FieldMask update_mask = 2;
+}
+
+----------------------------------------
+
+TITLE: Defining gRPC Service with Hidden FieldMask PATCH
+DESCRIPTION: Defines a gRPC service method for updating a resource using PATCH with the FieldMask hidden from the REST request, following Google API design guidelines.
+
+LANGUAGE: protobuf
+CODE:
+rpc UpdateV2(UpdateV2Request) returns (google.protobuf.Empty) {
+ option (google.api.http) = {
+   put: "/v2/example/a_bit_of_everything/{abe.uuid}"
+   body: "abe"
+   additional_bindings {
+     patch: "/v2/example/a_bit_of_everything/{abe.uuid}"
+     body: "abe"
+   }
+ };
+}
+
+----------------------------------------
+
+TITLE: Defining gRPC Service with Exposed FieldMask PATCH
+DESCRIPTION: Defines a gRPC service method for updating a resource using PATCH with the FieldMask exposed in the REST request, allowing clients to specify which fields to update.
+
+LANGUAGE: protobuf
+CODE:
+rpc UpdateV2(UpdateV2Request) returns (google.protobuf.Empty) {
+ option (google.api.http) = {
+   patch: "/v2a/example/a_bit_of_everything/{abe.uuid}"
+   body: "*"
+ };
+}
+
+----------------------------------------
+
+TITLE: Initializing Dependencies for gRPC-Gateway Example in Bash
+DESCRIPTION: This snippet shows how to initialize dependencies for the gRPC-Gateway example project using the 'dep' tool.
+
+LANGUAGE: bash
+CODE:
+# Handle dependencies
+$ dep init
+
+----------------------------------------
+
+TITLE: cURL Example for PATCH with Hidden FieldMask
+DESCRIPTION: Demonstrates how to make a PATCH request using cURL when the FieldMask is hidden, updating only the 'stringValue' field of the resource.
+
+LANGUAGE: sh
+CODE:
+curl \
+  --data '{"stringValue": "strprefix/foo"}' \
+  -X PATCH \
+  http://address:port/v2/example/a_bit_of_everything/1
+
+----------------------------------------
+
+TITLE: cURL Example for PATCH with Exposed FieldMask
+DESCRIPTION: Shows how to make a PATCH request using cURL when the FieldMask is exposed, specifying both the resource fields to update and the update mask.
+
+LANGUAGE: sh
+CODE:
+curl \
+  --data '{"abe":{"singleNested":{"amount":457},"stringValue":"some value that will not get updated because not in the field mask"},"updateMask":"singleNested"}}' \
+  -X PATCH \
+  http://address:port/v2a/example/a_bit_of_everything/1
+
+----------------------------------------
+
+TITLE: File Upload Shell Command
+DESCRIPTION: Example curl command demonstrating how to upload a binary file using multipart form data.
+
+LANGUAGE: shell
+CODE:
+curl -X POST -F "attachment=@/tmp/somefile.txt" http://localhost:9090/v1/files
+
+----------------------------------------
+
+TITLE: Configuring Custom Mux Route for File Upload
+DESCRIPTION: Setup of a custom route handler on the gRPC-Gateway mux instance to handle POST requests for file uploads.
+
+LANGUAGE: go
+CODE:
+// Create a mux instance
+mux := runtime.NewServeMux()
+
+// Attachment upload from http/s handled manually
+mux.HandlePath("POST", "/v1/files", handleBinaryFileUpload)
+
+----------------------------------------
+
+TITLE: Binary File Upload Handler Implementation
+DESCRIPTION: Implementation of the file upload handler function that processes the multipart form data and extracts the uploaded file. Includes error handling and file metadata access.
+
+LANGUAGE: go
+CODE:
+func handleBinaryFileUpload(w http.ResponseWriter, r *http.Request, params map[string]string) {
+	err := r.ParseForm()
+	if err != nil {
+		http.Error(w, fmt.Sprintf("failed to parse form: %s", err.Error()), http.StatusBadRequest)
+		return
+	}
+
+	f, header, err := r.FormFile("attachment")
+	if err != nil {
+		http.Error(w, fmt.Sprintf("failed to get file 'attachment': %s", err.Error()), http.StatusBadRequest)
+		return
+	}
+	defer f.Close()
+
+	//
+	// Now do something with the io.Reader in `f`, i.e. read it into a buffer or stream it to a gRPC client side stream.
+	// Also `header` will contain the filename, size etc of the original file.
+	//
+}
+
+----------------------------------------
+
+TITLE: Adding OpenAPI Field Descriptions in Protobuf
+DESCRIPTION: This snippet shows how to add OpenAPI descriptions to fields in a protobuf message using the openapiv2_field option.
+
+LANGUAGE: protobuf
+CODE:
+message MyMessage {
+  // This comment will end up directly in your Open API definition
+  string uuid = 1 [(grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {description: "The UUID field."}];
+}
+
+----------------------------------------
+
+TITLE: Running Integration Tests with PhantomJS for gRPC-Gateway
+DESCRIPTION: This snippet shows the commands to install dependencies and run integration tests using PhantomJS for the gRPC-Gateway browser example.
+
+LANGUAGE: shell
+CODE:
+$ npm install -g gulp-cli
+$ npm install
+$ gulp
+
+----------------------------------------
+
+TITLE: Customizing OpenAPI Schema for Messages
+DESCRIPTION: This example demonstrates how to customize the OpenAPI Schema Object for messages using proto options.
+
+LANGUAGE: protobuf
+CODE:
+message ABitOfEverything {
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_schema) = {
+        json_schema: {
+            title: "A bit of everything"
+            description: "Intentionally complicated message type to cover many features of Protobuf."
+            required: ["uuid", "int64_value", "double_value"]
+        }
+        external_docs: {
+            url: "https://github.com/grpc-ecosystem/grpc-gateway";
+            description: "Find out more about ABitOfEverything";
+        }
+        example: "{\"uuid\": \"0cf361e1-4b44-483d-a159-54dabdf7e814\"}"
+    };
+
+    string uuid = 1 [(grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {description: "The UUID field."}];
+}
+
+----------------------------------------
+
+TITLE: Customizing OpenAPI Output for Enums
+DESCRIPTION: This snippet shows how to customize the OpenAPI output for enum types using proto options.
+
+LANGUAGE: protobuf
+CODE:
+enum NumericEnum {
+  option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_enum) = {
+    description: "NumericEnum is one or zero."
+    title: "NumericEnum"
+    extensions: {
+      key: "x-a-bit-of-everything-foo"
+      value {
+        string_value: "bar"
+      }
+    }
+    external_docs: {
+      url: "https://github.com/grpc-ecosystem/grpc-gateway"
+      description: "Find out more about ABitOfEverything"
+    }
+    example: "\"ZERO\""
+  };
+  ZERO = 0;
+  ONE = 1;
+}
+
+----------------------------------------
+
+TITLE: Customizing OpenAPI Operation Output
+DESCRIPTION: This example shows how to customize the OpenAPI output for service operations, including security requirements and extensions.
+
+LANGUAGE: protobuf
+CODE:
+service ABitOfEverythingService {
+   rpc Delete(grpc.gateway.examples.internal.proto.sub2.IdMessage) returns (google.protobuf.Empty) {
+        option (google.api.http) = {
+            delete: "/v1/example/a_bit_of_everything/{uuid}"
+        };
+        option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+            security: {
+                security_requirement: {
+                    key: "ApiKeyAuth";
+                    value: {}
+                }
+                security_requirement: {
+                    key: "OAuth2";
+                    value: {
+                        scope: "read";
+                        scope: "write";
+                    }
+                }
+            }
+            extensions: {
+                key: "x-irreversible";
+                value {
+                    bool_value: true;
+                }
+            }
+        };
+    }
+}
+
+----------------------------------------
+
+TITLE: Using Go Templates in Proto Comments
+DESCRIPTION: This snippet demonstrates how to use Go templates in proto file comments to generate more advanced documentation.
+
+LANGUAGE: protobuf
+CODE:
+service LoginService {
+    // Login
+    //
+    // {{.MethodDescriptorProto.Name}} is a call with the method(s) {{$first := true}}{{range .Bindings}}{{if $first}}{{$first = false}}{{else}}, {{end}}{{.HTTPMethod}}{{end}} within the "{{.Service.Name}}" service.
+    // It takes in "{{.RequestType.Name}}" and returns a "{{.ResponseType.Name}}".
+    //
+    // {{import "tables.md"}}
+    rpc Login (LoginRequest) returns (LoginReply) {
+        option (google.api.http) = {
+            post: "/v1/example/login"
+            body: "*"
+        };
+    }
+}
+
+----------------------------------------
+
+TITLE: ProtobufAny Type Field Definition
+DESCRIPTION: Defines the Type_ string field that uniquely identifies protocol buffer message types through URL/resource names. The field requires at least one '/' character and must use a canonical form for the fully qualified type name. While HTTP type servers are theoretically possible, this functionality is not currently available in official protobuf releases.
+
+LANGUAGE: protobuf
+CODE:
+Type_ string
+
+----------------------------------------
+
+TITLE: Defining ExamplepbResponseBodyReq Model Properties in Markdown
+DESCRIPTION: Describes the properties of the ExamplepbResponseBodyReq model using a markdown table. The model has a single optional string property named 'Data' with a default value of null.
+
+LANGUAGE: markdown
+CODE:
+## Properties
+Name | Type | Description | Notes
+------------ | ------------- | ------------- | -------------
+**Data** | **string** |  | [optional] [default to null]
+
+----------------------------------------
+
+TITLE: Updating OpenAPIv2 Import Path in Protocol Buffers
+DESCRIPTION: Shows the required changes for importing OpenAPIv2 annotations in protocol buffer files, demonstrating both old and new import paths.
+
+LANGUAGE: protobuf
+CODE:
+import "protoc-gen-openapiv2/options/annotations.proto";
+
+LANGUAGE: protobuf
+CODE:
+import "protoc-gen-swagger/options/annotations.proto";
+
+----------------------------------------
+
+TITLE: Configuring JSON Marshaler with Proto Names
+DESCRIPTION: Example of configuring a custom marshaler to use proto names instead of camelCase, maintaining backward compatibility with v1 behavior.
+
+LANGUAGE: go
+CODE:
+mux := runtime.NewServeMux(
+	runtime.WithMarshalerOption(runtime.MIMEWildcard, &runtime.HTTPBodyMarshaler{
+		Marshaler: &runtime.JSONPb{
+			MarshalOptions: protojson.MarshalOptions{
+				UseProtoNames:   true,
+				EmitUnpopulated: true,
+			},
+			UnmarshalOptions: protojson.UnmarshalOptions{
+				DiscardUnknown: true,
+			},
+		},
+	}),
+)
+
+----------------------------------------
+
+TITLE: Defining ExamplepbResponseBodyOutResponse Properties in Markdown
+DESCRIPTION: Markdown table documenting the properties of the ExamplepbResponseBodyOutResponse model structure. Contains one field 'Data' of type string that is optional with a default value of null.
+
+LANGUAGE: markdown
+CODE:
+# ExamplepbResponseBodyOutResponse
+
+## Properties
+Name | Type | Description | Notes
+------------ | ------------- | ------------- | -------------
+**Data** | **string** |  | [optional] [default to null]
+
+----------------------------------------
+
+TITLE: Configuring Default Field Emission in JSON Marshaler
+DESCRIPTION: Demonstrates how to configure the marshaler to control emission of default/zero values in the JSON output.
+
+LANGUAGE: go
+CODE:
+mux := runtime.NewServeMux(
+	runtime.WithMarshalerOption(runtime.MIMEWildcard, &runtime.HTTPBodyMarshaler{
+		Marshaler: &runtime.JSONPb{
+			MarshalOptions: protojson.MarshalOptions{
+				EmitUnpopulated: false,
+			},
+			UnmarshalOptions: protojson.UnmarshalOptions{
+				DiscardUnknown: true,
+			},
+		},
+	}),
+)
+
+----------------------------------------
+
+TITLE: Installing gRPC-Gateway and Protobuf Tools with Go
+DESCRIPTION: Commands to install necessary tools for working with gRPC-Gateway, including protoc generator plugins. These tools are required for generating stubs and working with protocol buffers.
+
+LANGUAGE: Shell
+CODE:
+$ go install github.com/grpc-ecosystem/grpc-gateway/v2/protoc-gen-grpc-gateway@latest
+$ go install google.golang.org/protobuf/cmd/protoc-gen-go@latest
+$ go install google.golang.org/grpc/cmd/protoc-gen-go-grpc@latest
+
+----------------------------------------
+
+TITLE: Initializing Go Module for gRPC-Gateway Tutorial
+DESCRIPTION: Command to create a new Go module for the gRPC-Gateway tutorial. This sets up the initial go.mod file with the specified module path.
+
+LANGUAGE: Shell
+CODE:
+$ go mod init github.com/myuser/myrepo
+go: creating new go.mod: module github.com/myuser/myrepo
+
+----------------------------------------
+
+TITLE: Configuring Buf Generation
+DESCRIPTION: Buf configuration files for generating Go, gRPC, and gRPC-Gateway code from proto definitions. Includes plugin configuration and dependency management.
+
+LANGUAGE: yaml
+CODE:
+version: v1
+plugins:
+  - plugin: go
+    out: proto
+    opt: paths=source_relative
+  - plugin: go-grpc
+    out: proto
+    opt: paths=source_relative,require_unimplemented_servers=false
+  - plugin: grpc-gateway
+    out: proto
+    opt: paths=source_relative
+
+LANGUAGE: yaml
+CODE:
+version: v1
+name: buf.build/myuser/myrepo
+deps:
+  - buf.build/googleapis/googleapis
+
+----------------------------------------
+
+TITLE: Configuring Basic Buf Settings in YAML
+DESCRIPTION: Basic Buf configuration file (buf.yaml) that defines the version and repository name for your protobuf project.
+
+LANGUAGE: yaml
+CODE:
+version: v1
+name: buf.build/myuser/myrepo
+
+----------------------------------------
+
+TITLE: Configuring Buf Plugins for Go Generation
+DESCRIPTION: Configuration file (buf.gen.yaml) that sets up Go and gRPC-Go code generation plugins with source-relative path options.
+
+LANGUAGE: yaml
+CODE:
+version: v1
+plugins:
+  - plugin: go
+    out: proto
+    opt: paths=source_relative
+  - plugin: go-grpc
+    out: proto
+    opt: paths=source_relative
+
+----------------------------------------
+
+TITLE: Running Buf Generation Command
+DESCRIPTION: Shell command to execute Buf's code generation based on the configured plugins.
+
+LANGUAGE: sh
+CODE:
+$ buf generate
+
+----------------------------------------
+
+TITLE: Generating Go Stubs with Protoc for gRPC
+DESCRIPTION: This command uses protoc with the go and go-grpc plugins to generate Go types and gRPC service definitions. It outputs the generated files relative to the proto folder using the paths=source_relative option.
+
+LANGUAGE: sh
+CODE:
+$ protoc -I ./proto \
+   --go_out ./proto --go_opt paths=source_relative \
+   --go-grpc_out ./proto --go-grpc_opt paths=source_relative \
+   ./proto/helloworld/hello_world.proto
+
+----------------------------------------
+
+TITLE: GetResponseBody Endpoint Documentation
+DESCRIPTION: HTTP GET endpoint that returns a single ResponseBodyOutResponse. Requires a context and data string parameter. Returns JSON response with no authorization required.
+
+LANGUAGE: markdown
+CODE:
+# **ResponseBodyServiceGetResponseBody**
+> ExamplepbResponseBodyOutResponse ResponseBodyServiceGetResponseBody(ctx, data)
+
+### Required Parameters
+Name | Type | Description  | Notes
+------------- | ------------- | ------------- | -------------
+ **ctx** | **context.Context** | context for authentication, logging, cancellation, deadlines, tracing, etc.
+ **data** | **string**|  |
+
+----------------------------------------
+
+TITLE: GetResponseBodyStream Endpoint Documentation
+DESCRIPTION: HTTP GET endpoint that returns a stream of ResponseBodyOut objects. Requires a context and data string parameter. Returns JSON stream with no authorization required.
+
+LANGUAGE: markdown
+CODE:
+# **ResponseBodyServiceGetResponseBodyStream**
+> StreamResultOfExamplepbResponseBodyOut ResponseBodyServiceGetResponseBodyStream(ctx, data)
+
+### Required Parameters
+Name | Type | Description  | Notes
+------------- | ------------- | ------------- | -------------
+ **ctx** | **context.Context** | context for authentication, logging, cancellation, deadlines, tracing, etc.
+ **data** | **string**|  |
+
+----------------------------------------
+
+TITLE: ListResponseBodies Endpoint Documentation
+DESCRIPTION: HTTP GET endpoint that returns an array of RepeatedResponseBodyOutResponse objects. Requires a context and data string parameter. Returns JSON array with no authorization required.
+
+LANGUAGE: markdown
+CODE:
+# **ResponseBodyServiceListResponseBodies**
+> []ExamplepbRepeatedResponseBodyOutResponse ResponseBodyServiceListResponseBodies(ctx, data)
+
+### Required Parameters
+Name | Type | Description  | Notes
+------------- | ------------- | ------------- | -------------
+ **ctx** | **context.Context** | context for authentication, logging, cancellation, deadlines, tracing, etc.
+ **data** | **string**|  |
+
+----------------------------------------
+
+TITLE: Sending POST request to Echo endpoint in Go
+DESCRIPTION: This snippet demonstrates how to send a POST request to the Echo endpoint of the GenerateUnboundMethodsEchoService. It requires a context and a GenerateUnboundMethodsSimpleMessage body. The method returns the same message type.
+
+LANGUAGE: Go
+CODE:
+GenerateUnboundMethodsEchoServiceEcho(ctx context.Context, body ExamplepbGenerateUnboundMethodsSimpleMessage) (ExamplepbGenerateUnboundMethodsSimpleMessage, error)
+
+----------------------------------------
+
+TITLE: Sending POST request to EchoBody endpoint in Go
+DESCRIPTION: This snippet shows how to send a POST request to the EchoBody endpoint of the GenerateUnboundMethodsEchoService. It requires a context and a GenerateUnboundMethodsSimpleMessage body. The method returns the same message type.
+
+LANGUAGE: Go
+CODE:
+GenerateUnboundMethodsEchoServiceEchoBody(ctx context.Context, body ExamplepbGenerateUnboundMethodsSimpleMessage) (ExamplepbGenerateUnboundMethodsSimpleMessage, error)
+
+----------------------------------------
+
+TITLE: Documenting ExamplepbResponseBodyOut Model Properties in Markdown
+DESCRIPTION: Markdown table defining the properties of the ExamplepbResponseBodyOut model, including field name, type, description and additional notes.
+
+LANGUAGE: markdown
+CODE:
+| Name | Type | Description | Notes |
+| ------------ | ------------- | ------------- | ------------- |
+| **Response** | [***ExamplepbResponseBodyOutResponse**](examplepbResponseBodyOutResponse.md) |  | [optional] [default to null]
+
+----------------------------------------
+
+TITLE: ExamplepbResponseBodyMessage Schema Definition in Markdown
+DESCRIPTION: Markdown table defining the properties of ExamplepbResponseBodyMessage structure, showing field names, types, descriptions and additional notes.
+
+LANGUAGE: markdown
+CODE:
+# ExamplepbResponseBodyMessage
+
+## Properties
+Name | Type | Description | Notes
+------------ | ------------- | ------------- | -------------
+**Request** | **string** |  | [optional] [default to null]
+**Response** | [**ExamplepbResponseBodyMessageResponse**](examplepbResponseBodyMessageResponse.md) |  | [optional] [default to null]
+
+----------------------------------------
+
+TITLE: Markdown Documentation for ExamplepbResponseBodyMessageResponse Structure
+DESCRIPTION: Documentation table defining the properties of ExamplepbResponseBodyMessageResponse structure, which includes a single optional string field named 'Data' with default value set to null.
+
+LANGUAGE: markdown
+CODE:
+# ExamplepbResponseBodyMessageResponse
+
+## Properties
+Name | Type | Description | Notes
+------------ | ------------- | ------------- | -------------
+**Data** | **string** |  | [optional] [default to null]
+
+[[Back to Model list]](../README.md#documentation-for-models) [[Back to API list]](../README.md#documentation-for-api-endpoints) [[Back to README]](../README.md)
+
+----------------------------------------
+
+TITLE: Documenting ExamplepbRepeatedResponseBodyOut Model Structure in Markdown
+DESCRIPTION: Documents the properties of the ExamplepbRepeatedResponseBodyOut model, which includes a single property 'Response' that is an optional array of ExamplepbRepeatedResponseBodyOutResponse objects.
+
+LANGUAGE: markdown
+CODE:
+# ExamplepbRepeatedResponseBodyOut
+
+## Properties
+Name | Type | Description | Notes
+------------ | ------------- | ------------- | -------------
+**Response** | [**[]ExamplepbRepeatedResponseBodyOutResponse**](examplepbRepeatedResponseBodyOutResponse.md) |  | [optional] [default to null]
+
+----------------------------------------
+
+TITLE: Documenting ExamplepbRepeatedResponseBodyOutResponse Model Properties in Markdown
+DESCRIPTION: Markdown table defining the properties of the ExamplepbRepeatedResponseBodyOutResponse model. Contains two fields: Data (string) and Type_ (ResponseResponseType reference), both optional with default values.
+
+LANGUAGE: markdown
+CODE:
+| Name | Type | Description | Notes |
+| ------------ | ------------- | ------------- | ------------- |
+| **Data** | **string** |  | [optional] [default to null] |
+| **Type_** | [***ResponseResponseType**](ResponseResponseType.md) |  | [optional] [default to null] |
+
+----------------------------------------
+
+TITLE: Defining ExamplepbRepeatedResponseStrings Model Properties in Markdown
+DESCRIPTION: This snippet defines the properties of the ExamplepbRepeatedResponseStrings model using a markdown table. It specifies the name, type, description, and additional notes for each property.
+
+LANGUAGE: markdown
+CODE:
+## Properties
+Name | Type | Description | Notes
+------------ | ------------- | ------------- | -------------
+**Values** | **[]string** |  | [optional] [default to null]
+
+----------------------------------------
+
+TITLE: Defining StreamResultOfExamplepbResponseBodyOut Properties in Markdown
+DESCRIPTION: Documents the properties of the StreamResultOfExamplepbResponseBodyOut model including Result and Error fields. The Result field references ExamplepbResponseBodyOutResponse and Error field references RpcStatus.
+
+LANGUAGE: markdown
+CODE:
+# StreamResultOfExamplepbResponseBodyOut
+
+## Properties
+Name | Type | Description | Notes
+------------ | ------------- | ------------- | -------------
+**Result** | [***ExamplepbResponseBodyOutResponse**](examplepbResponseBodyOutResponse.md) |  | [optional] [default to null]
+**Error_** | [***RpcStatus**](rpcStatus.md) |  | [optional] [default to null]
+
+----------------------------------------
+
+TITLE: Defining ExamplepbGenerateUnboundMethodsSimpleMessage Model in Markdown
+DESCRIPTION: This snippet defines the properties of the ExamplepbGenerateUnboundMethodsSimpleMessage model. It includes three properties: Id, Num, and Duration, along with their types and descriptions.
+
+LANGUAGE: markdown
+CODE:
+# ExamplepbGenerateUnboundMethodsSimpleMessage
+
+## Properties
+Name | Type | Description | Notes
+------------ | ------------- | ------------- | -------------
+**Id** | **string** | Id represents the message identifier. | [optional] [default to null]
+**Num** | **string** |  | [optional] [default to null]
+**Duration** | **string** |  | [optional] [default to null]
+
+----------------------------------------
+
+TITLE: Defining RuntimeError Model Properties in Markdown
+DESCRIPTION: This snippet defines the properties of the RuntimeError model using a markdown table. It includes four properties: Error_, Code, Message, and Details, along with their types and optional descriptions.
+
+LANGUAGE: markdown
+CODE:
+## Properties
+Name | Type | Description | Notes
+------------ | ------------- | ------------- | -------------
+**Error_** | **string** |  | [optional] [default to null]
+**Code** | **int32** |  | [optional] [default to null]
+**Message** | **string** |  | [optional] [default to null]
+**Details** | [**[]ProtobufAny**](protobufAny.md) |  | [optional] [default to null]
+
+----------------------------------------
+
+TITLE: Defining RuntimeError Model Properties in Markdown
+DESCRIPTION: Defines the properties of the RuntimeError model using a markdown table. The properties include Error_, Code, Message, and Details, each with their respective types and optional attributes.
+
+LANGUAGE: markdown
+CODE:
+# RuntimeError
+
+## Properties
+Name | Type | Description | Notes
+------------ | ------------- | ------------- | -------------
+**Error_** | **string** |  | [optional] [default to null]
+**Code** | **int32** |  | [optional] [default to null]
+**Message** | **string** |  | [optional] [default to null]
+**Details** | [**[]ProtobufAny**](protobufAny.md) |  | [optional] [default to null]
+
+----------------------------------------
+
+TITLE: Setting Up a Simple gRPC-Gateway Browser Example
+DESCRIPTION: These commands set up a very simple example of gRPC-Gateway for browser use. After running these commands, the user should open index.html to view the example.
+
+LANGUAGE: shell
+CODE:
+$ gulp bower
+$ gulp backends
+
+----------------------------------------
+
+TITLE: Serving gRPC-Gateway Example for Manual Browser Testing
+DESCRIPTION: This command starts a local server to serve the gRPC-Gateway example. After running this command, the user should open http://localhost:8000 in their browser for manual testing.
+
+LANGUAGE: shell
+CODE:
+$ gulp serve
+
+----------------------------------------
+
+TITLE: Testing gRPC-Gateway APIs with curl in Bash
+DESCRIPTION: This snippet demonstrates how to test the gRPC-Gateway APIs using curl commands. It includes examples of listing all APIs and making POST and GET requests to specific endpoints.
+
+LANGUAGE: bash
+CODE:
+# List all apis
+$ curl http://localhost:8080/openapiv2/echo_service.swagger.json
+
+# Visit the apis
+$ curl -XPOST http://localhost:8080/v1/example/echo/foo
+{"id":"foo"}
+
+$ curl  http://localhost:8080/v1/example/echo/foo/123
+{"id":"foo","num":"123"}
+
+----------------------------------------
+
+TITLE: Setting Up and Running gRPC-Gateway Example Server in Bash
+DESCRIPTION: These commands navigate to the correct directory, install necessary tools (gulp and npm packages), and run the backend services for the gRPC-Gateway example.
+
+LANGUAGE: bash
+CODE:
+# Make sure you are in the correct directory: 
+# $GOPATH/src/github.com/grpc-ecosystem/grpc-gateway/v2/examples
+$ cd examples/internal/browser
+$ pwd
+
+# Install gulp
+$ npm install -g gulp-cli
+$ npm install
+$ gulp
+
+# Run
+$ gulp bower
+$ gulp backends
+
+----------------------------------------
+
+TITLE: Installing Go on Cygwin
+DESCRIPTION: Downloads and installs the Go programming language on Cygwin using wget and msiexec.
+
+LANGUAGE: bash
+CODE:
+wget -N https://storage.googleapis.com/golang/go1.8.1.windows-amd64.msi
+msiexec /i go1.8.1.windows-amd64.msi /passive /promptrestart
+
+----------------------------------------
+
+TITLE: Installing ProtocolBuffers on Cygwin
+DESCRIPTION: Downloads and extracts ProtocolBuffers 3.2.0 for Windows on Cygwin using wget and 7z.
+
+LANGUAGE: bash
+CODE:
+wget -N https://github.com/google/protobuf/releases/download/v3.2.0/protoc-3.2.0-win32.zip
+7z x protoc-3.2.0-win32.zip -o/usr/local/
+
+----------------------------------------
+
+TITLE: Setting up Go workspace on Cygwin
+DESCRIPTION: Creates the necessary directories for a Go workspace on Cygwin.
+
+LANGUAGE: bash
+CODE:
+mkdir /home/user/go
+mkdir /home/user/go/bin
+mkdir /home/user/go/pkg
+mkdir /home/user/go/src
+
+----------------------------------------
+
+TITLE: Configuring Go environment variables on Windows
+DESCRIPTION: Sets the GOPATH environment variable and adds the Go bin directory to the system PATH using Windows registry commands.
+
+LANGUAGE: powershell
+CODE:
+setx GOPATH c:\path\to\your\cygwin\home\user\go /M
+set pathkey="HKEY_LOCAL_MACHINE\System\CurrentControlSet\Control\Session Manager\Environment"
+for /F "usebackq skip=2 tokens=2*" %A IN (`reg query %pathkey% /v Path`) do (reg add %pathkey% /f /v Path /t REG_SZ /d "%B;c:\path\to\your\cygwin\home\user\go\bin")
+
+----------------------------------------
+
+TITLE: Installing grpc-gateway dependencies on Cygwin
+DESCRIPTION: Uses go get to install required packages for grpc-gateway development.
+
+LANGUAGE: bash
+CODE:
+go get -u -v github.com/grpc-ecosystem/grpc-gateway/v2/protoc-gen-grpc-gateway
+go get -u -v github.com/grpc-ecosystem/grpc-gateway/v2/protoc-gen-openapiv2
+go get -u -v google.golang.org/protobuf/cmd/protoc-gen-go
+go get -u -v google.golang.org/grpc/cmd/protoc-gen-go-grpc
+
+----------------------------------------
+
+TITLE: Cloning grpc-gateway repositories on Cygwin
+DESCRIPTION: Manually clones required repositories to resolve path issues in Cygwin environment.
+
+LANGUAGE: bash
+CODE:
+git clone https://github.com/grpc-ecosystem/grpc-gateway $(cygpath -u $GOPATH)/src/github.com/grpc-ecosystem/grpc-gateway
+git clone https://github.com/golang/protobuf $(cygpath -u $GOPATH)/src/github.com/golang/protobuf
+git clone https://github.com/google/go-genproto $(cygpath -u $GOPATH)/src/google.golang.org/genproto
+
+----------------------------------------
+
+TITLE: Generating gRPC and Gateway code on Cygwin
+DESCRIPTION: Uses protoc to generate Go code for gRPC and gRPC-Gateway, adjusting paths for Cygwin environment.
+
+LANGUAGE: bash
+CODE:
+protoc -I. -I$(cygpath -w /usr/local/include) -I${GOPATH}/src --go_out=. --go-grpc_out=. ./path/to/your_service.proto
+protoc -I. -I$(cygpath -w /usr/local/include) -I${GOPATH}/src ./path/to/your_service.proto
+protoc -I. -I$(cygpath -w /usr/local/include) -I${GOPATH}/src ./path/to/your_service.proto
+
+----------------------------------------
+
+TITLE: Cloning additional dependencies for gRPC-Gateway on Cygwin
+DESCRIPTION: Manually clones additional required repositories to resolve path issues in Cygwin environment.
+
+LANGUAGE: bash
+CODE:
+git clone https://go.googlesource.com/net $(cygpath -u $GOPATH)/src/golang.org/x/net
+git clone https://go.googlesource.com/text $(cygpath -u $GOPATH)/src/golang.org/x/text
+git clone https://github.com/grpc/grpc-go $(cygpath -u $GOPATH)/src/google.golang.org/grpc
+
+----------------------------------------
+
+TITLE: Compiling and installing gRPC-Gateway service on Cygwin
+DESCRIPTION: Compiles and installs the gRPC-Gateway service into the Go bin directory.
+
+LANGUAGE: bash
+CODE:
+go install
+
+----------------------------------------
+
+TITLE: Extracting HTTP Path Pattern at Runtime in gRPC-Gateway
+DESCRIPTION: This Go code snippet shows how to extract the HTTP path pattern at runtime using the WithMetadata function. It creates a new ServeMux and adds metadata including the RPC method and HTTP path pattern to the context.
+
+LANGUAGE: go
+CODE:
+mux := runtime.NewServeMux(
+	runtime.WithMetadata(func(ctx context.Context, r *http.Request) metadata.MD {
+		md := make(map[string]string)
+		if method, ok := runtime.RPCMethod(ctx); ok {
+			md["method"] = method // /grpc.gateway.examples.internal.proto.examplepb.LoginService/Login
+		}
+		if pattern, ok := runtime.HTTPPathPattern(ctx); ok {
+			md["pattern"] = pattern // /v1/example/login
+		}
+		return metadata.New(md)
+	}),
+)
+
+----------------------------------------
+
+TITLE: Configuring Jekyll Page Layout for gRPC-Gateway Operations
+DESCRIPTION: This YAML front matter configures the Jekyll page layout for the Operations section of the gRPC-Gateway documentation. It sets the default layout, specifies the title, sets the navigation order, and indicates that this page has child pages.
+
+LANGUAGE: yaml
+CODE:
+---
+layout: default
+title: Operations
+nav_order: 3
+has_children: true
+---
+
+----------------------------------------
+
+TITLE: Configuring Jekyll Page Layout for Tutorials
+DESCRIPTION: YAML front matter block that configures a documentation page for tutorials. Sets the default layout, page title, navigation order and specifies that the page has child pages.
+
+LANGUAGE: yaml
+CODE:
+---
+layout: default
+title: Tutorials
+nav_order: 6
+has_children: true
+---
+
+----------------------------------------
+
+TITLE: Configuring Jekyll Page Layout for GRPC Gateway Mapping Docs
+DESCRIPTION: YAML front matter configuration for a documentation page about GRPC Gateway mapping. Sets up the page layout, title, navigation order and indicates the presence of child pages.
+
+LANGUAGE: yaml
+CODE:
+---
+layout: default
+title: Mapping
+nav_order: 2
+has_children: true
+---
+
+----------------------------------------
+
+TITLE: Configuring Jekyll Page Layout for Development Documentation
+DESCRIPTION: YAML front matter configuration that defines the page layout, title, navigation order, and child page properties for the Development section of grpc-gateway documentation.
+
+LANGUAGE: yaml
+CODE:
+---
+layout: default
+title: Development
+nav_order: 4
+has_children: true
+---
+
+----------------------------------------
+
+TITLE: Jekyll Front Matter Configuration for Contributing Page
+DESCRIPTION: YAML front matter configuration for Jekyll static site generator, defining the page layout, title, navigation order and parent page relationship.
+
+LANGUAGE: yaml
+CODE:
+---
+layout: default
+title: Getting started
+nav_order: 0
+parent: Contributing
+---
+
+----------------------------------------
+
+TITLE: Defining Basic gRPC Service Structure in Protobuf
+DESCRIPTION: Basic protobuf definition showing a generic gRPC service structure with simple request and response messages.
+
+LANGUAGE: protobuf
+CODE:
+syntax = "proto3";
+
+package example.service.v1;
+
+import "protoc-gen-openapiv2/options/annotations.proto";
+
+service GenericService {
+  rpc GenericRPC(GenericRPCRequest) returns (GenericRPCResponse);
+}
+
+message GenericRPCRequest {
+  string id = 1;
+}
+
+message GenericRPCResponse {
+  string result = 1;
+}
+
+----------------------------------------
+
+TITLE: Generated OpenAPI Response Specification
+DESCRIPTION: The resulting OpenAPI specification JSON output showing how the custom response is represented in the generated documentation.
+
+LANGUAGE: json
+CODE:
+"400": {
+  "description": "Returned when the request is malformed.",
+  "schema": {
+    "$ref": "#/definitions/v1GenericResponse"
+  }
+}
+
+----------------------------------------
+
+TITLE: Creating Go Tools Module
+DESCRIPTION: Example of creating a tools.go file to track tool dependencies for the gRPC-Gateway project.
+
+LANGUAGE: go
+CODE:
+// +build tools
+
+package tools
+
+import (
+    _ "github.com/grpc-ecosystem/grpc-gateway/v2/protoc-gen-grpc-gateway"
+    _ "github.com/grpc-ecosystem/grpc-gateway/v2/protoc-gen-openapiv2"
+    _ "google.golang.org/grpc/cmd/protoc-gen-go-grpc"
+    _ "google.golang.org/protobuf/cmd/protoc-gen-go"
+)
+
+----------------------------------------
+
+TITLE: Defining Protocol Buffer Service
+DESCRIPTION: Example of defining a gRPC service using protocol buffers with HTTP annotations.
+
+LANGUAGE: protobuf
+CODE:
+syntax = "proto3";
+package your.service.v1;
+option go_package = "github.com/yourorg/yourprotos/gen/go/your/service/v1";
+
+import "google/api/annotations.proto";
+
+message StringMessage {
+  string value = 1;
+}
+
+service YourService {
+  rpc Echo(StringMessage) returns (StringMessage) {
+    option (google.api.http) = {
+      post: "/v1/example/echo"
+      body: "*"
+    };
+  }
+}
+
+----------------------------------------
+
+TITLE: Regenerating Files using Docker for grpc-gateway
+DESCRIPTION: This snippet demonstrates how to use Docker to regenerate files after making changes to the grpc-gateway project. It includes commands for installing dependencies, cleaning, generating files, and updating Bazel configurations.
+
+LANGUAGE: bash
+CODE:
+docker run -v $(pwd):/grpc-gateway -w /grpc-gateway --rm ghcr.io/grpc-ecosystem/grpc-gateway/build-env:latest \
+    /bin/bash -c 'make install && \
+        make clean && \
+        make generate'
+docker run -itv $(pwd):/grpc-gateway -w /grpc-gateway --entrypoint /bin/bash --rm \
+    ghcr.io/grpc-ecosystem/grpc-gateway/build-env:latest -c '\
+        bazel run :gazelle -- update-repos -from_file=go.mod -to_macro=repositories.bzl%go_repositories && \
+        bazel run :gazelle && \
+        bazel run :buildifier'
+
+----------------------------------------
+
+TITLE: Regenerating Files using VS Code Dev Containers for grpc-gateway
+DESCRIPTION: This snippet shows how to regenerate files after making changes to the grpc-gateway project using Visual Studio Code dev containers. It includes commands for installing dependencies, cleaning, generating files, and updating Bazel configurations.
+
+LANGUAGE: bash
+CODE:
+$ make install && make clean && make generate
+
+LANGUAGE: bash
+CODE:
+$ bazel run :gazelle -- update-repos -from_file=go.mod -to_macro=repositories.bzl%go_repositories && \
+    bazel run :gazelle && \
+    bazel run :buildifier

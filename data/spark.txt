@@ -1,0 +1,4163 @@
+TITLE: Creating a PySpark DataFrame with Explicit Schema
+DESCRIPTION: Shows how to create a PySpark DataFrame by specifying the schema explicitly. This approach provides more control over column data types.
+
+LANGUAGE: python
+CODE:
+df = spark.createDataFrame([
+    (1, 2., 'string1', date(2000, 1, 1), datetime(2000, 1, 1, 12, 0)),
+    (2, 3., 'string2', date(2000, 2, 1), datetime(2000, 1, 2, 12, 0)),
+    (3, 4., 'string3', date(2000, 3, 1), datetime(2000, 1, 3, 12, 0))
+], schema='a long, b double, c string, d date, e timestamp')
+df
+
+----------------------------------------
+
+TITLE: Complete PySpark Testing Example
+DESCRIPTION: Provides a complete example of setting up a PySpark application, defining a transformation function, and writing unit tests using unittest.
+
+LANGUAGE: python
+CODE:
+# pkg/etl.py
+import unittest
+
+from pyspark.sql import SparkSession 
+from pyspark.sql.functions import col
+from pyspark.sql.functions import regexp_replace
+from pyspark.testing.utils import assertDataFrameEqual
+
+# Create a SparkSession 
+spark = SparkSession.builder.appName("Sample PySpark ETL").getOrCreate() 
+
+sample_data = [{"name": "John    D.", "age": 30}, 
+  {"name": "Alice   G.", "age": 25}, 
+  {"name": "Bob  T.", "age": 35}, 
+  {"name": "Eve   A.", "age": 28}] 
+
+df = spark.createDataFrame(sample_data)
+
+# Define DataFrame transformation function
+def remove_extra_spaces(df, column_name):
+    # Remove extra spaces from the specified column using regexp_replace
+    df_transformed = df.withColumn(column_name, regexp_replace(col(column_name), "\\s+", " "))
+
+    return df_transformed
+
+LANGUAGE: python
+CODE:
+# pkg/test_etl.py
+import unittest
+
+from pyspark.sql import SparkSession 
+
+# Define unit test base class
+class PySparkTestCase(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        cls.spark = SparkSession.builder.appName("Sample PySpark ETL").getOrCreate() 
+
+    @classmethod
+    def tearDownClass(cls):
+        cls.spark.stop()
+        
+# Define unit test
+class TestTranformation(PySparkTestCase):
+    def test_single_space(self):
+        sample_data = [{"name": "John    D.", "age": 30}, 
+                        {"name": "Alice   G.", "age": 25}, 
+                        {"name": "Bob  T.", "age": 35}, 
+                        {"name": "Eve   A.", "age": 28}] 
+                
+        # Create a Spark DataFrame
+        original_df = spark.createDataFrame(sample_data)
+    
+        # Apply the transformation function from before
+        transformed_df = remove_extra_spaces(original_df, "name")
+    
+        expected_data = [{"name": "John D.", "age": 30}, 
+        {"name": "Alice G.", "age": 25}, 
+        {"name": "Bob T.", "age": 35}, 
+        {"name": "Eve A.", "age": 28}]
+    
+        expected_df = spark.createDataFrame(expected_data)
+    
+        assertDataFrameEqual(transformed_df, expected_df)
+
+LANGUAGE: python
+CODE:
+unittest.main(argv=[''], verbosity=0, exit=False)
+
+----------------------------------------
+
+TITLE: Initializing SparkSession in PySpark
+DESCRIPTION: Creates a SparkSession, which is the entry point for PySpark applications. This session provides a way to interact with Spark functionality.
+
+LANGUAGE: python
+CODE:
+from pyspark.sql import SparkSession
+
+spark = SparkSession.builder.getOrCreate()
+
+----------------------------------------
+
+TITLE: Querying Data with pandas on Spark
+DESCRIPTION: Demonstrates reading a Parquet file and performing group by aggregation using pandas API on Spark. Shows how to leverage Spark's optimization capabilities for better performance.
+
+LANGUAGE: python
+CODE:
+import pyspark.pandas as ps
+
+df = ps.read_parquet("G1_1e9_1e2_0_0.parquet")[
+    ["id1", "id2", "v3"]
+]
+df.query("id1 > 'id098'").groupby("id2").sum().head(3)
+
+----------------------------------------
+
+TITLE: Initializing SparkSession in PySpark
+DESCRIPTION: Creates a SparkSession, which is the entry point for PySpark applications. This session provides a way to interact with Spark functionality.
+
+LANGUAGE: python
+CODE:
+from pyspark.sql import SparkSession
+
+spark = SparkSession.builder.getOrCreate()
+
+----------------------------------------
+
+TITLE: Setting Up Pytest Fixture for PySpark Testing
+DESCRIPTION: Creates a pytest fixture for managing SparkSession in tests. This fixture allows sharing a SparkSession across multiple tests and ensures proper teardown.
+
+LANGUAGE: python
+CODE:
+import pytest
+
+@pytest.fixture
+def spark_fixture():
+    spark = SparkSession.builder.appName("Testing PySpark Example").getOrCreate()
+    yield spark
+
+----------------------------------------
+
+TITLE: Initializing SparkSession in PySpark
+DESCRIPTION: Creates a new SparkSession which is the entry point for PySpark DataFrame operations
+
+LANGUAGE: python
+CODE:
+from pyspark.sql import SparkSession
+
+spark = SparkSession.builder.getOrCreate()
+
+----------------------------------------
+
+TITLE: Grouping and Aggregating Data in PySpark
+DESCRIPTION: Shows how to group data by a column and apply aggregation functions in PySpark. This is a common operation for data analysis and summarization.
+
+LANGUAGE: python
+CODE:
+df = spark.createDataFrame([
+    ['red', 'banana', 1, 10], ['blue', 'banana', 2, 20], ['red', 'carrot', 3, 30],
+    ['blue', 'grape', 4, 40], ['red', 'carrot', 5, 50], ['black', 'carrot', 6, 60],
+    ['red', 'banana', 7, 70], ['red', 'grape', 8, 80]], schema=['color', 'fruit', 'v1', 'v2'])
+df.show()
+
+df.groupby('color').avg().show()
+
+----------------------------------------
+
+TITLE: Word Count using Spark RDD in Python
+DESCRIPTION: Demonstrates how to use Spark RDDs to count word occurrences in a text file, showcasing operations like flatMap, map, and reduceByKey.
+
+LANGUAGE: python
+CODE:
+text_file = spark.sparkContext.textFile("some_words.txt")
+
+counts = (
+    text_file.flatMap(lambda line: line.split(" "))
+    .map(lambda word: (word, 1))
+    .reduceByKey(lambda a, b: a + b)
+)
+
+counts.collect()
+
+----------------------------------------
+
+TITLE: Setting Up PySparkTestCase for Unittest
+DESCRIPTION: Defines a PySparkTestCase class that sets up and tears down a SparkSession for unittest. This is useful for managing SparkSession lifecycle in unit tests.
+
+LANGUAGE: python
+CODE:
+import unittest
+
+class PySparkTestCase(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        cls.spark = SparkSession.builder.appName("Testing PySpark Example").getOrCreate() 
+
+    
+    @classmethod
+    def tearDownClass(cls):
+        cls.spark.stop()
+
+----------------------------------------
+
+TITLE: Initializing SparkSession in PySpark
+DESCRIPTION: Creates a SparkSession object, which is the entry point for PySpark functionality. This is typically the first step in any PySpark application.
+
+LANGUAGE: python
+CODE:
+from pyspark.sql import SparkSession
+
+spark = SparkSession.builder.getOrCreate()
+
+----------------------------------------
+
+TITLE: Grouping and Aggregating PySpark DataFrame
+DESCRIPTION: Shows how to perform grouping and aggregation operations on a PySpark DataFrame. This is essential for data summarization and analysis.
+
+LANGUAGE: python
+CODE:
+df = spark.createDataFrame([
+    ['red', 'banana', 1, 10], ['blue', 'banana', 2, 20], ['red', 'carrot', 3, 30],
+    ['blue', 'grape', 4, 40], ['red', 'carrot', 5, 50], ['black', 'carrot', 6, 60],
+    ['red', 'banana', 7, 70], ['red', 'grape', 8, 80]], schema=['color', 'fruit', 'v1', 'v2'])
+df.show()
+
+df.groupby('color').avg().show()
+
+----------------------------------------
+
+TITLE: Setting Up PySpark Pytest Fixture
+DESCRIPTION: Creates a pytest fixture for sharing a SparkSession across tests. This fixture handles setting up and tearing down the SparkSession.
+
+LANGUAGE: python
+CODE:
+import pytest
+
+@pytest.fixture
+def spark_fixture():
+    spark = SparkSession.builder.appName("Testing PySpark Example").getOrCreate()
+    yield spark
+
+----------------------------------------
+
+TITLE: Creating PySpark DataFrame from Pandas DataFrame
+DESCRIPTION: Illustrates the conversion of a Pandas DataFrame to a PySpark DataFrame. This is useful when working with existing Pandas data structures.
+
+LANGUAGE: python
+CODE:
+pandas_df = pd.DataFrame({
+    'a': [1, 2, 3],
+    'b': [2., 3., 4.],
+    'c': ['string1', 'string2', 'string3'],
+    'd': [date(2000, 1, 1), date(2000, 2, 1), date(2000, 3, 1)],
+    'e': [datetime(2000, 1, 1, 12, 0), datetime(2000, 1, 2, 12, 0), datetime(2000, 1, 3, 12, 0)]
+})
+df = spark.createDataFrame(pandas_df)
+df
+
+----------------------------------------
+
+TITLE: Loading and Querying JSON Data with Spark SQL
+DESCRIPTION: Shows how to read JSON data from S3, register it as a temporary table, and perform SQL joins. Demonstrates Spark SQL's ability to work with multiple data sources.
+
+LANGUAGE: python
+CODE:
+spark.read.json("s3n://...").registerTempTable("json")
+results = spark.sql("""
+SELECT * 
+     FROM people
+     JOIN json ...""")
+
+----------------------------------------
+
+TITLE: Creating a PySpark DataFrame from a Pandas DataFrame
+DESCRIPTION: Illustrates how to convert a Pandas DataFrame to a PySpark DataFrame. This is useful when integrating PySpark with existing Pandas workflows.
+
+LANGUAGE: python
+CODE:
+pandas_df = pd.DataFrame({
+    'a': [1, 2, 3],
+    'b': [2., 3., 4.],
+    'c': ['string1', 'string2', 'string3'],
+    'd': [date(2000, 1, 1), date(2000, 2, 1), date(2000, 3, 1)],
+    'e': [datetime(2000, 1, 1, 12, 0), datetime(2000, 1, 2, 12, 0), datetime(2000, 1, 3, 12, 0)]
+})
+df = spark.createDataFrame(pandas_df)
+df
+
+----------------------------------------
+
+TITLE: Integrating PySpark DataFrame with SQL
+DESCRIPTION: Demonstrates how to use SQL queries with PySpark DataFrames by registering the DataFrame as a temporary view and executing SQL statements.
+
+LANGUAGE: python
+CODE:
+df.createOrReplaceTempView("tableA")
+spark.sql("SELECT count(*) from tableA").show()
+
+----------------------------------------
+
+TITLE: Creating PySpark DataFrame from Pandas DataFrame
+DESCRIPTION: Illustrates the conversion of a Pandas DataFrame to a PySpark DataFrame. This is useful when working with existing Pandas data structures.
+
+LANGUAGE: python
+CODE:
+pandas_df = pd.DataFrame({
+    'a': [1, 2, 3],
+    'b': [2., 3., 4.],
+    'c': ['string1', 'string2', 'string3'],
+    'd': [date(2000, 1, 1), date(2000, 2, 1), date(2000, 3, 1)],
+    'e': [datetime(2000, 1, 1, 12, 0), datetime(2000, 1, 2, 12, 0), datetime(2000, 1, 3, 12, 0)]
+})
+df = spark.createDataFrame(pandas_df)
+df
+
+----------------------------------------
+
+TITLE: Displaying PySpark DataFrame Content and Schema
+DESCRIPTION: Shows how to display the contents of a PySpark DataFrame and its schema. This is useful for data inspection and verification.
+
+LANGUAGE: python
+CODE:
+# All DataFrames above result same.
+df.show()
+df.printSchema()
+
+----------------------------------------
+
+TITLE: Writing and Reading PySpark DataFrame as Parquet
+DESCRIPTION: Illustrates how to write a PySpark DataFrame to a Parquet file and read it back. Parquet is an efficient columnar storage format often used with big data processing frameworks.
+
+LANGUAGE: python
+CODE:
+df.write.parquet('bar.parquet')
+spark.read.parquet('bar.parquet').show()
+
+----------------------------------------
+
+TITLE: Implementing Tests with pytest
+DESCRIPTION: Demonstrates how to implement tests using pytest framework with fixtures for SparkSession management.
+
+LANGUAGE: python
+CODE:
+import pytest
+
+@pytest.fixture
+def spark_fixture():
+    spark = SparkSession.builder.appName("Testing PySpark Example").getOrCreate()
+    yield spark
+
+----------------------------------------
+
+TITLE: Configuring Remote Debugging for Spark in IntelliJ
+DESCRIPTION: This snippet shows how to set up remote debugging for Spark applications using IntelliJ IDEA.
+
+LANGUAGE: shell
+CODE:
+./build/sbt
+sbt > project core
+sbt > set javaOptions in Test += "-agentlib:jdwp=transport=dt_socket,server=n,suspend=n,address=localhost:5005"
+sbt > testOnly *SparkContextSuite -- -t "Only one SparkContext may be active at a time"
+
+----------------------------------------
+
+TITLE: Defining and Applying DataFrame Transformation in PySpark
+DESCRIPTION: Defines a function to remove extra spaces from a specified column in a PySpark DataFrame and applies it to the sample data. This demonstrates a typical PySpark transformation that might need testing.
+
+LANGUAGE: python
+CODE:
+from pyspark.sql.functions import col, regexp_replace
+
+# Remove additional spaces in name
+def remove_extra_spaces(df, column_name):
+    # Remove extra spaces from the specified column
+    df_transformed = df.withColumn(column_name, regexp_replace(col(column_name), "\\s+", " "))
+    
+    return df_transformed
+
+transformed_df = remove_extra_spaces(df, "name")
+
+transformed_df.show()
+
+----------------------------------------
+
+TITLE: Using PySpark Built-in Test Utils
+DESCRIPTION: Demonstrates usage of PySpark's built-in assertDataFrameEqual and assertSchemaEqual utilities.
+
+LANGUAGE: python
+CODE:
+import pyspark.testing
+from pyspark.testing.utils import assertDataFrameEqual
+
+# Example 1
+df1 = spark.createDataFrame(data=[("1", 1000), ("2", 3000)], schema=["id", "amount"])
+df2 = spark.createDataFrame(data=[("1", 1000), ("2", 3000)], schema=["id", "amount"])
+assertDataFrameEqual(df1, df2)  # pass, DataFrames are identical
+
+----------------------------------------
+
+TITLE: Using Pytest for PySpark Testing
+DESCRIPTION: Shows how to use the pytest framework for testing PySpark code. It includes setting up a fixture for SparkSession and defining a test function.
+
+LANGUAGE: python
+CODE:
+import pytest
+from pyspark.testing.utils import assertDataFrameEqual
+
+@pytest.fixture
+def spark_fixture():
+    spark = SparkSession.builder.appName("Testing PySpark Example").getOrCreate()
+    yield spark
+
+def test_single_space(spark_fixture):
+    sample_data = [{"name": "John    D.", "age": 30}, 
+                   {"name": "Alice   G.", "age": 25}, 
+                   {"name": "Bob  T.", "age": 35}, 
+                   {"name": "Eve   A.", "age": 28}] 
+                    
+    # Create a Spark DataFrame
+    original_df = spark.createDataFrame(sample_data)
+    
+    # Apply the transformation function from before
+    transformed_df = remove_extra_spaces(original_df, "name")
+    
+    expected_data = [{"name": "John D.", "age": 30}, 
+    {"name": "Alice G.", "age": 25}, 
+    {"name": "Bob T.", "age": 35}, 
+    {"name": "Eve A.", "age": 28}]
+    
+    expected_df = spark.createDataFrame(expected_data)
+
+    assertDataFrameEqual(transformed_df, expected_df)
+
+----------------------------------------
+
+TITLE: Creating and Transforming Graphs with GraphX in Scala
+DESCRIPTION: This snippet demonstrates how to create a graph from vertices and edges, load messages from HDFS, and join the messages with the graph vertices using a custom closure. It showcases the flexibility of GraphX in working with both graphs and RDDs.
+
+LANGUAGE: scala
+CODE:
+graph = Graph(vertices, edges)
+messages = spark.textFile("hdfs://...")
+graph2 = graph.joinVertices(messages) {
+  (id, vertex, msg) => ...
+}
+
+----------------------------------------
+
+TITLE: Initializing and Configuring Spark Structured Streaming in Scala
+DESCRIPTION: This snippet demonstrates how to set up a basic Spark Structured Streaming pipeline. It reads a stream, performs JSON parsing and transformation, and configures the output stream with a trigger interval.
+
+LANGUAGE: scala
+CODE:
+spark
+  .readStream
+  .select($"value".cast("string").alias("jsonData"))
+  .select(from_json($"jsonData",jsonSchema).alias("payload"))
+  .writeStream
+  .trigger("1 seconds")
+  .start()
+
+----------------------------------------
+
+TITLE: Writing PySpark Unit Test
+DESCRIPTION: Demonstrates how to write a unit test for a PySpark transformation using unittest and the assertDataFrameEqual function.
+
+LANGUAGE: python
+CODE:
+from pyspark.testing.utils import assertDataFrameEqual
+
+class TestTranformation(PySparkTestCase):
+    def test_single_space(self):
+        sample_data = [{"name": "John    D.", "age": 30}, 
+                       {"name": "Alice   G.", "age": 25}, 
+                       {"name": "Bob  T.", "age": 35}, 
+                       {"name": "Eve   A.", "age": 28}] 
+                        
+        # Create a Spark DataFrame
+        original_df = spark.createDataFrame(sample_data)
+        
+        # Apply the transformation function from before
+        transformed_df = remove_extra_spaces(original_df, "name")
+        
+        expected_data = [{"name": "John D.", "age": 30}, 
+        {"name": "Alice G.", "age": 25}, 
+        {"name": "Bob T.", "age": 35}, 
+        {"name": "Eve A.", "age": 28}]
+        
+        expected_df = spark.createDataFrame(expected_data)
+    
+        assertDataFrameEqual(transformed_df, expected_df)
+
+----------------------------------------
+
+TITLE: Loading and Training KMeans Model with MLlib in Python
+DESCRIPTION: Example showing how to load data in LIBSVM format from HDFS and train a KMeans clustering model with 10 clusters using Spark MLlib.
+
+LANGUAGE: python
+CODE:
+data = spark.read.format("libsvm")\
+    .load("hdfs://...")
+
+model = KMeans(k=10).fit(data)
+
+----------------------------------------
+
+TITLE: Initializing Spark Structured Streaming from Kafka in Python
+DESCRIPTION: Sets up a Spark Structured Streaming DataFrame to read data from a Kafka source.
+
+LANGUAGE: python
+CODE:
+df = (
+    spark.readStream.format("kafka")
+    .option("kafka.bootstrap.servers", "host1:port1,host2:port2")
+    .option("subscribe", subscribeTopic)
+    .load()
+)
+
+----------------------------------------
+
+TITLE: Integrating PySpark DataFrame with SQL
+DESCRIPTION: Demonstrates how to use SQL queries with PySpark DataFrames by creating temporary views. This allows for seamless integration of SQL and DataFrame operations.
+
+LANGUAGE: python
+CODE:
+df.createOrReplaceTempView("tableA")
+spark.sql("SELECT count(*) from tableA").show()
+
+----------------------------------------
+
+TITLE: Applying Pandas UDF to PySpark DataFrame
+DESCRIPTION: Demonstrates the use of a Pandas UDF (User Defined Function) with a PySpark DataFrame. This allows for efficient vectorized operations on DataFrame columns.
+
+LANGUAGE: python
+CODE:
+import pandas as pd
+from pyspark.sql.functions import pandas_udf
+
+@pandas_udf('long')
+def pandas_plus_one(series: pd.Series) -> pd.Series:
+    # Simply plus one by using pandas Series.
+    return series + 1
+
+df.select(pandas_plus_one(df.a)).show()
+
+----------------------------------------
+
+TITLE: Writing Streaming Data to Parquet in Spark Python
+DESCRIPTION: Defines a function to read new data from Kafka and write it to a Parquet table using Spark Structured Streaming.
+
+LANGUAGE: python
+CODE:
+def perform_available_now_update():
+    checkpointPath = "data/tmp_students_checkpoint/"
+    path = "data/tmp_students"
+    return df.transform(lambda df: with_normalized_names(df)).writeStream.trigger(
+        availableNow=True
+    ).format("parquet").option("checkpointLocation", checkpointPath).start(path)
+
+----------------------------------------
+
+TITLE: Creating and Displaying DataFrame
+DESCRIPTION: Creates a sample DataFrame with mixed data types including integers, floats, strings, dates, and timestamps, then displays it using the show() method.
+
+LANGUAGE: python
+CODE:
+from datetime import datetime, date
+from pyspark.sql import Row
+
+df = spark.createDataFrame([
+    Row(a=1, b=2., c='string1', d=date(2000, 1, 1), e=datetime(2000, 1, 1, 12, 0)),
+    Row(a=2, b=3., c='string2', d=date(2000, 2, 1), e=datetime(2000, 1, 2, 12, 0)),
+    Row(a=4, b=5., c='string3', d=date(2000, 3, 1), e=datetime(2000, 1, 3, 12, 0))
+])
+df.show()
+
+----------------------------------------
+
+TITLE: Setting Up PySpark Unit Test Base Class
+DESCRIPTION: Creates a base class for PySpark unit tests using unittest. This class handles setting up and tearing down a SparkSession for each test.
+
+LANGUAGE: python
+CODE:
+import unittest
+
+class PySparkTestCase(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        cls.spark = SparkSession.builder.appName("Testing PySpark Example").getOrCreate() 
+
+    
+    @classmethod
+    def tearDownClass(cls):
+        cls.spark.stop()
+
+----------------------------------------
+
+TITLE: Implementing Unit Tests with unittest
+DESCRIPTION: Shows how to create unit tests for PySpark code using Python's unittest framework with proper setup and teardown
+
+LANGUAGE: python
+CODE:
+import unittest
+
+class PySparkTestCase(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        cls.spark = SparkSession.builder.appName("Testing PySpark Example").getOrCreate() 
+
+    
+    @classmethod
+    def tearDownClass(cls):
+        cls.spark.stop()
+
+----------------------------------------
+
+TITLE: DataFrame Operations with Pandas UDF
+DESCRIPTION: Shows how to create and use a Pandas UDF (User Defined Function) to perform operations on DataFrame columns
+
+LANGUAGE: python
+CODE:
+import pandas as pd
+from pyspark.sql.functions import pandas_udf
+
+@pandas_udf('long')
+def pandas_plus_one(series: pd.Series) -> pd.Series:
+    return series + 1
+
+df.select(pandas_plus_one(df.a)).show()
+
+----------------------------------------
+
+TITLE: Applying Pandas UDF to PySpark DataFrame
+DESCRIPTION: Demonstrates the use of a Pandas User Defined Function (UDF) on a PySpark DataFrame. This allows for efficient vectorized operations using Pandas functions.
+
+LANGUAGE: python
+CODE:
+import pandas as pd
+from pyspark.sql.functions import pandas_udf
+
+@pandas_udf('long')
+def pandas_plus_one(series: pd.Series) -> pd.Series:
+    # Simply plus one by using pandas Series.
+    return series + 1
+
+df.select(pandas_plus_one(df.a)).show()
+
+----------------------------------------
+
+TITLE: Implementing Tests with pytest
+DESCRIPTION: Demonstrates how to write tests using pytest framework with fixtures for PySpark session management
+
+LANGUAGE: python
+CODE:
+import pytest
+
+@pytest.fixture
+def spark_fixture():
+    spark = SparkSession.builder.appName("Testing PySpark Example").getOrCreate()
+    yield spark
+
+----------------------------------------
+
+TITLE: Creating PySpark DataFrame from List of Rows
+DESCRIPTION: Demonstrates how to create a PySpark DataFrame using a list of Row objects. This method allows for explicit specification of data types and column names.
+
+LANGUAGE: python
+CODE:
+from datetime import datetime, date
+import pandas as pd
+from pyspark.sql import Row
+
+df = spark.createDataFrame([
+    Row(a=1, b=2., c='string1', d=date(2000, 1, 1), e=datetime(2000, 1, 1, 12, 0)),
+    Row(a=2, b=3., c='string2', d=date(2000, 2, 1), e=datetime(2000, 1, 2, 12, 0)),
+    Row(a=4, b=5., c='string3', d=date(2000, 3, 1), e=datetime(2000, 1, 3, 12, 0))
+])
+df
+
+----------------------------------------
+
+TITLE: Creating PySpark DataFrame with Explicit Schema
+DESCRIPTION: Shows how to create a PySpark DataFrame with an explicitly defined schema. This approach provides more control over column data types.
+
+LANGUAGE: python
+CODE:
+df = spark.createDataFrame([
+    (1, 2., 'string1', date(2000, 1, 1), datetime(2000, 1, 1, 12, 0)),
+    (2, 3., 'string2', date(2000, 2, 1), datetime(2000, 1, 2, 12, 0)),
+    (3, 4., 'string3', date(2000, 3, 1), datetime(2000, 1, 3, 12, 0))
+], schema='a long, b double, c string, d date, e timestamp')
+df
+
+----------------------------------------
+
+TITLE: Writing Unittest for PySpark Transformation
+DESCRIPTION: Demonstrates how to write a unittest for the PySpark transformation function. This test case checks if the remove_extra_spaces function correctly removes extra spaces from the name column.
+
+LANGUAGE: python
+CODE:
+from pyspark.testing.utils import assertDataFrameEqual
+
+class TestTranformation(PySparkTestCase):
+    def test_single_space(self):
+        sample_data = [{"name": "John    D.", "age": 30}, 
+                       {"name": "Alice   G.", "age": 25}, 
+                       {"name": "Bob  T.", "age": 35}, 
+                       {"name": "Eve   A.", "age": 28}] 
+                        
+        # Create a Spark DataFrame
+        original_df = spark.createDataFrame(sample_data)
+        
+        # Apply the transformation function from before
+        transformed_df = remove_extra_spaces(original_df, "name")
+        
+        expected_data = [{"name": "John D.", "age": 30}, 
+        {"name": "Alice G.", "age": 25}, 
+        {"name": "Bob T.", "age": 35}, 
+        {"name": "Eve A.", "age": 28}]
+        
+        expected_df = spark.createDataFrame(expected_data)
+    
+        assertDataFrameEqual(transformed_df, expected_df)
+
+----------------------------------------
+
+TITLE: Implementing DataFrame Transformation
+DESCRIPTION: Defines and applies a function to remove extra spaces from text data in a DataFrame column using regexp_replace
+
+LANGUAGE: python
+CODE:
+from pyspark.sql.functions import col, regexp_replace
+
+# Remove additional spaces in name
+def remove_extra_spaces(df, column_name):
+    # Remove extra spaces from the specified column
+    df_transformed = df.withColumn(column_name, regexp_replace(col(column_name), "\\s+", " "))
+    
+    return df_transformed
+
+transformed_df = remove_extra_spaces(df, "name")
+
+transformed_df.show()
+
+----------------------------------------
+
+TITLE: Creating PySpark DataFrame from List of Rows
+DESCRIPTION: Demonstrates how to create a PySpark DataFrame using a list of Row objects. This method allows for explicit definition of data types and structure.
+
+LANGUAGE: python
+CODE:
+from datetime import datetime, date
+import pandas as pd
+from pyspark.sql import Row
+
+df = spark.createDataFrame([
+    Row(a=1, b=2., c='string1', d=date(2000, 1, 1), e=datetime(2000, 1, 1, 12, 0)),
+    Row(a=2, b=3., c='string2', d=date(2000, 2, 1), e=datetime(2000, 1, 2, 12, 0)),
+    Row(a=4, b=5., c='string3', d=date(2000, 3, 1), e=datetime(2000, 1, 3, 12, 0))
+])
+df
+
+----------------------------------------
+
+TITLE: Displaying PySpark DataFrame Content and Schema
+DESCRIPTION: Shows how to display the content of a PySpark DataFrame and its schema. This is crucial for data inspection and verification.
+
+LANGUAGE: python
+CODE:
+# All DataFrames above result same.
+df.show()
+df.printSchema()
+
+----------------------------------------
+
+TITLE: Building and Processing Graphs with GraphX in Scala
+DESCRIPTION: GraphX is introduced as a new framework for graph processing. This example demonstrates how to build a graph from RDDs and perform basic operations.
+
+LANGUAGE: Scala
+CODE:
+import org.apache.spark.graphx._
+
+// Create an RDD for vertices
+val users: RDD[(VertexId, (String, String))] =
+  sc.parallelize(Array((3L, ("rxin", "student")), (7L, ("jgonzal", "postdoc"))))
+
+// Create an RDD for edges
+val relationships: RDD[Edge[String]] =
+  sc.parallelize(Array(Edge(3L, 7L, "collab"), Edge(5L, 3L, "advisor")))
+
+// Build the graph
+val graph = Graph(users, relationships)
+
+// Count the number of "postdoc" users
+graph.vertices.filter { case (id, (name, pos)) => pos == "postdoc" }.count()
+
+----------------------------------------
+
+TITLE: Initializing Spark Session in Python
+DESCRIPTION: Creates a Spark Session with the application name 'demo'. If a session already exists, it will be reused.
+
+LANGUAGE: python
+CODE:
+from pyspark.sql import SparkSession
+
+spark = SparkSession.builder.appName("demo").getOrCreate()
+
+----------------------------------------
+
+TITLE: Applying a Pandas UDF to a PySpark DataFrame
+DESCRIPTION: Demonstrates the use of a Pandas UDF (User Defined Function) to perform operations on a PySpark DataFrame. This allows for vectorized operations using Pandas functionality.
+
+LANGUAGE: python
+CODE:
+import pandas as pd
+from pyspark.sql.functions import pandas_udf
+
+@pandas_udf('long')
+def pandas_plus_one(series: pd.Series) -> pd.Series:
+    # Simply plus one by using pandas Series.
+    return series + 1
+
+df.select(pandas_plus_one(df.a)).show()
+
+----------------------------------------
+
+TITLE: Using MLlib in Python
+DESCRIPTION: MLlib is now available in Python, operating on NumPy data. This example shows how to use the Naive Bayes classifier in Python.
+
+LANGUAGE: Python
+CODE:
+from pyspark.mllib.classification import NaiveBayes
+from pyspark.mllib.linalg import Vectors
+
+# Load and parse the data
+data = sc.textFile("data.txt")
+parsed_data = data.map(lambda x: (x.split(",")[0], Vectors.dense([float(x) for x in x.split(",")[1:]])))
+
+# Train a naive Bayes model
+model = NaiveBayes.train(parsed_data)
+
+# Make prediction
+prediction = model.predict(Vectors.dense([1.0, 0.0, 1.0]))
+
+----------------------------------------
+
+TITLE: Creating PySpark DataFrame from List of Rows
+DESCRIPTION: Demonstrates how to create a PySpark DataFrame using a list of Row objects. This method allows for explicit definition of data types and structure.
+
+LANGUAGE: python
+CODE:
+from datetime import datetime, date
+import pandas as pd
+from pyspark.sql import Row
+
+df = spark.createDataFrame([
+    Row(a=1, b=2., c='string1', d=date(2000, 1, 1), e=datetime(2000, 1, 1, 12, 0)),
+    Row(a=2, b=3., c='string2', d=date(2000, 2, 1), e=datetime(2000, 1, 2, 12, 0)),
+    Row(a=4, b=5., c='string3', d=date(2000, 3, 1), e=datetime(2000, 1, 3, 12, 0))
+])
+df
+
+----------------------------------------
+
+TITLE: Applying Pandas UDF to PySpark DataFrame
+DESCRIPTION: Demonstrates using a Pandas UDF (User Defined Function) to perform vectorized operations on DataFrame columns
+
+LANGUAGE: python
+CODE:
+import pandas as pd
+from pyspark.sql.functions import pandas_udf
+
+@pandas_udf('long')
+def pandas_plus_one(series: pd.Series) -> pd.Series:
+    return series + 1
+
+df.select(pandas_plus_one(df.a)).show()
+
+----------------------------------------
+
+TITLE: Reading SQL table with database name in Spark DataFrameReader
+DESCRIPTION: Example of using DataFrameReader.table() to read a table from a specific database in Spark SQL. This feature allows specifying the database name along with the table name.
+
+LANGUAGE: Scala
+CODE:
+sqlContext.read.table("dbName.tableName")
+
+----------------------------------------
+
+TITLE: Writing and Reading PySpark DataFrame as CSV
+DESCRIPTION: Illustrates how to write a PySpark DataFrame to a CSV file and then read it back. This is useful for data persistence and sharing.
+
+LANGUAGE: python
+CODE:
+df.write.csv('foo.csv', header=True)
+spark.read.csv('foo.csv', header=True).show()
+
+----------------------------------------
+
+TITLE: DataFrame I/O Operations
+DESCRIPTION: Demonstrates reading and writing DataFrames to different file formats including CSV, Parquet, and ORC
+
+LANGUAGE: python
+CODE:
+df.write.csv('foo.csv', header=True)
+spark.read.csv('foo.csv', header=True).show()
+
+df.write.parquet('bar.parquet')
+spark.read.parquet('bar.parquet').show()
+
+df.write.orc('zoo.orc')
+spark.read.orc('zoo.orc').show()
+
+----------------------------------------
+
+TITLE: Using PySpark Built-in Test Utility Functions
+DESCRIPTION: Demonstrates the use of PySpark's built-in test utility functions like assertDataFrameEqual for comparing DataFrames.
+
+LANGUAGE: python
+CODE:
+import pyspark.testing
+from pyspark.testing.utils import assertDataFrameEqual
+
+# Example 1
+df1 = spark.createDataFrame(data=[("1", 1000), ("2", 3000)], schema=["id", "amount"])
+df2 = spark.createDataFrame(data=[("1", 1000), ("2", 3000)], schema=["id", "amount"])
+assertDataFrameEqual(df1, df2)  # pass, DataFrames are identical
+
+----------------------------------------
+
+TITLE: Grouping and Aggregating PySpark DataFrame
+DESCRIPTION: Shows how to perform grouping and aggregation operations on a PySpark DataFrame. This is essential for data summarization and analysis.
+
+LANGUAGE: python
+CODE:
+df = spark.createDataFrame([
+    ['red', 'banana', 1, 10], ['blue', 'banana', 2, 20], ['red', 'carrot', 3, 30],
+    ['blue', 'grape', 4, 40], ['red', 'carrot', 5, 50], ['black', 'carrot', 6, 60],
+    ['red', 'banana', 7, 70], ['red', 'grape', 8, 80]], schema=['color', 'fruit', 'v1', 'v2'])
+df.show()
+
+df.groupby('color').avg().show()
+
+----------------------------------------
+
+TITLE: DataFrame Operations with Pandas Integration
+DESCRIPTION: Shows how to use Pandas UDFs and function APIs to apply Python native functions to PySpark DataFrames
+
+LANGUAGE: python
+CODE:
+import pandas as pd
+from pyspark.sql.functions import pandas_udf
+
+@pandas_udf('long')
+def pandas_plus_one(series: pd.Series) -> pd.Series:
+    # Simply plus one by using pandas Series.
+    return series + 1
+
+df.select(pandas_plus_one(df.a)).show()
+
+----------------------------------------
+
+TITLE: Enabling DataFrame hint for broadcast joins in Spark SQL
+DESCRIPTION: New DataFrame API method to provide a hint for broadcast joins in Spark SQL.
+
+LANGUAGE: Scala
+CODE:
+df.hint("broadcast")
+
+----------------------------------------
+
+TITLE: Persisting Spark DataFrame as Table in Python
+DESCRIPTION: Saves the DataFrame as a named Parquet table and demonstrates how to query and insert data using SQL.
+
+LANGUAGE: python
+CODE:
+df1.write.saveAsTable("some_people")
+
+spark.sql("select * from some_people").show()
+
+spark.sql("INSERT INTO some_people VALUES ('frank', 4, 'child')")
+
+spark.sql("select * from some_people where life_stage='teenager'").show()
+
+----------------------------------------
+
+TITLE: Creating DataFrame from Row Objects
+DESCRIPTION: Demonstrates creating a PySpark DataFrame using Row objects with different data types including numeric, string, date and timestamp
+
+LANGUAGE: python
+CODE:
+from datetime import datetime, date
+import pandas as pd
+from pyspark.sql import Row
+
+df = spark.createDataFrame([
+    Row(a=1, b=2., c='string1', d=date(2000, 1, 1), e=datetime(2000, 1, 1, 12, 0)),
+    Row(a=2, b=3., c='string2', d=date(2000, 2, 1), e=datetime(2000, 1, 2, 12, 0)),
+    Row(a=4, b=5., c='string3', d=date(2000, 3, 1), e=datetime(2000, 1, 3, 12, 0))
+])
+
+----------------------------------------
+
+TITLE: Creating Sample DataFrame in PySpark
+DESCRIPTION: Generates a sample DataFrame in PySpark with name and age data. This DataFrame will be used for demonstrating transformation and testing techniques.
+
+LANGUAGE: python
+CODE:
+sample_data = [{"name": "John    D.", "age": 30}, 
+  {"name": "Alice   G.", "age": 25}, 
+  {"name": "Bob  T.", "age": 35}, 
+  {"name": "Eve   A.", "age": 28}] 
+
+df = spark.createDataFrame(sample_data)
+
+----------------------------------------
+
+TITLE: Filtering Spark DataFrame in Python
+DESCRIPTION: Filters the DataFrame to include only teenagers and adults using the 'where' method and column conditions.
+
+LANGUAGE: python
+CODE:
+df1.where(col("life_stage").isin(["teenager", "adult"])).show()
+
+----------------------------------------
+
+TITLE: Creating DataFrame from Row Objects
+DESCRIPTION: Demonstrates creation of a PySpark DataFrame using Row objects with different data types including dates and timestamps
+
+LANGUAGE: python
+CODE:
+from datetime import datetime, date
+import pandas as pd
+from pyspark.sql import Row
+
+df = spark.createDataFrame([
+    Row(a=1, b=2., c='string1', d=date(2000, 1, 1), e=datetime(2000, 1, 1, 12, 0)),
+    Row(a=2, b=3., c='string2', d=date(2000, 2, 1), e=datetime(2000, 1, 2, 12, 0)),
+    Row(a=4, b=5., c='string3', d=date(2000, 3, 1), e=datetime(2000, 1, 3, 12, 0))
+])
+
+----------------------------------------
+
+TITLE: Using PySpark Built-in Test Utility Functions
+DESCRIPTION: Demonstrates the use of PySpark's built-in test utility functions like assertDataFrameEqual for comparing DataFrames. This is useful for simple ad-hoc validation cases.
+
+LANGUAGE: python
+CODE:
+import pyspark.testing
+from pyspark.testing.utils import assertDataFrameEqual
+
+# Example 1
+df1 = spark.createDataFrame(data=[("1", 1000), ("2", 3000)], schema=["id", "amount"])
+df2 = spark.createDataFrame(data=[("1", 1000), ("2", 3000)], schema=["id", "amount"])
+assertDataFrameEqual(df1, df2)  # pass, DataFrames are identical
+
+----------------------------------------
+
+TITLE: Adding Column to Spark DataFrame in Python
+DESCRIPTION: Adds a 'life_stage' column to the DataFrame based on age conditions using when-otherwise logic.
+
+LANGUAGE: python
+CODE:
+from pyspark.sql.functions import col, when
+
+df1 = df.withColumn(
+    "life_stage",
+    when(col("age") < 13, "child")
+    .when(col("age").between(13, 19), "teenager")
+    .otherwise("adult"),
+)
+
+----------------------------------------
+
+TITLE: Creating a PySpark DataFrame from a List of Rows
+DESCRIPTION: Demonstrates how to create a PySpark DataFrame using a list of Row objects. This method allows for explicit definition of data types and structure.
+
+LANGUAGE: python
+CODE:
+from datetime import datetime, date
+import pandas as pd
+from pyspark.sql import Row
+
+df = spark.createDataFrame([
+    Row(a=1, b=2., c='string1', d=date(2000, 1, 1), e=datetime(2000, 1, 1, 12, 0)),
+    Row(a=2, b=3., c='string2', d=date(2000, 2, 1), e=datetime(2000, 1, 2, 12, 0)),
+    Row(a=4, b=5., c='string3', d=date(2000, 3, 1), e=datetime(2000, 1, 3, 12, 0))
+])
+df
+
+----------------------------------------
+
+TITLE: DataFrame Space Normalization Function
+DESCRIPTION: Defines a function to remove extra spaces from a specified column using regexp_replace.
+
+LANGUAGE: python
+CODE:
+from pyspark.sql.functions import col, regexp_replace
+
+# Remove additional spaces in name
+def remove_extra_spaces(df, column_name):
+    # Remove extra spaces from the specified column
+    df_transformed = df.withColumn(column_name, regexp_replace(col(column_name), "\\s+", " "))
+    
+    return df_transformed
+
+transformed_df = remove_extra_spaces(df, "name")
+
+transformed_df.show()
+
+----------------------------------------
+
+TITLE: Aggregating Spark DataFrame in Python
+DESCRIPTION: Computes the average age for the entire dataset and then for each life stage using groupBy and avg functions.
+
+LANGUAGE: python
+CODE:
+from pyspark.sql.functions import avg
+
+df1.select(avg("age")).show()
+
+df1.groupBy("life_stage").avg().show()
+
+----------------------------------------
+
+TITLE: Querying Spark DataFrame with SQL in Python
+DESCRIPTION: Demonstrates how to use SQL queries on Spark DataFrames to compute average age overall and by life stage.
+
+LANGUAGE: python
+CODE:
+spark.sql("select avg(age) from {df1}", df1=df1).show()
+
+spark.sql("select life_stage, avg(age) from {df1} group by life_stage", df1=df1).show()
+
+----------------------------------------
+
+TITLE: PySpark DataFrame Equality Testing
+DESCRIPTION: Demonstrates usage of PySpark's built-in assertDataFrameEqual utility for comparing DataFrames.
+
+LANGUAGE: python
+CODE:
+import pyspark.testing
+from pyspark.testing.utils import assertDataFrameEqual
+
+# Example 1
+df1 = spark.createDataFrame(data=[("1", 1000), ("2", 3000)], schema=["id", "amount"])
+df2 = spark.createDataFrame(data=[("1", 1000), ("2", 3000)], schema=["id", "amount"])
+assertDataFrameEqual(df1, df2)  # pass, DataFrames are identical
+
+----------------------------------------
+
+TITLE: Cleaning Streaming Data in Spark Python
+DESCRIPTION: Defines a function to clean and normalize streaming data, parsing JSON and splitting student names.
+
+LANGUAGE: python
+CODE:
+schema = StructType([
+ StructField("student_name", StringType()),
+ StructField("graduation_year", StringType()),
+ StructField("major", StringType()),
+])
+
+def with_normalized_names(df, schema):
+    parsed_df = (
+        df.withColumn("json_data", from_json(col("value").cast("string"), schema))
+        .withColumn("student_name", col("json_data.student_name"))
+        .withColumn("graduation_year", col("json_data.graduation_year"))
+        .withColumn("major", col("json_data.major"))
+        .drop(col("json_data"))
+        .drop(col("value"))
+    )
+    split_col = split(parsed_df["student_name"], "XX")
+    return (
+        parsed_df.withColumn("first_name", split_col.getItem(0))
+        .withColumn("last_name", split_col.getItem(1))
+        .drop("student_name")
+    )
+
+----------------------------------------
+
+TITLE: Querying Data with Spark SQL in Python
+DESCRIPTION: Demonstrates basic SQL query execution and result processing using Spark SQL. Shows how to execute a SQL query and map over the results to extract specific fields.
+
+LANGUAGE: python
+CODE:
+results = spark.sql("SELECT * FROM people")
+names = results.map(lambda p: p.name)
+
+----------------------------------------
+
+TITLE: Spark Streaming State Management
+DESCRIPTION: Method for implementing stateful stream processing in Spark Streaming applications.
+
+LANGUAGE: Java
+CODE:
+updateStateByKey
+
+----------------------------------------
+
+TITLE: Creating Remote Spark Connect Session
+DESCRIPTION: Establishes a remote connection to the Spark Connect server running on localhost:15002.
+
+LANGUAGE: python
+CODE:
+spark = SparkSession.builder.remote("sc://localhost:15002").getOrCreate()
+
+----------------------------------------
+
+TITLE: Creating Spark DataFrame in Python
+DESCRIPTION: Creates a Spark DataFrame with 'first_name' and 'age' columns, containing four rows of data.
+
+LANGUAGE: python
+CODE:
+df = spark.createDataFrame(
+    [
+        ("sue", 32),
+        ("li", 3),
+        ("bob", 75),
+        ("heo", 13),
+    ],
+    ["first_name", "age"],
+)
+
+----------------------------------------
+
+TITLE: Defining PySpark Transformation Function
+DESCRIPTION: Defines a function to remove extra spaces from a specified column in a PySpark DataFrame using regexp_replace. This demonstrates a typical ETL transformation operation.
+
+LANGUAGE: python
+CODE:
+from pyspark.sql.functions import col, regexp_replace
+
+# Remove additional spaces in name
+def remove_extra_spaces(df, column_name):
+    # Remove extra spaces from the specified column
+    df_transformed = df.withColumn(column_name, regexp_replace(col(column_name), "\\s+", " "))
+    
+    return df_transformed
+
+transformed_df = remove_extra_spaces(df, "name")
+
+transformed_df.show()
+
+----------------------------------------
+
+TITLE: Creating Remote Spark Connect Session - Python
+DESCRIPTION: Establishes a remote connection to the Spark Connect server running on localhost:15002.
+
+LANGUAGE: python
+CODE:
+spark = SparkSession.builder.remote("sc://localhost:15002").getOrCreate()
+
+----------------------------------------
+
+TITLE: Python Data Analysis Example
+DESCRIPTION: Shows data analysis workflow including CSV reading, column selection, filtering and statistical analysis
+
+LANGUAGE: python
+CODE:
+df = spark.read.csv("accounts.csv", header=True)
+
+# Select subset of features and filter for balance > 0
+filtered_df = df.select("AccountBalance", "CountOfDependents").filter("AccountBalance > 0")
+
+# Generate summary statistics
+filtered_df.summary().show()
+
+----------------------------------------
+
+TITLE: DataFrame Transformation Function
+DESCRIPTION: Defines a function to remove extra spaces from text columns using regexp_replace.
+
+LANGUAGE: python
+CODE:
+from pyspark.sql.functions import col, regexp_replace
+
+# Remove additional spaces in name
+def remove_extra_spaces(df, column_name):
+    # Remove extra spaces from the specified column
+    df_transformed = df.withColumn(column_name, regexp_replace(col(column_name), "\\s+", " "))
+    
+    return df_transformed
+
+transformed_df = remove_extra_spaces(df, "name")
+
+transformed_df.show()
+
+----------------------------------------
+
+TITLE: Stopping Existing Spark Session
+DESCRIPTION: Stops any existing local Spark session to prepare for creating a remote Spark Connect session.
+
+LANGUAGE: python
+CODE:
+from pyspark.sql import SparkSession
+
+SparkSession.builder.master("local[*]").getOrCreate().stop()
+
+----------------------------------------
+
+TITLE: Python Quick Start Data Processing Example
+DESCRIPTION: Basic example of reading JSON data and performing filtering operations in PySpark
+
+LANGUAGE: python
+CODE:
+df = spark.read.json("logs.json")
+df.where("age > 21").select("name.first").show()
+
+----------------------------------------
+
+TITLE: Configuring Spark SQL to use Tungsten and code generation
+DESCRIPTION: Configuration to enable optimized execution using Tungsten and code generation for expression evaluation in Spark SQL.
+
+LANGUAGE: Properties
+CODE:
+spark.sql.tungsten.enabled=true
+
+----------------------------------------
+
+TITLE: Stopping Existing Spark Session - Python
+DESCRIPTION: Stops any existing local Spark session to prepare for creating a remote Spark Connect session.
+
+LANGUAGE: python
+CODE:
+from pyspark.sql import SparkSession
+
+SparkSession.builder.master("local[*]").getOrCreate().stop()
+
+----------------------------------------
+
+TITLE: Integrating SQL Queries with PySpark DataFrame
+DESCRIPTION: Shows how to use SQL queries with PySpark DataFrames by registering the DataFrame as a temporary view. This allows for SQL-based data manipulation.
+
+LANGUAGE: python
+CODE:
+df.createOrReplaceTempView("tableA")
+spark.sql("SELECT count(*) from tableA").show()
+
+----------------------------------------
+
+TITLE: Enabling backpressure in Spark Streaming
+DESCRIPTION: Configuration to enable the new experimental backpressure feature in Spark Streaming for handling bursty input streams.
+
+LANGUAGE: Properties
+CODE:
+spark.streaming.backpressure.enabled=true
+
+----------------------------------------
+
+TITLE: Creating and Displaying DataFrame
+DESCRIPTION: Creates a sample DataFrame with different data types including integers, floats, strings, dates, and timestamps, then displays it.
+
+LANGUAGE: python
+CODE:
+from datetime import datetime, date
+from pyspark.sql import Row
+
+df = spark.createDataFrame([
+    Row(a=1, b=2., c='string1', d=date(2000, 1, 1), e=datetime(2000, 1, 1, 12, 0)),
+    Row(a=2, b=3., c='string2', d=date(2000, 2, 1), e=datetime(2000, 1, 2, 12, 0)),
+    Row(a=4, b=5., c='string3', d=date(2000, 3, 1), e=datetime(2000, 1, 3, 12, 0))
+])
+df.show()
+
+----------------------------------------
+
+TITLE: Creating PySpark DataFrame with Explicit Schema
+DESCRIPTION: Shows how to create a PySpark DataFrame with an explicitly defined schema. This approach provides more control over column data types.
+
+LANGUAGE: python
+CODE:
+df = spark.createDataFrame([
+    (1, 2., 'string1', date(2000, 1, 1), datetime(2000, 1, 1, 12, 0)),
+    (2, 3., 'string2', date(2000, 2, 1), datetime(2000, 1, 2, 12, 0)),
+    (3, 4., 'string3', date(2000, 3, 1), datetime(2000, 1, 3, 12, 0))
+], schema='a long, b double, c string, d date, e timestamp')
+df
+
+----------------------------------------
+
+TITLE: Creating and Displaying DataFrame with Spark Connect in Python
+DESCRIPTION: This code demonstrates creating a DataFrame using the remote Spark session and displaying its contents. It showcases the use of various data types including integers, floats, strings, dates, and datetimes.
+
+LANGUAGE: python
+CODE:
+from datetime import datetime, date
+from pyspark.sql import Row
+
+df = spark.createDataFrame([
+    Row(a=1, b=2., c='string1', d=date(2000, 1, 1), e=datetime(2000, 1, 1, 12, 0)),
+    Row(a=2, b=3., c='string2', d=date(2000, 2, 1), e=datetime(2000, 1, 2, 12, 0)),
+    Row(a=4, b=5., c='string3', d=date(2000, 3, 1), e=datetime(2000, 1, 3, 12, 0))
+])
+df.show()
+
+----------------------------------------
+
+TITLE: Creating and Displaying DataFrame with Remote Spark Session in Python
+DESCRIPTION: This code creates a DataFrame using the remote Spark session and displays its contents. It demonstrates that the remote session can be used similarly to a regular Spark session.
+
+LANGUAGE: python
+CODE:
+from datetime import datetime, date
+from pyspark.sql import Row
+
+df = spark.createDataFrame([
+    Row(a=1, b=2., c='string1', d=date(2000, 1, 1), e=datetime(2000, 1, 1, 12, 0)),
+    Row(a=2, b=3., c='string2', d=date(2000, 2, 1), e=datetime(2000, 1, 2, 12, 0)),
+    Row(a=4, b=5., c='string3', d=date(2000, 3, 1), e=datetime(2000, 1, 3, 12, 0))
+])
+df.show()
+
+----------------------------------------
+
+TITLE: Using PySpark Built-in Test Utils
+DESCRIPTION: Demonstrates usage of PySpark's built-in testing utilities for DataFrame and schema comparison
+
+LANGUAGE: python
+CODE:
+import pyspark.testing
+from pyspark.testing.utils import assertDataFrameEqual
+
+# Example 1
+df1 = spark.createDataFrame(data=[("1", 1000), ("2", 3000)], schema=["id", "amount"])
+df2 = spark.createDataFrame(data=[("1", 1000), ("2", 3000)], schema=["id", "amount"])
+assertDataFrameEqual(df1, df2)  # pass, DataFrames are identical
+
+----------------------------------------
+
+TITLE: Creating PySpark DataFrame from Rows
+DESCRIPTION: Demonstrates creating a DataFrame using Row objects with different data types including dates and timestamps.
+
+LANGUAGE: python
+CODE:
+from datetime import datetime, date
+import pandas as pd
+from pyspark.sql import Row
+
+df = spark.createDataFrame([
+    Row(a=1, b=2., c='string1', d=date(2000, 1, 1), e=datetime(2000, 1, 1, 12, 0)),
+    Row(a=2, b=3., c='string2', d=date(2000, 2, 1), e=datetime(2000, 1, 2, 12, 0)),
+    Row(a=4, b=5., c='string3', d=date(2000, 3, 1), e=datetime(2000, 1, 3, 12, 0))
+])
+
+----------------------------------------
+
+TITLE: Creating Remote Spark Connect Session
+DESCRIPTION: Establishes a remote connection to the Spark Connect server running on localhost:15002.
+
+LANGUAGE: python
+CODE:
+spark = SparkSession.builder.remote("sc://localhost:15002").getOrCreate()
+
+----------------------------------------
+
+TITLE: Testing PySpark with pytest
+DESCRIPTION: Demonstrates how to use pytest fixtures for PySpark testing setup and execution.
+
+LANGUAGE: python
+CODE:
+import pytest
+
+@pytest.fixture
+def spark_fixture():
+    spark = SparkSession.builder.appName("Testing PySpark Example").getOrCreate()
+    yield spark
+
+----------------------------------------
+
+TITLE: Creating and Displaying DataFrame with Spark Connect
+DESCRIPTION: Demonstrates creating a DataFrame using Spark Connect with various data types including integers, floats, strings, dates, and timestamps, then displays the results.
+
+LANGUAGE: python
+CODE:
+from datetime import datetime, date
+from pyspark.sql import Row
+
+df = spark.createDataFrame([
+    Row(a=1, b=2., c='string1', d=date(2000, 1, 1), e=datetime(2000, 1, 1, 12, 0)),
+    Row(a=2, b=3., c='string2', d=date(2000, 2, 1), e=datetime(2000, 1, 2, 12, 0)),
+    Row(a=4, b=5., c='string3', d=date(2000, 3, 1), e=datetime(2000, 1, 3, 12, 0))
+])
+df.show()
+
+----------------------------------------
+
+TITLE: Stopping Existing Spark Session in Python
+DESCRIPTION: This code stops any existing regular Spark session to prepare for creating a remote Spark Connect session. It's necessary because regular and remote sessions cannot coexist.
+
+LANGUAGE: python
+CODE:
+from pyspark.sql import SparkSession
+
+SparkSession.builder.master("local[*]").getOrCreate().stop()
+
+----------------------------------------
+
+TITLE: Creating Sample DataFrame
+DESCRIPTION: Initializes a test DataFrame with sample name and age data.
+
+LANGUAGE: python
+CODE:
+sample_data = [{"name": "John    D.", "age": 30}, 
+  {"name": "Alice   G.", "age": 25}, 
+  {"name": "Bob  T.", "age": 35}, 
+  {"name": "Eve   A.", "age": 28}] 
+
+df = spark.createDataFrame(sample_data)
+
+----------------------------------------
+
+TITLE: Setting primitivesAsString option for JSON schema inference in Spark
+DESCRIPTION: When inferring schema from JSON into a DataFrame, users can set primitivesAsString to true to infer all primitive value types as Strings. The default value is false.
+
+LANGUAGE: Scala
+CODE:
+// Set primitivesAsString option to true
+sqlContext.read.option("primitivesAsString", true).json("path/to/json")
+
+----------------------------------------
+
+TITLE: Grouping and Aggregating PySpark DataFrame
+DESCRIPTION: Shows how to perform grouping and aggregation operations on a PySpark DataFrame. This is useful for summarizing data by categories.
+
+LANGUAGE: python
+CODE:
+df = spark.createDataFrame([
+    ['red', 'banana', 1, 10], ['blue', 'banana', 2, 20], ['red', 'carrot', 3, 30],
+    ['blue', 'grape', 4, 40], ['red', 'carrot', 5, 50], ['black', 'carrot', 6, 60],
+    ['red', 'banana', 7, 70], ['red', 'grape', 8, 80]], schema=['color', 'fruit', 'v1', 'v2'])
+df.groupby('color').avg().show()
+
+----------------------------------------
+
+TITLE: Initializing PySpark Session
+DESCRIPTION: Creates a basic SparkSession for testing PySpark examples.
+
+LANGUAGE: python
+CODE:
+from pyspark.sql import SparkSession 
+from pyspark.sql.functions import col 
+
+# Create a SparkSession 
+spark = SparkSession.builder.appName("Testing PySpark Example").getOrCreate() 
+
+----------------------------------------
+
+TITLE: Spark Key Operations
+DESCRIPTION: Key-based reduction operation in Spark for aggregating data.
+
+LANGUAGE: Java
+CODE:
+foldByKey
+
+----------------------------------------
+
+TITLE: Writing and Reading PySpark DataFrame as CSV
+DESCRIPTION: Demonstrates how to write a PySpark DataFrame to a CSV file and then read it back. This is useful for data persistence and sharing.
+
+LANGUAGE: python
+CODE:
+df.write.csv('foo.csv', header=True)
+spark.read.csv('foo.csv', header=True).show()
+
+----------------------------------------
+
+TITLE: Setting Up PySpark Pytest Fixture
+DESCRIPTION: Defines a pytest fixture for creating and sharing a SparkSession across tests.
+
+LANGUAGE: python
+CODE:
+import pytest
+
+@pytest.fixture
+def spark_fixture():
+    spark = SparkSession.builder.appName("Testing PySpark Example").getOrCreate()
+    yield spark
+
+----------------------------------------
+
+TITLE: Spark Streaming Operations
+DESCRIPTION: Basic counting operation in Spark Streaming for real-time data processing.
+
+LANGUAGE: Java
+CODE:
+count
+
+----------------------------------------
+
+TITLE: Displaying PySpark DataFrame Content and Schema
+DESCRIPTION: Shows how to display the content of a PySpark DataFrame and its schema. This is useful for data inspection and verification.
+
+LANGUAGE: python
+CODE:
+# All DataFrames above result same.
+df.show()
+df.printSchema()
+
+----------------------------------------
+
+TITLE: Initializing SparkSession for PySpark Testing
+DESCRIPTION: Creates a SparkSession for a PySpark testing example. This is typically the first step in setting up a PySpark application or test environment.
+
+LANGUAGE: python
+CODE:
+from pyspark.sql import SparkSession 
+from pyspark.sql.functions import col 
+
+# Create a SparkSession 
+spark = SparkSession.builder.appName("Testing PySpark Example").getOrCreate() 
+
+----------------------------------------
+
+TITLE: Creating Sample DataFrame in PySpark
+DESCRIPTION: Generates a sample DataFrame using a list of dictionaries. This is useful for creating test data in PySpark applications.
+
+LANGUAGE: python
+CODE:
+sample_data = [{"name": "John    D.", "age": 30}, 
+  {"name": "Alice   G.", "age": 25}, 
+  {"name": "Bob  T.", "age": 35}, 
+  {"name": "Eve   A.", "age": 28}] 
+
+df = spark.createDataFrame(sample_data)
+
+----------------------------------------
+
+TITLE: Converting Pandas DataFrame to PySpark DataFrame
+DESCRIPTION: Shows how to convert a pandas DataFrame to a PySpark DataFrame while preserving data types
+
+LANGUAGE: python
+CODE:
+pandas_df = pd.DataFrame({
+    'a': [1, 2, 3],
+    'b': [2., 3., 4.],
+    'c': ['string1', 'string2', 'string3'],
+    'd': [date(2000, 1, 1), date(2000, 2, 1), date(2000, 3, 1)],
+    'e': [datetime(2000, 1, 1, 12, 0), datetime(2000, 1, 2, 12, 0), datetime(2000, 1, 3, 12, 0)]
+})
+df = spark.createDataFrame(pandas_df)
+
+----------------------------------------
+
+TITLE: Initializing PySpark SparkSession
+DESCRIPTION: Creates the entry point SparkSession object for PySpark operations
+
+LANGUAGE: python
+CODE:
+from pyspark.sql import SparkSession
+
+spark = SparkSession.builder.getOrCreate()
+
+----------------------------------------
+
+TITLE: Initializing PySpark Session
+DESCRIPTION: Creates a SparkSession for a PySpark application. This is the entry point for programming Spark with the Dataset and DataFrame API.
+
+LANGUAGE: python
+CODE:
+from pyspark.sql import SparkSession 
+from pyspark.sql.functions import col 
+
+# Create a SparkSession 
+spark = SparkSession.builder.appName("Testing PySpark Example").getOrCreate() 
+
+----------------------------------------
+
+TITLE: Initializing SparkSession in PySpark
+DESCRIPTION: Creates a new SparkSession which is the entry point for PySpark functionality
+
+LANGUAGE: python
+CODE:
+from pyspark.sql import SparkSession
+
+spark = SparkSession.builder.getOrCreate()
+
+----------------------------------------
+
+TITLE: Initializing PySpark Session
+DESCRIPTION: Creates a basic SparkSession for testing purposes with a custom application name.
+
+LANGUAGE: python
+CODE:
+from pyspark.sql import SparkSession 
+from pyspark.sql.functions import col 
+
+# Create a SparkSession 
+spark = SparkSession.builder.appName("Testing PySpark Example").getOrCreate()
+
+----------------------------------------
+
+TITLE: Creating PySpark DataFrame
+DESCRIPTION: Demonstrates how to create a PySpark DataFrame from a list of dictionaries. This is a common way to initialize data for testing or small-scale operations.
+
+LANGUAGE: python
+CODE:
+sample_data = [{"name": "John    D.", "age": 30}, 
+  {"name": "Alice   G.", "age": 25}, 
+  {"name": "Bob  T.", "age": 35}, 
+  {"name": "Eve   A.", "age": 28}] 
+
+df = spark.createDataFrame(sample_data)
+
+----------------------------------------
+
+TITLE: Creating PySpark DataFrame with Explicit Schema
+DESCRIPTION: Shows how to create a PySpark DataFrame with an explicitly defined schema. This approach provides more control over column data types.
+
+LANGUAGE: python
+CODE:
+df = spark.createDataFrame([
+    (1, 2., 'string1', date(2000, 1, 1), datetime(2000, 1, 1, 12, 0)),
+    (2, 3., 'string2', date(2000, 2, 1), datetime(2000, 1, 2, 12, 0)),
+    (3, 4., 'string3', date(2000, 3, 1), datetime(2000, 1, 3, 12, 0))
+], schema='a long, b double, c string, d date, e timestamp')
+df
+
+----------------------------------------
+
+TITLE: Running PySpark Tests
+DESCRIPTION: This snippet demonstrates how to run PySpark tests, including specific modules, classes, and individual test cases.
+
+LANGUAGE: shell
+CODE:
+$ python/run-tests --testnames pyspark.sql.tests.test_arrow
+
+$ python/run-tests --testnames 'pyspark.sql.tests.test_arrow ArrowTests'
+
+$ python/run-tests --testnames 'pyspark.sql.tests.test_arrow ArrowTests.test_null_conversion'
+
+$ python/run-tests --testnames pyspark.sql.dataframe
+
+$ python/run-tests-with-coverage --testnames pyspark.sql.tests.test_arrow --python-executables=python
+
+----------------------------------------
+
+TITLE: Initializing SparkSession in PySpark
+DESCRIPTION: Creates a new SparkSession which is the entry point for PySpark functionality.
+
+LANGUAGE: python
+CODE:
+from pyspark.sql import SparkSession
+
+spark = SparkSession.builder.getOrCreate()
+
+----------------------------------------
+
+TITLE: Creating PySpark DataFrame from Pandas DataFrame
+DESCRIPTION: Illustrates how to create a PySpark DataFrame from a pandas DataFrame. This is useful when transitioning from pandas to PySpark for larger datasets.
+
+LANGUAGE: python
+CODE:
+pandas_df = pd.DataFrame({
+    'a': [1, 2, 3],
+    'b': [2., 3., 4.],
+    'c': ['string1', 'string2', 'string3'],
+    'd': [date(2000, 1, 1), date(2000, 2, 1), date(2000, 3, 1)],
+    'e': [datetime(2000, 1, 1, 12, 0), datetime(2000, 1, 2, 12, 0), datetime(2000, 1, 3, 12, 0)]
+})
+df = spark.createDataFrame(pandas_df)
+df
+
+----------------------------------------
+
+TITLE: Building Individual Spark Submodules with SBT and Maven
+DESCRIPTION: This snippet shows how to build specific Spark submodules using both SBT and Maven build systems.
+
+LANGUAGE: shell
+CODE:
+$ # sbt
+$ build/sbt
+> project core
+> package
+
+$ # or you can build the spark-core module with sbt directly using:
+$ build/sbt core/package
+
+$ # Maven
+$ build/mvn package -DskipTests -pl core
+
+----------------------------------------
+
+TITLE: Creating PySpark DataFrame
+DESCRIPTION: Demonstrates how to create a PySpark DataFrame from sample data. This DataFrame will be used for subsequent transformations and tests.
+
+LANGUAGE: python
+CODE:
+sample_data = [{"name": "John    D.", "age": 30}, 
+  {"name": "Alice   G.", "age": 25}, 
+  {"name": "Bob  T.", "age": 35}, 
+  {"name": "Eve   A.", "age": 28}] 
+
+df = spark.createDataFrame(sample_data)
+
+----------------------------------------
+
+TITLE: Writing and Reading PySpark DataFrame as Parquet
+DESCRIPTION: Demonstrates how to write a PySpark DataFrame to a Parquet file and read it back. Parquet is an efficient columnar storage format often used with big data processing frameworks.
+
+LANGUAGE: python
+CODE:
+df.write.parquet('bar.parquet')
+spark.read.parquet('bar.parquet').show()
+
+----------------------------------------
+
+TITLE: Reducing SBT Build Times in Spark Development
+DESCRIPTION: This snippet demonstrates how to optimize SBT build times during Spark development by avoiding re-creating the assembly JAR and using compiled classes.
+
+LANGUAGE: shell
+CODE:
+$ build/sbt clean package
+$ ./bin/spark-shell
+$ export SPARK_PREPEND_CLASSES=true
+$ ./bin/spark-shell # Now it's using compiled classes
+# ... do some local development ... #
+$ build/sbt compile
+$ unset SPARK_PREPEND_CLASSES
+$ ./bin/spark-shell
+ 
+# You can also use ~ to let sbt do incremental builds on file changes without running a new sbt session every time
+$ build/sbt ~compile
+
+----------------------------------------
+
+TITLE: Maven Dependency Configuration
+DESCRIPTION: Maven coordinates for adding Spark as a dependency in Maven-based projects.
+
+LANGUAGE: xml
+CODE:
+groupId: org.apache.spark
+artifactId: spark-core_2.12
+version: 3.5.5
+
+----------------------------------------
+
+TITLE: Integrating SQL Queries with PySpark DataFrames
+DESCRIPTION: Shows how to register a PySpark DataFrame as a temporary view and run SQL queries on it. This demonstrates the seamless integration between DataFrame and SQL APIs in PySpark.
+
+LANGUAGE: python
+CODE:
+df.createOrReplaceTempView("tableA")
+spark.sql("SELECT count(*) from tableA").show()
+
+----------------------------------------
+
+TITLE: Checking Binary Compatibility in Spark
+DESCRIPTION: This snippet shows how to check for binary compatibility issues in Spark using MiMa and how to add exclusions for justified incompatibilities.
+
+LANGUAGE: shell
+CODE:
+$ dev/mima
+
+----------------------------------------
+
+TITLE: Invalid Pivot Column Error in Spark SQL
+DESCRIPTION: This error message indicates that a pivot column is invalid because it must be comparable, implying that the user should use comparable pivot columns.
+
+LANGUAGE: scala
+CODE:
+Invalid pivot column {}. Pivot columns must be comparable.
+
+----------------------------------------
+
+TITLE: DataFrame I/O Operations
+DESCRIPTION: Examples of reading and writing DataFrames in different file formats including CSV, Parquet and ORC
+
+LANGUAGE: python
+CODE:
+df.write.csv('foo.csv', header=True)
+spark.read.csv('foo.csv', header=True).show()
+
+df.write.parquet('bar.parquet')
+spark.read.parquet('bar.parquet').show()
+
+df.write.orc('zoo.orc')
+spark.read.orc('zoo.orc').show()
+
+----------------------------------------
+
+TITLE: Initializing SparkSession in PySpark
+DESCRIPTION: Creates a SparkSession, which is the entry point for PySpark applications. This session provides a way to interact with Spark functionality.
+
+LANGUAGE: python
+CODE:
+from pyspark.sql import SparkSession
+
+spark = SparkSession.builder.getOrCreate()
+
+----------------------------------------
+
+TITLE: Path Not Found Error in Spark
+DESCRIPTION: This error message simply states that a specified path does not exist, implying that the user provided an invalid path and should use a different one.
+
+LANGUAGE: scala
+CODE:
+Path does not exist: {}
+
+----------------------------------------
+
+TITLE: Adding MiMa Exclusions for Binary Incompatibilities
+DESCRIPTION: This snippet demonstrates how to add exclusions for justified binary incompatibilities in Spark's MiMa configuration.
+
+LANGUAGE: scala
+CODE:
+// [SPARK-zz][CORE] Fix an issue
+ProblemFilters.exclude[DirectMissingMethodProblem]("org.apache.spark.SomeClass.this")
+
+----------------------------------------
+
+TITLE: Optimized pandas Query
+DESCRIPTION: Demonstrates manually optimized pandas code using column pruning and filtering, showing the complexity of manual optimization required in pandas.
+
+LANGUAGE: python
+CODE:
+df = pd.read_parquet(
+    "G1_1e9_1e2_0_0.parquet",
+    columns=["id1", "id2", "v3"],
+    filters=[("id1", ">", "id098")],
+    engine="pyarrow",
+)
+df.query("id1 > 'id098'").groupby("id2").sum().head(3)
+
+----------------------------------------
+
+TITLE: Saving SequenceFile with Native Types in Spark
+DESCRIPTION: Demonstrates how to create and save a dataset as a SequenceFile using native types that automatically convert to Hadoop Writable types.
+
+LANGUAGE: scala
+CODE:
+// Will write a SequenceFile of (IntWritable, IntWritable)
+val squares = spark.parallelize(1 to 100).map(n => (n, n*n))
+squares.saveAsSequenceFile("hdfs://...")
+
+----------------------------------------
+
+TITLE: Running Individual Tests in Spark with Maven
+DESCRIPTION: This snippet shows how to run specific Scala and Java tests in Spark using Maven.
+
+LANGUAGE: shell
+CODE:
+build/mvn -Dtest=none -DwildcardSuites=org.apache.spark.scheduler.DAGSchedulerSuite test
+
+build/mvn test -DwildcardSuites=none -Dtest=org.apache.spark.streaming.JavaAPISuite test
+
+----------------------------------------
+
+TITLE: R Data Processing Example
+DESCRIPTION: Basic example of reading JSON data and performing filtering operations in R
+
+LANGUAGE: r
+CODE:
+df <- read.json(path = "logs.json")
+df <- filter(df, df$age > 21)
+head(select(df, df$name.first))
+
+----------------------------------------
+
+TITLE: New Hadoop API Package Reference
+DESCRIPTION: Package reference for the new Hadoop API support in Spark 0.5.0, enabling read/write operations with storage formats in the new Hadoop API.
+
+LANGUAGE: java
+CODE:
+org.apache.mapreduce
+
+----------------------------------------
+
+TITLE: Running Individual Tests in Spark with SBT
+DESCRIPTION: This snippet demonstrates how to run specific tests or test suites in Spark using SBT, including wildcard patterns and filtering by test name.
+
+LANGUAGE: shell
+CODE:
+$ build/sbt
+> project core
+> test
+
+> testOnly org.apache.spark.scheduler.DAGSchedulerSuite
+
+> testOnly *DAGSchedulerSuite
+
+> testOnly org.apache.spark.scheduler.*
+
+> testOnly *DAGSchedulerSuite -- -z "SPARK-12345"
+
+$ build/sbt "core/testOnly *DAGSchedulerSuite -- -z SPARK-12345"
+
+----------------------------------------
+
+TITLE: Creating Remote Spark Session with Spark Connect in Python
+DESCRIPTION: This snippet demonstrates how to create a remote Spark session using Spark Connect. It connects to the Spark server running on localhost:15002.
+
+LANGUAGE: python
+CODE:
+spark = SparkSession.builder.remote("sc://localhost:15002").getOrCreate()
+
+----------------------------------------
+
+TITLE: Maven Dependency Configuration for Spark 0.6.0
+DESCRIPTION: Maven coordinates for including Spark 0.6.0 as a dependency in Java/Scala projects. Uses Scala 2.9.2 compatible artifact.
+
+LANGUAGE: xml
+CODE:
+<dependency>
+    <groupId>org.spark-project</groupId>
+    <artifactId>spark-core_2.9.2</artifactId>
+    <version>0.6.0</version>
+</dependency>
+
+----------------------------------------
+
+TITLE: Unit Testing Setup with PySpark
+DESCRIPTION: Demonstrates complete unit test setup with PySpark including session management and test cases.
+
+LANGUAGE: python
+CODE:
+import unittest
+
+class PySparkTestCase(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        cls.spark = SparkSession.builder.appName("Sample PySpark ETL").getOrCreate() 
+
+    @classmethod
+    def tearDownClass(cls):
+        cls.spark.stop()
+        
+class TestTranformation(PySparkTestCase):
+    def test_single_space(self):
+        sample_data = [{"name": "John    D.", "age": 30}, 
+                        {"name": "Alice   G.", "age": 25}, 
+                        {"name": "Bob  T.", "age": 35}, 
+                        {"name": "Eve   A.", "age": 28}] 
+                
+        # Create a Spark DataFrame
+        original_df = spark.createDataFrame(sample_data)
+    
+        # Apply the transformation function from before
+        transformed_df = remove_extra_spaces(original_df, "name")
+    
+        expected_data = [{"name": "John D.", "age": 30}, 
+        {"name": "Alice G.", "age": 25}, 
+        {"name": "Bob T.", "age": 35}, 
+        {"name": "Eve A.", "age": 28}]
+    
+        expected_df = spark.createDataFrame(expected_data)
+    
+        assertDataFrameEqual(transformed_df, expected_df)
+
+----------------------------------------
+
+TITLE: Creating Remote Spark Session with Spark Connect in Python
+DESCRIPTION: This code creates a remote Spark session using Spark Connect. It connects to the Spark server running on localhost:15002.
+
+LANGUAGE: python
+CODE:
+spark = SparkSession.builder.remote("sc://localhost:15002").getOrCreate()
+
+----------------------------------------
+
+TITLE: RDD Persistence Configuration Example
+DESCRIPTION: Shows how to set storage level for RDDs using the persist() method, replacing the deprecated spark.cache.class parameter.
+
+LANGUAGE: scala
+CODE:
+rdd.persist() // Store RDD with custom storage level
+
+----------------------------------------
+
+TITLE: Creating Sample DataFrame
+DESCRIPTION: Creates a sample DataFrame with name and age columns containing multiple space characters in names.
+
+LANGUAGE: python
+CODE:
+sample_data = [{"name": "John    D.", "age": 30}, 
+  {"name": "Alice   G.", "age": 25}, 
+  {"name": "Bob  T.", "age": 35}, 
+  {"name": "Eve   A.", "age": 28}] 
+
+df = spark.createDataFrame(sample_data)
+
+----------------------------------------
+
+TITLE: Stopping Existing Spark Session in Python
+DESCRIPTION: This code stops any existing regular Spark session to prepare for creating a remote Spark Connect session. It's necessary because regular and remote sessions cannot coexist.
+
+LANGUAGE: python
+CODE:
+from pyspark.sql import SparkSession
+
+SparkSession.builder.master("local[*]").getOrCreate().stop()
+
+----------------------------------------
+
+TITLE: Configuring Hadoop Version for Spark 0.5.2 Compilation in Scala
+DESCRIPTION: To compile Spark 0.5.2 against Hadoop 2 distributions, users need to modify the HADOOP_VERSION and HADOOP_MAJOR_VERSION variables in the project/SparkBuild.scala file. This configuration change allows Spark to be compatible with different Hadoop versions.
+
+LANGUAGE: scala
+CODE:
+project/SparkBuild.scala
+
+----------------------------------------
+
+TITLE: Implementing DataFrame Transformation
+DESCRIPTION: Defines and applies a function to remove extra spaces from strings in a DataFrame column.
+
+LANGUAGE: python
+CODE:
+from pyspark.sql.functions import col, regexp_replace
+
+# Remove additional spaces in name
+def remove_extra_spaces(df, column_name):
+    # Remove extra spaces from the specified column
+    df_transformed = df.withColumn(column_name, regexp_replace(col(column_name), "\\s+", " "))
+    
+    return df_transformed
+
+transformed_df = remove_extra_spaces(df, "name")
+
+transformed_df.show()
+
+----------------------------------------
+
+TITLE: Creating and Displaying DataFrame with Spark Connect
+DESCRIPTION: Demonstrates DataFrame creation and manipulation using Spark Connect, including different data types like integers, floats, strings, dates, and timestamps.
+
+LANGUAGE: python
+CODE:
+from datetime import datetime, date
+from pyspark.sql import Row
+
+df = spark.createDataFrame([
+    Row(a=1, b=2., c='string1', d=date(2000, 1, 1), e=datetime(2000, 1, 1, 12, 0)),
+    Row(a=2, b=3., c='string2', d=date(2000, 2, 1), e=datetime(2000, 1, 2, 12, 0)),
+    Row(a=4, b=5., c='string3', d=date(2000, 3, 1), e=datetime(2000, 1, 3, 12, 0))
+])
+df.show()
+
+----------------------------------------
+
+TITLE: Configuring Spark Daemon Memory in Bash
+DESCRIPTION: Sets the memory allocation for Spark standalone deploy cluster daemons. This configuration uses a separate variable SPARK_DAEMON_MEMORY instead of SPARK_MEM, with a default of 512 MB.
+
+LANGUAGE: bash
+CODE:
+SPARK_DAEMON_MEMORY=512m
+
+----------------------------------------
+
+TITLE: Creating Sample DataFrame
+DESCRIPTION: Initializes a sample DataFrame with name and age data for testing purposes.
+
+LANGUAGE: python
+CODE:
+sample_data = [{"name": "John    D.", "age": 30}, 
+  {"name": "Alice   G.", "age": 25}, 
+  {"name": "Bob  T.", "age": 35}, 
+  {"name": "Eve   A.", "age": 28}] 
+
+df = spark.createDataFrame(sample_data)
+
+----------------------------------------
+
+TITLE: Creating Remote Spark Connect Session
+DESCRIPTION: Establishes a remote connection to the Spark Connect server running on localhost:15002 using the SparkSession builder.
+
+LANGUAGE: python
+CODE:
+spark = SparkSession.builder.remote("sc://localhost:15002").getOrCreate()
+
+----------------------------------------
+
+TITLE: Building Spark with Maven and Hadoop Profiles
+DESCRIPTION: Maven commands for building Spark with different Hadoop versions using Maven profiles.
+
+LANGUAGE: shell
+CODE:
+mvn -Phadoop1
+mvn -Phadoop2
+
+----------------------------------------
+
+TITLE: Initializing PySpark Session
+DESCRIPTION: Creates a new SparkSession for the testing example application.
+
+LANGUAGE: python
+CODE:
+from pyspark.sql import SparkSession 
+from pyspark.sql.functions import col 
+
+# Create a SparkSession 
+spark = SparkSession.builder.appName("Testing PySpark Example").getOrCreate() 
+
+----------------------------------------
+
+TITLE: Launching Spark Connect Server with Bash
+DESCRIPTION: Starts the Spark Connect server using a bash script with required packages configuration. Loads environment variables and executes the start-connect-server.sh script.
+
+LANGUAGE: bash
+CODE:
+%%bash
+source ~/.profile # Make sure environment variables are loaded.
+$HOME/sbin/start-connect-server.sh --packages org.apache.spark:spark-connect_2.12:$SPARK_VERSION
+
+----------------------------------------
+
+TITLE: Printing RDD Lineage Graph
+DESCRIPTION: New method to print an RDD's lineage graph for troubleshooting purposes.
+
+LANGUAGE: scala
+CODE:
+RDD.toDebugString()
+
+----------------------------------------
+
+TITLE: Initializing PySpark Session
+DESCRIPTION: Creates a new SparkSession for running PySpark operations. Sets up the basic environment for PySpark usage.
+
+LANGUAGE: python
+CODE:
+from pyspark.sql import SparkSession 
+from pyspark.sql.functions import col 
+
+# Create a SparkSession 
+spark = SparkSession.builder.appName("Testing PySpark Example").getOrCreate() 
+
+----------------------------------------
+
+TITLE: Stopping Existing Spark Session
+DESCRIPTION: Stops any existing local Spark session to prepare for remote connection. This is necessary as local and remote sessions cannot coexist.
+
+LANGUAGE: python
+CODE:
+from pyspark.sql import SparkSession
+
+SparkSession.builder.master("local[*]").getOrCreate().stop()
+
+----------------------------------------
+
+TITLE: Configuring Spark Default Parallelism
+DESCRIPTION: Spark configuration property to set the default parallelism for shuffle operations.
+
+LANGUAGE: properties
+CODE:
+spark.default.parallelism
+
+----------------------------------------
+
+TITLE: Unit Testing PySpark with unittest
+DESCRIPTION: Example of using Python's unittest framework with PySpark, including test class setup and teardown.
+
+LANGUAGE: python
+CODE:
+import unittest
+
+class PySparkTestCase(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        cls.spark = SparkSession.builder.appName("Testing PySpark Example").getOrCreate() 
+
+    
+    @classmethod
+    def tearDownClass(cls):
+        cls.spark.stop()
+
+----------------------------------------
+
+TITLE: Launching Spark Connect Server
+DESCRIPTION: Starts the Spark Connect server using a shell script with required package dependencies.
+
+LANGUAGE: bash
+CODE:
+!$HOME/sbin/start-connect-server.sh --packages org.apache.spark:spark-connect_2.12:$SPARK_VERSION
+
+----------------------------------------
+
+TITLE: Installing PySpark via pip
+DESCRIPTION: Command to install PySpark package from PyPI repository
+
+LANGUAGE: bash
+CODE:
+pip install pyspark
+
+----------------------------------------
+
+TITLE: PySpark Built-in Test Utils Example
+DESCRIPTION: Demonstrates usage of PySpark's built-in assertDataFrameEqual and assertSchemaEqual test utilities.
+
+LANGUAGE: python
+CODE:
+import pyspark.testing
+from pyspark.testing.utils import assertDataFrameEqual
+
+# Example 1
+df1 = spark.createDataFrame(data=[("1", 1000), ("2", 3000)], schema=["id", "amount"])
+df2 = spark.createDataFrame(data=[("1", 1000), ("2", 3000)], schema=["id", "amount"])
+assertDataFrameEqual(df1, df2)  # pass, DataFrames are identical
+
+----------------------------------------
+
+TITLE: Executing Spark Query Using Go Client
+DESCRIPTION: Example demonstrating how to execute a Spark SQL query using the spark-connect-go client library, showing the simplified remote query execution process.
+
+LANGUAGE: go
+CODE:
+spark, _ := sql.SparkSession.Builder.Remote(remote).Build()
+df, _ := spark.Sql("select * from my_cool_table where age > 42")
+df.Show(100, false)
+
+----------------------------------------
+
+TITLE: YAML Frontmatter Configuration for Blog Post
+DESCRIPTION: YAML configuration block defining metadata for the blog post including layout, title, categories, tags, and publication status.
+
+LANGUAGE: yaml
+CODE:
+---
+layout: post
+title: Spark Release 2.4.3
+categories: []
+tags: []
+status: publish
+type: post
+published: true
+meta:
+  _edit_last: '4'
+  _wpas_done_all: '1'
+---
+
+----------------------------------------
+
+TITLE: Using Unittest for PySpark Testing
+DESCRIPTION: Illustrates how to use Python's unittest framework for testing PySpark code. It includes setting up a test case class with SparkSession initialization and a sample test method.
+
+LANGUAGE: python
+CODE:
+import unittest
+from pyspark.testing.utils import assertDataFrameEqual
+
+class PySparkTestCase(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        cls.spark = SparkSession.builder.appName("Testing PySpark Example").getOrCreate() 
+
+    @classmethod
+    def tearDownClass(cls):
+        cls.spark.stop()
+
+class TestTranformation(PySparkTestCase):
+    def test_single_space(self):
+        sample_data = [{"name": "John    D.", "age": 30}, 
+                       {"name": "Alice   G.", "age": 25}, 
+                       {"name": "Bob  T.", "age": 35}, 
+                       {"name": "Eve   A.", "age": 28}] 
+                        
+        # Create a Spark DataFrame
+        original_df = spark.createDataFrame(sample_data)
+        
+        # Apply the transformation function from before
+        transformed_df = remove_extra_spaces(original_df, "name")
+        
+        expected_data = [{"name": "John D.", "age": 30}, 
+        {"name": "Alice G.", "age": 25}, 
+        {"name": "Bob T.", "age": 35}, 
+        {"name": "Eve A.", "age": 28}]
+        
+        expected_df = spark.createDataFrame(expected_data)
+    
+        assertDataFrameEqual(transformed_df, expected_df)
+
+----------------------------------------
+
+TITLE: Uploading GPG Key to Public Server
+DESCRIPTION: Command to upload the generated GPG public key to the OpenPGP key server for release verification.
+
+LANGUAGE: bash
+CODE:
+$ gpg --keyserver hkps://keys.openpgp.org --send-key 26A27D33
+
+----------------------------------------
+
+TITLE: Initializing Spark Session with Runtime Filtering
+DESCRIPTION: Enables row-level runtime filtering for improved join performance
+
+LANGUAGE: scala
+CODE:
+spark.conf.set("spark.sql.optimizer.runtime.bloomFilter.enabled", true)
+
+----------------------------------------
+
+TITLE: Using PySpark Built-in Test Utility Functions
+DESCRIPTION: Demonstrates the use of PySpark's built-in test utility functions like assertDataFrameEqual and assertSchemaEqual for simple ad-hoc validations of DataFrames and schemas.
+
+LANGUAGE: python
+CODE:
+import pyspark.testing
+from pyspark.testing.utils import assertDataFrameEqual
+
+# Example 1
+df1 = spark.createDataFrame(data=[("1", 1000), ("2", 3000)], schema=["id", "amount"])
+df2 = spark.createDataFrame(data=[("1", 1000), ("2", 3000)], schema=["id", "amount"])
+assertDataFrameEqual(df1, df2)  # pass, DataFrames are identical
+
+# Example 2
+df1 = spark.createDataFrame(data=[("1", 0.1), ("2", 3.23)], schema=["id", "amount"])
+df2 = spark.createDataFrame(data=[("1", 0.109), ("2", 3.23)], schema=["id", "amount"])
+assertDataFrameEqual(df1, df2, rtol=1e-1)  # pass, DataFrames are approx equal by rtol
+
+----------------------------------------
+
+TITLE: Generating GPG Key for Release Signing
+DESCRIPTION: Commands to generate a new GPG key pair for signing Apache Spark releases. Shows interactive process for creating a 4096-bit RSA key with no expiration.
+
+LANGUAGE: bash
+CODE:
+$ gpg --full-gen-key
+gpg (GnuPG) 2.0.12; Copyright (C) 2009 Free Software Foundation, Inc.
+This is free software: you are free to change and redistribute it.
+There is NO WARRANTY, to the extent permitted by law.
+
+Please select what kind of key you want:
+   (1) RSA and RSA (default)
+   (2) DSA and Elgamal
+   (3) DSA (sign only)
+   (4) RSA (sign only)
+Your selection? 1
+RSA keys may be between 1024 and 4096 bits long.
+What keysize do you want? (2048) 4096
+Requested keysize is 4096 bits
+Please specify how long the key should be valid.
+         0 = key does not expire
+      <n>  = key expires in n days
+      <n>w = key expires in n weeks
+      <n>m = key expires in n months
+      <n>y = key expires in n years
+Key is valid for? (0) 
+Key does not expire at all
+Is this correct? (y/N) y
+
+----------------------------------------
+
+TITLE: Using New Trigger.AvailableNow for Streaming Queries
+DESCRIPTION: Runs streaming queries in multiple batches like Trigger.Once
+
+LANGUAGE: scala
+CODE:
+df.writeStream
+  .trigger(Trigger.AvailableNow())
+  .start()
+
+----------------------------------------
+
+TITLE: Implementing PySpark Pytest
+DESCRIPTION: Creates a pytest for the PySpark transformation function using the spark_fixture and assertDataFrameEqual.
+
+LANGUAGE: python
+CODE:
+import pytest
+from pyspark.testing.utils import assertDataFrameEqual
+
+def test_single_space(spark_fixture):
+    sample_data = [{"name": "John    D.", "age": 30}, 
+                   {"name": "Alice   G.", "age": 25}, 
+                   {"name": "Bob  T.", "age": 35}, 
+                   {"name": "Eve   A.", "age": 28}] 
+                    
+    # Create a Spark DataFrame
+    original_df = spark_fixture.createDataFrame(sample_data)
+    
+    # Apply the transformation function from before
+    transformed_df = remove_extra_spaces(original_df, "name")
+    
+    expected_data = [{"name": "John D.", "age": 30}, 
+    {"name": "Alice G.", "age": 25}, 
+    {"name": "Bob T.", "age": 35}, 
+    {"name": "Eve A.", "age": 28}]
+    
+    expected_df = spark_fixture.createDataFrame(expected_data)
+
+    assertDataFrameEqual(transformed_df, expected_df)
+
+----------------------------------------
+
+TITLE: Managing Release Keys in SVN
+DESCRIPTION: Commands to update the KEYS file in Apache SVN repository with the new release signing key.
+
+LANGUAGE: bash
+CODE:
+$ gpg --export --armor 26A27D33
+
+# Move dev/ to release/ when the voting is completed. See Finalize the Release below
+svn co --depth=files "https://dist.apache.org/repos/dist/dev/spark" svn-spark
+# edit svn-spark/KEYS file
+svn ci --username $ASF_USERNAME --password "$ASF_PASSWORD" -m"Update KEYS"
+
+----------------------------------------
+
+TITLE: Demonstrating XSS Vulnerability in Spark Web UI
+DESCRIPTION: Example request and response demonstrating the XSS vulnerability (CVE-2017-7678) in Spark's web UI using MHTML injection.
+
+LANGUAGE: http
+CODE:
+GET /app/?appId=Content-Type:%20multipart/related;%20boundary=_AppScan%0d%0a--_AppScan%0d%0aContent-Location:foo%0d%0aContent-Transfer-Encoding:base64%0d%0a%0d%0aPGh0bWw%2bPHNjcmlwdD5hbGVydCgiWFNTIik8L3NjcmlwdD48L2h0bWw%2b%0d%0a HTTP/1.1
+
+LANGUAGE: html
+CODE:
+<div class="row-fluid">No running application with ID Content-Type: multipart/related;
+boundary=_AppScan
+--_AppScan
+Content-Location:foo
+Content-Transfer-Encoding:base64
+PGh0bWw+PHNjcmlwdD5hbGVydCgiWFNTIik8L3NjcmlwdD48L2h0bWw+
+</div>
+
+LANGUAGE: html
+CODE:
+<html><script>alert("XSS")</script></html>
+
+----------------------------------------
+
+TITLE: Setting Up PySpark Unit Test Base Class
+DESCRIPTION: Defines a base class for PySpark unit tests using unittest, including setup and teardown of SparkSession.
+
+LANGUAGE: python
+CODE:
+import unittest
+
+class PySparkTestCase(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        cls.spark = SparkSession.builder.appName("Testing PySpark Example").getOrCreate() 
+
+    
+    @classmethod
+    def tearDownClass(cls):
+        cls.spark.stop()
+
+----------------------------------------
+
+TITLE: Configuring Spark Context with SparkConf in Scala
+DESCRIPTION: The new SparkConf class is introduced as the preferred way to configure advanced settings on SparkContext. It is especially useful in tests to ensure properties don't persist across test runs.
+
+LANGUAGE: Scala
+CODE:
+val conf = new SparkConf()
+  .setMaster("local[2]")
+  .setAppName("MyApp")
+  .set("spark.executor.memory", "1g")
+
+val sc = new SparkContext(conf)
+
+----------------------------------------
+
+TITLE: Generating HTML Documentation with Jekyll
+DESCRIPTION: Command to generate HTML documentation from Markdown files using Jekyll. The SKIP_SCALADOC option allows skipping the time-consuming Scaladoc generation process.
+
+LANGUAGE: shell
+CODE:
+SKIP_SCALADOC=1 jekyll
+
+----------------------------------------
+
+TITLE: Defining PySpark Transformation Function
+DESCRIPTION: Implements a function to remove extra spaces from a specified column in a PySpark DataFrame using regexp_replace.
+
+LANGUAGE: python
+CODE:
+from pyspark.sql.functions import col, regexp_replace
+
+# Remove additional spaces in name
+def remove_extra_spaces(df, column_name):
+    # Remove extra spaces from the specified column
+    df_transformed = df.withColumn(column_name, regexp_replace(col(column_name), "\\s+", " "))
+    
+    return df_transformed
+
+transformed_df = remove_extra_spaces(df, "name")
+
+transformed_df.show()
+
+----------------------------------------
+
+TITLE: Running Jekyll Server for Local Documentation Viewing
+DESCRIPTION: Command to build the documentation and start a local webserver using Jekyll, allowing you to view the generated site at http://localhost:4000.
+
+LANGUAGE: shell
+CODE:
+jekyll --server
+
+----------------------------------------
+
+TITLE: Using expr function to create DataFrame column from SQL expression
+DESCRIPTION: New function to turn a SQL expression string into a DataFrame column.
+
+LANGUAGE: Scala
+CODE:
+import org.apache.spark.sql.functions.expr
+
+df.select(expr("count(*) over (partition by department)"))
+
+----------------------------------------
+
+TITLE: Setting ADD_JARS Environment Variable in Spark Shell
+DESCRIPTION: Environment variable configuration for adding external JARs to Spark clusters. The JARs specified will be distributed to all worker nodes.
+
+LANGUAGE: shell
+CODE:
+ADD_JARS
+
+----------------------------------------
+
+TITLE: Generating HTML Documentation with Jekyll
+DESCRIPTION: Command to generate HTML documentation from markdown files using Jekyll. The SKIP_SCALADOC option allows skipping the Scaladoc generation process.
+
+LANGUAGE: shell
+CODE:
+SKIP_SCALADOC=1 jekyll
+
+----------------------------------------
+
+TITLE: Using Spark Streaming Listener in Scala
+DESCRIPTION: A new StreamingListener interface has been added for monitoring statistics about streaming computations. This example shows how to implement and register a custom listener.
+
+LANGUAGE: Scala
+CODE:
+import org.apache.spark.streaming.scheduler._
+
+class MyStreamingListener extends StreamingListener {
+  override def onBatchCompleted(batchCompleted: StreamingListenerBatchCompleted) {
+    // Custom logic here
+  }
+}
+
+val ssc = new StreamingContext(...)
+ssc.addStreamingListener(new MyStreamingListener())
+
+----------------------------------------
+
+TITLE: Accessing Distributed Files in Spark
+DESCRIPTION: Methods to access files distributed to worker nodes using SparkFiles utility.
+
+LANGUAGE: scala
+CODE:
+SparkFiles.getRootDirectory
+SparkFiles.get
+
+----------------------------------------
+
+TITLE: Building API Documentation
+DESCRIPTION: Commands for generating Scala and Python API documentation separately using sbt and epydoc respectively.
+
+LANGUAGE: shell
+CODE:
+sbt/sbt doc
+
+LANGUAGE: shell
+CODE:
+epydoc --config epydoc.conf
+
+----------------------------------------
+
+TITLE: Setting Spark Config Properties in Python
+DESCRIPTION: This snippet demonstrates how to set Spark configuration properties directly from Python, which is a new feature in Spark 0.8.1.
+
+LANGUAGE: python
+CODE:
+# Example of setting a Spark config property in Python
+# (Specific syntax not provided in the announcement)
+
+----------------------------------------
+
+TITLE: Accessing S3 Credentials in Spark EC2
+DESCRIPTION: Environment variables used by Spark to read S3 credentials for easier Amazon S3 access.
+
+LANGUAGE: shell
+CODE:
+AWS_ACCESS_KEY_ID
+AWS_SECRET_ACCESS_KEY
+
+----------------------------------------
+
+TITLE: PySpark Class Hierarchy
+DESCRIPTION: The main classes in PySpark including SparkContext for application context, RDD for distributed collections, Accumulator for shared variables, and Broadcast for broadcast variables.
+
+LANGUAGE: python
+CODE:
+- SparkContext
+- RDD
+- Accumulator
+- AccumulatorParam
+- AddingAccumulatorParam
+- Broadcast
+- SparkFiles
+
+----------------------------------------
+
+TITLE: Logging Spark BlockManager Web UI URL
+DESCRIPTION: Example log output showing the URL for the Spark BlockManager web UI, which is used for monitoring memory usage of distributed datasets.
+
+LANGUAGE: plaintext
+CODE:
+15:08:44 INFO BlockManagerUI: Started BlockManager web UI at http://mbk.local:63814
+
+----------------------------------------
+
+TITLE: Accessing Hadoop Configuration in Spark
+DESCRIPTION: New method to access and configure Hadoop input/output settings globally across Spark operations.
+
+LANGUAGE: scala
+CODE:
+SparkContext.hadoopConfiguration
+
+----------------------------------------
+
+TITLE: Creating and Displaying DataFrame
+DESCRIPTION: Creates a sample DataFrame with mixed data types including integers, floats, strings, dates, and timestamps, then displays it using the show() method.
+
+LANGUAGE: python
+CODE:
+from datetime import datetime, date
+from pyspark.sql import Row
+
+df = spark.createDataFrame([
+    Row(a=1, b=2., c='string1', d=date(2000, 1, 1), e=datetime(2000, 1, 1, 12, 0)),
+    Row(a=2, b=3., c='string2', d=date(2000, 2, 1), e=datetime(2000, 1, 2, 12, 0)),
+    Row(a=4, b=5., c='string3', d=date(2000, 3, 1), e=datetime(2000, 1, 3, 12, 0))
+])
+df.show()
+
+----------------------------------------
+
+TITLE: Configuring Spark Job Distribution in Standalone Cluster
+DESCRIPTION: An option to control how jobs are distributed across nodes in a Spark standalone cluster. Setting this option spreads jobs out instead of concentrating them on a small number of nodes.
+
+LANGUAGE: properties
+CODE:
+spark.deploy.spreadOut
+
+----------------------------------------
+
+TITLE: New RDD Operations in Spark 0.7.0
+DESCRIPTION: List of new RDD transformations added in Spark 0.7.0, including operations for working with key-value pairs and dataset manipulation.
+
+LANGUAGE: scala
+CODE:
+keys
+values
+keyBy
+subtract
+coalesce
+zip
+
+----------------------------------------
+
+TITLE: Launching Spark Server with Spark Connect in Bash
+DESCRIPTION: This command starts a Spark server with support for Spark Connect sessions using the start-connect-server.sh script. It includes the necessary Spark Connect package.
+
+LANGUAGE: bash
+CODE:
+!$HOME/sbin/start-connect-server.sh --packages org.apache.spark:spark-connect_2.12:$SPARK_VERSION
+
+----------------------------------------
+
+TITLE: New Spark Operators in Java
+DESCRIPTION: Key new operators added in Spark 0.5.0 including sortByKey for parallel sorting, takeSample for sampling data, and optimized fold and aggregate operators. These operators can preserve RDD partitioning information to reduce network communication costs.
+
+LANGUAGE: java
+CODE:
+sortByKey
+takeSample
+fold
+aggregate
+join
+
+----------------------------------------
+
+TITLE: Creating Debian Package for Spark
+DESCRIPTION: Maven command to create a Debian package for Spark with Hadoop 1.x support.
+
+LANGUAGE: shell
+CODE:
+mvn -Phadoop1,deb install
+
+----------------------------------------
+
+TITLE: Launching Spark Connect Server
+DESCRIPTION: Starts the Spark Connect server using a shell script with required package dependencies.
+
+LANGUAGE: bash
+CODE:
+!$HOME/sbin/start-connect-server.sh --packages org.apache.spark:spark-connect_2.12:$SPARK_VERSION
+
+----------------------------------------
+
+TITLE: DataFrame Operations with Pandas UDFs
+DESCRIPTION: Shows how to use Pandas UDFs (User Defined Functions) to apply custom transformations on DataFrame columns.
+
+LANGUAGE: python
+CODE:
+import pandas as pd
+from pyspark.sql.functions import pandas_udf
+
+@pandas_udf('long')
+def pandas_plus_one(series: pd.Series) -> pd.Series:
+    # Simply plus one by using pandas Series.
+    return series + 1
+
+df.select(pandas_plus_one(df.a)).show()
+
+----------------------------------------
+
+TITLE: Configuring Spark UI Port
+DESCRIPTION: Spark configuration property to control the port used for the BlockManager web UI.
+
+LANGUAGE: properties
+CODE:
+spark.ui.port
+
+----------------------------------------
+
+TITLE: Stopping Existing Spark Session
+DESCRIPTION: Stops any existing local Spark session to prepare for remote connection. This is required as local and remote sessions cannot coexist.
+
+LANGUAGE: python
+CODE:
+from pyspark.sql import SparkSession
+
+SparkSession.builder.master("local[*]").getOrCreate().stop()
+
+----------------------------------------
+
+TITLE: Working with SQL in PySpark
+DESCRIPTION: Demonstrates SQL integration with PySpark DataFrames including registering temporary views and using SQL queries.
+
+LANGUAGE: python
+CODE:
+df.createOrReplaceTempView("tableA")
+spark.sql("SELECT count(*) from tableA").show()
+
+----------------------------------------
+
+TITLE: Dynamic Resource Addition
+DESCRIPTION: Examples of dynamically adding files and JARs to workers using SparkContext methods.
+
+LANGUAGE: scala
+CODE:
+SparkContext.addFile()
+SparkContext.addJar()
+
+----------------------------------------
+
+TITLE: Creating PySpark DataFrame from Row Objects
+DESCRIPTION: Demonstrates DataFrame creation using Row objects with explicit data types and values
+
+LANGUAGE: python
+CODE:
+from datetime import datetime, date
+import pandas as pd
+from pyspark.sql import Row
+
+df = spark.createDataFrame([
+    Row(a=1, b=2., c='string1', d=date(2000, 1, 1), e=datetime(2000, 1, 1, 12, 0)),
+    Row(a=2, b=3., c='string2', d=date(2000, 2, 1), e=datetime(2000, 1, 2, 12, 0)),
+    Row(a=4, b=5., c='string3', d=date(2000, 3, 1), e=datetime(2000, 1, 3, 12, 0))
+])
+
+----------------------------------------
+
+TITLE: Unresolved Logical Plan Example
+DESCRIPTION: Example showing the unresolved logical plan generated for a simple DataFrame query that limits table results.
+
+LANGUAGE: text
+CODE:
+== Parsed Logical Plan ==
+GlobalLimit 5
++- LocalLimit 5
+   +- SubqueryAlias spark_catalog.default.some_table
+      +- UnresolvedRelation spark_catalog.default.some_table
+
+----------------------------------------
+
+TITLE: Maven Dependency Configuration for Spark 0.5.1
+DESCRIPTION: Maven coordinates for integrating Spark 0.5.1 into Maven-based projects. Includes the groupId, artifactId, and version specifications for Maven Central repository.
+
+LANGUAGE: xml
+CODE:
+<dependency>
+  <groupId>org.spark-project</groupId>
+  <artifactId>spark-core_2.9.2</artifactId>
+  <version>0.5.1</version>
+</dependency>
+
+----------------------------------------
+
+TITLE: Launching Spark Connect Server - Bash Script
+DESCRIPTION: Starts the Spark Connect server by executing the start-connect-server.sh script with required packages for Spark Connect functionality.
+
+LANGUAGE: bash
+CODE:
+%%bash
+source ~/.profile # Make sure environment variables are loaded.
+$HOME/sbin/start-connect-server.sh --packages org.apache.spark:spark-connect_2.12:$SPARK_VERSION
+
+----------------------------------------
+
+TITLE: Incorrect pandas Query Optimization
+DESCRIPTION: Illustrates how manual optimization in pandas can lead to incorrect results when row-group filtering predicates are wrongly specified.
+
+LANGUAGE: python
+CODE:
+df = pd.read_parquet(
+    "G1_1e9_1e2_0_0.parquet",
+    columns=["id1", "id2", "v3"],
+    filters=[("id1", "==", "id001")],
+    engine="pyarrow",
+)
+df.query("id1 > 'id098'").groupby("id2").sum().head(3)
+
+----------------------------------------
+
+TITLE: Reading SequenceFile with Native Types in Spark
+DESCRIPTION: Shows how to read a SequenceFile containing IntWritable and Text types using native Scala types (Int, String).
+
+LANGUAGE: scala
+CODE:
+// Will read a SequenceFile of (IntWritable, Text)
+val data = spark.sequenceFile[Int, String]("hdfs://...")
+
+----------------------------------------
+
+TITLE: Initializing SparkSession for PySpark Testing
+DESCRIPTION: Creates a SparkSession for a PySpark testing example. This is the first step in setting up a PySpark application for testing.
+
+LANGUAGE: python
+CODE:
+from pyspark.sql import SparkSession 
+from pyspark.sql.functions import col 
+
+# Create a SparkSession 
+spark = SparkSession.builder.appName("Testing PySpark Example").getOrCreate() 
+
+----------------------------------------
+
+TITLE: Unoptimized pandas Query
+DESCRIPTION: Shows the unoptimized pandas approach to reading and querying Parquet data, which fails due to memory limitations on large datasets.
+
+LANGUAGE: python
+CODE:
+import pandas as pd
+
+df = pd.read_parquet("G1_1e9_1e2_0_0.parquet")[
+    ["id1", "id2", "v3"]
+]
+df.query("id1 > 'id098'").groupby("id2").sum().head(3)
+
+----------------------------------------
+
+TITLE: Saving Dataset as Text File in Spark
+DESCRIPTION: Demonstrates how to save a distributed dataset as a text file in HDFS using Spark's saveAsTextFile operation.
+
+LANGUAGE: scala
+CODE:
+val numbers = spark.parallelize(1 to 100)
+numbers.saveAsTextFile("hdfs://...")
+
+----------------------------------------
+
+TITLE: Launching Spark Connect Server
+DESCRIPTION: Starts the Spark Connect server using a shell script with specified package dependencies.
+
+LANGUAGE: bash
+CODE:
+!$HOME/sbin/start-connect-server.sh --packages org.apache.spark:spark-connect_2.13:$SPARK_VERSION
+
+----------------------------------------
+
+TITLE: Scala Data Processing Example
+DESCRIPTION: Basic example of reading JSON data and performing filtering operations in Scala
+
+LANGUAGE: scala
+CODE:
+val df = spark.read.json("logs.json")
+df.where("age > 21")
+  .select("name.first").show()
+
+----------------------------------------
+
+TITLE: Building PySpark Epydoc
+DESCRIPTION: Command to build PySpark's Epydoc API documentation from the PySpark directory using a configuration file.
+
+LANGUAGE: shell
+CODE:
+epydoc --config epydoc.conf
+
+----------------------------------------
+
+TITLE: Creating Remote Spark Connect Session
+DESCRIPTION: Establishes a remote connection to the Spark Connect server running on localhost:15002.
+
+LANGUAGE: python
+CODE:
+spark = SparkSession.builder.remote("sc://localhost:15002").getOrCreate()
+
+----------------------------------------
+
+TITLE: Python Machine Learning Example
+DESCRIPTION: Demonstrates training a Random Forest model including data splitting, model fitting and prediction generation
+
+LANGUAGE: python
+CODE:
+# Every record contains a label and feature vector
+df = spark.createDataFrame(data, ["label", "features"])
+
+# Split the data into train/test datasets
+train_df, test_df = df.randomSplit([.80, .20], seed=42)
+
+# Set hyperparameters for the algorithm
+rf = RandomForestRegressor(numTrees=100)
+
+# Fit the model to the training data
+model = rf.fit(train_df)
+
+# Generate predictions on the test dataset.
+model.transform(test_df).show()
+
+----------------------------------------
+
+TITLE: Building Spark Scaladoc
+DESCRIPTION: Command to build Spark's Scaladoc API documentation using SBT from the project root directory.
+
+LANGUAGE: shell
+CODE:
+sbt/sbt doc
+
+----------------------------------------
+
+TITLE: Git Remote Configuration for Spark PR Merging
+DESCRIPTION: Sample git remote configuration showing required remotes for merging pull requests in Apache Spark. Shows the setup for apache, apache-github, and origin remotes.
+
+LANGUAGE: bash
+CODE:
+apache	git@github.com:apache/spark.git (fetch)
+apache	git@github.com:apache/spark.git (push)
+apache-github	git@github.com:apache/spark.git (fetch)
+apache-github	git@github.com:apache/spark.git (push)
+origin	git@github.com:[your username]/spark.git (fetch)
+origin	git@github.com:[your username]/spark.git (push)
+
+----------------------------------------
+
+TITLE: Window Frame Specification Error in Spark SQL
+DESCRIPTION: This improved error message explains that there's a mismatch between the function frame and specification frame in a window expression, implying that the user should match these frames.
+
+LANGUAGE: scala
+CODE:
+Cannot specify frame for window expression {}. Window expression contains mismatch between function frame {} and specification frame {}.
+
+----------------------------------------
+
+TITLE: Syntax Highlighting in Markdown with Pygments
+DESCRIPTION: Example of how to mark a block of code in markdown for syntax highlighting using Pygments. This snippet demonstrates highlighting for Scala code.
+
+LANGUAGE: markdown
+CODE:
+{% highlight scala %}
+// Your scala code goes here, you can replace scala with many other
+// supported languages too.
+{% endhighlight %}
+
+----------------------------------------
+
+TITLE: SQL Query Example
+DESCRIPTION: Example of reading and querying JSON data using Spark SQL with column aliasing and filtering
+
+LANGUAGE: sql
+CODE:
+SELECT
+  name.first AS first_name,
+  name.last AS last_name,
+  age
+FROM json.`logs.json`
+  WHERE age > 21;
+
+----------------------------------------
+
+TITLE: Invalid Function Name Error in Spark SQL
+DESCRIPTION: This improved error message explains why a function name is invalid in the context of temporary functions and catalogs, providing a clear instruction on how to specify a valid function name.
+
+LANGUAGE: scala
+CODE:
+Function name {} is invalid. Temporary functions cannot belong to a catalog. Specify a function name with one or two parts.
+
+----------------------------------------
+
+TITLE: Generating HTML Documentation with Jekyll
+DESCRIPTION: Command to generate HTML documentation from markdown files using Jekyll. The SKIP_SCALADOC option allows skipping the time-consuming Scaladoc build process.
+
+LANGUAGE: shell
+CODE:
+SKIP_SCALADOC=1 jekyll
+
+----------------------------------------
+
+TITLE: Java Data Processing Example
+DESCRIPTION: Basic example of reading JSON data and performing filtering operations in Java
+
+LANGUAGE: java
+CODE:
+Dataset df = spark.read().json("logs.json");
+df.where("age > 21")
+  .select("name.first").show();
+
+----------------------------------------
+
+TITLE: Initializing Bootstrap v5.2.3 JavaScript
+DESCRIPTION: Header comment for Bootstrap v5.2.3 JavaScript file. Specifies version, copyright information, and license details.
+
+LANGUAGE: JavaScript
+CODE:
+/*!
+  * Bootstrap v5.2.3 (https://getbootstrap.com/)
+  * Copyright 2011-2022 The Bootstrap Authors (https://github.com/twbs/bootstrap/graphs/contributors)
+  * Licensed under MIT (https://github.com/twbs/bootstrap/blob/main/LICENSE)
+  */
+
+----------------------------------------
+
+TITLE: API Documentation Build Commands
+DESCRIPTION: Commands for building Scaladoc and Epydoc API documentation separately from the main documentation.
+
+LANGUAGE: shell
+CODE:
+sbt/sbt doc
+epydoc --config epydoc.conf
+
+----------------------------------------
+
+TITLE: YAML Frontend Matter Configuration
+DESCRIPTION: YAML configuration block defining the blog post metadata including layout, title, categories, tags, and publication status.
+
+LANGUAGE: yaml
+CODE:
+---
+layout: post
+title: Submission is open for Spark Summit East 2016
+categories:
+- News
+tags: []
+status: publish
+type: post
+published: true
+meta:
+  _edit_last: '4'
+  _wpas_done_all: '1'
+---
+
+----------------------------------------
+
+TITLE: Loading External Dependencies in HTML
+DESCRIPTION: HTML tags for importing required JavaScript libraries and CSS stylesheets from the /deps directory. Includes core UI frameworks like jQuery and Bootstrap, along with utility libraries for features like sticky headers, clipboard functionality, and search autocomplete.
+
+LANGUAGE: html
+CODE:
+<script src="deps/jquery-3.6.0/jquery-3.6.0.min.js"></script>
+<meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no" />
+<link href="deps/bootstrap-5.3.1/bootstrap.min.css" rel="stylesheet" />
+<script src="deps/bootstrap-5.3.1/bootstrap.bundle.min.js"></script>
+<link href="deps/font-awesome-6.4.2/css/all.min.css" rel="stylesheet" />
+<link href="deps/font-awesome-6.4.2/css/v4-shims.min.css" rel="stylesheet" />
+<script src="deps/headroom-0.11.0/headroom.min.js"></script>
+<script src="deps/headroom-0.11.0/jQuery.headroom.min.js"></script>
+<script src="deps/bootstrap-toc-1.0.1/bootstrap-toc.min.js"></script>
+<script src="deps/clipboard.js-2.0.11/clipboard.min.js"></script>
+<script src="deps/search-1.0.0/autocomplete.jquery.min.js"></script>
+<script src="deps/search-1.0.0/fuse.min.js"></script>
+<script src="deps/search-1.0.0/mark.min.js"></script>
+
+----------------------------------------
+
+TITLE: Jekyll Build Commands
+DESCRIPTION: Various Jekyll commands for building documentation, including options to skip API documentation generation.
+
+LANGUAGE: shell
+CODE:
+jekyll
+SKIP_SCALADOC=1 jekyll
+jekyll --server
+SKIP_API=1 jekyll
+
+----------------------------------------
+
+TITLE: Rendering News Posts with Jekyll/Liquid Template
+DESCRIPTION: Template code that iterates through news category posts and renders each with a title link, formatted date, and excerpt. Uses Jekyll front matter to define the page layout and type, along with Liquid templating syntax for post iteration and formatting.
+
+LANGUAGE: html
+CODE:
+---
+layout: global
+type: archive
+title: News
+---
+## Spark News
+{% for post in site.categories.news %}
+  <article class="hentry">
+    <header class="entry-header">
+      <h3 class="entry-title"><a href="{{ post.url }}">{{ post.title }}</a></h3>
+      <div class="entry-date">{{post.date | date: "%B %-d, %Y"}}</div>
+    </header>
+    <div class="entry-content">{{post.excerpt}}</div>
+  </article>
+{% endfor %}
+
+----------------------------------------
+
+TITLE: Syntax Highlighting Block in Jekyll Markdown
+DESCRIPTION: Example of how to create syntax-highlighted code blocks in Jekyll markdown files using Pygments. This syntax supports multiple programming languages.
+
+LANGUAGE: markdown
+CODE:
+{% highlight scala %}
+// Your scala code goes here, you can replace scala with many other
+// supported languages too.
+{% endhighlight %}
+
+----------------------------------------
+
+TITLE: Iterating and Displaying Spark Screencast Posts with Jekyll and Liquid
+DESCRIPTION: This snippet uses Liquid templating to loop through screencast posts and generate HTML for each entry. It displays the post title as a link, the publication date, and an excerpt of the content.
+
+LANGUAGE: liquid
+CODE:
+{% for post in site.categories.screencasts %}
+  <article class="hentry">
+    <header class="entry-header">
+      <h1 class="entry-title"><a href="{{ post.url }}">{{ post.title }}</a></h1>
+      <div class="entry-meta">{{post.date | date: "%B %d, %Y"}}</div>
+    </header>
+    <div class="entry-content">{{post.excerpt}}</div>
+  </article>
+{% endfor %}
+
+----------------------------------------
+
+TITLE: Skipping API Documentation Build in Jekyll
+DESCRIPTION: Command to run Jekyll while skipping the time-consuming process of building and copying Scala and Python API documentation.
+
+LANGUAGE: shell
+CODE:
+SKIP_API=1 jekyll
+
+----------------------------------------
+
+TITLE: Building Spark Documentation
+DESCRIPTION: Various Jekyll commands for building and serving Spark documentation, including options to skip API documentation generation.
+
+LANGUAGE: shell
+CODE:
+jekyll
+
+LANGUAGE: shell
+CODE:
+SKIP_SCALADOC=1 jekyll
+
+LANGUAGE: shell
+CODE:
+jekyll --server
+
+LANGUAGE: shell
+CODE:
+SKIP_API=1 jekyll
+
+----------------------------------------
+
+TITLE: jQuery and Sizzle.js License Text
+DESCRIPTION: Complete MIT license text for jQuery v3.6.1 and Sizzle.js, detailing terms of use, copyright information, and warranty disclaimers. Includes permissions for use, modification, and distribution.
+
+LANGUAGE: text
+CODE:
+jQuery v 3.6.1
+Copyright OpenJS Foundation and other contributors, https://openjsf.org/
+
+Permission is hereby granted, free of charge, to any person obtaining
+a copy of this software and associated documentation files (the
+"Software"), to deal in the Software without restriction, including
+without limitation the rights to use, copy, modify, merge, publish,
+distribute, sublicense, and/or sell copies of the Software, and to
+permit persons to whom the Software is furnished to do so, subject to
+the following conditions:
+
+The above copyright notice and this permission notice shall be
+included in all copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
+NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE
+LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION
+OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION
+WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+
+******************************************
+
+The jQuery JavaScript Library v3.6.1 also includes Sizzle.js
+
+Sizzle.js includes the following license:
+
+Copyright JS Foundation and other contributors, https://js.foundation/
+
+This software consists of voluntary contributions made by many
+individuals. For exact contribution history, see the revision history
+available at https://github.com/jquery/sizzle
+
+The following license applies to all parts of this software except as
+documented below:
+
+====
+
+Permission is hereby granted, free of charge, to any person obtaining
+a copy of this software and associated documentation files (the
+"Software"), to deal in the Software without restriction, including
+without limitation the rights to use, copy, modify, merge, publish,
+distribute, sublicense, and/or sell copies of the Software, and to
+permit persons to whom the Software is furnished to do so, subject to
+the following conditions:
+
+The above copyright notice and this permission notice shall be
+included in all copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
+NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE
+LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION
+OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION
+WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+
+====
+
+All files located in the node_modules and external directories are
+externally maintained libraries used by this software which have their
+own licenses; we recommend you read them, as their terms may differ from
+the terms above.
+
+----------------------------------------
+
+TITLE: jQuery and Sizzle.js License Text
+DESCRIPTION: Complete MIT license text for jQuery v3.6.1 and Sizzle.js, detailing terms of use, copyright information, and warranty disclaimers. Includes permissions for use, modification, and distribution.
+
+LANGUAGE: text
+CODE:
+jQuery v 3.6.1
+Copyright OpenJS Foundation and other contributors, https://openjsf.org/
+
+Permission is hereby granted, free of charge, to any person obtaining
+a copy of this software and associated documentation files (the
+"Software"), to deal in the Software without restriction, including
+without limitation the rights to use, copy, modify, merge, publish,
+distribute, sublicense, and/or sell copies of the Software, and to
+permit persons to whom the Software is furnished to do so, subject to
+the following conditions:
+
+The above copyright notice and this permission notice shall be
+included in all copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
+NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE
+LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION
+OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION
+WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+
+******************************************
+
+The jQuery JavaScript Library v3.6.1 also includes Sizzle.js
+
+Sizzle.js includes the following license:
+
+Copyright JS Foundation and other contributors, https://js.foundation/
+
+This software consists of voluntary contributions made by many
+individuals. For exact contribution history, see the revision history
+available at https://github.com/jquery/sizzle
+
+The following license applies to all parts of this software except as
+documented below:
+
+====
+
+Permission is hereby granted, free of charge, to any person obtaining
+a copy of this software and associated documentation files (the
+"Software"), to deal in the Software without restriction, including
+without limitation the rights to use, copy, modify, merge, publish,
+distribute, sublicense, and/or sell copies of the Software, and to
+permit persons to whom the Software is furnished to do so, subject to
+the following conditions:
+
+The above copyright notice and this permission notice shall be
+included in all copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
+NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE
+LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION
+OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION
+WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+
+====
+
+All files located in the node_modules and external directories are
+externally maintained libraries used by this software which have their
+own licenses; we recommend you read them, as their terms may differ from
+the terms above.
+
+----------------------------------------
+
+TITLE: Serving Spark Documentation Locally with Jekyll
+DESCRIPTION: Command to build and serve the Spark documentation locally using Jekyll's built-in webserver on port 4000.
+
+LANGUAGE: shell
+CODE:
+jekyll --server
+
+----------------------------------------
+
+TITLE: Jekyll Syntax Highlighting Block
+DESCRIPTION: Template for adding syntax-highlighted code blocks in Jekyll markdown files, supporting multiple programming languages.
+
+LANGUAGE: liquid
+CODE:
+{% highlight scala %}
+// Your scala code goes here, you can replace scala with many other
+// supported languages too.
+{% endhighlight %}
+
+----------------------------------------
+
+TITLE: jQuery UI MIT License and Terms
+DESCRIPTION: Complete license text for jQuery UI including MIT license terms, copyright notice, permissions, warranty disclaimer, and additional notes about sample code and external dependencies.
+
+LANGUAGE: text
+CODE:
+Copyright jQuery Foundation and other contributors, https://jquery.org/
+
+This software consists of voluntary contributions made by many
+individuals. For exact contribution history, see the revision history
+available at https://github.com/jquery/jquery-ui
+
+The following license applies to all parts of this software except as
+documented below:
+
+====
+
+Permission is hereby granted, free of charge, to any person obtaining
+a copy of this software and associated documentation files (the
+"Software"), to deal in the Software without restriction, including
+without limitation the rights to use, copy, modify, merge, publish,
+distribute, sublicense, and/or sell copies of the Software, and to
+permit persons to whom the Software is furnished to do so, subject to
+the following conditions:
+
+The above copyright notice and this permission notice shall be
+included in all copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
+NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE
+LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION
+OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION
+WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+
+====
+
+Copyright and related rights for sample code are waived via CC0. Sample
+code is defined as all source code contained within the demos directory.
+
+CC0: http://creativecommons.org/publicdomain/zero/1.0/
+
+====
+
+All files located in the node_modules and external directories are
+externally maintained libraries used by this software which have their
+own licenses; we recommend you read them, as their terms may differ from
+the terms above.
+
+----------------------------------------
+
+TITLE: Generating Spark Scaladoc
+DESCRIPTION: Command to build Spark Scaladoc using SBT from the project root directory.
+
+LANGUAGE: shell
+CODE:
+sbt/sbt doc
+
+----------------------------------------
+
+TITLE: Installing Pygments Syntax Highlighter
+DESCRIPTION: Command to install Pygments syntax highlighter using Python's easy_install package manager.
+
+LANGUAGE: shell
+CODE:
+sudo easy_install Pygments
+
+----------------------------------------
+
+TITLE: Including Web Dependencies in HTML
+DESCRIPTION: This HTML snippet includes various JavaScript and CSS dependencies for a web application. It sets up jQuery, Bootstrap, Font Awesome, Headroom.js, Bootstrap TOC, Clipboard.js, and search-related libraries. The viewport meta tag is also included for responsive design.
+
+LANGUAGE: HTML
+CODE:
+<script src="deps/jquery-3.6.0/jquery-3.6.0.min.js"></script>
+<meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no" />
+<link href="deps/bootstrap-5.3.1/bootstrap.min.css" rel="stylesheet" />
+<script src="deps/bootstrap-5.3.1/bootstrap.bundle.min.js"></script>
+<link href="deps/font-awesome-6.5.2/css/all.min.css" rel="stylesheet" />
+<link href="deps/font-awesome-6.5.2/css/v4-shims.min.css" rel="stylesheet" />
+<script src="deps/headroom-0.11.0/headroom.min.js"></script>
+<script src="deps/headroom-0.11.0/jQuery.headroom.min.js"></script>
+<script src="deps/bootstrap-toc-1.0.1/bootstrap-toc.min.js"></script>
+<script src="deps/clipboard.js-2.0.11/clipboard.min.js"></script>
+<script src="deps/search-1.0.0/autocomplete.jquery.min.js"></script>
+<script src="deps/search-1.0.0/fuse.min.js"></script>
+<script src="deps/search-1.0.0/mark.min.js"></script>
+
+----------------------------------------
+
+TITLE: Syntax Highlighting with Pygments in Markdown
+DESCRIPTION: Example of how to use Pygments for syntax highlighting in markdown documentation. This snippet shows the syntax for highlighting Scala code.
+
+LANGUAGE: markdown
+CODE:
+{% highlight scala %}
+// Your scala code goes here, you can replace scala with many other
+// supported languages too.
+{% endhighlight %}
+
+----------------------------------------
+
+TITLE: Building Spark Scaladoc
+DESCRIPTION: Command to generate Scaladoc for Spark subprojects. This is typically run automatically by Jekyll during site generation, but can be run separately if needed.
+
+LANGUAGE: shell
+CODE:
+sbt/sbt doc
+
+----------------------------------------
+
+TITLE: Loading Frontend Dependencies in HTML
+DESCRIPTION: A set of script and link tags that load essential frontend libraries and stylesheets including jQuery 3.6.0, Bootstrap 5.3.1, Font Awesome 6.5.2, Headroom 0.11.0, and various utility libraries for enhanced functionality.
+
+LANGUAGE: html
+CODE:
+<script src="deps/jquery-3.6.0/jquery-3.6.0.min.js"></script>
+<meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no" />
+<link href="deps/bootstrap-5.3.1/bootstrap.min.css" rel="stylesheet" />
+<script src="deps/bootstrap-5.3.1/bootstrap.bundle.min.js"></script>
+<link href="deps/font-awesome-6.5.2/css/all.min.css" rel="stylesheet" />
+<link href="deps/font-awesome-6.5.2/css/v4-shims.min.css" rel="stylesheet" />
+<script src="deps/headroom-0.11.0/headroom.min.js"></script>
+<script src="deps/headroom-0.11.0/jQuery.headroom.min.js"></script>
+<script src="deps/bootstrap-toc-1.0.1/bootstrap-toc.min.js"></script>
+<script src="deps/clipboard.js-2.0.11/clipboard.min.js"></script>
+<script src="deps/search-1.0.0/autocomplete.jquery.min.js"></script>
+<script src="deps/search-1.0.0/fuse.min.js"></script>
+<script src="deps/search-1.0.0/mark.min.js"></script>
+
+----------------------------------------
+
+TITLE: Syntax Highlighting Code Block Template for Jekyll
+DESCRIPTION: Template showing how to format code blocks in markdown for syntax highlighting using Jekyll and Pygments. Can be used with multiple programming languages, with Scala shown as an example.
+
+LANGUAGE: markdown
+CODE:
+{% highlight scala %}
+// Your scala code goes here, you can replace scala with many other
+// supported languages too.
+{% endhighlight %}
+
+----------------------------------------
+
+TITLE: Syntax Highlighting in Markdown with Pygments
+DESCRIPTION: Example of how to use Pygments for syntax highlighting in Markdown documentation. This snippet shows the syntax for highlighting Scala code, but other languages are also supported.
+
+LANGUAGE: markdown
+CODE:
+{% highlight scala %}
+// Your scala code goes here, you can replace scala with many other
+// supported languages too.
+{% endhighlight %}
+
+----------------------------------------
+
+TITLE: Displaying jQuery and Sizzle.js License Text
+DESCRIPTION: This snippet contains the full license text for jQuery v3.6.1 and the included Sizzle.js library. It details the permissions granted, conditions of use, and liability disclaimers under the MIT license.
+
+LANGUAGE: plaintext
+CODE:
+jQuery v 3.6.1
+Copyright OpenJS Foundation and other contributors, https://openjsf.org/
+
+Permission is hereby granted, free of charge, to any person obtaining
+a copy of this software and associated documentation files (the
+"Software"), to deal in the Software without restriction, including
+without limitation the rights to use, copy, modify, merge, publish,
+distribute, sublicense, and/or sell copies of the Software, and to
+permit persons to whom the Software is furnished to do so, subject to
+the following conditions:
+
+The above copyright notice and this permission notice shall be
+included in all copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
+NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE
+LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION
+OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION
+WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+
+******************************************
+
+The jQuery JavaScript Library v3.6.1 also includes Sizzle.js
+
+Sizzle.js includes the following license:
+
+Copyright JS Foundation and other contributors, https://js.foundation/
+
+This software consists of voluntary contributions made by many
+individuals. For exact contribution history, see the revision history
+available at https://github.com/jquery/sizzle
+
+The following license applies to all parts of this software except as
+documented below:
+
+====
+
+Permission is hereby granted, free of charge, to any person obtaining
+a copy of this software and associated documentation files (the
+"Software"), to deal in the Software without restriction, including
+without limitation the rights to use, copy, modify, merge, publish,
+distribute, sublicense, and/or sell copies of the Software, and to
+permit persons to whom the Software is furnished to do so, subject to
+the following conditions:
+
+The above copyright notice and this permission notice shall be
+included in all copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
+NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE
+LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION
+OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION
+WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+
+====
+
+All files located in the node_modules and external directories are
+externally maintained libraries used by this software which have their
+own licenses; we recommend you read them, as their terms may differ from
+the terms above.
+
+----------------------------------------
+
+TITLE: Jekyll Front Matter Configuration for Spark Powered By Page
+DESCRIPTION: YAML front matter configuration for the Jekyll-powered page that defines the layout, title, type and navigation properties.
+
+LANGUAGE: yaml
+CODE:
+---
+layout: global
+title: Powered By Spark
+type: "page singular"
+navigation:
+  weight: 5
+  show: true
+---
+
+----------------------------------------
+
+TITLE: Decimal Parsing Error in Spark SQL
+DESCRIPTION: This improved error message specifies that a decimal is invalid due to a parsing error at a specific position, implying that the user should fix the error at that position.
+
+LANGUAGE: scala
+CODE:
+Invalid decimal {}; encountered error while parsing at position {}.
+
+----------------------------------------
+
+TITLE: Displaying jQuery UI License Text
+DESCRIPTION: This snippet contains the full text of the jQuery UI license, which is based on the MIT license. It includes copyright information, terms of use, warranty disclaimers, and special considerations for sample code and external libraries.
+
+LANGUAGE: plaintext
+CODE:
+Copyright jQuery Foundation and other contributors, https://jquery.org/
+
+This software consists of voluntary contributions made by many
+individuals. For exact contribution history, see the revision history
+available at https://github.com/jquery/jquery-ui
+
+The following license applies to all parts of this software except as
+documented below:
+
+====
+
+Permission is hereby granted, free of charge, to any person obtaining
+a copy of this software and associated documentation files (the
+"Software"), to deal in the Software without restriction, including
+without limitation the rights to use, copy, modify, merge, publish,
+distribute, sublicense, and/or sell copies of the Software, and to
+permit persons to whom the Software is furnished to do so, subject to
+the following conditions:
+
+The above copyright notice and this permission notice shall be
+included in all copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
+NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE
+LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION
+OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION
+WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+
+====
+
+Copyright and related rights for sample code are waived via CC0. Sample
+code is defined as all source code contained within the demos directory.
+
+CC0: http://creativecommons.org/publicdomain/zero/1.0/
+
+====
+
+All files located in the node_modules and external directories are
+externally maintained libraries used by this software which have their
+own licenses; we recommend you read them, as their terms may differ from
+the terms above.
+
+----------------------------------------
+
+TITLE: Configuring YAML Front Matter for Spark Mailing Lists Page Redirect
+DESCRIPTION: This YAML front matter configures a page about Spark mailing lists. It sets the layout, title, and redirect URL. It also specifies the page type and navigation properties, including weight and visibility.
+
+LANGUAGE: yaml
+CODE:
+---
+layout: global
+title: Mailing Lists
+redirect: community.html
+type: "page singular"
+navigation:
+  weight: 5
+  show: true
+---
+
+----------------------------------------
+
+TITLE: Generating Encoder for Inner Class in Scala
+DESCRIPTION: This error message explains the inability to generate an encoder for an inner class due to scope access limitations and suggests moving the class out of its parent class as a solution.
+
+LANGUAGE: scala
+CODE:
+Unable to generate an encoder for inner class {} without access to the scope that this class was defined in. Try moving this class out of its parent class.
+
+----------------------------------------
+
+TITLE: Displaying jQuery UI License Text
+DESCRIPTION: This snippet contains the full text of the jQuery UI license, which is an MIT-style license. It includes copyright information, terms of use, disclaimer of warranty, and additional notes on sample code and external libraries.
+
+LANGUAGE: plaintext
+CODE:
+Copyright jQuery Foundation and other contributors, https://jquery.org/
+
+This software consists of voluntary contributions made by many
+individuals. For exact contribution history, see the revision history
+available at https://github.com/jquery/jquery-ui
+
+The following license applies to all parts of this software except as
+documented below:
+
+====
+
+Permission is hereby granted, free of charge, to any person obtaining
+a copy of this software and associated documentation files (the
+"Software"), to deal in the Software without restriction, including
+without limitation the rights to use, copy, modify, merge, publish,
+distribute, sublicense, and/or sell copies of the Software, and to
+permit persons to whom the Software is furnished to do so, subject to
+the following conditions:
+
+The above copyright notice and this permission notice shall be
+included in all copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
+NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE
+LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION
+OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION
+WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+
+====
+
+Copyright and related rights for sample code are waived via CC0. Sample
+code is defined as all source code contained within the demos directory.
+
+CC0: http://creativecommons.org/publicdomain/zero/1.0/
+
+====
+
+All files located in the node_modules and external directories are
+externally maintained libraries used by this software which have their
+own licenses; we recommend you read them, as their terms may differ from
+the terms above.
+
+----------------------------------------
+
+TITLE: HTML Content Structure for Spark History
+DESCRIPTION: HTML markup for displaying the Apache Spark history content, including trademark symbol and external links
+
+LANGUAGE: html
+CODE:
+<h2><span class="text-capitalize">Apache Spark<span class="tm">&trade;</span></span> history</h2>
+
+<p>
+Apache Spark started as a research project at the <a href="https://amplab.cs.berkeley.edu">UC Berkeley AMPLab</a>
+in 2009, and was open sourced in early 2010.
+Many of the ideas behind the system were presented in various
+<a href="{{site.baseurl}}/research.html">research papers</a> over the years.
+</p>
+
+<p>
+After being released, Spark grew into a broad developer community, and moved to the
+<a href="https://www.apache.org">Apache Software Foundation</a> in 2013.
+Today, the project is developed collaboratively by a community of hundreds of developers from
+hundreds of organizations.
+</p>
+
+<p>
+You can get involved in Apache Spark development by reading
+<a href="{{site.baseurl}}/contributing.html">how to contribute</a>.
+</p>
+
+----------------------------------------
+
+TITLE: Adding JIRA ID to R Test
+DESCRIPTION: Example of how to add a JIRA ID to an R test case.
+
+LANGUAGE: r
+CODE:
+test_that("SPARK-12345: a short description of the test", {
+  ...
+
+
+----------------------------------------
+
+TITLE: Markdown Front Matter Configuration
+DESCRIPTION: YAML front matter configuration for the history page, defining layout, title, type and navigation properties
+
+LANGUAGE: markdown
+CODE:
+---
+layout: global
+title: History
+type: "page singular"
+navigation:
+  weight: 5
+  show: true
+---
+
+----------------------------------------
+
+TITLE: Adding JIRA ID to Python Test
+DESCRIPTION: Example of how to add a JIRA ID to a Python test case.
+
+LANGUAGE: python
+CODE:
+def test_case(self):
+    # SPARK-12345: a short description of the test
+    ...
+
+
+----------------------------------------
+
+TITLE: Referencing Apache Spark Tag on StackOverflow (HTML)
+DESCRIPTION: Shows how to create a link to the Apache Spark tag on StackOverflow using HTML. This is useful for directing users to a community resource for getting help with Spark-related questions.
+
+LANGUAGE: html
+CODE:
+<a href="https://stackoverflow.com/questions/tagged/apache-spark"><code>apache-spark</code></a>
+
+----------------------------------------
+
+TITLE: Git Log Command for Review History
+DESCRIPTION: Command to view Git history for reviewing previous patch commits and reviewers for a specific file.
+
+LANGUAGE: shell
+CODE:
+git log --format=full <filename>
+
+----------------------------------------
+
+TITLE: Page Layout Configuration in YAML
+DESCRIPTION: YAML front matter configuration for the downloads page, specifying layout, title, type and navigation settings.
+
+LANGUAGE: yaml
+CODE:
+---
+layout: global
+title: Downloads
+type: singular
+navigation:
+  weight: 3
+  show: true
+---
+
+----------------------------------------
+
+TITLE: Importing JavaScript and CSS Dependencies in HTML
+DESCRIPTION: This code snippet imports various JavaScript and CSS libraries using <script> and <link> tags. It includes jQuery, Bootstrap, Font Awesome, Headroom.js, Bootstrap Table of Contents, Clipboard.js, and search-related libraries. These dependencies are commonly used for creating responsive, interactive web applications with enhanced functionality and styling.
+
+LANGUAGE: HTML
+CODE:
+<script src="deps/jquery-3.6.0/jquery-3.6.0.min.js"></script>
+<meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no" />
+<link href="deps/bootstrap-5.3.1/bootstrap.min.css" rel="stylesheet" />
+<script src="deps/bootstrap-5.3.1/bootstrap.bundle.min.js"></script>
+<link href="deps/font-awesome-6.4.2/css/all.min.css" rel="stylesheet" />
+<link href="deps/font-awesome-6.4.2/css/v4-shims.min.css" rel="stylesheet" />
+<script src="deps/headroom-0.11.0/headroom.min.js"></script>
+<script src="deps/headroom-0.11.0/jQuery.headroom.min.js"></script>
+<script src="deps/bootstrap-toc-1.0.1/bootstrap-toc.min.js"></script>
+<script src="deps/clipboard.js-2.0.11/clipboard.min.js"></script>
+<script src="deps/search-1.0.0/autocomplete.jquery.min.js"></script>
+<script src="deps/search-1.0.0/fuse.min.js"></script>
+<script src="deps/search-1.0.0/mark.min.js"></script>
+
+----------------------------------------
+
+TITLE: Adding JIRA ID to Java Test
+DESCRIPTION: Example of how to add a JIRA ID to a Java test case.
+
+LANGUAGE: java
+CODE:
+@Test
+public void testCase() {
+  // SPARK-12345: a short description of the test
+  ...
+
+
+----------------------------------------
+
+TITLE: Including JavaScript and CSS Dependencies in HTML
+DESCRIPTION: This snippet demonstrates how to include various JavaScript libraries and CSS stylesheets in an HTML file. It includes jQuery, Bootstrap, Font Awesome, Headroom.js, Clipboard.js, and search-related scripts. These dependencies are essential for creating a responsive, interactive web application with advanced features.
+
+LANGUAGE: HTML
+CODE:
+<script src="deps/jquery-3.6.0/jquery-3.6.0.min.js"></script>
+<meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no" />
+<link href="deps/bootstrap-5.3.1/bootstrap.min.css" rel="stylesheet" />
+<script src="deps/bootstrap-5.3.1/bootstrap.bundle.min.js"></script>
+<link href="deps/font-awesome-6.4.2/css/all.min.css" rel="stylesheet" />
+<link href="deps/font-awesome-6.4.2/css/v4-shims.min.css" rel="stylesheet" />
+<script src="deps/headroom-0.11.0/headroom.min.js"></script>
+<script src="deps/headroom-0.11.0/jQuery.headroom.min.js"></script>
+<script src="deps/bootstrap-toc-1.0.1/bootstrap-toc.min.js"></script>
+<script src="deps/clipboard.js-2.0.11/clipboard.min.js"></script>
+<script src="deps/search-1.0.0/autocomplete.jquery.min.js"></script>
+<script src="deps/search-1.0.0/fuse.min.js"></script>
+<script src="deps/search-1.0.0/mark.min.js"></script>
+
+----------------------------------------
+
+TITLE: Loading Web Dependencies in HTML
+DESCRIPTION: Loads required front-end dependencies including jQuery 3.6.0 and Bootstrap 5.3.1 resources. Also sets viewport meta tag for responsive design.
+
+LANGUAGE: html
+CODE:
+<script src="deps/jquery-3.6.0/jquery-3.6.0.min.js"></script>
+<meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no" />
+<link href="deps/bootstrap-5.3.1/bootstrap.min.css" rel="stylesheet" />
+<script src="deps/bootstrap-5.3.1/bootstrap.bundle.min.js"></script>
+
+----------------------------------------
+
+TITLE: Adding JIRA ID to Scala Test
+DESCRIPTION: Example of how to add a JIRA ID to a Scala test case.
+
+LANGUAGE: scala
+CODE:
+test("SPARK-12345: a short description of the test") {
+  ...
+
+
+----------------------------------------
+
+TITLE: Loading Web Dependencies in HTML
+DESCRIPTION: Loads required front-end dependencies including jQuery 3.6.0 and Bootstrap 5.3.1 resources. Also sets viewport meta tag for responsive design.
+
+LANGUAGE: html
+CODE:
+<script src="deps/jquery-3.6.0/jquery-3.6.0.min.js"></script>
+<meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no" />
+<link href="deps/bootstrap-5.3.1/bootstrap.min.css" rel="stylesheet" />
+<script src="deps/bootstrap-5.3.1/bootstrap.bundle.min.js"></script>
+
+----------------------------------------
+
+TITLE: Cloning the Apache Spark Source Code
+DESCRIPTION: Command to clone the master development branch of Apache Spark from GitHub.
+
+LANGUAGE: bash
+CODE:
+git clone git://github.com/apache/spark.git
+
+----------------------------------------
+
+TITLE: Loading jQuery and Bootstrap Dependencies in HTML
+DESCRIPTION: Loads jQuery 3.6.0 and Bootstrap 5.2.2 libraries along with responsive viewport configuration. Includes both CSS and JavaScript components of Bootstrap for full functionality.
+
+LANGUAGE: html
+CODE:
+<script src="deps/jquery-3.6.0/jquery-3.6.0.min.js"></script>
+<meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no" />
+<link href="deps/bootstrap-5.2.2/bootstrap.min.css" rel="stylesheet" />
+<script src="deps/bootstrap-5.2.2/bootstrap.bundle.min.js"></script>
+
+----------------------------------------
+
+TITLE: Markdown 404 Page Template with YAML Front Matter
+DESCRIPTION: Markdown template file with YAML front matter that defines the page layout, title, and Apache 2.0 license information. Includes guidance text for users who encounter missing pages and links to archived documentation.
+
+LANGUAGE: markdown
+CODE:
+---
+layout: global
+title: 404 Not Found
+license: |
+  Licensed to the Apache Software Foundation (ASF) under one or more
+  contributor license agreements.  See the NOTICE file distributed with
+  this work for additional information regarding copyright ownership.
+  The ASF licenses this file to You under the Apache License, Version 2.0
+  (the "License"); you may not use this file except in compliance with
+  the License.  You may obtain a copy of the License at
+
+       http://www.apache.org/licenses/LICENSE-2.0
+
+  Unless required by applicable law or agreed to in writing, software
+  distributed under the License is distributed on an "AS IS" BASIS,
+  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+  See the License for the specific language governing permissions and
+  limitations under the License.
+---
+
+----------------------------------------
+
+TITLE: jQuery and Sizzle.js MIT License Text
+DESCRIPTION: Complete MIT license text covering both jQuery v3.6.1 and the included Sizzle.js library. Details permissions, conditions, and disclaimers for software usage and distribution.
+
+LANGUAGE: plaintext
+CODE:
+jQuery v 3.6.1
+Copyright OpenJS Foundation and other contributors, https://openjsf.org/
+
+Permission is hereby granted, free of charge, to any person obtaining
+a copy of this software and associated documentation files (the
+"Software"), to deal in the Software without restriction, including
+without limitation the rights to use, copy, modify, merge, publish,
+distribute, sublicense, and/or sell copies of the Software, and to
+permit persons to whom the Software is furnished to do so, subject to
+the following conditions:
+
+The above copyright notice and this permission notice shall be
+included in all copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
+NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE
+LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION
+OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION
+WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+
+******************************************
+
+The jQuery JavaScript Library v3.6.1 also includes Sizzle.js
+
+Sizzle.js includes the following license:
+
+Copyright JS Foundation and other contributors, https://js.foundation/
+
+This software consists of voluntary contributions made by many
+individuals. For exact contribution history, see the revision history
+available at https://github.com/jquery/sizzle
+
+The following license applies to all parts of this software except as
+documented below:
+
+====
+
+Permission is hereby granted, free of charge, to any person obtaining
+a copy of this software and associated documentation files (the
+"Software"), to deal in the Software without restriction, including
+without limitation the rights to use, copy, modify, merge, publish,
+distribute, sublicense, and/or sell copies of the Software, and to
+permit persons to whom the Software is furnished to do so, subject to
+the following conditions:
+
+The above copyright notice and this permission notice shall be
+included in all copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
+NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE
+LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION
+OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION
+WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+
+====
+
+All files located in the node_modules and external directories are
+externally maintained libraries used by this software which have their
+own licenses; we recommend you read them, as their terms may differ from
+the terms above.
+
+*********************
+
+----------------------------------------
+
+TITLE: Syntax Highlighting Block Example in Markdown
+DESCRIPTION: Example showing how to mark a code block for syntax highlighting using Jekyll's highlight tags. This demonstrates the proper format for adding syntax-highlighted code in documentation markdown pages.
+
+LANGUAGE: markdown
+CODE:
+{% highlight scala %}
+// Your Scala code goes here, you can replace Scala with many other
+// supported languages too.
+{% endhighlight %}
+
+----------------------------------------
+
+TITLE: PySpark Core Modules Structure
+DESCRIPTION: The main module structure of PySpark including accumulators, broadcast, context, files, and RDD modules. These form the foundation of PySpark's distributed computing capabilities.
+
+LANGUAGE: python
+CODE:
+pyspark
+  |- accumulators
+  |- broadcast
+  |- context
+  |- files
+  |- rdd
+
+----------------------------------------
+
+TITLE: Using Local URI Scheme for Dependencies in Spark
+DESCRIPTION: This snippet shows the new 'local://' URI scheme, which allows users to specify files already present on slave nodes as dependencies.
+
+LANGUAGE: scala
+CODE:
+// Example of using local:// URI
+// (Specific syntax not provided in the announcement)

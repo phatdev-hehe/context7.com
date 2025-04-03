@@ -1,0 +1,3386 @@
+TITLE: Basic mods.toml Configuration Example
+DESCRIPTION: Example configuration file showing the basic structure and essential properties for a Minecraft Forge mod, including loader settings, mod metadata, and dependencies.
+
+LANGUAGE: toml
+CODE:
+modLoader="javafml"
+loaderVersion="[52,)"
+
+license="All Rights Reserved"
+issueTrackerURL="https://github.com/MinecraftForge/MinecraftForge/issues"
+showAsResourcePack=false
+clientSideOnly=false
+
+[[mods]]
+  modId="examplemod"
+  version="1.0.0.0"
+  displayName="Example Mod"
+  updateJSONURL="https://files.minecraftforge.net/net/minecraftforge/forge/promotions_slim.json"
+  displayURL="https://minecraftforge.net"
+  logoFile="logo.png"
+  credits="I'd like to thank my mother and father."
+  authors="Author"
+  description='''
+  Lets you craft dirt into diamonds. This is a traditional mod that has existed for eons. It is ancient. The holy Notch created it. Jeb rainbowfied it. Dinnerbone made it upside down. Etc.
+  '''
+  displayTest="MATCH_VERSION"
+
+[[dependencies.examplemod]]
+  modId="forge"
+  mandatory=true
+  versionRange="[52,)"
+  ordering="NONE"
+  side="BOTH"
+
+[[dependencies.examplemod]]
+  modId="minecraft"
+  mandatory=true
+  versionRange="[1.21.1,)"
+  ordering="NONE"
+  side="BOTH"
+
+----------------------------------------
+
+TITLE: Configuring Group ID in Gradle
+DESCRIPTION: Sets the group ID property in Gradle for proper package naming convention based on domain ownership or email address.
+
+LANGUAGE: gradle
+CODE:
+// In some build.gradle
+group = 'com.example'
+
+----------------------------------------
+
+TITLE: Java Mod Entrypoint Implementation
+DESCRIPTION: Example Java class showing how to implement the main entrypoint for a Minecraft Forge mod using the @Mod annotation and FMLJavaModLoadingContext.
+
+LANGUAGE: java
+CODE:
+@Mod("examplemod") // Must match mods.toml
+public class Example {
+
+  public Example(FMLJavaModLoadingContext context) {
+    // Initialize logic here
+    var modBus = context.getModEventBus();
+
+    // ...
+  }
+}
+
+----------------------------------------
+
+TITLE: Setting Mod Version in Gradle
+DESCRIPTION: Defines the version number for the mod using Maven-style versioning convention in Gradle configuration.
+
+LANGUAGE: gradle
+CODE:
+// In some build.gradle
+version = '1.21.1-1.0.0.0'
+
+----------------------------------------
+
+TITLE: Registering Event Handlers in Java for Minecraft Forge
+DESCRIPTION: Demonstrates how to register event handlers for both the mod bus and forge bus in the main mod class constructor. It shows the usage of addListener and addGenericListener methods.
+
+LANGUAGE: java
+CODE:
+// In the main mod class ExampleMod
+
+// This event is on the mod bus
+private void modEventHandler(RegisterEvent event) {
+	// Do things here
+}
+
+// This event is on the forge bus
+private static void forgeEventHandler(AttachCapabilitiesEvent<Entity> event) {
+	// ...
+}
+
+// In the mod constructor
+modEventBus.addListener(this::modEventHandler);
+forgeEventBus.addGenericListener(Entity.class, ExampleMod::forgeEventHandler);
+
+----------------------------------------
+
+TITLE: Registering Objects using RegisterEvent
+DESCRIPTION: Shows how to register multiple blocks using the RegisterEvent lifecycle event. This approach provides more control over registration timing and allows batch registration.
+
+LANGUAGE: java
+CODE:
+@SubscribeEvent
+public void register(RegisterEvent event) {
+  event.register(ForgeRegistries.Keys.BLOCKS,
+    helper -> {
+      helper.register(ResourceLocation.fromNamespaceAndPath(MODID, "example_block_1"), new Block(...));
+      helper.register(ResourceLocation.fromNamespaceAndPath(MODID, "example_block_2"), new Block(...));
+      helper.register(ResourceLocation.fromNamespaceAndPath(MODID, "example_block_3"), new Block(...));
+      // ...
+    }
+  );
+}
+
+----------------------------------------
+
+TITLE: Registering Blocks using DeferredRegister
+DESCRIPTION: Demonstrates block registration using DeferredRegister, which is the recommended approach for registering game objects. Shows creation of a DeferredRegister instance and registering a block with properties.
+
+LANGUAGE: java
+CODE:
+private static final DeferredRegister<Block> BLOCKS = DeferredRegister.create(ForgeRegistries.BLOCKS, MODID);
+
+public static final RegistryObject<Block> ROCK_BLOCK = BLOCKS.register("rock", () -> new Block(BlockBehaviour.Properties.of().mapColor(MapColor.STONE)));
+
+public ExampleMod(FMLJavaModLoadingContext context) {
+  BLOCKS.register(context.getModEventBus());
+}
+
+----------------------------------------
+
+TITLE: Automatically Registering Static Event Handlers in Java for Minecraft Forge
+DESCRIPTION: Shows how to use the @Mod$EventBusSubscriber annotation to automatically register static event handlers. This example listens to RenderLevelStageEvent on the client side only.
+
+LANGUAGE: java
+CODE:
+@Mod.EventBusSubscriber(modid = "mymod", bus = Bus.FORGE, value = Dist.CLIENT)
+public class MyStaticClientOnlyEventHandler {
+	@SubscribeEvent
+	public static void drawLast(RenderLevelStageEvent event) {
+		System.out.println("Drawing!");
+	}
+}
+
+----------------------------------------
+
+TITLE: Implementing Mod Event Subscribers in Java with Minecraft Forge
+DESCRIPTION: Demonstrates two approaches for registering mod lifecycle event listeners: using the @EventBusSubscriber annotation and registering in the mod constructor. Shows how to handle the FMLCommonSetupEvent in both cases.
+
+LANGUAGE: Java
+CODE:
+@Mod.EventBusSubscriber(modid = "mymod", bus = Mod.EventBusSubscriber.Bus.MOD)
+public class MyModEventSubscriber {
+  @SubscribeEvent
+  static void onCommonSetup(FMLCommonSetupEvent event) { ... }
+}
+
+@Mod("mymod")
+public class MyMod {
+  public MyMod(FMLModLoadingContext context) {
+    context.getModEventBus().addListener(this::onCommonSetup);
+  } 
+
+  private void onCommonSetup(FMLCommonSetupEvent event) { ... }
+}
+
+----------------------------------------
+
+TITLE: Using RegistryObject for Object References
+DESCRIPTION: Demonstrates how to create and use RegistryObject to safely reference registered objects. Shows examples for both standard and custom registries.
+
+LANGUAGE: java
+CODE:
+public static final RegistryObject<Item> BOW = RegistryObject.create(ResourceLocation.withDefaultNamespace("bow"), ForgeRegistries.ITEMS);
+
+// assume that 'neomagicae:mana_type' is a valid registry, and 'neomagicae:coffeinum' is a valid object within that registry
+public static final RegistryObject<ManaType> COFFEINUM = RegistryObject.create(ResourceLocation.fromNamespaceAndPath("neomagicae", "coffeinum"), ResourceLocation.fromNamespaceAndPath("neomagicae", "mana_type"), "neomagicae");
+
+----------------------------------------
+
+TITLE: Initializing SimpleChannel for Minecraft Forge Networking
+DESCRIPTION: Creates a SimpleChannel instance for handling custom network packets. It defines a protocol version and version compatibility checks for client-server communication.
+
+LANGUAGE: java
+CODE:
+private static final String PROTOCOL_VERSION = "1";
+public static final SimpleChannel INSTANCE = NetworkRegistry.newSimpleChannel(
+  ResourceLocation.fromNamespaceAndPath("mymodid", "main"),
+  () -> PROTOCOL_VERSION,
+  PROTOCOL_VERSION::equals,
+  PROTOCOL_VERSION::equals
+);
+
+----------------------------------------
+
+TITLE: Using ObjectHolder Annotation
+DESCRIPTION: Examples of using @ObjectHolder annotation to inject registry objects into static fields. Shows various annotation configurations and requirements.
+
+LANGUAGE: java
+CODE:
+class Holder {
+  @ObjectHolder(registryName = "minecraft:enchantment", value = "minecraft:flame")
+  public static final Enchantment flame = null;
+
+  public static final Biome ice_flat = null;
+
+  @ObjectHolder("minecraft:creeper")
+  public static Entity creeper = null;
+
+  @ObjectHolder(registryName = "potion")
+  public static final Potion levitation = null;
+}
+
+----------------------------------------
+
+TITLE: Implementing SavedData in Java for Minecraft Forge
+DESCRIPTION: This snippet demonstrates how to implement a SavedData subclass and attach it to a level using DimensionDataStorage. It shows the creation, loading, and computation of a custom ExampleSavedData instance.
+
+LANGUAGE: java
+CODE:
+// In some class
+public ExampleSavedData create() {
+  return new ExampleSavedData();
+}
+
+public ExampleSavedData load(CompoundTag tag) {
+  ExampleSavedData data = this.create();
+  // Load saved data
+  return data;
+}
+
+// In some method within the class
+netherDataStorage.computeIfAbsent(this::load, this::create, "example");
+
+----------------------------------------
+
+TITLE: Accessing ExistingFileHelper in Minecraft Forge Data Generation
+DESCRIPTION: Demonstrates how to retrieve an instance of ExistingFileHelper from the GatherDataEvent. This helper is used to validate the existence of referenced data files during data generation.
+
+LANGUAGE: java
+CODE:
+ExistingFileHelper existingFileHelper = event.getExistingFileHelper();
+
+----------------------------------------
+
+TITLE: Initializing Configuration Class with ForgeConfigSpec Builder
+DESCRIPTION: Demonstrates how to create a configuration class using ForgeConfigSpec.Builder in a static block pattern. Shows the typical setup for defining and storing configuration values.
+
+LANGUAGE: java
+CODE:
+// In some config class
+ExampleConfig(ForgeConfigSpec.Builder builder) {
+  // Define values here in final fields
+}
+
+// Somewhere the constructor is accessible
+static {
+  Pair<ExampleConfig, ForgeConfigSpec> pair = new ForgeConfigSpec.Builder()
+    .configure(ExampleConfig::new);
+  // Store pair values in some constant field
+}
+
+----------------------------------------
+
+TITLE: Registering Data Providers in Minecraft Forge
+DESCRIPTION: Shows how to register data providers using the DataGenerator obtained from the GatherDataEvent. This is typically done when setting up data generation for a mod.
+
+LANGUAGE: java
+CODE:
+DataGenerator generator = event.getGenerator();
+generator.addProvider(/* ... */);
+
+----------------------------------------
+
+TITLE: Using ResourceLocation in Minecraft Forge
+DESCRIPTION: ResourceLocation is a core class used to identify and locate resources in Minecraft. It consists of a namespace and path component, typically formatted as 'namespace:path'. When namespace is omitted, it defaults to 'minecraft'. Resources are typically stored in assets/<namespace>/<context>/<path> structure.
+
+LANGUAGE: java
+CODE:
+ResourceLocation location = new ResourceLocation("examplemod:path")
+
+----------------------------------------
+
+TITLE: Cloning Minecraft Forge Repository with Git
+DESCRIPTION: This command clones the Minecraft Forge repository from GitHub to a local directory. Replace <User> with your GitHub username.
+
+LANGUAGE: git
+CODE:
+git clone https://github.com/<User>/MinecraftForge
+
+----------------------------------------
+
+TITLE: Registering BlockEntityType in MinecraftForge
+DESCRIPTION: Shows how to register a BlockEntityType using DeferredRegister and implement the BlockEntity constructor. This is required to create and reference BlockEntity instances.
+
+LANGUAGE: java
+CODE:
+// For some DeferredRegister<BlockEntityType<?>> REGISTER
+public static final RegistryObject<BlockEntityType<MyBE>> MY_BE = REGISTER.register("mybe", () -> BlockEntityType.Builder.of(MyBE::new, validBlocks).build(null));
+
+// In MyBE, a BlockEntity subclass
+public MyBE(BlockPos pos, BlockState state) {
+  super(MY_BE.get(), pos, state);
+}
+
+----------------------------------------
+
+TITLE: Setting up Forge Development Environment with Gradle
+DESCRIPTION: These Gradle commands set up the Forge development environment and generate Eclipse run configurations. They should be executed in the cloned repository directory.
+
+LANGUAGE: gradle
+CODE:
+./gradlew setup
+
+LANGUAGE: gradle
+CODE:
+./gradlew genEclipseRuns
+
+----------------------------------------
+
+TITLE: Implementing IEntityAdditionalSpawnData Interface in Minecraft Forge
+DESCRIPTION: Interface implementation for adding custom spawn data to entity spawn packets. Used for data that remains constant after entity spawning.
+
+LANGUAGE: java
+CODE:
+public class CustomEntity implements IEntityAdditionalSpawnData {
+    @Override
+    public void writeSpawnData(FriendlyByteBuf buffer) {
+        // Write spawn data to buffer
+    }
+
+    @Override
+    public void readSpawnData(FriendlyByteBuf additionalData) {
+        // Read spawn data from buffer
+    }
+}
+
+----------------------------------------
+
+TITLE: Using DistExecutor for Side-Specific Code - Java
+DESCRIPTION: Example demonstrating how to use DistExecutor to run methods on specific physical sides of Minecraft. Shows both unsafe and safe variants for running and calling methods.
+
+LANGUAGE: java
+CODE:
+// In a client class: ExampleClass
+public static void unsafeRunMethodExample(Object param1, Object param2) {
+  // ...
+}
+
+public static Object safeCallMethodExample() {
+  // ...
+}
+
+// In some common class
+DistExecutor.unsafeRunWhenOn(Dist.CLIENT, () -> ExampleClass.unsafeRunMethodExample(var1, var2));
+
+DistExecutor.safeCallWhenOn(Dist.CLIENT, () -> ExampleClass::safeCallMethodExample);
+
+----------------------------------------
+
+TITLE: Creating Shaped Recipes with ShapedRecipeBuilder in Minecraft Forge
+DESCRIPTION: Demonstrates how to use ShapedRecipeBuilder to generate shaped crafting recipes, including pattern definition, ingredient mapping, and unlocking criteria.
+
+LANGUAGE: java
+CODE:
+// In RecipeProvider#buildRecipes(writer)
+ShapedRecipeBuilder builder = ShapedRecipeBuilder.shaped(RecipeCategory.MISC, result)
+  .pattern("a a") // Create recipe pattern
+  .define('a', item) // Define what the symbol represents
+  .unlockedBy("criteria", criteria) // How the recipe is unlocked
+  .save(writer); // Add data to builder
+
+----------------------------------------
+
+TITLE: Defining Language Translations in JSON
+DESCRIPTION: Example of a language file (en_us.json) showing translation key mappings for mod items, blocks and command messages. The file must be placed in assets/[namespace]/lang/ and encoded in UTF-8.
+
+LANGUAGE: json
+CODE:
+{
+  "item.examplemod.example_item": "Example Item Name",
+  "block.examplemod.example_block": "Example Block Name",
+  "commands.examplemod.examplecommand.error": "Example Command Errored!"
+}
+
+----------------------------------------
+
+TITLE: Java Tag Usage Example
+DESCRIPTION: Example demonstrating different methods of creating and checking tags in Java code, including usage with Items, Potions, and VillagerTypes. Shows how to create tag keys and verify if objects belong to specific tags.
+
+LANGUAGE: java
+CODE:
+public static final TagKey<Item> myItemTag = ItemTags.create(ResourceLocation.fromNamespaceAndPath("mymod", "myitemgroup"));
+
+public static final TagKey<Potion> myPotionTag = ForgeRegistries.POTIONS.tags().createTagKey(ResourceLocation.fromNamespaceAndPath("mymod", "mypotiongroup"));
+
+public static final TagKey<VillagerType> myVillagerTypeTag = TagKey.create(Registries.VILLAGER_TYPE, ResourceLocation.fromNamespaceAndPath("mymod", "myvillagertypegroup"));
+
+// In some method:
+
+ItemStack stack = /*...*/;
+boolean isInItemGroup = stack.is(myItemTag);
+
+Potion potion = /*...*/;
+boolean isInPotionGroup  = ForgeRegistries.POTIONS.tags().getTag(myPotionTag).contains(potion);
+
+ResourceKey<VillagerType> villagerTypeKey = /*...*/;
+boolean isInVillagerTypeGroup = BuiltInRegistries.VILLAGER_TYPE.getHolder(villagerTypeKey).map(holder -> holder.is(myVillagerTypeTag)).orElse(false);
+
+----------------------------------------
+
+TITLE: Exposing a Capability in a BlockEntity in Java
+DESCRIPTION: Shows how to expose a capability in a BlockEntity by overriding getCapability() and invalidateCaps() methods.
+
+LANGUAGE: java
+CODE:
+// Somewhere in your BlockEntity subclass
+LazyOptional<IItemHandler> inventoryHandlerLazyOptional;
+
+// Supplied instance (e.g. () -> inventoryHandler)
+// Ensure laziness as initialization should only happen when needed
+inventoryHandlerLazyOptional = LazyOptional.of(inventoryHandlerSupplier);
+
+@Override
+public <T> LazyOptional<T> getCapability(Capability<T> cap, Direction side) {
+  if (cap == ForgeCapabilities.ITEM_HANDLER) {
+    return inventoryHandlerLazyOptional.cast();
+  }
+  return super.getCapability(cap, side);
+}
+
+@Override
+public void invalidateCaps() {
+  super.invalidateCaps();
+  inventoryHandlerLazyOptional.invalidate();
+}
+
+----------------------------------------
+
+TITLE: Registering KeyMapping Event Handler in MinecraftForge
+DESCRIPTION: Shows how to register a key mapping by listening to RegisterKeyMappingsEvent on the mod event bus. Uses lazy initialization to ensure the key mapping exists only when registered.
+
+LANGUAGE: java
+CODE:
+// In some physical client only class
+
+// Key mapping is lazily initialized so it doesn't exist until it is registered
+public static final Lazy<KeyMapping> EXAMPLE_MAPPING = Lazy.of(() -> /*...*/); 
+
+// Event is on the mod event bus only on the physical client
+@SubscribeEvent
+public void registerBindings(RegisterKeyMappingsEvent event) {
+  event.register(EXAMPLE_MAPPING.get());
+}
+
+----------------------------------------
+
+TITLE: Registering a Custom Capability using @AutoRegisterCapability in Java
+DESCRIPTION: Demonstrates how to register a custom capability using the @AutoRegisterCapability annotation.
+
+LANGUAGE: java
+CODE:
+@AutoRegisterCapability
+public interface IExampleCapability {
+  // ...
+}
+
+----------------------------------------
+
+TITLE: Initializing a Basic Screen in Minecraft Forge
+DESCRIPTION: Demonstrates how to create a basic screen class, initialize it with a title, and add widgets during initialization.
+
+LANGUAGE: java
+CODE:
+// In some Screen subclass
+public MyScreen(Component title) {
+    super(title);
+}
+
+@Override
+protected void init() {
+    super.init();
+
+    // Add widgets and precomputed values
+    this.addRenderableWidget(new EditBox(/* ... */));
+}
+
+----------------------------------------
+
+TITLE: Encoding and Decoding with NbtOps in Java
+DESCRIPTION: Shows how to encode Java objects to NBT Tags and decode NBT Tags back to Java objects using NbtOps.
+
+LANGUAGE: java
+CODE:
+// Let exampleCodec represent a Codec<ExampleJavaObject>
+// Let exampleObject be a ExampleJavaObject
+// Let exampleNbt be a Tag
+
+// Encode Java object to Tag
+exampleCodec.encodeStart(JsonOps.INSTANCE, exampleObject);
+
+// Decode Tag into Java object
+exampleCodec.parse(JsonOps.INSTANCE, exampleNbt);
+
+----------------------------------------
+
+TITLE: Creating a Static Event Handler in Java for Minecraft Forge
+DESCRIPTION: Demonstrates how to create a static event handler for the ArrowNockEvent. This handler needs to be registered using MinecraftForge.EVENT_BUS.register(MyStaticForgeEventHandler.class).
+
+LANGUAGE: java
+CODE:
+public class MyStaticForgeEventHandler {
+	@SubscribeEvent
+	public static void arrowNocked(ArrowNockEvent event) {
+		System.out.println("Arrow nocked!");
+	}
+}
+
+----------------------------------------
+
+TITLE: Encoding and Decoding with JsonOps in Java
+DESCRIPTION: Demonstrates how to encode Java objects to JsonElements and decode JsonElements back to Java objects using JsonOps with both standard and compressed formats.
+
+LANGUAGE: java
+CODE:
+// Let exampleCodec represent a Codec<ExampleJavaObject>
+// Let exampleObject be a ExampleJavaObject
+// Let exampleJson be a JsonElement
+
+// Encode Java object to regular JsonElement
+exampleCodec.encodeStart(JsonOps.INSTANCE, exampleObject);
+
+// Encode Java object to compressed JsonElement
+exampleCodec.encodeStart(JsonOps.COMPRESSED, exampleObject);
+
+// Decode JsonElement into Java object
+// Assume JsonElement was parsed normally
+exampleCodec.parse(JsonOps.INSTANCE, exampleJson);
+
+----------------------------------------
+
+TITLE: Creating a Range Codec in Java
+DESCRIPTION: Demonstrates how to create a range codec that validates if a value is within a specified inclusive range.
+
+LANGUAGE: java
+CODE:
+public static final Codec<Integer> RANGE_CODEC = Codec.intRange(0, 4); 
+
+----------------------------------------
+
+TITLE: Implementing IContainerFactory for Extra Data
+DESCRIPTION: Shows how to create a MenuType that handles additional data using IContainerFactory and FriendlyByteBuf.
+
+LANGUAGE: java
+CODE:
+public static final RegistryObject<MenuType<MyMenuExtra>> MY_MENU_EXTRA = REGISTER.register("my_menu_extra", () -> IForgeMenuType.create(MyMenu::new));
+
+public MyMenuExtra(int containerId, Inventory playerInv, FriendlyByteBuf extraData) {
+  super(MY_MENU_EXTRA.get(), containerId);
+  // Store extra data from buffer
+  // ...
+}
+
+----------------------------------------
+
+TITLE: Creating a Dispatch Codec in Java
+DESCRIPTION: Shows how to create a dispatch codec that can decode different object types based on a specified type field.
+
+LANGUAGE: java
+CODE:
+// Assume there is an IForgeRegistry<Codec<? extends ExampleObject>> DISPATCH
+public static final Codec<ExampleObject> = DISPATCH.getCodec() // Gets Codec<Codec<? extends ExampleObject>>
+  .dispatch(
+    ExampleObject::type, // Get the codec from the specific object
+    Function.identity() // Get the codec from the registry
+  );
+
+----------------------------------------
+
+TITLE: Obtaining a Capability Instance in Java
+DESCRIPTION: Demonstrates how to obtain a capability instance using CapabilityManager.get() with a CapabilityToken.
+
+LANGUAGE: java
+CODE:
+public static final Capability<IItemHandler> ITEM_HANDLER = CapabilityManager.get(new CapabilityToken<>(){});
+
+----------------------------------------
+
+TITLE: Setting Default BlockState in Java for Minecraft Forge
+DESCRIPTION: Demonstrates how to set the default state for a block using multiple properties in the Block constructor.
+
+LANGUAGE: Java
+CODE:
+this.registerDefaultState(
+  this.stateDefinition.any()
+    .setValue(FACING, Direction.NORTH)
+    .setValue(OPEN, false)
+    .setValue(HINGE, DoorHingeSide.LEFT)
+    .setValue(POWERED, false)
+    .setValue(HALF, DoubleBlockHalf.LOWER)
+);
+
+----------------------------------------
+
+TITLE: Implementing GlobalLootModifierProvider in MinecraftForge
+DESCRIPTION: This code snippet demonstrates how to implement a GlobalLootModifierProvider and add it to the DataGenerator in a Minecraft mod. It shows the process of subscribing to the GatherDataEvent and adding a custom GlobalLootModifierProvider to the generator.
+
+LANGUAGE: java
+CODE:
+// On the MOD event bus
+@SubscribeEvent
+public void gatherData(GatherDataEvent event) {
+    event.getGenerator().addProvider(
+        // Tell generator to run only when server data are generating
+        event.includeServer(),
+        output -> new MyGlobalLootModifierProvider(output, MOD_ID)
+    );
+}
+
+// In some GlobalLootModifierProvider#start
+this.add("example_modifier", new ExampleModifier(
+  new LootItemCondition[] {
+    WeatherCheck.weather().setRaining(true).build() // Executes when raining
+  },
+  "val1",
+  10,
+  Items.DIRT
+));
+
+----------------------------------------
+
+TITLE: Implementing BlockEntity Data Storage
+DESCRIPTION: Demonstrates the methods needed to save and load BlockEntity data using CompoundTag. These methods handle persistence of BlockEntity state.
+
+LANGUAGE: java
+CODE:
+BlockEntity#saveAdditional(CompoundTag tag)
+
+BlockEntity#load(CompoundTag tag)
+
+----------------------------------------
+
+TITLE: Registering LootTableProvider in MinecraftForge Data Generation
+DESCRIPTION: Shows how to add a LootTableProvider to the DataGenerator during the GatherDataEvent. This setup allows for the generation of custom loot tables for a mod.
+
+LANGUAGE: java
+CODE:
+@SubscribeEvent
+public void gatherData(GatherDataEvent event) {
+    event.getGenerator().addProvider(
+        event.includeServer(),
+        output -> new MyLootTableProvider(
+          output,
+          Collections.emptySet(),
+          List.of(subProvider1, subProvider2, /*...*/)
+        )
+    );
+}
+
+----------------------------------------
+
+TITLE: Implementing BlockEntity Ticking
+DESCRIPTION: Shows how to implement ticking functionality in a BlockEntity by overriding the getTicker method and creating a tick handler.
+
+LANGUAGE: java
+CODE:
+// Inside some Block subclass
+@Nullable
+@Override
+public <T extends BlockEntity> BlockEntityTicker<T> getTicker(Level level, BlockState state, BlockEntityType<T> type) {
+  return type == MyBlockEntityTypes.MYBE.get() ? MyBlockEntity::tick : null;
+}
+
+// Inside MyBlockEntity
+public static void tick(Level level, BlockPos pos, BlockState state, MyBlockEntity blockEntity) {
+  // Do stuff
+}
+
+----------------------------------------
+
+TITLE: Adding Items to Creative Tabs in Minecraft Forge
+DESCRIPTION: This snippet demonstrates how to add items to existing creative tabs using the BuildCreativeModeTabContentsEvent. It shows how to add items to the ingredients tab and includes a check for the tab key.
+
+LANGUAGE: java
+CODE:
+// Registered on the MOD event bus
+// Assume we have RegistryObject<Item> and RegistryObject<Block> called ITEM and BLOCK
+@SubscribeEvent
+public void buildContents(BuildCreativeModeTabContentsEvent event) {
+  // Add to ingredients tab
+  if (event.getTabKey() == CreativeModeTabs.INGREDIENTS) {
+    event.accept(ITEM);
+    event.accept(BLOCK); // Takes in an ItemLike, assumes block has registered item
+  }
+}
+
+----------------------------------------
+
+TITLE: Creating MenuType Registration
+DESCRIPTION: Demonstrates how to register a MenuType using DeferredRegister and implement the basic menu constructor.
+
+LANGUAGE: java
+CODE:
+public static final RegistryObject<MenuType<MyMenu>> MY_MENU = REGISTER.register("my_menu", () -> new MenuType(MyMenu::new, FeatureFlags.DEFAULT_FLAGS));
+
+public MyMenu(int containerId, Inventory playerInv) {
+  super(MY_MENU.get(), containerId);
+  // ...
+}
+
+----------------------------------------
+
+TITLE: Implementing ForgeAdvancementProvider$AdvancementGenerator in Minecraft Forge
+DESCRIPTION: Shows the structure of the generate method in a ForgeAdvancementProvider$AdvancementGenerator. This method is responsible for creating and configuring advancements.
+
+LANGUAGE: java
+CODE:
+// In some subclass of ForgeAdvancementProvider$AdvancementGenerator or as a lambda reference
+
+@Override
+public void generate(HolderLookup.Provider registries, Consumer<Advancement> writer, ExistingFileHelper existingFileHelper) {
+  // Build advancements here
+}
+
+----------------------------------------
+
+TITLE: Menu Access Implementation
+DESCRIPTION: Demonstrates implementing a menu with ContainerLevelAccess for block-based menus.
+
+LANGUAGE: java
+CODE:
+public MyMenuAccess(int containerId, Inventory playerInventory) {
+  this(containerId, playerInventory, ContainerLevelAccess.NULL);
+}
+
+public MyMenuAccess(int containerId, Inventory playerInventory, ContainerLevelAccess access) {
+  // ...
+}
+
+@Override
+public boolean stillValid(Player player) {
+  return AbstractContainerMenu.stillValid(this.access, player, MY_BLOCK.get());
+}
+
+----------------------------------------
+
+TITLE: Defining Configuration Values with Builder
+DESCRIPTION: Shows how to define configuration values using ForgeConfigSpec.Builder with comments and validation. Demonstrates the basic pattern for creating configurable values.
+
+LANGUAGE: java
+CODE:
+// For some ForgeConfigSpec$Builder builder
+ConfigValue<T> value = builder.comment("Comment")
+  .define("config_value_name", defaultValue);
+
+----------------------------------------
+
+TITLE: Quick Move Stack Implementation
+DESCRIPTION: Shows a complete implementation of quickMoveStack for handling shift-click operations in a menu.
+
+LANGUAGE: java
+CODE:
+@Override
+public ItemStack quickMoveStack(Player player, int quickMovedSlotIndex) {
+  ItemStack quickMovedStack = ItemStack.EMPTY;
+  Slot quickMovedSlot = this.slots.get(quickMovedSlotIndex);
+  
+  if (quickMovedSlot != null && quickMovedSlot.hasItem()) {
+    ItemStack rawStack = quickMovedSlot.getItem();
+    quickMovedStack = rawStack.copy();
+
+    if (quickMovedSlotIndex == 0) {
+      if (!this.moveItemStackTo(rawStack, 5, 41, true)) {
+        return ItemStack.EMPTY;
+      }
+      slot.onQuickCraft(rawStack, quickMovedStack);
+    }
+    else if (quickMovedSlotIndex >= 5 && quickMovedSlotIndex < 41) {
+      if (!this.moveItemStackTo(rawStack, 1, 5, false)) {
+        if (quickMovedSlotIndex < 32) {
+          if (!this.moveItemStackTo(rawStack, 32, 41, false)) {
+            return ItemStack.EMPTY;
+          }
+        }
+        else if (!this.moveItemStackTo(rawStack, 5, 32, false)) {
+          return ItemStack.EMPTY;
+        }
+      }
+    }
+    else if (!this.moveItemStackTo(rawStack, 5, 41, false)) {
+      return ItemStack.EMPTY;
+    }
+
+    if (rawStack.isEmpty()) {
+      quickMovedSlot.set(ItemStack.EMPTY);
+    } else {
+      quickMovedSlot.setChanged();
+    }
+
+    if (rawStack.getCount() == quickMovedStack.getCount()) {
+      return ItemStack.EMPTY;
+    }
+    quickMovedSlot.onTake(player, rawStack);
+  }
+
+  return quickMovedStack;
+}
+
+----------------------------------------
+
+TITLE: And/Or Condition Implementation
+DESCRIPTION: Boolean AND/OR operator conditions that combine multiple conditions using logical operators.
+
+LANGUAGE: javascript
+CODE:
+{
+  "type": "forge:and",
+  "values": [
+    {
+      // First condition
+    },
+    {
+      // Second condition to be ANDed
+    }
+  ]
+}
+
+----------------------------------------
+
+TITLE: Menu Opening Implementation
+DESCRIPTION: Shows how to implement menu opening functionality for blocks and mobs.
+
+LANGUAGE: java
+CODE:
+// Block Implementation
+@Override
+public MenuProvider getMenuProvider(BlockState state, Level level, BlockPos pos) {
+  return new SimpleMenuProvider(/* ... */);
+}
+
+@Override
+public InteractionResult use(BlockState state, Level level, BlockPos pos, Player player, InteractionHand hand, BlockHitResult result) {
+  if (!level.isClientSide && player instanceof ServerPlayer serverPlayer) {
+    serverPlayer.openMenu(state.getMenuProvider(level, pos));
+  }
+  return InteractionResult.sidedSuccess(level.isClientSide);
+}
+
+// Mob Implementation
+public class MyMob extends Mob implements MenuProvider {
+  @Override
+  public InteractionResult mobInteract(Player player, InteractionHand hand) {
+    if (!this.level.isClientSide && player instanceof ServerPlayer serverPlayer) {
+      serverPlayer.openMenu(this);
+    }
+    return InteractionResult.sidedSuccess(this.level.isClientSide);
+  }
+}
+
+----------------------------------------
+
+TITLE: Implementing Anvil Recipe Update Handler in Java
+DESCRIPTION: Event handler for custom anvil recipes that checks input items and sets output, experience cost, and material requirements. Must be attached to the Forge event bus.
+
+LANGUAGE: java
+CODE:
+public void updateAnvil(AnvilUpdateEvent event) {
+  if (event.getLeft().is(...) && event.getRight().is(...)) {
+    event.setOutput(...);
+    event.setCost(...);
+    event.setMaterialCost(...);
+  }
+}
+
+----------------------------------------
+
+TITLE: Implementing Screen Ticking in Minecraft Forge
+DESCRIPTION: Shows how to implement the tick method in a screen subclass to perform client-side logic for rendering purposes.
+
+LANGUAGE: java
+CODE:
+// In some Screen subclass
+@Override
+public void tick() {
+    super.tick();
+
+    // Add ticking logic for EditBox in editBox
+    this.editBox.tick();
+}
+
+----------------------------------------
+
+TITLE: Demonstrating Module Package Conflicts in Java
+DESCRIPTION: This snippet shows how package conflicts between different modules can cause the mod loader to crash on startup. It emphasizes the importance of using unique top-level package names in Minecraft Forge mod development.
+
+LANGUAGE: text
+CODE:
+module A
+  - package X
+    - class I
+    - class J
+module B
+  - package X // This package will cause the mod loader to crash, as there already is a module with package X being exported
+    - class R
+    - class S
+    - class T
+
+----------------------------------------
+
+TITLE: Defining BlockEntityRenderer Method Parameters
+DESCRIPTION: The render method parameters for BlockEntityRenderer implementation including blockEntity instance, partial tick timing, pose stack for matrix transformations, buffer source for vertex consumer access, and combined light and overlay values.
+
+LANGUAGE: java
+CODE:
+void render(
+    BlockEntity blockEntity,     // Instance of block entity being rendered
+    float partialTick,         // Fraction of time passed since last tick
+    PoseStack poseStack,       // Matrix stack for position transformations
+    BufferSource bufferSource, // Rendering buffer for vertex consumer
+    int combinedLight,         // Current light value on block entity
+    int combinedOverlay        // Current overlay value (usually OverlayTexture#NO_OVERLAY)
+)
+
+----------------------------------------
+
+TITLE: Handling Screen Closure in Minecraft Forge
+DESCRIPTION: Demonstrates how to implement onClose and removed methods to handle screen teardown and resource cleanup.
+
+LANGUAGE: java
+CODE:
+// In some Screen subclass
+
+@Override
+public void onClose() {
+    // Stop any handlers here
+
+    // Call last in case it interferes with the override
+    super.onClose();
+}
+
+@Override
+public void removed() {
+    // Reset initial states here
+
+    // Call last in case it interferes with the override
+    super.removed();
+}
+
+----------------------------------------
+
+TITLE: Demonstrating Legacy Metadata Usage in Java
+DESCRIPTION: Shows how metadata was used to represent block properties like facing and position before the introduction of block states.
+
+LANGUAGE: Java
+CODE:
+switch (meta) {
+  case 0: { ... } // south and on the lower half of the block
+  case 1: { ... } // south on the upper side of the block
+  case 2: { ... } // north and on the lower half of the block
+  case 3: { ... } // north and on the upper half of the block
+  // ... etc. ...
+}
+
+----------------------------------------
+
+TITLE: Rendering an AbstractContainerScreen Background in Minecraft Forge
+DESCRIPTION: Demonstrates how to implement the renderBg method to draw the background texture for an AbstractContainerScreen.
+
+LANGUAGE: java
+CODE:
+// In some AbstractContainerScreen subclass
+
+// The location of the background texture (assets/<namespace>/<path>)
+private static final ResourceLocation BACKGROUND_LOCATION = new ResourceLocation(MOD_ID, "textures/gui/container/my_container_screen.png");
+
+@Override
+protected void renderBg(GuiGraphics graphics, float partialTick, int mouseX, int mouseY) {
+    /*
+     * Renders the background texture to the screen. 'leftPos' and
+     * 'topPos' should already represent the top left corner of where
+     * the texture should be rendered as it was precomputed from the
+     * 'imageWidth' and 'imageHeight'. The two zeros represent the
+     * integer u/v coordinates inside the 256 x 256 PNG file.
+     */
+    graphics.blit(BACKGROUND_LOCATION, this.leftPos, this.topPos, 0, 0, this.imageWidth, this.imageHeight);
+}
+
+----------------------------------------
+
+TITLE: Initializing DatapackBuiltinEntriesProvider for Datapack Registry Objects in Java
+DESCRIPTION: This snippet demonstrates how to set up a DatapackBuiltinEntriesProvider within a GatherDataEvent handler. It shows the process of adding the provider to the DataGenerator and initializing it with a RegistrySetBuilder and mod ID.
+
+LANGUAGE: java
+CODE:
+// On the MOD event bus
+@SubscribeEvent
+public void gatherData(GatherDataEvent event) {
+    event.getGenerator().addProvider(
+        // Tell generator to run only when server data are generating
+        event.includeServer(),
+        output -> new DatapackBuiltinEntriesProvider(
+          output,
+          event.getLookupProvider(),
+          // The builder containing the datapack registry objects to generate
+          new RegistrySetBuilder().add(/* ... */),
+          // Set of mod ids to generate the datapack registry objects of
+          Set.of(MOD_ID)
+        )
+    );
+}
+
+----------------------------------------
+
+TITLE: Registering an AbstractContainerScreen in Minecraft Forge
+DESCRIPTION: Shows how to register an AbstractContainerScreen with a menu type using MenuScreens.register in the FMLClientSetupEvent.
+
+LANGUAGE: java
+CODE:
+// Event is listened to on the mod event bus
+private void clientSetup(FMLClientSetupEvent event) {
+    event.enqueueWork(
+        // Assume RegistryObject<MenuType<MyMenu>> MY_MENU
+        // Assume MyContainerScreen<MyMenu> which takes in three parameters
+        () -> MenuScreens.register(MY_MENU.get(), MyContainerScreen::new)
+    );
+}
+
+----------------------------------------
+
+TITLE: Implementing RecipeType Getter Method
+DESCRIPTION: Implementation of the getType method required for recipe types, showing how to return the registered RecipeType instance.
+
+LANGUAGE: java
+CODE:
+// For some RegistryObject<RecipeType> EXAMPLE_TYPE
+// In ExampleRecipe
+@Override
+public RecipeType<?> getType() {
+  return EXAMPLE_TYPE.get();
+}
+
+----------------------------------------
+
+TITLE: Creating Basic KeyMapping with Keyboard Input
+DESCRIPTION: Demonstrates creation of a basic key mapping using KEYSYM type for keyboard input. Defines translation key, input type, default key (P), and category.
+
+LANGUAGE: java
+CODE:
+new KeyMapping(
+  "key.examplemod.example1", // Will be localized using this translation key
+  InputConstants.Type.KEYSYM, // Default mapping is on the keyboard
+  GLFW.GLFW_KEY_P, // Default key is P
+  "key.categories.misc" // Mapping will be in the misc category
+)
+
+----------------------------------------
+
+TITLE: Registering Model Providers with DataGenerator
+DESCRIPTION: Demonstrates how to add model providers to the DataGenerator for generating client assets.
+
+LANGUAGE: java
+CODE:
+// On the MOD event bus
+@SubscribeEvent
+public void gatherData(GatherDataEvent event) {
+    DataGenerator gen = event.getGenerator();
+    ExistingFileHelper efh = event.getExistingFileHelper();
+
+    gen.addProvider(
+        // Tell generator to run only when client assets are generating
+        event.includeClient(),
+        output -> new MyItemModelProvider(output, MOD_ID, efh)
+    );
+    gen.addProvider(
+        event.includeClient(),
+        output -> new MyBlockStateProvider(output, MOD_ID, efh)
+    );
+}
+
+----------------------------------------
+
+TITLE: Creating KeyMapping with GUI Context and Mouse Input
+DESCRIPTION: Shows how to create a key mapping specifically for GUI contexts using mouse input. Includes custom category definition and left mouse button binding.
+
+LANGUAGE: java
+CODE:
+new KeyMapping(
+  "key.examplemod.example2",
+  KeyConflictContext.GUI, // Mapping can only be used when a screen is open
+  InputConstants.Type.MOUSE, // Default mapping is on the mouse
+  GLFW.GLFW_MOUSE_BUTTON_LEFT, // Default mouse input is the left mouse button
+  "key.categories.examplemod.examplecategory" // Mapping will be in the new example category
+)
+
+----------------------------------------
+
+TITLE: Converting Between Encoded Formats in Java
+DESCRIPTION: Demonstrates how to convert between different encoded formats, specifically from NBT Tag to JsonElement.
+
+LANGUAGE: java
+CODE:
+// Convert Tag to JsonElement
+// Let exampleTag be a Tag
+JsonElement convertedJson = NbtOps.INSTANCE.convertTo(JsonOps.INSTANCE, exampleTag);
+
+----------------------------------------
+
+TITLE: Handling KeyMapping in Game Tick Event
+DESCRIPTION: Shows how to check for key mapping activation during game ticks using ClientTickEvent and consumeClick() method.
+
+LANGUAGE: java
+CODE:
+// Event is on the Forge event bus only on the physical client
+public void onClientTick(ClientTickEvent event) {
+  if (event.phase == TickEvent.Phase.END) { // Only call code once as the tick event is called twice every tick
+    while (EXAMPLE_MAPPING.get().consumeClick()) {
+      // Execute logic to perform on click here
+    }
+  }
+}
+
+----------------------------------------
+
+TITLE: Handling DataResult in Java
+DESCRIPTION: Shows how to handle the DataResult returned by codec operations, including error handling and result processing.
+
+LANGUAGE: java
+CODE:
+// Let exampleCodec represent a Codec<ExampleJavaObject>
+// Let exampleJson be a JsonElement
+
+// Decode JsonElement into Java object
+DataResult<ExampleJavaObject> result = exampleCodec.parse(JsonOps.INSTANCE, exampleJson);
+
+result
+  // Get result or partial on error, report error message
+  .resultOrPartial(errorMessage -> /* Do something with error message */)
+  // If result or partial is present, do something
+  .ifPresent(decodedObject -> /* Do something with decoded object */);
+
+----------------------------------------
+
+TITLE: Handling KeyMapping in GUI for Keyboard Input
+DESCRIPTION: Demonstrates how to check for key mapping activation within a GUI screen for keyboard input using keyPressed method.
+
+LANGUAGE: java
+CODE:
+// In some Screen subclass
+@Override
+public boolean keyPressed(int key, int scancode, int mods) {
+  if (EXAMPLE_MAPPING.get().isActiveAndMatches(InputConstants.getKey(key, scancode))) {
+    // Execute logic to perform on key press here
+    return true;
+  }
+  return super.keyPressed(x, y, button);
+}
+
+----------------------------------------
+
+TITLE: Creating a Record Codec in Java
+DESCRIPTION: Demonstrates how to create a record codec for a custom object with multiple fields using RecordCodecBuilder.
+
+LANGUAGE: java
+CODE:
+public static final Codec<SomeObject> RECORD_CODEC = RecordCodecBuilder.create(instance -> // Given an instance
+  instance.group( // Define the fields within the instance
+    Codec.STRING.fieldOf("s").forGetter(SomeObject::s), // String
+    Codec.INT.optionalFieldOf("i", 0).forGetter(SomeObject::i), // Integer, defaults to 0 if field not present
+    Codec.BOOL.fieldOf("b").forGetter(SomeObject::b) // Boolean
+  ).apply(instance, SomeObject::new) // Define how to create the object
+);
+
+----------------------------------------
+
+TITLE: Custom Code Profiling Implementation
+DESCRIPTION: Example showing how to implement custom profiling sections in mod code using ProfilerFiller. The ProfilerFiller instance can be obtained from Level, MinecraftServer, or Minecraft instances.
+
+LANGUAGE: java
+CODE:
+ProfilerFiller#push(yourSectionName : String);
+//The code you want to profile
+ProfilerFiller#pop();
+
+----------------------------------------
+
+TITLE: Implementing getOverrides Method in BakedModel
+DESCRIPTION: Returns the ItemOverrides for the model when rendered as an item.
+
+LANGUAGE: Java
+CODE:
+getOverrides()
+
+----------------------------------------
+
+TITLE: Configuring a Game Test Method with Additional Parameters
+DESCRIPTION: Demonstrates how to use @GameTest annotation parameters to configure test execution, such as setup time and required status.
+
+LANGUAGE: java
+CODE:
+@GameTest(
+  setupTicks = 20L, // The test spends 20 ticks to set up for execution
+  required = false // The failure is logged but does not affect the execution of the batch
+)
+public static void exampleConfiguredTest(GameTestHelper helper) {
+  // Do stuff
+}
+
+----------------------------------------
+
+TITLE: Implementing useAmbientOcclusion Method in BakedModel
+DESCRIPTION: Determines if ambient occlusion should be applied when rendering the model as a block.
+
+LANGUAGE: Java
+CODE:
+useAmbientOcclusion()
+
+----------------------------------------
+
+TITLE: Creating a Game Test Generator Method in Java
+DESCRIPTION: Shows how to define a method that dynamically generates Game Tests using the @GameTestGenerator annotation.
+
+LANGUAGE: java
+CODE:
+public class ExampleGameTests {
+  @GameTestGenerator
+  public static Collection<TestFunction> exampleTests() {
+    // Return a collection of TestFunctions
+  }
+}
+
+----------------------------------------
+
+TITLE: Implementing isGui3d Method in BakedModel
+DESCRIPTION: Determines if the model should appear flat when rendered as an item in inventories or GUIs.
+
+LANGUAGE: Java
+CODE:
+isGui3d()
+
+----------------------------------------
+
+TITLE: Registering Game Tests Using @GameTestHolder Annotation
+DESCRIPTION: Shows how to use the @GameTestHolder annotation to register all Game Tests within a class.
+
+LANGUAGE: java
+CODE:
+@GameTestHolder(MODID)
+public class ExampleGameTests {
+  // ...
+}
+
+----------------------------------------
+
+TITLE: Defining a Basic Game Test Method in Java
+DESCRIPTION: Shows how to create a simple Game Test method using the @GameTest annotation and GameTestHelper parameter.
+
+LANGUAGE: java
+CODE:
+public class ExampleGameTests {
+  @GameTest
+  public static void exampleTest(GameTestHelper helper) {
+    // Do stuff
+  }
+}
+
+----------------------------------------
+
+TITLE: Handling Client-Side Packets in Minecraft Forge
+DESCRIPTION: Shows how to handle packets received on the client side. It uses DistExecutor to ensure the code runs only on the physical client and demonstrates proper thread safety.
+
+LANGUAGE: java
+CODE:
+// In Packet class
+public static void handle(MyClientMessage msg, Supplier<NetworkEvent.Context> ctx) {
+  ctx.get().enqueueWork(() ->
+    // Make sure it's only executed on the physical client
+    DistExecutor.unsafeRunWhenOn(Dist.CLIENT, () -> () -> ClientPacketHandlerClass.handlePacket(msg, ctx))
+  );
+  ctx.get().setPacketHandled(true);
+}
+
+// In ClientPacketHandlerClass
+public static void handlePacket(MyClientMessage msg, Supplier<NetworkEvent.Context> ctx) {
+  // Do stuff
+}
+
+----------------------------------------
+
+TITLE: Implementing Batch Setup for Game Tests in Java
+DESCRIPTION: Demonstrates how to use @BeforeBatch annotation to perform setup operations for a batch of Game Tests.
+
+LANGUAGE: java
+CODE:
+public class ExampleGameTests {
+  @BeforeBatch(batch = "firstBatch")
+  public static void beforeTest(ServerLevel level) {
+    // Perform setup
+  }
+
+  @GameTest(batch = "firstBatch")
+  public static void exampleTest2(GameTestHelper helper) {
+    // Do stuff
+  }
+}
+
+----------------------------------------
+
+TITLE: Sending Packets to Clients in Minecraft Forge
+DESCRIPTION: Demonstrates various methods of sending packets to clients using PacketDistributor. It includes examples for sending to a single player, all players tracking a chunk, and all connected players.
+
+LANGUAGE: java
+CODE:
+// Send to one player
+INSTANCE.send(PacketDistributor.PLAYER.with(serverPlayer), new MyMessage());
+
+// Send to all players tracking this level chunk
+INSTANCE.send(PacketDistributor.TRACKING_CHUNK.with(levelChunk), new MyMessage());
+
+// Send to all connected players
+INSTANCE.send(PacketDistributor.ALL.noArg(), new MyMessage());
+
+----------------------------------------
+
+TITLE: Configuring Game Test Namespaces in Gradle
+DESCRIPTION: Demonstrates how to enable specific namespaces for Game Tests in the Gradle buildscript.
+
+LANGUAGE: gradle
+CODE:
+// Inside a run configuration
+property 'forge.enabledGameTestNamespaces', 'modid1,modid2,modid3'
+
+----------------------------------------
+
+TITLE: Implementing Entity Data Parameter Synchronization in Minecraft Forge
+DESCRIPTION: Example showing how to create and use EntityDataAccessor for synchronizing entity data between server and client. The system requires defining static parameters and initializing them in defineSynchedData().
+
+LANGUAGE: java
+CODE:
+public class CustomEntity extends Entity {
+    private static final EntityDataAccessor<T> DATA_PARAMETER = 
+        SynchedEntityData.defineId(CustomEntity.class, EntityDataSerializers.SERIALIZER_TYPE);
+
+    @Override
+    protected void defineSynchedData() {
+        super.defineSynchedData();
+        this.entityData.define(DATA_PARAMETER, defaultValue);
+    }
+}
+
+----------------------------------------
+
+TITLE: Enabling Game Tests in Custom Run Configurations
+DESCRIPTION: Shows how to enable Game Tests for custom run configurations in the Gradle buildscript.
+
+LANGUAGE: gradle
+CODE:
+// Inside a run configuration
+property 'forge.enableGameTest', 'true'
+
+----------------------------------------
+
+TITLE: Configuring Advancement Requirements in JSON
+DESCRIPTION: Demonstrates how to structure advancement criteria and requirements in JSON format. Shows how to define multiple criteria paths that can unlock an advancement.
+
+LANGUAGE: javascript
+CODE:
+// In some advancement JSON
+
+// List of defined criteria to meet
+"criteria": {
+  "example_criterion1": { /*...*/ },
+  "example_criterion2": { /*...*/ },
+  "example_criterion3": { /*...*/ },
+  "example_criterion4": { /*...*/ }
+},
+
+// This advancement is only unlocked once
+// - Criteria 1 AND 2 have been met
+// OR
+// - Criteria 3 and 4 have been met
+"requirements": [
+  [
+    "example_criterion1",
+    "example_criterion2"
+  ],
+  [
+    "example_criterion3",
+    "example_criterion4"
+  ]
+]
+
+----------------------------------------
+
+TITLE: Implementing RecipeSerializer Getter Method
+DESCRIPTION: Implementation of the getSerializer method required for recipe serialization, showing how to return the registered RecipeSerializer instance.
+
+LANGUAGE: java
+CODE:
+// For some RegistryObject<RecipeSerializer> EXAMPLE_SERIALIZER
+// In ExampleRecipe
+@Override
+public RecipeSerializer<?> getSerializer() {
+  return EXAMPLE_SERIALIZER.get();
+}
+
+----------------------------------------
+
+TITLE: Implementing Static Factory Method for Trigger Instance
+DESCRIPTION: Demonstrates creation of a static factory method for easier trigger instance creation during data generation.
+
+LANGUAGE: java
+CODE:
+public static ExampleTriggerInstance instance(ContextAwarePredicate player, ItemPredicate item) {
+  return new ExampleTriggerInstance(player, item);
+}
+
+----------------------------------------
+
+TITLE: Custom Recipe JSON Structure
+DESCRIPTION: Example JSON structure for defining a custom recipe, showing the required fields and format for recipe serialization.
+
+LANGUAGE: json
+CODE:
+{
+  "type": "examplemod:example_serializer",
+  "input": {
+    // Some ingredient input
+  },
+  "data": 0,
+  "output": {
+    // Some stack output
+  }
+}
+
+----------------------------------------
+
+TITLE: Configuring Advancement Rewards in JSON
+DESCRIPTION: Shows how to define advancement rewards including experience points, loot tables, recipes, and functions in JSON format.
+
+LANGUAGE: javascript
+CODE:
+// In some advancement JSON
+"rewards": {
+  "experience": 10,
+  "loot": [
+    "minecraft:example_loot_table",
+    "minecraft:example_loot_table2"
+    // ...
+  ],
+  "recipes": [
+    "minecraft:example_recipe",
+    "minecraft:example_recipe2"
+    // ...
+  ],
+  "function": "minecraft:example_function"
+}
+
+----------------------------------------
+
+TITLE: Non-Item Recipe Logic Implementation
+DESCRIPTION: Example implementation for recipes that don't use items as inputs or outputs, showing custom matching and assembly methods.
+
+LANGUAGE: java
+CODE:
+// In some Recipe subimplementation ExampleRecipe
+
+// Checks the block at the position to see if it matches the stored data
+boolean matches(Level level, BlockPos pos);
+
+// Creates the block state to set the block at the specified position to
+BlockState assemble(RegistryAccess access);
+
+// In some manager class
+public Optional<ExampleRecipe> getRecipeFor(Level level, BlockPos pos) {
+  return level.getRecipeManager()
+    .getAllRecipesFor(exampleRecipeType) // Gets all recipes
+    .stream() // Looks through all recipes for types
+    .filter(recipe -> recipe.matches(level, pos)) // Checks if the recipe inputs are valid
+    .findFirst(); // Finds the first recipe whose inputs match
+}
+
+----------------------------------------
+
+TITLE: Conditional Recipe/Advancement Structure
+DESCRIPTION: Base structure for conditional recipes and advancements in MinecraftForge. Defines how to specify conditions and their corresponding data.
+
+LANGUAGE: javascript
+CODE:
+{
+  "type": "forge:conditional",
+  
+  "recipes": [
+    {
+      "conditions": [
+        {
+          // Condition 1
+        },
+        {
+          // Condition 2
+        }
+      ],
+      "recipe": {
+        // The recipe to use if all conditions succeed
+      }
+    },
+    {
+      // Next condition to check if the previous fails
+    },
+  ]
+}
+
+----------------------------------------
+
+TITLE: Implementing PartialNBTIngredient in JSON
+DESCRIPTION: Shows how to define a partial NBT ingredient that checks specific NBT keys for equivalency across single or multiple items.
+
+LANGUAGE: javascript
+CODE:
+{
+  "type": "forge:partial_nbt",
+  "item": "examplemod:example_item",
+  "items": [
+    "examplemod:example_item",
+    "examplemod:example_item2"
+  ],
+  "nbt": {
+    "key1": "data1",
+    "key2": {
+      // Data 2
+    }
+  }
+}
+
+----------------------------------------
+
+TITLE: True/False Condition Implementation
+DESCRIPTION: Simple boolean condition implementation that always returns true or false based on the condition type.
+
+LANGUAGE: javascript
+CODE:
+{
+  "type": "forge:true"
+}
+
+----------------------------------------
+
+TITLE: Implementing DifferenceIngredient in JSON
+DESCRIPTION: Shows how to define a difference ingredient that requires matching the first ingredient but not the second (subtraction).
+
+LANGUAGE: javascript
+CODE:
+{
+  "type": "forge:difference",
+  "base": {
+    // Ingredient the stack is in
+  },
+  "subtracted": {
+    // Ingredient the stack is NOT in
+  }
+}
+
+----------------------------------------
+
+TITLE: Not Condition Implementation
+DESCRIPTION: Boolean NOT operator condition that inverts the result of a contained condition.
+
+LANGUAGE: javascript
+CODE:
+{
+  "type": "forge:not",
+  "value": {
+    // A condition
+  }
+}
+
+----------------------------------------
+
+TITLE: Registering Custom Ingredient Serializer in Java
+DESCRIPTION: Example of how to register a custom ingredient serializer in Minecraft Forge using RegisterEvent or FMLCommonSetupEvent.
+
+LANGUAGE: java
+CODE:
+// In some serializer class
+public static final ExampleIngredientSerializer INSTANCE = new ExampleIngredientSerializer();
+
+// In some handler class
+public void registerSerializers(RegisterEvent event) {
+  event.register(ForgeRegistries.Keys.RECIPE_SERIALIZERS,
+    helper -> CraftingHelper.register(registryName, INSTANCE)
+  );
+}
+
+// In some ingredient subclass
+@Override
+public IIngredientSerializer<? extends Ingredient> getSerializer() {
+  return INSTANCE;
+}
+
+----------------------------------------
+
+TITLE: Mod Loaded Condition
+DESCRIPTION: Condition that checks if a specific mod is loaded in the current application.
+
+LANGUAGE: javascript
+CODE:
+{
+  "type": "forge:mod_loaded",
+  "modid": "examplemod"
+}
+
+----------------------------------------
+
+TITLE: Defining Loot Modifier Properties JSON
+DESCRIPTION: JSON structure for defining the properties and conditions of a specific loot modifier. Contains type definition, activation conditions, and custom properties.
+
+LANGUAGE: json
+CODE:
+{
+  "type": "examplemod:example_loot_modifier",
+  "conditions": [],
+  "prop1": "val1",
+  "prop2": 10,
+  "prop3": "minecraft:dirt"
+}
+
+----------------------------------------
+
+TITLE: Tag Empty Condition
+DESCRIPTION: Condition that checks if a specified item tag has no entries.
+
+LANGUAGE: javascript
+CODE:
+{
+  "type": "forge:tag_empty",
+  "tag": "examplemod:example_tag"
+}
+
+----------------------------------------
+
+TITLE: Implementing LootModifier Class in Java
+DESCRIPTION: Example implementation of a custom LootModifier class that extends the base functionality for modifying loot drops based on conditions.
+
+LANGUAGE: java
+CODE:
+public class ExampleModifier extends LootModifier {
+
+  public ExampleModifier(LootItemCondition[] conditionsIn, String prop1, int prop2, Item prop3) {
+    super(conditionsIn);
+    // Store the rest of the parameters
+  }
+
+  @NotNull
+  @Override
+  protected ObjectArrayList<ItemStack> doApply(ObjectArrayList<ItemStack> generatedLoot, LootContext context) {
+    // Modify the loot and return the new drops
+  }
+
+  @Override
+  public Codec<? extends IGlobalLootModifier> codec() {
+    // Return the codec used to encode and decode this modifier
+  }
+}
+
+----------------------------------------
+
+TITLE: Configuring Global Loot Modifiers JSON Structure
+DESCRIPTION: The global_loot_modifiers.json configuration file that defines the list of loot modifiers to be loaded into the game. Must be placed in data/forge/loot_modifiers/global_loot_modifiers.json.
+
+LANGUAGE: json
+CODE:
+{
+  "replace": false,
+  "entries": [
+    "examplemod:example_glm",
+    "examplemod:example_glm2"
+  ]
+}
+
+----------------------------------------
+
+TITLE: Registering Loot Modifier Codec
+DESCRIPTION: Example of registering a codec for the loot modifier that handles serialization and deserialization of the modifier properties.
+
+LANGUAGE: java
+CODE:
+public static final RegistryObject<Codec<ExampleModifier>> = REGISTRAR.register("example_codec", () ->
+  RecordCodecBuilder.create(
+    inst -> LootModifier.codecStart(inst).and(
+      inst.group(
+        Codec.STRING.fieldOf("prop1").forGetter(m -> m.prop1),
+        Codec.INT.fieldOf("prop2").forGetter(m -> m.prop2),
+        ForgeRegistries.ITEMS.getCodec().fieldOf("prop3").forGetter(m -> m.prop3)
+      )
+    ).apply(inst, ExampleModifier::new)
+  )
+);
+
+----------------------------------------
+
+TITLE: Defining Named Loot Pool in JSON
+DESCRIPTION: Example of naming a loot pool using the 'name' key in a JSON loot table configuration. Named pools help with identification and management.
+
+LANGUAGE: javascript
+CODE:
+{
+  "name": "example_pool", // Pool will be named 'example_pool'
+  "rolls": {
+    // ...
+  },
+  "entries": {
+    // ...
+  }
+}
+
+----------------------------------------
+
+TITLE: Sample Profiling Result Output
+DESCRIPTION: Example output structure from the Debug Profiler showing nested performance metrics for different game systems including levels, entities, and block entities.
+
+LANGUAGE: text
+CODE:
+[00] levels - 96.70%/96.70%
+[01] |   Level Name - 99.76%/96.47%
+[02] |   |   tick - 99.31%/95.81%
+[03] |   |   |   entities - 47.72%/45.72%
+[04] |   |   |   |   regular - 98.32%/44.95%
+[04] |   |   |   |   blockEntities - 0.90%/0.41%
+[05] |   |   |   |   |   unspecified - 64.26%/0.26%
+[05] |   |   |   |   |   minecraft:furnace - 33.35%/0.14%
+[05] |   |   |   |   |   minecraft:chest - 2.39%/0.01%
+
+----------------------------------------
+
+TITLE: Loot Table ID Condition Configuration
+DESCRIPTION: JSON configuration for the Forge-specific loot table ID condition that allows items to generate for specific tables. Commonly used with global loot modifiers.
+
+LANGUAGE: javascript
+CODE:
+{
+  "conditions": [
+    {
+      "condition": "forge:loot_table_id",
+      // Will apply when the loot table is for dirt
+      "loot_table_id": "minecraft:blocks/dirt"
+    }
+  ]
+}
+
+----------------------------------------
+
+TITLE: Configuring Update Checker JSON Format
+DESCRIPTION: JSON structure for defining mod version information including homepage, version-specific changelogs, and latest/recommended version declarations for different Minecraft versions.
+
+LANGUAGE: javascript
+CODE:
+{
+  "homepage": "<homepage/download page for your mod>",
+  "<mcversion>": {
+    "<modversion>": "<changelog for this version>", 
+    // List all versions of your mod for the given Minecraft version, along with their changelogs
+    // ...
+  },
+  "promos": {
+    "<mcversion>-latest": "<modversion>",
+    // Declare the latest "bleeding-edge" version of your mod for the given Minecraft version
+    "<mcversion>-recommended": "<modversion>",
+    // Declare the latest "stable" version of your mod for the given Minecraft version
+    // ...
+  }
+}
+
+----------------------------------------
+
+TITLE: Tool Action Condition Configuration
+DESCRIPTION: JSON configuration for the Forge-specific condition that checks if a tool can perform a specific action. Used to conditionally generate loot based on tool capabilities.
+
+LANGUAGE: javascript
+CODE:
+{
+  "conditions": [
+    {
+      "condition": "forge:can_tool_perform_action",
+      // Will apply when the tool can strip a log like an axe
+      "action": "axe_strip"
+    }
+  ]
+}
+
+----------------------------------------
+
+TITLE: Handling Non-ASCII Characters in Translations
+DESCRIPTION: Example showing how to add translations containing special characters or diacritics, which are automatically converted to unicode equivalents.
+
+LANGUAGE: java
+CODE:
+// Encdoded as 'Example with a d\u00EDacritic'
+this.addItem("example.diacritic", "Example with a díacritic");
+
+----------------------------------------
+
+TITLE: Implementing Basic Recipe Class in Java
+DESCRIPTION: Example of a basic recipe implementation using a Java record that implements the Recipe interface for Container type. Shows the basic structure for holding recipe data.
+
+LANGUAGE: java
+CODE:
+public record ExampleRecipe(Ingredient input, int data, ItemStack output) implements Recipe<Container> {
+  // Implement methods here
+}
+
+----------------------------------------
+
+TITLE: Configuring Sound Definitions in Minecraft Forge
+DESCRIPTION: Demonstrates how to create and configure sound definitions with multiple sounds, including settings for volume, pitch, streaming, and probability weights.
+
+LANGUAGE: java
+CODE:
+// In some SoundDefinitionsProvider#registerSounds
+this.add(EXAMPLE_SOUND_EVENT, definition()
+  .subtitle("sound.examplemod.example_sound") // Set translation key
+  .with(
+    sound(ResourceLocation.fromNamespaceAndPath(MODID, "example_sound_1")) // Set first sound
+      .weight(4) // Has a 4 / 5 = 80% chance of playing
+      .volume(0.5), // Scales all volumes called on this sound by half
+    sound(ResourceLocation.fromNamespaceAndPath(MODID, "example_sound_2")) // Set second sound
+      .stream() // Streams the sound
+  )
+);
+
+this.add(EXAMPLE_SOUND_EVENT_2, definition()
+  .subtitle("sound.examplemod.example_sound") // Set translation key
+  .with(
+    sound(EXAMPLE_SOUND_EVENT.getLocation(), SoundType.EVENT) // Adds sounds from 'EXAMPLE_SOUND_EVENT'
+      .pitch(0.5) // Scales all pitches called on this sound by half
+  )
+);
+
+----------------------------------------
+
+TITLE: Using RecipeWrapper in Java for Recipe Lookup
+DESCRIPTION: This code snippet shows how to use the RecipeWrapper utility class to wrap an IItemHandler and pass it to the RecipeManager for finding matching recipes.
+
+LANGUAGE: java
+CODE:
+// Within some method with IItemHandlerModifiable handler
+recipeManger.getRecipeFor(RecipeType.CRAFTING, new RecipeWrapper(handler), level);
+
+----------------------------------------
+
+TITLE: Rendering a Custom Screen in Minecraft Forge
+DESCRIPTION: Illustrates how to override the render method to draw the background, widgets, and tooltips on a custom screen.
+
+LANGUAGE: java
+CODE:
+// In some Screen subclass
+
+// mouseX and mouseY indicate the scaled coordinates of where the cursor is in on the screen
+@Override
+public void render(GuiGraphics graphics, int mouseX, int mouseY, float partialTick) {
+    // Background is typically rendered first
+    this.renderBackground(graphics);
+
+    // Render things here before widgets (background textures)
+
+    // Then the widgets if this is a direct child of the Screen
+    super.render(graphics, mouseX, mouseY, partialTick);
+
+    // Render things after widgets (tooltips)
+}
+
+----------------------------------------
+
+TITLE: Defining Recipe Result with NBT in JavaScript
+DESCRIPTION: This JSON snippet demonstrates how to define a recipe result with a full ItemStack, including item name, count, and NBT data.
+
+LANGUAGE: javascript
+CODE:
+// In some recipe JSON
+"result": {
+  // The name of the registry item to give as a result
+  "item": "examplemod:example_item",
+  // The number of items to return
+  "count": 4,
+  // The tag data of the stack, can also be a string
+  "nbt": {
+      // Add tag data here
+  }
+}
+
+----------------------------------------
+
+TITLE: Initializing an AbstractContainerScreen in Minecraft Forge
+DESCRIPTION: Shows how to create and initialize an AbstractContainerScreen subclass for inventory-like interfaces.
+
+LANGUAGE: java
+CODE:
+// In some AbstractContainerScreen subclass
+public MyContainerScreen(MyMenu menu, Inventory playerInventory, Component title) {
+    super(menu, playerInventory, title);
+
+    this.titleLabelX = 10;
+    this.inventoryLabelX = 10;
+
+    /*
+     * If the 'imageHeight' is changed, 'inventoryLabelY' must also be
+     * changed as the value depends on the 'imageHeight' value.
+     */
+}
+
+----------------------------------------
+
+TITLE: Implementing CompoundIngredient in JSON
+DESCRIPTION: Shows how to define a compound ingredient that acts as an OR condition, where the input must match at least one of the supplied ingredients.
+
+LANGUAGE: javascript
+CODE:
+[
+  {
+    // Ingredient
+  },
+  {
+    // Custom ingredient
+    "type": "examplemod:example_ingredient"
+  }
+]
+
+----------------------------------------
+
+TITLE: Registering Item Color Handlers in Minecraft Forge
+DESCRIPTION: Shows how to register ItemColor handlers for items using the RegisterColorHandlersEvent.Item event. This enables items to have dynamic coloring based on their properties and state.
+
+LANGUAGE: java
+CODE:
+@SubscribeEvent
+public void registerItemColors(RegisterColorHandlersEvent.Item event){
+  event.register(myItemColor, coloredItem1, coloredItem2, ...);
+}
+
+----------------------------------------
+
+TITLE: Implementing StrictNBTIngredient in JSON
+DESCRIPTION: Demonstrates how to create a strict NBT ingredient that compares item, damage, and share tags for exact equivalency.
+
+LANGUAGE: javascript
+CODE:
+{
+  "type": "forge:nbt",
+  "item": "examplemod:example_item",
+  "nbt": {
+    // Add nbt data (must match exactly what is on the stack)
+  }
+}
+
+----------------------------------------
+
+TITLE: Specifying Face Data in Elements Model
+DESCRIPTION: Demonstrates how to add custom face data to an elements model in Minecraft Forge. The data can be specified at the element level or for individual faces, including color, light levels, and ambient occlusion settings.
+
+LANGUAGE: json
+CODE:
+{
+  "elements": [
+    {
+      "forge_data": {
+        "color": "0xFFFF0000",
+        "block_light": 15,
+        "sky_light": 15,
+        "ambient_occlusion": false
+      },
+      "faces": {
+        "north": {
+          "forge_data": {
+            "color": "0xFFFF0000",
+            "block_light": 15,
+            "sky_light": 15,
+            "ambient_occlusion": false
+          },
+          // ...
+        },
+        // ...
+      },
+      // ...
+    }
+  ]
+}
+
+----------------------------------------
+
+TITLE: Implementing IntersectionIngredient in JSON
+DESCRIPTION: Demonstrates how to create an intersection ingredient that requires all supplied ingredients to match (AND condition).
+
+LANGUAGE: javascript
+CODE:
+{
+  "type": "forge:intersection",
+  "children": [
+    {
+      // Ingredient 1
+    },
+    {
+      // Ingredient 2
+    }
+  ]
+}
+
+----------------------------------------
+
+TITLE: Defining Item Overrides in Vanilla JSON Item Model
+DESCRIPTION: This snippet demonstrates the structure of the 'overrides' array in a vanilla JSON item model. It shows how to define ItemOverrides with predicates and target models.
+
+LANGUAGE: javascript
+CODE:
+{
+  // Inside a vanilla JSON item model
+  "overrides": [
+    {
+      // This is an ItemOverride
+      "predicate": {
+        // This is the Map<ResourceLocation, Float>, containing the names of properties and their minimum values
+        "example1:prop": 0.5
+      },
+      // This is the 'location', or target model, of the override, which is used if the predicate above matches
+      "model": "example1:item/model"
+    },
+    {
+      // This is another ItemOverride
+      "predicate": {
+        "example2:prop": 1
+      },
+      "model": "example2:item/model"
+    }
+  ]
+}
+
+----------------------------------------
+
+TITLE: JSON Tag Declaration Example
+DESCRIPTION: Example showing how to declare tags in JSON format with optional entries and the replace flag. Demonstrates the structure for adding items to tags with required and optional entries.
+
+LANGUAGE: json
+CODE:
+{
+  "replace": false,
+  "values": [
+    "minecraft:gold_ingot",
+    "mymod:my_ingot",
+    {
+      "id": "othermod:ingot_other",
+      "required": false
+    }
+  ]
+}
+
+----------------------------------------
+
+TITLE: Initializing BlockEntityWithoutLevelRenderer for Custom Item in Java
+DESCRIPTION: This snippet demonstrates how to set up a BlockEntityWithoutLevelRenderer for a custom item class. It overrides the initializeClient method to provide a custom renderer instance.
+
+LANGUAGE: java
+CODE:
+// In your item class
+@Override
+public void initializeClient(Consumer<IClientItemExtensions> consumer) {
+  consumer.accept(new IClientItemExtensions() {
+
+    @Override
+    public BlockEntityWithoutLevelRenderer getCustomRenderer() {
+      return myBEWLRInstance;
+    }
+  });
+}
+
+----------------------------------------
+
+TITLE: Registering Language Provider in DataGenerator
+DESCRIPTION: Shows how to register a custom language provider with the DataGenerator using the MOD event bus. This example demonstrates setting up translations for American English (en_us).
+
+LANGUAGE: java
+CODE:
+@SubscribeEvent
+public void gatherData(GatherDataEvent event) {
+    event.getGenerator().addProvider(
+        // Tell generator to run only when client assets are generating
+        event.includeClient(),
+        // Localizations for American English
+        output -> new MyLanguageProvider(output, MOD_ID, "en_us")
+    );
+}
+
+----------------------------------------
+
+TITLE: Implementing isCustomRenderer Method in BakedModel
+DESCRIPTION: Indicates whether to use BlockEntityWithoutLevelRenderer for item rendering. Usually returns false.
+
+LANGUAGE: Java
+CODE:
+isCustomRenderer()
+
+----------------------------------------
+
+TITLE: Adding Translation Entries in LanguageProvider
+DESCRIPTION: Demonstrates how to add translation mappings for blocks and custom objects within the LanguageProvider implementation.
+
+LANGUAGE: java
+CODE:
+// In LanguageProvider#addTranslations
+this.addBlock(EXAMPLE_BLOCK, "Example Block");
+this.add("object.examplemod.example_object", "Example Object");
+
+----------------------------------------
+
+TITLE: Implementing getParticleIcon Method in BakedModel
+DESCRIPTION: Returns the texture to be used for particle effects. Now deprecated in favor of getParticleIcon(ModelData).
+
+LANGUAGE: Java
+CODE:
+getParticleIcon()
+
+----------------------------------------
+
+TITLE: Creating Block State Variants
+DESCRIPTION: Demonstrates how to create block state variants using VariantBlockStateBuilder.
+
+LANGUAGE: java
+CODE:
+// In some BlockStateProvider#registerStatesAndModels
+
+// EXAMPLE_BLOCK_1: Has Property BlockStateProperties#AXIS
+this.getVariantBuilder(EXAMPLE_BLOCK_1) // Get variant builder
+  .partialState() // Construct partial state
+  .with(AXIS, Axis.Y) // When BlockState AXIS = Y
+    .modelForState() // Set models when AXIS = Y
+    .modelFile(yModelFile1) // Can show 'yModelFile1'
+    .nextModel() // Adds another model when AXIS = Y
+    .modelFile(yModelFile2) // Can show 'yModelFile2'
+    .weight(2) // Will show 'yModelFile2' 2/3 of the time
+    .addModel() // Finalizes models when AXIS = Y
+  .with(AXIS, Axis.Z) // When BlockState AXIS = Z
+    .modelForState() // Set models when AXIS = Z
+    .modelFile(hModelFile) // Can show 'hModelFile'
+    .addModel() // Finalizes models when AXIS = Z
+  .with(AXIS, Axis.X)  // When BlockState AXIS = X
+    .modelForState() // Set models when AXIS = X
+    .modelFile(hModelFile) // Can show 'hModelFile'
+    .rotationY(90) // Rotates 'hModelFile' 90 degrees on the Y axis
+    .addModel(); // Finalizes models when AXIS = X
+
+----------------------------------------
+
+TITLE: Implementing applyTransform Method in BakedModel
+DESCRIPTION: Applies transformations to the model. Replaces the deprecated getTransforms method.
+
+LANGUAGE: Java
+CODE:
+applyTransform()
+
+----------------------------------------
+
+TITLE: Using Custom Model Loader
+DESCRIPTION: Demonstrates how to use a custom model loader (OBJ in this example) with BlockModelBuilder.
+
+LANGUAGE: java
+CODE:
+// For some BlockModelBuilder builder
+builder.customLoader(ObjModelBuilder::begin) // Custom loader 'forge:obj'
+  .modelLocation(modLoc("models/block/model.obj")) // Set the OBJ model location
+  .flipV(true) // Flips the V coordinate in the supplied .mtl texture
+  .end() // Finish custom loader configuration
+.texture("particle", mcLoc("block/dirt")) // Set particle texture to dirt
+.texture("texture0", mcLoc("block/dirt")); // Set 'texture0' texture to dirt
+
+----------------------------------------
+
+TITLE: Implementing getQuads Method in BakedModel
+DESCRIPTION: Main method that returns a list of BakedQuads containing vertex data for rendering. Takes BlockState, Direction, Random, and ModelData as parameters.
+
+LANGUAGE: Java
+CODE:
+getQuads(BlockState state, Direction side, Random rand, ModelData data)
+
+----------------------------------------
+
+TITLE: Creating Custom Model Provider
+DESCRIPTION: Demonstrates how to create a custom model provider by extending ModelProvider.
+
+LANGUAGE: java
+CODE:
+public class ExampleModelProvider extends ModelProvider<ExampleModelBuilder> {
+
+  public ExampleModelProvider(PackOutput output, String modid, ExistingFileHelper existingFileHelper) {
+    // Models will be generated to 'assets/<modid>/models/example' if no 'modid' is specified in '#getBuilder'
+    super(output, modid, "example", ExampleModelBuilder::new, existingFileHelper);
+  }
+}
+
+----------------------------------------
+
+TITLE: Item Exists Condition
+DESCRIPTION: Condition that verifies if a specific item has been registered in the current application.
+
+LANGUAGE: javascript
+CODE:
+{
+  "type": "forge:item_exists",
+  "item": "examplemod:example_item"
+}
+
+----------------------------------------
+
+TITLE: Registering Sound Definition Provider in Minecraft Forge
+DESCRIPTION: Shows how to register a custom SoundDefinitionsProvider with the DataGenerator on the MOD event bus. The provider is only added when client assets are being generated.
+
+LANGUAGE: java
+CODE:
+@SubscribeEvent
+public void gatherData(GatherDataEvent event) {
+    event.getGenerator().addProvider(
+        // Tell generator to run only when client assets are generating
+        event.includeClient(),
+        output -> new MySoundDefinitionsProvider(output, MOD_ID, event.getExistingFileHelper())
+    );
+}
+
+----------------------------------------
+
+TITLE: Custom Condition Serializer Registration
+DESCRIPTION: Example of registering a custom condition serializer in MinecraftForge.
+
+LANGUAGE: java
+CODE:
+// In some serializer class
+public static final ExampleConditionSerializer INSTANCE = new ExampleConditionSerializer();
+
+// In some handler class
+public void registerSerializers(RegisterEvent event) {
+  event.register(ForgeRegistries.Keys.RECIPE_SERIALIZERS,
+    helper -> CraftingHelper.register(INSTANCE)
+  );
+}
+
+----------------------------------------
+
+TITLE: Registering ForgeAdvancementProvider in Minecraft Forge
+DESCRIPTION: Demonstrates how to add a ForgeAdvancementProvider to the DataGenerator during the GatherDataEvent. This setup allows for the generation of custom advancements in a Forge mod.
+
+LANGUAGE: java
+CODE:
+// On the MOD event bus
+@SubscribeEvent
+public void gatherData(GatherDataEvent event) {
+    event.getGenerator().addProvider(
+        // Tell generator to run only when server data are generating
+        event.includeServer(),
+        output -> new ForgeAdvancementProvider(
+          output,
+          event.getLookupProvider(),
+          event.getExistingFileHelper(),
+          // Sub providers which generate the advancements
+          List.of(subProvider1, subProvider2, /*...*/)
+        )
+    );
+}
+
+----------------------------------------
+
+TITLE: Defining Recipe Unlock Criteria in JavaScript
+DESCRIPTION: This snippet demonstrates how to define criteria for unlocking a recipe advancement in JSON format. It checks if the user has unlocked the recipe by using it once or receiving it through a command.
+
+LANGUAGE: javascript
+CODE:
+// Within some recipe advancement json
+"has_the_recipe": { // Criteria label
+  // Succeeds if examplemod:example_recipe is used
+  "trigger": "minecraft:recipe_unlocked",
+  "conditions": {
+    "recipe": "examplemod:example_recipe"
+  }
+}
+//...
+"requirements": [
+  [
+    "has_the_recipe"
+    // ... Other criteria labels to be ORed against to unlock recipe
+  ]
+]
+
+----------------------------------------
+
+TITLE: Creating an Advancement using Advancement$Builder in Minecraft Forge
+DESCRIPTION: Illustrates how to use Advancement$Builder to create and save a new advancement. This example adds a criterion and saves the advancement with a specific name.
+
+LANGUAGE: java
+CODE:
+// In some ForgeAdvancementProvider$AdvancementGenerator#generate(registries, writer, existingFileHelper)
+Advancement example = Advancement.Builder.advancement()
+  .addCriterion("example_criterion", triggerInstance) // How the advancement is unlocked
+  .save(writer, name, existingFileHelper); // Add data to builder
+
+----------------------------------------
+
+TITLE: Registering Custom Banner Pattern in Java
+DESCRIPTION: Implementation for registering a custom banner pattern that can be used in the loom. Patterns must be registered and properly tagged to appear as options in the loom interface.
+
+LANGUAGE: java
+CODE:
+private static final DeferredRegister<BannerPattern> REGISTER = DeferredRegister.create(Registries.BANNER_PATTERN, "examplemod");
+
+// Takes in the pattern name to send over the network
+public static final BannerPattern EXAMPLE_PATTERN = REGISTER.register("example_pattern", () -> new BannerPattern("examplemod:ep"));
+
+----------------------------------------
+
+TITLE: Configuring RegistrySetBuilder for Multiple Registries in Java
+DESCRIPTION: This code snippet illustrates how to create and configure a RegistrySetBuilder for multiple registries. It shows the process of adding entries for CONFIGURED_FEATURE and PLACED_FEATURE registries using the #add method.
+
+LANGUAGE: java
+CODE:
+new RegistrySetBuilder()
+  // Create configured features
+  .add(Registries.CONFIGURED_FEATURE, bootstrap -> {
+    // Register configured features here
+  })
+  // Create placed features
+  .add(Registries.PLACED_FEATURE, bootstrap -> {
+    // Register placed features here
+  });
+
+----------------------------------------
+
+TITLE: Tag Structure Example
+DESCRIPTION: Example showing the structure of how tags are organized in the documentation
+
+LANGUAGE: markdown
+CODE:
+- `namespace:tag_name`
+    - `minecraft:item_id`
+    - `minecraft:another_item_id`
+
+----------------------------------------
+
+TITLE: Registering Configured Feature with BootstapContext in Java
+DESCRIPTION: This snippet demonstrates how to register a configured feature using BootstapContext within a RegistrySetBuilder. It includes the creation of a ResourceKey and the registration of a ConfiguredFeature object.
+
+LANGUAGE: java
+CODE:
+public static final ResourceKey<ConfiguredFeature<?, ?>> EXAMPLE_CONFIGURED_FEATURE = ResourceKey.create(
+  Registries.CONFIGURED_FEATURE,
+  ResourceLocation.fromNamespaceAndPath(MOD_ID, "example_configured_feature")
+);
+
+// In some constant location or argument
+new RegistrySetBuilder()
+  // Create configured features
+  .add(Registries.CONFIGURED_FEATURE, bootstrap -> {
+    // Register configured features here
+    bootstrap.register(
+      // The resource key for the configured feature
+      EXAMPLE_CONFIGURED_FEATURE,
+      new ConfiguredFeature<>(
+        Feature.ORE, // Create an ore feature
+        new OreConfiguration(
+          List.of(), // Does nothing
+          8 // in veins of at most 8
+        )
+      )
+    );
+  })
+  // Create placed features
+  .add(Registries.PLACED_FEATURE, bootstrap -> {
+    // Register placed features here
+  });
+
+----------------------------------------
+
+TITLE: Generating Basic Item Model
+DESCRIPTION: Shows how to generate a simple item model using ItemModelProvider.
+
+LANGUAGE: java
+CODE:
+// In some ItemModelProvider#registerModels
+
+// Will generate 'assets/<modid>/models/item/example_item.json'
+// Parent will be 'minecraft:item/generated'
+// For the texture key 'layer0'
+//  It will be at 'assets/<modid>/textures/item/example_item.png'
+this.basicItem(EXAMPLE_ITEM.get());
+
+----------------------------------------
+
+TITLE: Datapack Registry Object Lookup and Registration in Java
+DESCRIPTION: This code snippet shows how to look up and register datapack registry objects using BootstapContext. It demonstrates the process of getting a HolderGetter, retrieving a Holder.Reference, and registering a PlacedFeature that depends on a previously registered ConfiguredFeature.
+
+LANGUAGE: java
+CODE:
+public static final ResourceKey<ConfiguredFeature<?, ?>> EXAMPLE_CONFIGURED_FEATURE = ResourceKey.create(
+  Registries.CONFIGURED_FEATURE,
+  ResourceLocation.fromNamespaceAndPath(MOD_ID, "example_configured_feature")
+);
+
+public static final ResourceKey<PlacedFeature> EXAMPLE_PLACED_FEATURE = ResourceKey.create(
+  Registries.PLACED_FEATURE,
+  ResourceLocation.fromNamespaceAndPath(MOD_ID, "example_placed_feature")
+);
+
+// In some constant location or argument
+new RegistrySetBuilder()
+  // Create configured features
+  .add(Registries.CONFIGURED_FEATURE, bootstrap -> {
+    // Register configured features here
+    bootstrap.register(
+      // The resource key for the configured feature
+      EXAMPLE_CONFIGURED_FEATURE,
+      new ConfiguredFeature(/* ... */)
+    );
+  })
+  // Create placed features
+  .add(Registries.PLACED_FEATURE, bootstrap -> {
+    // Register placed features here
+
+    // Get configured feature registry
+    HolderGetter<ConfiguredFeature<?, ?>> configured = bootstrap.lookup(Registries.CONFIGURED_FEATURE);
+
+    bootstrap.register(
+      // The resource key for the placed feature
+      EXAMPLE_PLACED_FEATURE,
+      new PlacedFeature(
+        configured.getOrThrow(EXAMPLE_CONFIGURED_FEATURE), // Get the configured feature
+        List.of() // and do nothing to the placement location
+      )
+    )
+  });
+
+----------------------------------------
+
+TITLE: Creating Multipart Block States
+DESCRIPTION: Shows how to create multipart block states using MultiPartBlockStateBuilder.
+
+LANGUAGE: java
+CODE:
+// In some BlockStateProvider#registerStatesAndModels
+
+// Redstone Wire
+this.getMultipartBuilder(REDSTONE) // Get multipart builder
+  .part() // Create part
+    .modelFile(redstoneDot) // Can show 'redstoneDot'
+    .addModel() // 'redstoneDot' is displayed when...
+    .useOr() // At least one of these conditions are true
+    .nestedGroup() // true when all grouped conditions are true
+      .condition(WEST_REDSTONE, NONE) // true when WEST_REDSTONE is NONE
+      .condition(EAST_REDSTONE, NONE) // true when EAST_REDSTONE is NONE
+      .condition(SOUTH_REDSTONE, NONE) // true when SOUTH_REDSTONE is NONE
+      .condition(NORTH_REDSTONE, NONE) // true when NORTH_REDSTONE is NONE
+    .endNestedGroup() // End group
+    .nestedGroup() // true when all grouped conditions are true
+      .condition(EAST_REDSTONE, SIDE, UP) // true when EAST_REDSTONE is SIDE or UP
+      .condition(NORTH_REDSTONE, SIDE, UP) // true when NORTH_REDSTONE is SIDE or UP
+    .endNestedGroup() // End group
+    .nestedGroup() // true when all grouped conditions are true
+      .condition(EAST_REDSTONE, SIDE, UP) // true when EAST_REDSTONE is SIDE or UP
+      .condition(SOUTH_REDSTONE, SIDE, UP) // true when SOUTH_REDSTONE is SIDE or UP
+    .endNestedGroup() // End group
+    .nestedGroup() // true when all grouped conditions are true
+      .condition(WEST_REDSTONE, SIDE, UP) // true when WEST_REDSTONE is SIDE or UP
+      .condition(SOUTH_REDSTONE, SIDE, UP) // true when SOUTH_REDSTONE is SIDE or UP
+    .endNestedGroup() // End group
+    .nestedGroup() // true when all grouped conditions are true
+      .condition(WEST_REDSTONE, SIDE, UP) // true when WEST_REDSTONE is SIDE or UP
+      .condition(NORTH_REDSTONE, SIDE, UP) // true when NORTH_REDSTONE is SIDE or UP
+    .endNestedGroup() // End group
+    .end() // Finish part
+  .part() // Create part
+    .modelFile(redstoneSide0) // Can show 'redstoneSide0'
+    .addModel() // 'redstoneSide0' is displayed when...
+    .condition(NORTH_REDSTONE, SIDE, UP) // NORTH_REDSTONE is SIDE or UP
+    .end() // Finish part
+  .part() // Create part
+    .modelFile(redstoneSideAlt0) // Can show 'redstoneSideAlt0'
+    .addModel() // 'redstoneSideAlt0' is displayed when...
+    .condition(SOUTH_REDSTONE, SIDE, UP) // SOUTH_REDSTONE is SIDE or UP
+    .end() // Finish part
+  .part() // Create part
+    .modelFile(redstoneSideAlt1) // Can show 'redstoneSideAlt1'
+    .rotationY(270) // Rotates 'redstoneSideAlt1' 270 degrees on the Y axis
+    .addModel() // 'redstoneSideAlt1' is displayed when...
+    .condition(EAST_REDSTONE, SIDE, UP) // EAST_REDSTONE is SIDE or UP
+    .end() // Finish part
+  .part() // Create part
+    .modelFile(redstoneSide1) // Can show 'redstoneSide1'
+    .rotationY(270) // Rotates 'redstoneSide1' 270 degrees on the Y axis
+    .addModel() // 'redstoneSide1' is displayed when...
+    .condition(WEST_REDSTONE, SIDE, UP) // WEST_REDSTONE is SIDE or UP
+    .end() // Finish part
+  .part() // Create part
+    .modelFile(redstoneUp) // Can show 'redstoneUp'
+    .addModel() // 'redstoneUp' is displayed when...
+    .condition(NORTH_REDSTONE, UP) // NORTH_REDSTONE is UP
+    .end() // Finish part
+  .part() // Create part
+    .modelFile(redstoneUp) // Can show 'redstoneUp'
+    .rotationY(90) // Rotates 'redstoneUp' 90 degrees on the Y axis
+    .addModel() // 'redstoneUp' is displayed when...
+    .condition(EAST_REDSTONE, UP) // EAST_REDSTONE is UP
+    .end() // Finish part
+  .part() // Create part
+    .modelFile(redstoneUp) // Can show 'redstoneUp'
+    .rotationY(180) // Rotates 'redstoneUp' 180 degrees on the Y axis
+    .addModel() // 'redstoneUp' is displayed when...
+    .condition(SOUTH_REDSTONE, UP) // SOUTH_REDSTONE is UP
+    .end() // Finish part
+  .part() // Create part
+    .modelFile(redstoneUp) // Can show 'redstoneUp'
+    .rotationY(270) // Rotates 'redstoneUp' 270 degrees on the Y axis
+    .addModel() // 'redstoneUp' is displayed when...
+    .condition(WEST_REDSTONE, UP) // WEST_REDSTONE is UP
+    .end(); // Finish part
+
+----------------------------------------
+
+TITLE: Adding LootTableSubProvider to LootTableProvider in MinecraftForge
+DESCRIPTION: Shows how to add a LootTableSubProvider to the LootTableProvider constructor. This associates the sub-provider with a specific LootContextParamSet.
+
+LANGUAGE: java
+CODE:
+new LootTableProvider.SubProviderEntry(
+  ExampleSubProvider::new,
+  LootContextParamSets.EMPTY
+)
+
+----------------------------------------
+
+TITLE: Creating Custom Model Loader Builder
+DESCRIPTION: Shows how to create a custom model loader builder by extending CustomLoaderBuilder.
+
+LANGUAGE: java
+CODE:
+public class ExampleLoaderBuilder<T extends ModelBuilder<T>> extends CustomLoaderBuilder<T> {
+  public static <T extends ModelBuilder<T>> ExampleLoaderBuilder<T> begin(T parent, ExistingFileHelper existingFileHelper) {
+    return new ExampleLoaderBuilder<>(parent, existingFileHelper);
+  }
+
+  protected ExampleLoaderBuilder(T parent, ExistingFileHelper existingFileHelper) {
+    super(ResourceLocation.fromNamespaceAndPath(MOD_ID, "example_loader"), parent, existingFileHelper);
+  }
+}
+
+----------------------------------------
+
+TITLE: Implementing BlockLootSubProvider in MinecraftForge
+DESCRIPTION: Demonstrates the implementation of a BlockLootSubProvider, which is used for generating block loot tables. It includes setting up explosion resistance and feature flags.
+
+LANGUAGE: java
+CODE:
+public MyBlockLootSubProvider() {
+  super(Collections.emptySet(), FeatureFlags.REGISTRY.allFlags());
+}
+
+----------------------------------------
+
+TITLE: Creating Cooking Recipes with SimpleCookingRecipeBuilder in Minecraft Forge
+DESCRIPTION: Illustrates how to use SimpleCookingRecipeBuilder to generate smelting, blasting, smoking, and campfire cooking recipes, including specifying cooking time and experience.
+
+LANGUAGE: java
+CODE:
+// In RecipeProvider#buildRecipes(writer)
+SimpleCookingRecipeBuilder builder = SimpleCookingRecipeBuilder.smelting(input, RecipeCategory.MISC, result, experience, cookingTime)
+  .unlockedBy("criteria", criteria) // How the recipe is unlocked 
+  .save(writer); // Add data to builder
+
+----------------------------------------
+
+TITLE: Implementing EntityLootSubProvider in MinecraftForge
+DESCRIPTION: Shows the implementation of an EntityLootSubProvider, used for generating entity loot tables. It includes setting up feature flags for entity types.
+
+LANGUAGE: java
+CODE:
+public MyEntityLootSubProvider() {
+  super(FeatureFlags.REGISTRY.allFlags());
+}
+
+----------------------------------------
+
+TITLE: Creating Smithing Transform Recipes in Minecraft Forge
+DESCRIPTION: Shows how to use SmithingTransformRecipeBuilder to generate smithing recipes that transform items, including specifying template, base, and addition items.
+
+LANGUAGE: java
+CODE:
+// In RecipeProvider#buildRecipes(writer)
+SmithingTransformRecipeBuilder builder = SmithingTransformRecipeBuilder.smithing(template, base, addition, RecipeCategory.MISC, result)
+  .unlocks("criteria", criteria) // How the recipe is unlocked
+  .save(writer, name); // Add data to builder
+
+----------------------------------------
+
+TITLE: Retrieving Known Blocks for BlockLootSubProvider in MinecraftForge
+DESCRIPTION: Demonstrates how to implement the getKnownBlocks method in a BlockLootSubProvider, using DeferredRegister to get all registered block entries.
+
+LANGUAGE: java
+CODE:
+@Override
+protected Iterable<Block> getKnownBlocks() {
+  return BLOCK_REGISTRAR.getEntries()
+    .stream()
+    .flatMap(RegistryObject::stream)
+    ::iterator;
+}
+
+----------------------------------------
+
+TITLE: Creating Conditional Recipes in Minecraft Forge
+DESCRIPTION: Demonstrates how to use ConditionalRecipe.Builder to generate conditional recipes with multiple conditions and recipes.
+
+LANGUAGE: java
+CODE:
+// In RecipeProvider#buildRecipes(writer)
+ConditionalRecipe.builder()
+  // Add the conditions for the recipe
+  .addCondition(...)
+  // Add recipe to return when conditions are true
+  .addRecipe(...)
+
+  // Add the next conditions for the next recipe
+  .addCondition(...)
+  // Add next recipe to return when the next conditions are true
+  .addRecipe(...)
+
+  // Create conditional advancement which uses the conditions
+  // and unlocking advancement in the recipes above
+  .generateAdvancement()
+  .build(writer, name);
+
+----------------------------------------
+
+TITLE: Adding RecipeProvider to DataGenerator in Minecraft Forge
+DESCRIPTION: Shows how to add a custom RecipeProvider to the DataGenerator for generating server-side data in a Minecraft Forge mod.
+
+LANGUAGE: java
+CODE:
+// On the MOD event bus
+@SubscribeEvent
+public void gatherData(GatherDataEvent event) {
+    event.getGenerator().addProvider(
+        // Tell generator to run only when server data are generating
+        event.includeServer(),
+        MyRecipeProvider::new
+    );
+}
+
+----------------------------------------
+
+TITLE: Implementing GatherDataEvent Handler for Tag Generation
+DESCRIPTION: Shows how to register a custom BlockTagsProvider with the DataGenerator through the GatherDataEvent. This setup is required to enable tag generation for mod content.
+
+LANGUAGE: java
+CODE:
+@SubscribeEvent
+public void gatherData(GatherDataEvent event) {
+    event.getGenerator().addProvider(
+        event.includeServer(),
+        output -> new MyBlockTagsProvider(
+          output,
+          event.getLookupProvider(),
+          MOD_ID,
+          event.getExistingFileHelper()
+        )
+    );
+}
+
+----------------------------------------
+
+TITLE: Creating Shapeless Recipes with ShapelessRecipeBuilder in Minecraft Forge
+DESCRIPTION: Shows how to use ShapelessRecipeBuilder to generate shapeless crafting recipes, including adding ingredients and specifying unlocking criteria.
+
+LANGUAGE: java
+CODE:
+// In RecipeProvider#buildRecipes(writer)
+ShapelessRecipeBuilder builder = ShapelessRecipeBuilder.shapeless(RecipeCategory.MISC, result)
+  .requires(item) // Add item to the recipe
+  .unlockedBy("criteria", criteria) // How the recipe is unlocked
+  .save(writer); // Add data to builder
+
+----------------------------------------
+
+TITLE: Item Translation Key Example
+DESCRIPTION: Example showing the JSON structure for defining an item's translation key. This corresponds to an item with the registry ID 'examplemod:example_item'.
+
+LANGUAGE: json
+CODE:
+{
+  "item.examplemod.example_item": "Example Item Name"
+}
+
+----------------------------------------
+
+TITLE: Creating Stonecutting Recipes with SingleItemRecipeBuilder in Minecraft Forge
+DESCRIPTION: Demonstrates how to use SingleItemRecipeBuilder to generate stonecutting recipes and other single-item recipes.
+
+LANGUAGE: java
+CODE:
+// In RecipeProvider#buildRecipes(writer)
+SingleItemRecipeBuilder builder = SingleItemRecipeBuilder.stonecutting(input, RecipeCategory.MISC, result)
+  .unlockedBy("criteria", criteria) // How the recipe is unlocked
+  .save(writer); // Add data to builder
+
+----------------------------------------
+
+TITLE: Configuring One-Sided Mod Display Test - TOML
+DESCRIPTION: Configuration in mods.toml for specifying how a mod should handle version matching between client and server sides.
+
+LANGUAGE: toml
+CODE:
+[[mods]]
+  # ...
+
+  # MATCH_VERSION means that your mod will cause a red X if the versions on client and server differ. This is the default behaviour and should be what you choose if you have server and client elements to your mod.
+  # IGNORE_SERVER_VERSION means that your mod will not cause a red X if it's present on the server but not on the client. This is what you should use if you're a server only mod.
+  # IGNORE_ALL_VERSION means that your mod will not cause a red X if it's present on the client or the server. This is a special case and should only be used if your mod has no server component.
+  # NONE means that no display test is set on your mod. You need to do this yourself, see IExtensionPoint.DisplayTest for more information. You can define any scheme you wish with this value.
+  # IMPORTANT NOTE: this is NOT an instruction as to which environments (CLIENT or DEDICATED SERVER) your mod loads on. Your mod should load (and maybe do nothing!) wherever it finds itself.
+  displayTest="IGNORE_ALL_VERSION" # MATCH_VERSION is the default if nothing is specified (#optional)
+
+----------------------------------------
+
+TITLE: Creating Smithing Trim Recipes in Minecraft Forge
+DESCRIPTION: Demonstrates how to use SmithingTrimRecipeBuilder to generate smithing recipes for armor trims.
+
+LANGUAGE: java
+CODE:
+// In RecipeProvider#buildRecipes(writer)
+SmithingTrimRecipe builder = SmithingTrimRecipe.smithingTrim(template, base, addition, RecipeCategory.MISC)
+  .unlocks("criteria", criteria) // How the recipe is unlocked
+  .save(writer, name); // Add data to builder
+
+----------------------------------------
+
+TITLE: Custom Display Test Registration - Java
+DESCRIPTION: Example showing how to register a custom display test for handling mod compatibility between client and server.
+
+LANGUAGE: java
+CODE:
+ModLoadingContext.get().registerExtensionPoint(IExtensionPoint.DisplayTest.class, () -> new IExtensionPoint.DisplayTest(() -> NetworkConstants.IGNORESERVERONLY, (a, b) -> true));
+
+----------------------------------------
+
+TITLE: Creating Special Recipes in Minecraft Forge
+DESCRIPTION: Shows how to use SpecialRecipeBuilder to generate empty JSONs for dynamic recipes that cannot be easily constrained to the recipe JSON format.
+
+LANGUAGE: java
+CODE:
+// In RecipeProvider#buildRecipes(writer)
+SpecialRecipeBuilder.special(dynamicRecipeSerializer)
+  .save(writer, name); // Add data to builder
+
+----------------------------------------
+
+TITLE: Alternative Capability Exposure using Capability.orEmpty() in Java
+DESCRIPTION: Demonstrates an alternative way to expose a capability using Capability.orEmpty() for single capability exposure.
+
+LANGUAGE: java
+CODE:
+@Override
+public <T> LazyOptional<T> getCapability(Capability<T> cap, Direction side) {
+  return ForgeCapabilities.ITEM_HANDLER.orEmpty(cap, inventoryHandlerLazyOptional);
+}
+
+----------------------------------------
+
+TITLE: Using IConditionBuilder for Conditional Recipes in Minecraft Forge
+DESCRIPTION: Shows how to use IConditionBuilder interface to simplify adding conditions to conditional recipes without manually constructing condition instances.
+
+LANGUAGE: java
+CODE:
+// In ConditionalRecipe$Builder#addCondition
+(
+  // If either 'examplemod:example_item'
+  // OR 'examplemod:example_item2' exists
+  // AND
+  // NOT FALSE
+
+  // Methods are defined by IConditionBuilder
+  and( 
+    or(
+      itemExists("examplemod", "example_item"),
+      itemExists("examplemod", "example_item2")
+    ),
+    not(
+      FALSE()
+    )
+  )
+)
+
+----------------------------------------
+
+TITLE: Registering a Custom Capability using RegisterCapabilitiesEvent in Java
+DESCRIPTION: Shows how to register a custom capability using the RegisterCapabilitiesEvent.
+
+LANGUAGE: java
+CODE:
+@SubscribeEvent
+public void registerCaps(RegisterCapabilitiesEvent event) {
+  event.register(IExampleCapability.class);
+}
+
+----------------------------------------
+
+TITLE: Custom RecipeType TagsProvider Implementation
+DESCRIPTION: Shows how to create a custom TagsProvider for a specific registry type. This example implements a provider for recipe types.
+
+LANGUAGE: java
+CODE:
+public RecipeTypeTagsProvider(PackOutput output, CompletableFuture<HolderLookup.Provider> registries, ExistingFileHelper fileHelper) {
+  super(output, Registries.RECIPE_TYPE, registries, MOD_ID, fileHelper);
+}
+
+----------------------------------------
+
+TITLE: Marking BlockEntity as Dirty in ItemStackHandler in Java
+DESCRIPTION: Shows how to mark a BlockEntity as dirty when its inventory contents change using ItemStackHandler.
+
+LANGUAGE: java
+CODE:
+public class MyBlockEntity extends BlockEntity {
+
+  private final IItemHandler inventory = new ItemStackHandler(...) {
+    @Override
+    protected void onContentsChanged(int slot) {
+      super.onContentsChanged(slot);
+      setChanged();
+    }
+  }
+
+  // ...
+}
+
+----------------------------------------
+
+TITLE: Implementing IntrinsicHolderTagsProvider for Attributes
+DESCRIPTION: Demonstrates implementation of an IntrinsicHolderTagsProvider, which allows objects to add themselves to tags using their ResourceKey.
+
+LANGUAGE: java
+CODE:
+public AttributeTagsProvider(PackOutput output, CompletableFuture<HolderLookup.Provider> registries, ExistingFileHelper fileHelper) {
+  super(
+    output,
+    ForgeRegistries.Keys.ATTRIBUTES,
+    registries,
+    attribute -> ForgeRegistries.ATTRIBUTES.getResourceKey(attribute).get(),
+    MOD_ID,
+    fileHelper
+  );
+}
+
+----------------------------------------
+
+TITLE: Creating a Transformer Codec in Java
+DESCRIPTION: Shows how to create a transformer codec that converts between two equivalent or partially equivalent types.
+
+LANGUAGE: java
+CODE:
+// Assume there is some codec A_CODEC
+public static final Codec<ClassB> B_CODEC = A_CODEC.xmap(ClassA::toB, ClassB::toA);
+
+----------------------------------------
+
+TITLE: Configuring Sound Events in sounds.json for Minecraft Forge
+DESCRIPTION: Defines sound events in the sounds.json file, specifying subtitles and sound files to be played. Demonstrates both simple and advanced sound configurations, including streaming for longer audio files.
+
+LANGUAGE: json
+CODE:
+{
+  "open_chest": {
+    "subtitle": "mymod.subtitle.open_chest",
+    "sounds": [ "mymod:open_chest_sound_file" ]
+  },
+  "epic_music": {
+    "sounds": [
+      {
+        "name": "mymod:music/epic_music",
+        "stream": true
+      }
+    ]
+  }
+}
+
+----------------------------------------
+
+TITLE: Creating a List Codec in Java
+DESCRIPTION: Shows how to create a codec for a list of objects based on an existing object codec.
+
+LANGUAGE: java
+CODE:
+// BlockPos#CODEC is a Codec<BlockPos>
+public static final Codec<List<BlockPos>> LIST_CODEC = BlockPos.CODEC.listOf();
+
+----------------------------------------
+
+TITLE: Specifying Face Data in Generated Item Model
+DESCRIPTION: Shows how to add custom face data to a generated item model using the forge:item_layers loader in Minecraft Forge. The example applies a red tint and full brightness to layer 1 of the item model.
+
+LANGUAGE: json
+CODE:
+{
+  "textures": {
+    "layer0": "minecraft:item/stick",
+    "layer1": "minecraft:item/glowstone_dust"
+  },
+  "forge_data": {
+    "1": {
+      "color": "0xFFFF0000",
+      "block_light": 15,
+      "sky_light": 15,
+      "ambient_occlusion": false
+    }
+  }
+}
+
+----------------------------------------
+
+TITLE: Creating a Map Codec in Java
+DESCRIPTION: Demonstrates how to create a codec for a map with string keys and custom value objects.
+
+LANGUAGE: java
+CODE:
+// BlockPos#CODEC is a Codec<BlockPos>
+public static final Codec<Map<String, BlockPos>> MAP_CODEC = Codec.unboundedMap(Codec.STRING, BlockPos.CODEC);
+
+----------------------------------------
+
+TITLE: Specifying Render Type for a Glass Block Model in JSON
+DESCRIPTION: This snippet demonstrates how to set the render type for a glass block model to 'cutout' using the 'render_type' property in the model JSON.
+
+LANGUAGE: json
+CODE:
+{
+  "render_type": "minecraft:cutout",
+  "parent": "block/cube_all",
+  "textures": {
+    "all": "block/glass"
+  }
+}
+
+----------------------------------------
+
+TITLE: Creating a Pair Codec in Java
+DESCRIPTION: Shows how to create a codec for pairs of objects using two separate codecs.
+
+LANGUAGE: java
+CODE:
+public static final Codec<Pair<Integer, String>> PAIR_CODEC = Codec.pair(
+  Codec.INT.fieldOf("left").codec(),
+  Codec.STRING.fieldOf("right").codec()
+);
+
+----------------------------------------
+
+TITLE: Registering Custom Named Render Types in Java
+DESCRIPTION: This code shows how to register custom named render types using the RegisterNamedRenderTypesEvent in Minecraft Forge. It demonstrates registering both cutout and translucent render types.
+
+LANGUAGE: java
+CODE:
+public static void onRegisterNamedRenderTypes(RegisterNamedRenderTypesEvent event)
+{
+  event.register("special_cutout", RenderType.cutout(), Sheets.cutoutBlockSheet());
+  event.register("special_translucent", RenderType.translucent(), Sheets.translucentCullBlockSheet(), Sheets.translucentItemSheet());
+}
+
+----------------------------------------
+
+TITLE: Creating an Either Codec in Java
+DESCRIPTION: Demonstrates how to create a codec that can decode one of two different object types.
+
+LANGUAGE: java
+CODE:
+public static final Codec<Either<Integer, String>> EITHER_CODEC = Codec.either(
+  Codec.INT,
+  Codec.STRING
+);
+
+----------------------------------------
+
+TITLE: Matrix Transform Specification in JSON
+DESCRIPTION: Demonstrates how to specify a root transform using a 3x4 transformation matrix in row major order. The matrix combines translation, rotation, scale, and origin transformations.
+
+LANGUAGE: javascript
+CODE:
+"transform": {
+    "matrix": [
+        [ 0, 0, 0, 0 ],
+        [ 0, 0, 0, 0 ],
+        [ 0, 0, 0, 0 ]
+    ]
+}
+
+----------------------------------------
+
+TITLE: Particle Description JSON Configuration
+DESCRIPTION: JSON configuration file for defining particle textures. This file should be placed in assets/<modid>/particles and defines texture locations for particle rendering.
+
+LANGUAGE: json
+CODE:
+{
+  "textures": [
+    "mymod:particle_texture",
+    "mymod:particle_texture2"
+  ]
+}
+
+----------------------------------------
+
+TITLE: Element-wise Transform Specification in JSON
+DESCRIPTION: Shows how to specify a root transform using individual transformation elements including origin, translation, and rotation. This example translates the model up by 0.5 units and rotates it 45 degrees around the Y axis.
+
+LANGUAGE: javascript
+CODE:
+{
+    "transform": {
+        "origin": "center",
+        "translation": [ 0, 0.5, 0 ],
+        "rotation": { "y": 45 }
+    },
+    // ...
+}
+
+----------------------------------------
+
+TITLE: Demonstrating Package Naming Conflicts in Java
+DESCRIPTION: This snippet illustrates how naming conflicts can occur when two JAR files contain classes with the same name and package structure. It explains why unique package names are important for mod development.
+
+LANGUAGE: text
+CODE:
+a.jar
+  - com.example.ExampleClass
+b.jar
+  - com.example.ExampleClass // This class will not normally be loaded
+
+----------------------------------------
+
+TITLE: Configuring Part Visibility in Composite Models for Minecraft Forge
+DESCRIPTION: This example demonstrates how to use the 'visibility' property in a composite model JSON file and its child models. It shows how to selectively hide or show different parts of the model, and how child models can override the visibility settings of their parent.
+
+LANGUAGE: json
+CODE:
+// mycompositemodel.json
+{
+  "loader": "forge:composite",
+  "children": {
+    "part_one": {
+      "parent": "mymod:mypartmodel_one"
+    },
+    "part_two": {
+      "parent": "mymod:mypartmodel_two"
+    }
+  },
+  "visibility": {
+    "part_two": false
+  }
+}
+
+// mycompositechild_one.json
+{
+  "parent": "mymod:mycompositemodel",
+  "visibility": {
+    "part_one": false,
+    "part_two": true
+  }
+}
+
+// mycompositechild_two.json
+{
+  "parent": "mymod:mycompositemodel",
+  "visibility": {
+    "part_two": true
+  }
+}
+
+----------------------------------------
+
+TITLE: Creating Custom Creative Tabs in Minecraft Forge
+DESCRIPTION: This snippet shows how to create and register a custom creative tab using CreativeModeTab.builder(). It demonstrates setting the tab's title, icon, and default items. The example assumes the use of a DeferredRegister for registration.
+
+LANGUAGE: java
+CODE:
+// Assume we have a DeferredRegister<CreativeModeTab> called REGISTRAR
+// Assume we have RegistryObject<Item> and RegistryObject<Block> called ITEM and BLOCK
+public static final RegistryObject<CreativeModeTab> EXAMPLE_TAB = REGISTRAR.register("example", () -> CreativeModeTab.builder()
+  // Set name of tab to display
+  .title(Component.translatable("item_group." + MOD_ID + ".example"))
+  // Set icon of creative tab
+  .icon(() -> new ItemStack(ITEM.get()))
+  // Add default items to tab
+  .displayItems((params, output) -> {
+    output.accept(ITEM.get());
+    output.accept(BLOCK.get());
+  })
+  .build()
+);
+
+----------------------------------------
+
+TITLE: Configuring WaveFront OBJ Model in MinecraftForge
+DESCRIPTION: JSON configuration for loading a WaveFront OBJ model in MinecraftForge. Demonstrates how to specify the loader, handle texture flipping, and define texture mappings for use in MTL files.
+
+LANGUAGE: javascript
+CODE:
+{
+  "loader": "forge:obj",
+  "flip_v": true,
+  "model": "examplemod:models/block/model.obj",
+  "textures": {
+    "texture0": "minecraft:block/dirt",
+    "particle": "minecraft:block/dirt"
+  }
+}
+
+----------------------------------------
+
+TITLE: Creating KeyMapping with Modifier Key
+DESCRIPTION: Demonstrates creating a key mapping that requires a modifier key (SHIFT) to be held down while pressing the main key (G).
+
+LANGUAGE: java
+CODE:
+new KeyMapping(
+  "key.examplemod.example3",
+  KeyConflictContext.UNIVERSAL,
+  KeyModifier.SHIFT, // Default mapping requires shift to be held down
+  InputConstants.Type.KEYSYM, // Default mapping is on the keyboard
+  GLFW.GLFW_KEY_G, // Default key is G
+  "key.categories.misc"
+)
+
+----------------------------------------
+
+TITLE: Implementing BakedModel#applyTransform in Java for Minecraft Forge
+DESCRIPTION: This method is part of the Forge system for handling model transformations. It takes an ItemDisplayContext, PoseStack, and a boolean flag for left-hand rendering, returning a BakedModel to be rendered. This approach allows for more flexibility than the vanilla system.
+
+LANGUAGE: java
+CODE:
+BakedModel applyTransform(ItemDisplayContext context, PoseStack poseStack, boolean leftHand);
+
+----------------------------------------
+
+TITLE: Handling KeyMapping in GUI for Mouse Input
+DESCRIPTION: Shows how to check for key mapping activation within a GUI screen for mouse input using mouseClicked method.
+
+LANGUAGE: java
+CODE:
+// In some Screen subclass
+@Override
+public boolean mouseClicked(double x, double y, int button) {
+  if (EXAMPLE_MAPPING.get().isActiveAndMatches(InputConstants.TYPE.MOUSE.getOrCreate(button))) {
+    // Execute logic to perform on mouse click here
+    return true;
+  }
+  return super.mouseClicked(x, y, button);
+}
+
+----------------------------------------
+
+TITLE: Defining Item Model Overrides with Custom Properties in JSON
+DESCRIPTION: This JSON snippet demonstrates how to define item model overrides based on a custom property 'examplemod:power'. It shows the structure for specifying different models based on property values.
+
+LANGUAGE: json
+CODE:
+{
+  "parent": "item/generated",
+  "textures": {
+    "layer0": "examplemod:items/example_partial"
+  },
+  "overrides": [
+    {
+      "predicate": {
+        "examplemod:power": 0.75
+      },
+      "model": "examplemod:item/example_powered"
+    }
+  ]
+}
+
+----------------------------------------
+
+TITLE: Implementing BlockEntity Client Synchronization
+DESCRIPTION: Demonstrates how to synchronize BlockEntity data to clients using block updates with update packets and tags.
+
+LANGUAGE: java
+CODE:
+@Override
+public CompoundTag getUpdateTag() {
+  CompoundTag tag = new CompoundTag();
+  //Write your data into the tag
+  return tag;
+}
+
+@Override
+public Packet<ClientGamePacketListener> getUpdatePacket() {
+  // Will get tag from #getUpdateTag
+  return ClientboundBlockEntityDataPacket.create(this);
+}
+
+// Can override IForgeBlockEntity#onDataPacket. By default, this will defer to the #load.
+
+----------------------------------------
+
+TITLE: Registering Custom Item Properties in Minecraft Forge
+DESCRIPTION: This Java code snippet shows how to register a custom item property 'pulling' for an apple item in Minecraft Forge. It demonstrates the use of ItemProperties.register() and FMLClientSetupEvent to set up the property.
+
+LANGUAGE: java
+CODE:
+private void setup(final FMLClientSetupEvent event)
+{
+  event.enqueueWork(() ->
+  {
+    ItemProperties.register(ExampleItems.APPLE, 
+      ResourceLocation.fromNamespaceAndPath(ExampleMod.MODID, "pulling"), (stack, level, living, id) -> {
+        return living != null && living.isUsingItem() && living.getUseItem() == stack ? 1.0F : 0.0F;
+      });
+  });
+}
+
+----------------------------------------
+
+TITLE: Creating an Instance Event Handler in Java for Minecraft Forge
+DESCRIPTION: Shows how to create an instance event handler for the EntityItemPickupEvent. This handler needs to be registered using MinecraftForge.EVENT_BUS.register(...) or FMLJavaModLoadingContext.get().getModEventBus().register(...) depending on the bus.
+
+LANGUAGE: java
+CODE:
+public class MyForgeEventHandler {
+	@SubscribeEvent
+	public void pickupItem(EntityItemPickupEvent event) {
+		System.out.println("Item picked up!");
+	}
+}
+
+----------------------------------------
+
+TITLE: Registering Block Color Handlers in Minecraft Forge
+DESCRIPTION: Demonstrates how to register BlockColor handlers for blocks using the RegisterColorHandlersEvent.Block event. This allows blocks to have dynamic coloring based on their state, position, and environment.
+
+LANGUAGE: java
+CODE:
+@SubscribeEvent
+public void registerBlockColors(RegisterColorHandlersEvent.Block event){
+  event.register(myBlockColor, coloredBlock1, coloredBlock2, ...);
+}
+
+----------------------------------------
+
+TITLE: Implementing LootTableSubProvider in MinecraftForge
+DESCRIPTION: Demonstrates the implementation of a LootTableSubProvider, which is responsible for generating specific loot tables. This class defines the method to generate loot tables using a BiConsumer.
+
+LANGUAGE: java
+CODE:
+public class ExampleSubProvider implements LootTableSubProvider {
+
+  public ExampleSubProvider() {}
+
+  @Override
+  public void generate(BiConsumer<ResourceLocation, LootTable.Builder> writer) {
+    // Generate loot tables here by calling writer#accept
+  }
+}
+
+----------------------------------------
+
+TITLE: Configuring Access Transformer in Gradle
+DESCRIPTION: Gradle configuration to specify the location of the Access Transformer configuration file in a Forge mod project. The file must be placed at META-INF/accesstransformer.cfg in the final JAR.
+
+LANGUAGE: groovy
+CODE:
+minecraft {
+  accessTransformer = file('src/main/resources/META-INF/accesstransformer.cfg')
+}
+
+----------------------------------------
+
+TITLE: Generating Loot Tables in BlockLootSubProvider for MinecraftForge
+DESCRIPTION: Shows the implementation of the generate method in a BlockLootSubProvider, where individual loot tables for blocks are added.
+
+LANGUAGE: java
+CODE:
+@Override
+public void generate() {
+  // Add loot tables here
+}
+
+----------------------------------------
+
+TITLE: Access Transformer Configuration Examples
+DESCRIPTION: Examples demonstrating various Access Transformer directives including class, field, and method transformations using the proper descriptor syntax for Minecraft Forge modding.
+
+LANGUAGE: plaintext
+CODE:
+# Makes public the ByteArrayToKeyFunction interface in Crypt
+public net.minecraft.util.Crypt$ByteArrayToKeyFunction
+
+# Makes protected and removes the final modifier from 'random' in MinecraftServer
+protected-f net.minecraft.server.MinecraftServer f_129758_ #random
+
+# Makes public the 'makeExecutor' method in Util,
+# accepting a String and returns an ExecutorService
+public net.minecraft.Util m_137477_(Ljava/lang/String;)Ljava/util/concurrent/ExecutorService; #makeExecutor
+
+# Makes public the 'leastMostToIntArray' method in UUIDUtil,
+# accepting two longs and returning an int[]
+public net.minecraft.core.UUIDUtil m_235872_(JJ)[I #leastMostToIntArray
+
+----------------------------------------
+
+TITLE: Registering Configuration with ModLoadingContext
+DESCRIPTION: Demonstrates how to register a configuration specification with Forge's mod loading system. Shows the basic pattern for registering config files with specific types.
+
+LANGUAGE: java
+CODE:
+// In the mod constructor with a ForgeConfigSpec CONFIG and FMLJavaModLoadingContext context
+context.registerConfig(Type.COMMON, CONFIG);
+
+----------------------------------------
+
+TITLE: Demonstrating Markdown Syntax for Admonitions in Minecraft Forge Docs
+DESCRIPTION: Shows the correct syntax for creating admonitions in Markdown, which are specially formatted notice blocks in the documentation.
+
+LANGUAGE: markdown
+CODE:
+!!! important
+    Please use **two spaces** to indent, not tabs.
+
+----------------------------------------
+
+TITLE: Registering Non-Forge Registry Objects
+DESCRIPTION: Example of registering objects for registries not wrapped by Forge, such as LootItemConditionType. Uses DeferredRegister with a specific registry key.
+
+LANGUAGE: java
+CODE:
+private static final DeferredRegister<LootItemConditionType> REGISTER = DeferredRegister.create(Registries.LOOT_CONDITION_TYPE, "examplemod");
+
+public static final RegistryObject<LootItemConditionType> EXAMPLE_LOOT_ITEM_CONDITION_TYPE = REGISTER.register("example_loot_item_condition_type", () -> new LootItemConditionType(...));
+
+----------------------------------------
+
+TITLE: Markdown Link to Contributing Documentation
+DESCRIPTION: A markdown reference link to the Minecraft Forge contribution guidelines documentation.
+
+LANGUAGE: markdown
+CODE:
+# Contributing Documentation
+
+Guidelines for contributing can be found [on the docs][contributing].
+
+[contributing]: https://docs.minecraftforge.net/en/latest/contributing/
+
+----------------------------------------
+
+TITLE: Illustrating JSON Code Block Syntax Highlighting in Minecraft Forge Docs
+DESCRIPTION: Demonstrates how to specify syntax highlighting for JSON code blocks in the documentation using the 'js' identifier.
+
+LANGUAGE: markdown
+CODE:
+```js
+// JSON code block goes here
+```
+
+----------------------------------------
+
+TITLE: Setting Archive Name in Gradle
+DESCRIPTION: Configures the output archive name for the mod build file using Gradle configuration.
+
+LANGUAGE: gradle
+CODE:
+// In some build.gradle
+base.archivesName = 'mymod'
+
+----------------------------------------
+
+TITLE: Installing Documentation Dependencies for MinecraftForge
+DESCRIPTION: Specifies required Python packages for documentation generation. Includes pymdown-extensions without version constraint and mkdocs version 1.0 or higher to ensure Python 3.7 compatibility.
+
+LANGUAGE: plaintext
+CODE:
+pymdown-extensions
+# ReadTheDocs defaults to mkdocs version 0.17.0 for backwards compatibility reasons
+# It is incompatible with Python 3.7, however, which is why we need to force a newer version
+mkdocs>=1.0

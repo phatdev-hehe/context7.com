@@ -1,0 +1,1768 @@
+TITLE: Basic useQueryState Implementation in React
+DESCRIPTION: Demonstrates basic usage of useQueryState hook to manage a name parameter in the URL query string. Shows how to read, update and clear the query parameter value.
+
+LANGUAGE: tsx
+CODE:
+'use client'
+
+import { useQueryState } from 'nuqs'
+
+export function Demo() {
+  const [name, setName] = useQueryState('name')
+  return (
+    <>
+      <input value={name || ''} onChange={e => setName(e.target.value)} />
+      <button onClick={() => setName(null)}>Clear</button>
+      <p>Hello, {name || 'anonymous visitor'}!</p>
+    </>
+  )
+}
+
+----------------------------------------
+
+TITLE: Basic Usage Example
+DESCRIPTION: Simple example showing how to use useQueryState hook to manage state in URL parameters
+
+LANGUAGE: tsx
+CODE:
+'use client'
+
+import { useQueryState } from 'nuqs'
+
+export default () => {
+  const [name, setName] = useQueryState('name')
+  return (
+    <>
+      <h1>Hello, {name || 'anonymous visitor'}!</h1>
+      <input value={name || ''} onChange={e => setName(e.target.value)} />
+      <button onClick={() => setName(null)}>Clear</button>
+    </>
+  )
+}
+
+----------------------------------------
+
+TITLE: Using String Parser in TypeScript
+DESCRIPTION: Demonstrates basic string parser usage and configuration with default values and options.
+
+LANGUAGE: typescript
+CODE:
+import { parseAsString } from 'nuqs'
+
+export const searchParamsParsers = {
+  q: parseAsString.withDefault('').withOptions({
+    shallow: false
+  })
+}
+
+----------------------------------------
+
+TITLE: Using useQueryStates for Multiple Coordinated Updates in TypeScript
+DESCRIPTION: Demonstrates the usage of useQueryStates hook to manage multiple related query parameters (latitude and longitude) with default values and custom options.
+
+LANGUAGE: typescript
+CODE:
+import { useQueryStates, parseAsFloat } from 'nuqs'
+
+const [coordinates, setCoordinates] = useQueryStates(
+  {
+    lat: parseAsFloat.withDefault(45.18),
+    lng: parseAsFloat.withDefault(5.72)
+  },
+  {
+    history: 'push'
+  }
+)
+
+const { lat, lng } = coordinates
+
+// Set all (or a subset of) the keys in one go:
+const search = await setCoordinates({
+  lat: Math.random() * 180 - 90,
+  lng: Math.random() * 360 - 180
+})
+
+----------------------------------------
+
+TITLE: Configuring NuqsAdapter for Next.js App Router
+DESCRIPTION: Demonstrates how to wrap the children component with NuqsAdapter in the root layout file for Next.js app router. This setup enables nuqs functionality throughout the application.
+
+LANGUAGE: tsx
+CODE:
+import { NuqsAdapter } from 'nuqs/adapters/next/app'
+import { type ReactNode } from 'react'
+
+export default function RootLayout({
+  children
+}: {
+  children: ReactNode
+}) {
+  return (
+    <html>
+      <body>
+        <NuqsAdapter>{children}</NuqsAdapter>
+      </body>
+    </html>
+  )
+}
+
+----------------------------------------
+
+TITLE: Configuring nuqs Options with Builder Pattern in TypeScript
+DESCRIPTION: Demonstrates how to pass options at the hook level using the builder pattern in nuqs.
+
+LANGUAGE: typescript
+CODE:
+const [state, setState] = useQueryState(
+  'foo',
+  parseAsString.withOptions({ history: 'push' })
+)
+
+----------------------------------------
+
+TITLE: Creating Custom Star Rating Parser in TypeScript using nuqs
+DESCRIPTION: This snippet demonstrates how to create a custom parser for star ratings using the createParser function from nuqs. It includes parse and serialize functions to handle the conversion between string representations and numeric values.
+
+LANGUAGE: typescript
+CODE:
+import { createParser } from 'nuqs'
+
+const parseAsStarRating = createParser({
+  parse(queryValue) {
+    const inBetween = queryValue.split('★')
+    const isValid = inBetween.length > 1 && inBetween.every(s => s === '')
+    if (!isValid) return null
+    const numStars = inBetween.length - 1
+    return Math.min(5, numStars)
+  },
+  serialize(value) {
+    return Array.from({length: value}, () => '★').join('')
+  }
+})
+
+----------------------------------------
+
+TITLE: Default Value Configuration Examples
+DESCRIPTION: Shows different ways to configure default values with useQueryState, including string and number types, and using the withDefault parser method.
+
+LANGUAGE: ts
+CODE:
+const [search] = useQueryState('search', { defaultValue: '' })
+//      ^? string
+
+const [count] = useQueryState('count', parseAsInteger)
+//      ^? number | null -> no default value = nullable
+
+const [count] = useQueryState('count', parseAsInteger.withDefault(0))
+//      ^? number
+
+----------------------------------------
+
+TITLE: Initializing Search Params Loader in TypeScript
+DESCRIPTION: Creates a type-safe loader function for parsing search parameters with default values for coordinates
+
+LANGUAGE: tsx
+CODE:
+import { parseAsFloat, createLoader } from 'nuqs/server'
+
+export const coordinatesSearchParams = {
+  latitude: parseAsFloat.withDefault(0),
+  longitude: parseAsFloat.withDefault(0)
+}
+
+export const loadSearchParams = createLoader(coordinatesSearchParams)
+
+----------------------------------------
+
+TITLE: Testing Components with Vitest v1
+DESCRIPTION: Example of testing a counter button component using Vitest v1 and Testing Library, demonstrating setup, action, and assertion steps with nuqs testing adapter.
+
+LANGUAGE: tsx
+CODE:
+import { render, screen } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
+import { withNuqsTestingAdapter, type UrlUpdateEvent } from 'nuqs/adapters/testing'
+import { describe, expect, it, vi } from 'vitest'
+import { CounterButton } from './counter-button'
+
+it('should increment the count when clicked', async () => {
+  const user = userEvent.setup()
+  const onUrlUpdate = vi.fn<[UrlUpdateEvent]>()
+  render(<CounterButton />, {
+    // 1. Setup the test by passing initial search params / querystring:
+    wrapper: withNuqsTestingAdapter({ searchParams: '?count=42', onUrlUpdate })
+  })
+  // 2. Act
+  const button = screen.getByRole('button')
+  await user.click(button)
+  // 3. Assert changes in the state and in the (mocked) URL
+  expect(button).toHaveTextContent('count is 43')
+  expect(onUrlUpdate).toHaveBeenCalledOnce()
+  const event = onUrlUpdate.mock.calls[0][0]!
+  expect(event.queryString).toBe('?count=43')
+  expect(event.searchParams.get('count')).toBe('43')
+  expect(event.options.history).toBe('push')
+})
+
+----------------------------------------
+
+TITLE: Implementing NuqsAdapter for Next.js Pages Router
+DESCRIPTION: Shows how to wrap the Component page outlet with NuqsAdapter in the _app.tsx file for Next.js pages router. This configuration enables nuqs across all pages in the application.
+
+LANGUAGE: tsx
+CODE:
+import type { AppProps } from 'next/app'
+import { NuqsAdapter } from 'nuqs/adapters/next/pages'
+
+export default function MyApp({ Component, pageProps }: AppProps) {
+  return (
+    <NuqsAdapter>
+      <Component {...pageProps} />
+    </NuqsAdapter>
+  )
+}
+
+----------------------------------------
+
+TITLE: Updating Multiple Query Parameters with useQueryState in TypeScript
+DESCRIPTION: Demonstrates how to use multiple useQueryState hooks to update latitude and longitude coordinates asynchronously in a single event loop tick.
+
+LANGUAGE: typescript
+CODE:
+const MultipleQueriesDemo = () => {
+  const [lat, setLat] = useQueryState('lat', parseAsFloat)
+  const [lng, setLng] = useQueryState('lng', parseAsFloat)
+  const randomCoordinates = React.useCallback(() => {
+    setLat(Math.random() * 180 - 90)
+    setLng(Math.random() * 360 - 180)
+  }, [])
+}
+
+----------------------------------------
+
+TITLE: Counter Implementation with useQueryState and Integer Parser
+DESCRIPTION: Shows how to implement a counter using useQueryState with parseAsInteger parser. Demonstrates handling null values without default value configuration.
+
+LANGUAGE: tsx
+CODE:
+import { useQueryState, parseAsInteger } from 'nuqs'
+
+export default () => {
+  const [count, setCount] = useQueryState('count', parseAsInteger)
+  return (
+    <>
+      <pre>count: {count}</pre>
+      <button onClick={() => setCount(0)}>Reset</button>
+      {/* handling null values in setCount is annoying: */}
+      <button onClick={() => setCount(c => (c ?? 0) + 1)}>+</button>
+      <button onClick={() => setCount(c => (c ?? 0) - 1)}>-</button>
+      <button onClick={() => setCount(null)}>Clear</button>
+    </>
+  )
+}
+
+----------------------------------------
+
+TITLE: String Literal Parser Configuration
+DESCRIPTION: Demonstrates setting up a type-safe string literal parser with predefined valid values.
+
+LANGUAGE: typescript
+CODE:
+import { parseAsStringLiteral } from 'nuqs'
+
+// List accepted values
+const sortOrder = ['asc', 'desc'] as const
+
+// Then pass it to the parser
+parseAsStringLiteral(sortOrder)
+
+// Optional: extract the type from them
+type SortOrder = (typeof sortOrder)[number] // 'asc' | 'desc'
+
+----------------------------------------
+
+TITLE: Implementing NuqsAdapter with React Router v6
+DESCRIPTION: Shows how to integrate NuqsAdapter with React Router v6 by wrapping the RouterProvider component. This setup allows nuqs to work with React Router's routing system.
+
+LANGUAGE: tsx
+CODE:
+import { NuqsAdapter } from 'nuqs/adapters/react-router/v6'
+import { createBrowserRouter, RouterProvider } from 'react-router-dom'
+import App from './App'
+
+const router = createBrowserRouter([
+  {
+    path: '/',
+    element: <App />
+  }
+])
+
+export function ReactRouter() {
+  return (
+    <NuqsAdapter>
+      <RouterProvider router={router} />
+    </NuqsAdapter>
+  )
+}
+
+----------------------------------------
+
+TITLE: JSON Parser with Zod Schema
+DESCRIPTION: Shows how to implement JSON parsing with validation using Zod schema in search parameters.
+
+LANGUAGE: typescript
+CODE:
+import { parseAsJson } from 'nuqs'
+import { z } from 'zod'
+
+const schema = z.object({
+  pkg: z.string(),
+  version: z.number(),
+  worksWith: z.array(z.string())
+})
+
+const [json, setJson] = useQueryState('json', parseAsJson(schema.parse))
+
+setJson({
+  pkg: 'nuqs',
+  version: 2,
+  worksWith: ['Next.js', 'React', 'Remix', 'React Router', 'and more']
+})
+
+----------------------------------------
+
+TITLE: Setting Shallow Option to False in nuqs with TypeScript
+DESCRIPTION: Shows how to configure nuqs to notify the server on query updates by setting the shallow option to false.
+
+LANGUAGE: typescript
+CODE:
+useQueryState('foo', { shallow: false })
+
+----------------------------------------
+
+TITLE: Handling Promises from useQueryState Updates in TypeScript
+DESCRIPTION: Shows how to await the Promise returned by state updater functions to access the updated URLSearchParameters object after batch updates.
+
+LANGUAGE: typescript
+CODE:
+const randomCoordinates = React.useCallback(() => {
+  setLat(42)
+  return setLng(12)
+}, [])
+
+randomCoordinates().then((search: URLSearchParams) => {
+  search.get('lat') // 42
+  search.get('lng') // 12, has been queued and batch-updated
+})
+
+----------------------------------------
+
+TITLE: Configuring URL Update Throttling in nuqs with TypeScript
+DESCRIPTION: Demonstrates how to set a custom throttle time for URL updates in nuqs, particularly useful when paired with shallow: false.
+
+LANGUAGE: tsx
+CODE:
+useQueryState('foo', {
+  // Send updates to the server maximum once every second
+  shallow: false,
+  throttleMs: 1000
+})
+
+----------------------------------------
+
+TITLE: Implementing Transitions with useTransition in nuqs and React
+DESCRIPTION: Shows how to use React's useTransition hook with nuqs to handle loading states during server re-rendering.
+
+LANGUAGE: tsx
+CODE:
+'use client'
+
+import React from 'react'
+import { useQueryState, parseAsString } from 'nuqs'
+
+function ClientComponent({ data }) {
+  // 1. Provide your own useTransition hook:
+  const [isLoading, startTransition] = React.useTransition()
+  const [query, setQuery] = useQueryState(
+    'query',
+    // 2. Pass the `startTransition` as an option:
+    parseAsString().withOptions({ startTransition, shallow: false })
+  )
+  // 3. `isLoading` will be true while the server is re-rendering
+  // and streaming RSC payloads, when the query is updated via `setQuery`.
+
+  // Indicate loading state
+  if (isLoading) return <div>Loading...</div>
+
+  // Normal rendering with data
+  return <div>...</div>
+}
+
+----------------------------------------
+
+TITLE: Testing Components with NuqsTestingAdapter
+DESCRIPTION: Comprehensive test example demonstrating how to use the NuqsTestingAdapter for testing components that use nuqs hooks, including setup, actions, and assertions.
+
+LANGUAGE: tsx
+CODE:
+import { render, screen } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
+import { NuqsTestingAdapter, type UrlUpdateEvent } from 'nuqs/adapters/testing'
+import { describe, expect, it, vi } from 'vitest'
+import { CounterButton } from './counter-button'
+
+it('should increment the count when clicked', async () => {
+  const user = userEvent.setup()
+  const onUrlUpdate = vi.fn<[UrlUpdateEvent]>()
+  render(<CounterButton />, {
+    // 1. Setup the test by passing initial search params / querystring:
+    wrapper: ({ children }) => (
+      <NuqsTestingAdapter searchParams="?count=42" onUrlUpdate={onUrlUpdate}>
+        {children}
+      </NuqsTestingAdapter>
+    )
+  })
+  // 2. Act
+  const button = screen.getByRole('button')
+  await user.click(button)
+  // 3. Assert changes in the state and in the (mocked) URL
+  expect(button).toHaveTextContent('count is 43')
+  expect(onUrlUpdate).toHaveBeenCalledOnce()
+  expect(onUrlUpdate.mock.calls[0][0].queryString).toBe('?count=43')
+  expect(onUrlUpdate.mock.calls[0][0].searchParams.get('count')).toBe('43')
+  expect(onUrlUpdate.mock.calls[0][0].options.history).toBe('push')
+})
+
+----------------------------------------
+
+TITLE: Setting up NuqsAdapter for React Router v7
+DESCRIPTION: Demonstrates the configuration of NuqsAdapter with React Router v7 by wrapping the Outlet component in the root.tsx file. This enables nuqs to work with the latest version of React Router.
+
+LANGUAGE: tsx
+CODE:
+import { NuqsAdapter } from 'nuqs/adapters/react-router/v7'
+import { Outlet } from 'react-router'
+
+// ...
+
+export default function App() {
+  return (
+    <NuqsAdapter>
+      <Outlet />
+    </NuqsAdapter>
+  )
+}
+
+----------------------------------------
+
+TITLE: Using Optimistic Search Params in React Router with TypeScript
+DESCRIPTION: Demonstrates how to use the useOptimisticSearchParams hook provided by nuqs for React Router based frameworks.
+
+LANGUAGE: tsx
+CODE:
+import { useOptimisticSearchParams } from 'nuqs/adapters/remix' // or '…/react-router/v6' or '…/react-router/v7'
+
+function Component() {
+  // Note: this is read-only, but reactive to all URL changes
+  const searchParams = useOptimisticSearchParams()
+  return <div>{searchParams.get('foo')}</div>
+}
+
+----------------------------------------
+
+TITLE: Next.js App Router Search Params Implementation
+DESCRIPTION: Demonstrates using the loader in a Next.js App Router page component with async search params handling
+
+LANGUAGE: tsx
+CODE:
+import { loadSearchParams } from './search-params'
+import type { SearchParams } from 'nuqs/server'
+
+type PageProps = {
+  searchParams: Promise<SearchParams>
+}
+
+export default async function Page({ searchParams }: PageProps) {
+  const { latitude, longitude } = await loadSearchParams(searchParams)
+  return <Map
+    lat={latitude}
+    lng={longitude}
+  />
+}
+
+----------------------------------------
+
+TITLE: Integer Parser Implementation
+DESCRIPTION: Shows how to use the integer parser with default values for handling numeric search parameters.
+
+LANGUAGE: typescript
+CODE:
+import { parseAsInteger } from 'nuqs'
+
+useQueryState('int', parseAsInteger.withDefault(0))
+
+----------------------------------------
+
+TITLE: Next.js App Router Adapter
+DESCRIPTION: Setup code for using nuqs with Next.js app router
+
+LANGUAGE: tsx
+CODE:
+// src/app/layout.tsx
+import { NuqsAdapter } from 'nuqs/adapters/next/app'
+import { type ReactNode } from 'react'
+
+export default function RootLayout({ children }: { children: ReactNode }) {
+  return (
+    <html>
+      <body>
+        <NuqsAdapter>{children}</NuqsAdapter>
+      </body>
+    </html>
+  )
+}
+
+----------------------------------------
+
+TITLE: State Updates with Default Values
+DESCRIPTION: Demonstrates simplified state updates when using default values, showing how null handling becomes unnecessary.
+
+LANGUAGE: tsx
+CODE:
+const increment = () => setCount(c => c + 1) // c will never be null
+const decrement = () => setCount(c => c - 1) // c will never be null
+const clearCount = () => setCount(null) // Remove query from the URL
+
+----------------------------------------
+
+TITLE: Setting up NuqsAdapter for React SPA with Vite
+DESCRIPTION: Illustrates the integration of NuqsAdapter in a React Single Page Application using Vite. This setup allows nuqs to manage query parameters in client-side only applications.
+
+LANGUAGE: tsx
+CODE:
+import { NuqsAdapter } from 'nuqs/adapters/react'
+
+createRoot(document.getElementById('root')!).render(
+  <NuqsAdapter>
+    <App />
+  </NuqsAdapter>
+)
+
+----------------------------------------
+
+TITLE: Implementing Next.js App Router Adapter
+DESCRIPTION: Example showing how to integrate the NuqsAdapter in a Next.js app router layout file. Requires Next.js version 14.2.0 or higher.
+
+LANGUAGE: tsx
+CODE:
+import { NuqsAdapter } from 'nuqs/adapters/next/app'
+import { type ReactNode } from 'react'
+
+export default function RootLayout({
+  children
+}: {
+  children: ReactNode
+}) {
+  return (
+    <html>
+      <body>
+        <NuqsAdapter>{children}</NuqsAdapter>
+      </body>
+    </html>
+  )
+}
+
+----------------------------------------
+
+TITLE: Creating and Using a Query String Serializer in TypeScript
+DESCRIPTION: Demonstrates how to create and use a serializer function for query strings using the createSerializer helper from nuqs. It shows how to define search parameters with various parsers and generate a query string.
+
+LANGUAGE: typescript
+CODE:
+import {
+  createSerializer,
+  parseAsInteger,
+  parseAsIsoDateTime,
+  parseAsString,
+  parseAsStringLiteral
+} from 'nuqs/server' // can also be imported from 'nuqs' in client code
+
+const searchParams = {
+  search: parseAsString,
+  limit: parseAsInteger,
+  from: parseAsIsoDateTime,
+  to: parseAsIsoDateTime,
+  sortBy: parseAsStringLiteral(['asc', 'desc'] as const)
+}
+
+// Create a serializer function by passing the description of the search params to accept
+const serialize = createSerializer(searchParams)
+
+// Then later, pass it some values (a subset) and render them to a query string
+serialize({
+  search: 'foo bar',
+  limit: 10,
+  from: new Date('2024-01-01'),
+  // here, we omit `to`, which won't be added
+  sortBy: null // null values are also not rendered
+})
+// ?search=foo+bar&limit=10&from=2024-01-01T00:00:00.000Z
+
+----------------------------------------
+
+TITLE: Setting nuqs Options in State Updater Function in TypeScript
+DESCRIPTION: Shows how to pass options when calling the state updater function in nuqs.
+
+LANGUAGE: typescript
+CODE:
+setState('foo', { scroll: true })
+
+----------------------------------------
+
+TITLE: Configuring NuqsAdapter for Remix
+DESCRIPTION: Demonstrates how to set up NuqsAdapter in a Remix application by wrapping the Outlet component in the root.tsx file. This enables nuqs functionality across all routes in the Remix app.
+
+LANGUAGE: tsx
+CODE:
+import { NuqsAdapter } from 'nuqs/adapters/remix'
+
+// ...
+
+export default function App() {
+  return (
+    <NuqsAdapter>
+      <Outlet />
+    </NuqsAdapter>
+  )
+}
+
+----------------------------------------
+
+TITLE: Creating Custom Coordinate Hook with nuqs in TypeScript
+DESCRIPTION: Demonstrates how to create a custom hook using nuqs to manage latitude and longitude coordinates as query states with default values.
+
+LANGUAGE: typescript
+CODE:
+'use client'
+
+import { useQueryStates, parseAsFloat } from 'nuqs'
+
+export function useCoordinates() {
+  return useQueryStates({
+    lat: parseAsFloat.withDefault(0),
+    lng: parseAsFloat.withDefault(0),
+  })
+}
+
+----------------------------------------
+
+TITLE: Testing Components with Vitest v2
+DESCRIPTION: Example of testing a counter button component using Vitest v2 and Testing Library, showing setup, action, and assertion steps with nuqs testing adapter.
+
+LANGUAGE: tsx
+CODE:
+import { render, screen } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
+import { withNuqsTestingAdapter, type OnUrlUpdateFunction } from 'nuqs/adapters/testing'
+import { describe, expect, it, vi } from 'vitest'
+import { CounterButton } from './counter-button'
+
+it('should increment the count when clicked', async () => {
+  const user = userEvent.setup()
+  const onUrlUpdate = vi.fn<OnUrlUpdateFunction>()
+  render(<CounterButton />, {
+    // 1. Setup the test by passing initial search params / querystring:
+    wrapper: withNuqsTestingAdapter({ searchParams: '?count=42', onUrlUpdate })
+  })
+  // 2. Act
+  const button = screen.getByRole('button')
+  await user.click(button)
+  // 3. Assert changes in the state and in the (mocked) URL
+  expect(button).toHaveTextContent('count is 43')
+  expect(onUrlUpdate).toHaveBeenCalledOnce()
+  const event = onUrlUpdate.mock.calls[0][0]!
+  expect(event.queryString).toBe('?count=43')
+  expect(event.searchParams.get('count')).toBe('43')
+  expect(event.options.history).toBe('push')
+})
+
+----------------------------------------
+
+TITLE: Implementing Next.js Pages Router Adapter
+DESCRIPTION: Example showing how to integrate the NuqsAdapter in a Next.js pages router _app file.
+
+LANGUAGE: tsx
+CODE:
+import type { AppProps } from 'next/app'
+import { NuqsAdapter } from 'nuqs/adapters/next/pages'
+
+export default function MyApp({ Component, pageProps }: AppProps) {
+  return (
+    <NuqsAdapter>
+      <Component {...pageProps} />
+    </NuqsAdapter>
+  )
+}
+
+----------------------------------------
+
+TITLE: Configuring Options for useQueryStates Updates in TypeScript
+DESCRIPTION: Illustrates how to set call-level options when updating state with useQueryStates, which take precedence over parser and global options.
+
+LANGUAGE: typescript
+CODE:
+setCoordinates(
+  {
+    lat: 42,
+    lng: 12
+  },
+  {
+    shallow: false
+  }
+)
+
+----------------------------------------
+
+TITLE: Testing Hooks with React Testing Library
+DESCRIPTION: Demonstrates how to use withNuqsTestingAdapter to test hooks that rely on nuqs' useQueryState with React Testing Library's renderHook function.
+
+LANGUAGE: tsx
+CODE:
+import { withNuqsTestingAdapter } from 'nuqs/adapters/testing'
+
+const { result } = renderHook(() => useTheHookToTest(), {
+  wrapper: withNuqsTestingAdapter({
+    searchParams: { count: "42" },
+  }),
+})
+
+----------------------------------------
+
+TITLE: Using URL Key Remapping with useQueryStates in TypeScript
+DESCRIPTION: Demonstrates how to use the urlKeys option to remap variable names to shorter keys in the URL, allowing for more meaningful variable names in the codebase.
+
+LANGUAGE: typescript
+CODE:
+const [{ latitude, longitude }, setCoordinates] = useQueryStates(
+  {
+    // Use variable names that make sense in your codebase
+    latitude: parseAsFloat.withDefault(45.18),
+    longitude: parseAsFloat.withDefault(5.72)
+  },
+  {
+    urlKeys: {
+      // And remap them to shorter keys in the URL
+      latitude: 'lat',
+      longitude: 'lng'
+    }
+  }
+)
+
+// No changes in the setter API, but the keys are remapped to:
+// ?lat=45.18&lng=5.72
+setCoordinates({
+  latitude: 45.18,
+  longitude: 5.72
+})
+
+----------------------------------------
+
+TITLE: Configuring History Option in nuqs with TypeScript
+DESCRIPTION: Demonstrates how to configure the history option to push new history entries for state changes in nuqs.
+
+LANGUAGE: typescript
+CODE:
+useQueryState('foo', { history: 'push' })
+
+----------------------------------------
+
+TITLE: Enabling Scroll to Top on Query State Updates in nuqs with TypeScript
+DESCRIPTION: Shows how to enable scrolling to the top of the page on query state updates in nuqs.
+
+LANGUAGE: typescript
+CODE:
+useQueryState('foo', { scroll: true })
+
+----------------------------------------
+
+TITLE: Defining Reusable Parsers and URL Keys with TypeScript
+DESCRIPTION: Shows how to create reusable definitions for parsers and URL keys using the UrlKeys type helper, which can be shared across multiple components or nuqs features.
+
+LANGUAGE: typescript
+CODE:
+import { type UrlKeys } from 'nuqs' // or 'nuqs/server'
+
+export const coordinatesParsers = {
+  latitude: parseAsFloat.withDefault(45.18),
+  longitude: parseAsFloat.withDefault(5.72)
+}
+
+export const coordinatesUrlKeys: UrlKeys<typeof coordinatesParsers> = {
+  latitude: 'lat',
+  longitude: 'lng'
+}
+
+----------------------------------------
+
+TITLE: Configuring Clear on Default Behavior in nuqs with TypeScript
+DESCRIPTION: Demonstrates how to keep the search parameter in the URL when it's set to the default value by configuring the clearOnDefault option.
+
+LANGUAGE: typescript
+CODE:
+useQueryState('search', {
+  defaultValue: '',
+  clearOnDefault: false
+})
+
+----------------------------------------
+
+TITLE: Creating Waku Adapter for nuqs in TypeScript
+DESCRIPTION: Implementation of a custom Waku adapter for nuqs that handles URL search parameters and navigation. The adapter uses Waku's router functionality to manage URL updates and navigation state.
+
+LANGUAGE: tsx
+CODE:
+"use client";
+
+import {
+  type unstable_AdapterOptions as AdapterOptions,
+  unstable_createAdapterProvider as createAdapterProvider,
+  renderQueryString,
+} from "nuqs/adapters/custom";
+import { useRouter_UNSTABLE as useRouter } from "waku";
+
+function useNuqsAdapter() {
+  const { path, query, push, replace } = useRouter();
+  const searchParams = new URLSearchParams(query);
+  const updateUrl = (search: URLSearchParams, options: AdapterOptions) => {
+    const query = renderQueryString(search);
+    const url = path + query + location.hash;
+    if (options.shallow) {
+      options.history === "push"
+        ? history.pushState(null, "", url)
+        : history.replaceState(null, "", url);
+    } else {
+      const updateMethod = options.history === "push" ? push : replace;
+      // bypass waku's typesafe route check by using `as never`
+      updateMethod(url as never);
+    }
+    // Waku router does not scroll unless the pathname changes
+    if (options.scroll) {
+      window.scrollTo(0, 0);
+    }
+  };
+  return {
+    searchParams,
+    updateUrl,
+  };
+}
+
+export const NuqsAdapter = createAdapterProvider(useNuqsAdapter);
+
+----------------------------------------
+
+TITLE: Handling Different Parsers on Same Key in TypeScript
+DESCRIPTION: Demonstrates an issue where using different parsers on the same query key can lead to unexpected state propagation. Shows the problematic implementation and recommended solution using a custom hook.
+
+LANGUAGE: typescript
+CODE:
+const [int] = useQueryState('foo', parseAsInteger)
+const [float, setFloat] = useQueryState('foo', parseAsFloat)
+
+setFloat(1.234)
+
+// `int` is now 1.234, instead of 1
+
+LANGUAGE: typescript
+CODE:
+function useIntFloat() {
+  const [float, setFloat] = useQueryState('foo', parseAsFloat)
+  const int = Math.floor(float)
+  return [{int, float}, setFloat] as const
+}
+
+----------------------------------------
+
+TITLE: Testing Custom Parsers
+DESCRIPTION: Example of how to test custom parsers created with createParser, including bijectivity tests using helpers from nuqs/testing.
+
+LANGUAGE: ts
+CODE:
+import {
+  isParserBijective,
+  testParseThenSerialize,
+  testSerializeThenParse
+} from 'nuqs/testing'
+
+it('is bijective', () => {
+  // Passing tests return true
+  expect(isParserBijective(parseAsInteger, '42', 42)).toBe(true)
+  // Failing test throws an error
+  expect(() => isParserBijective(parseAsInteger, '42', 47)).toThrowError()
+
+  // You can also test either side separately:
+  expect(testParseThenSerialize(parseAsInteger, '42')).toBe(true)
+  expect(testSerializeThenParse(parseAsInteger, 42)).toBe(true)
+  // Those will also throw an error if the test fails,
+  // which makes it easier to isolate which side failed:
+  expect(() => testParseThenSerialize(parseAsInteger, 'not a number')).toThrowError()
+  expect(() => testSerializeThenParse(parseAsInteger, NaN)).toThrowError()
+})
+
+----------------------------------------
+
+TITLE: Using Shorter URL Keys with Query String Serializer in TypeScript
+DESCRIPTION: Demonstrates how to use the urlKeys option with createSerializer to map longer variable names to shorter keys in the URL, improving URL readability while maintaining clear variable names in the code.
+
+LANGUAGE: typescript
+CODE:
+const serialize = createSerializer(
+  {
+    // 1. Use variable names that make sense for your domain/business logic
+    latitude: parseAsFloat,
+    longitude: parseAsFloat,
+    zoomLevel: parseAsInteger
+  },
+  {
+    // 2. Remap them to shorter keys in the URL
+    urlKeys: {
+      latitude: 'lat',
+      longitude: 'lng',
+      zoomLevel: 'z'
+    }
+  }
+)
+
+// 3. Use your variable names when calling the serializer,
+// and the shorter keys will be rendered in the URL:
+serialize({
+  latitude: 45.18,
+  longitude: 5.72,
+  zoomLevel: 12
+})
+// ?lat=45.18&lng=5.72&z=12
+
+----------------------------------------
+
+TITLE: Configuring Root Layout with Waku Adapter
+DESCRIPTION: Setup of the root layout component that implements the Waku adapter. Includes configuration for dynamic rendering and proper component wrapping with Suspense.
+
+LANGUAGE: tsx
+CODE:
+import { Suspense, type ReactNode } from 'react';
+
+import { NuqsAdapter } from './nuqs-waku-adapter'
+
+type LayoutProps = { children: ReactNode };
+
+export default async function Layout({ children }: LayoutProps) {
+  return (
+      <>
+        <NuqsAdapter>
+          <Suspense>
+            {children}
+          </Suspense>
+        </NuqsAdapter>
+      </>
+  );
+}
+
+export const getConfig = async () => {
+  return {
+    render: 'dynamic',
+    // render: 'static', // works but can cause hydration warnings
+  } as const;
+};
+
+----------------------------------------
+
+TITLE: Using Base Parameters with Query String Serializer in TypeScript
+DESCRIPTION: Shows how to use the base parameter with the serialize function to append or amend search parameters to existing URLs, URLSearchParams, or query strings.
+
+LANGUAGE: typescript
+CODE:
+serialize('/path?baz=qux', { foo: 'bar' }) // /path?baz=qux&foo=bar
+
+const search = new URLSearchParams('?baz=qux')
+serialize(search, { foo: 'bar' }) // ?baz=qux&foo=bar
+
+const url = new URL('https://example.com/path?baz=qux')
+serialize(url, { foo: 'bar' }) // https://example.com/path?baz=qux&foo=bar
+
+// Passing null removes existing values
+serialize('?remove=me', { foo: 'bar', remove: null }) // ?foo=bar
+
+----------------------------------------
+
+TITLE: Integrating NuqsAdapter in One Framework Layout
+DESCRIPTION: This code snippet shows how to integrate the NuqsAdapter into the root layout file of a One framework application. It wraps the Slot component with the NuqsAdapter to enable nuqs functionality throughout the app.
+
+LANGUAGE: tsx
+CODE:
+import { NuqsAdapter } from './nuqs-one-adapter'
+import { Slot } from 'one'
+
+export default function Layout() {
+  return (
+    <>
+      {typeof document !== 'undefined' && (
+        <>
+          <meta charSet="utf-8" />
+          <meta httpEquiv="X-UA-Compatible" content="IE=edge" />
+          <meta
+            name="viewport"
+            content="width=device-width, initial-scale=1, maximum-scale=5"
+          />
+          <link rel="icon" href="/favicon.svg" />
+        </>
+      )}
+      <NuqsAdapter>
+        <Slot />
+      </NuqsAdapter>
+    </>
+  )
+}
+
+----------------------------------------
+
+TITLE: Using Parser Type Inference in TypeScript with nuqs
+DESCRIPTION: Illustrates how to use the inferParserType type helper to access the underlying type returned by a parser, both for individual parsers and for objects describing multiple parsers.
+
+LANGUAGE: typescript
+CODE:
+import { parseAsInteger, type inferParserType } from 'nuqs' // or 'nuqs/server'
+
+const intNullable = parseAsInteger
+const intNonNull = parseAsInteger.withDefault(0)
+
+inferParserType<typeof intNullable> // number | null
+inferParserType<typeof intNonNull> // number
+
+LANGUAGE: typescript
+CODE:
+import {
+  parseAsBoolean,
+  parseAsInteger,
+  type inferParserType
+} from 'nuqs' // or 'nuqs/server'
+
+const parsers = {
+  a: parseAsInteger,
+  b: parseAsBoolean.withDefault(false)
+}
+
+inferParserType<typeof parsers>
+// { a: number | null, b: boolean }
+
+----------------------------------------
+
+TITLE: Creating Custom Parser with Equality Function in nuqs with TypeScript
+DESCRIPTION: Shows how to create a custom parser with an equality function for use with the clearOnDefault option in nuqs.
+
+LANGUAGE: typescript
+CODE:
+const dateParser = createParser({
+  parse: (value: string) => new Date(value.slice(0, 10)),
+  serialize: (date: Date) => date.toISOString().slice(0, 10),
+  eq: (a: Date, b: Date) => a.getTime() === b.getTime()
+})
+
+----------------------------------------
+
+TITLE: Implementing Custom nuqs Adapter for One Framework
+DESCRIPTION: This code snippet defines a custom adapter for integrating nuqs with the One framework. It uses One's routing and parameter hooks to create a compatible interface for nuqs.
+
+LANGUAGE: tsx
+CODE:
+import {
+  type unstable_AdapterOptions as AdapterOptions,
+  unstable_createAdapterProvider as createAdapterProvider,
+  renderQueryString
+} from 'nuqs/adapters/custom'
+import { useActiveParams, useRouter } from 'one'
+
+function useNuqsOneAdapter() {
+  const router = useRouter()
+  const searchParams = new URLSearchParams(useActiveParams() as {})
+  const updateUrl = (search: URLSearchParams, options: AdapterOptions) => {
+    if (options.history === 'push') {
+      router.push(renderQueryString(search), {
+        scroll: options.scroll
+      })
+    } else {
+      router.replace(renderQueryString(search), {
+        scroll: options.scroll
+      })
+    }
+  }
+  return {
+    searchParams,
+    updateUrl
+  }
+}
+
+export const NuqsAdapter = createAdapterProvider(useNuqsOneAdapter)
+
+----------------------------------------
+
+TITLE: Implementing Lossy Serializer for Geographic Coordinates in TypeScript
+DESCRIPTION: This example shows a parser for geographic coordinates with a lossy serializer. It demonstrates how precision can be lost when serializing floating-point values, which can lead to inconsistencies when reloading the page or restoring state from the URL.
+
+LANGUAGE: typescript
+CODE:
+const geoCoordParser = {
+  parse: parseFloat,
+  serialize: v => v.toFixed(4) // Loses precision
+}
+
+const [lat, setLat] = useQueryState('lat', geoCoordParser)
+
+----------------------------------------
+
+TITLE: Configuring Jest for ESM Compatibility
+DESCRIPTION: Instructions for configuring Jest to work with nuqs as an ESM-only package, including changes to jest.config.ts and package.json.
+
+LANGUAGE: ts
+CODE:
+const config: Config = {
+  // <Other options here>
+  extensionsToTreatAsEsm: [".ts", ".tsx"],
+  transform: {}
+};
+
+LANGUAGE: json
+CODE:
+{
+  "scripts": {
+    "test": "NODE_OPTIONS=\"$NODE_OPTIONS --experimental-vm-modules\" jest"
+  }
+}
+
+----------------------------------------
+
+TITLE: Using NuqsTestingAdapter Directly
+DESCRIPTION: Demonstrates how to use the NuqsTestingAdapter component directly to wrap components using nuqs in tests.
+
+LANGUAGE: tsx
+CODE:
+import { NuqsTestingAdapter } from 'nuqs/adapters/testing'
+
+<NuqsTestingAdapter>
+  <ComponentsUsingNuqs/>
+</NuqsTestingAdapter>
+
+----------------------------------------
+
+TITLE: Implementing Map Components with Custom Coordinate Hook in React
+DESCRIPTION: Shows how to use the custom useCoordinates hook in React components for both displaying and updating latitude and longitude values.
+
+LANGUAGE: tsx
+CODE:
+'use client'
+
+import { useCoordinates } from '../hooks/useCoordinates'
+
+function MapView() {
+  const [{ lat, lng }] = useCoordinates() // Read-only
+  return (
+    <div>
+      Latitude: {lat}
+      Longitude: {lng}
+    </div>
+  )
+}
+
+function MapControls() {
+  const [{ lat, lng }, setCoordinates] = useCoordinates()
+  return (
+    <div>
+      <input
+        type="number"
+        value={lat}
+        onChange={(e) => setCoordinates({ lat: e.target.valueAsNumber })}
+      />
+      <input
+        type="number"
+        value={lng}
+        onChange={(e) => setCoordinates({ lng: e.target.valueAsNumber })}
+      />
+    </div>
+  )
+}
+
+----------------------------------------
+
+TITLE: Creating Search Params Cache Configuration
+DESCRIPTION: Sets up a type-safe search parameters cache with default values for query and pagination
+
+LANGUAGE: typescript
+CODE:
+import {
+  createSearchParamsCache,
+  parseAsInteger,
+  parseAsString
+} from 'nuqs/server'
+
+export const searchParamsCache = createSearchParamsCache({
+  q: parseAsString.withDefault(''),
+  maxResults: parseAsInteger.withDefault(10)
+})
+
+----------------------------------------
+
+TITLE: Implementing Cache in Page Component
+DESCRIPTION: Shows how to use the search params cache in a Next.js page component with nested server components
+
+LANGUAGE: tsx
+CODE:
+import { searchParamsCache } from './searchParams'
+import { type SearchParams } from 'nuqs/server'
+
+type PageProps = {
+  searchParams: Promise<SearchParams>
+}
+
+export default async function Page({ searchParams }: PageProps) {
+  const { q: query } = await searchParamsCache.parse(searchParams)
+  return (
+    <div>
+      <h1>Search Results for {query}</h1>
+      <Results />
+    </div>
+  )
+}
+
+function Results() {
+  const maxResults = searchParamsCache.get('maxResults')
+  return <span>Showing up to {maxResults} results</span>
+}
+
+----------------------------------------
+
+TITLE: Testing Components with NuqsTestingAdapter
+DESCRIPTION: Example test setup using Vitest and Testing Library to test components using nuqs hooks with the new testing adapter.
+
+LANGUAGE: tsx
+CODE:
+import { render, screen } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
+import { NuqsTestingAdapter, type UrlUpdateEvent } from 'nuqs/adapters/testing'
+import { describe, expect, it, vi } from 'vitest'
+import { CounterButton } from './counter-button'
+
+it('should increment the count when clicked', async () => {
+  const user = userEvent.setup()
+  const onUrlUpdate = vi.fn<[UrlUpdateEvent]>()
+  render(<CounterButton />, {
+    wrapper: ({ children }) => (
+      <NuqsTestingAdapter searchParams="?count=1" onUrlUpdate={onUrlUpdate}>
+        {children}
+      </NuqsTestingAdapter>
+    )
+  })
+  const button = screen.getByRole('button')
+  await user.click(button)
+  expect(button).toHaveTextContent('count is 2')
+  expect(onUrlUpdate).toHaveBeenCalledOnce()
+  expect(onUrlUpdate.mock.calls[0][0].queryString).toBe('?count=2')
+  expect(onUrlUpdate.mock.calls[0][0].searchParams.get('count')).toBe('2')
+  expect(onUrlUpdate.mock.calls[0][0].options.history).toBe('push')
+})
+
+----------------------------------------
+
+TITLE: Implementing Suspense Boundary for Client Components in Next.js
+DESCRIPTION: Shows how to properly implement client-side components using nuqs with Suspense boundaries in Next.js. Includes both the quick fix and recommended approach for better user experience.
+
+LANGUAGE: tsx
+CODE:
+'use client'
+
+export default function Page() {
+  return (
+    <Suspense>
+      <Client />
+    </Suspense>
+  )
+}
+
+function Client() {
+  const [foo, setFoo] = useQueryState('foo')
+  // ...
+}
+
+----------------------------------------
+
+TITLE: Enabling Debug Logging for nuqs in Browser
+DESCRIPTION: This snippet demonstrates how to enable debug logging for nuqs by setting the 'debug' item in localStorage to 'nuqs'. It also mentions how to combine it with other debug flags.
+
+LANGUAGE: javascript
+CODE:
+// In your devtools:
+localStorage.setItem('debug', 'nuqs')
+
+----------------------------------------
+
+TITLE: Setting Canonical URL for Local-Only State in Next.js
+DESCRIPTION: This snippet demonstrates how to set a canonical URL in Next.js metadata to ignore query strings used for local-only state. It uses the Metadata type from Next.js to define the canonical URL without the query string.
+
+LANGUAGE: typescript
+CODE:
+import type { Metadata } from 'next'
+
+export const metadata: Metadata = {
+  alternates: {
+    canonical: '/url/path/without/querystring'
+  }
+}
+
+----------------------------------------
+
+TITLE: Generating Canonical URL with Content-Defining Query Strings in Next.js
+DESCRIPTION: This example shows how to generate a canonical URL that includes relevant query strings for content-defining parameters. It uses nuqs parsers to validate the query string and Next.js metadata generation to set the canonical URL dynamically.
+
+LANGUAGE: typescript
+CODE:
+import type { Metadata, ResolvingMetadata } from 'next'
+import { notFound } from "next/navigation";
+import { createParser, parseAsString, type SearchParams } from 'nuqs/server'
+
+type Props = {
+  searchParams: Promise<SearchParams>
+}
+
+// Normally you'd reuse custom parsers across your application,
+// but for this example we'll define it here.
+const youTubeVideoIdRegex = /^[^"&?\/\s]{11}$/i
+const parseAsYouTubeVideoId = createParser({
+  parse(query) {
+    if (!youTubeVideoIdRegex.test(query)) {
+      return null
+    }
+    return query
+  },
+  serialize(videoId) {
+    return videoId
+  }
+})
+
+export async function generateMetadata({
+  searchParams
+}: Props): Promise<Metadata> {
+  const videoId = parseAsYouTubeVideoId.parseServerSide((await searchParams).v)
+  if (!videoId) {
+    notFound()
+  }
+  return {
+    alternates: {
+      canonical: `/watch?v=${videoId}`
+    }
+  }
+}
+
+----------------------------------------
+
+TITLE: Installing nuqs package
+DESCRIPTION: Commands to install the nuqs package using different package managers
+
+LANGUAGE: shell
+CODE:
+pnpm add nuqs
+
+LANGUAGE: shell
+CODE:
+yarn add nuqs
+
+LANGUAGE: shell
+CODE:
+npm install nuqs
+
+----------------------------------------
+
+TITLE: Using Parsers and Custom Types
+DESCRIPTION: Examples of using built-in and custom parsers for different data types
+
+LANGUAGE: typescript
+CODE:
+import {
+  parseAsString,
+  parseAsInteger,
+  parseAsFloat,
+  parseAsBoolean,
+  parseAsTimestamp,
+  parseAsIsoDateTime,
+  parseAsArrayOf,
+  parseAsJson,
+  parseAsStringEnum,
+  parseAsStringLiteral,
+  parseAsNumberLiteral
+} from 'nuqs'
+
+useQueryState('tag') // defaults to string
+useQueryState('count', parseAsInteger)
+useQueryState('brightness', parseAsFloat)
+useQueryState('darkMode', parseAsBoolean)
+useQueryState('after', parseAsTimestamp) // state is a Date
+useQueryState('date', parseAsIsoDateTime) // state is a Date
+useQueryState('array', parseAsArrayOf(parseAsInteger)) // state is number[]
+useQueryState('json', parseAsJson<Point>()) // state is a Point
+
+----------------------------------------
+
+TITLE: Integrating NuqsAdapter with React SPA
+DESCRIPTION: Example showing how to wrap a React application with the NuqsAdapter component for use in a React SPA with Vite.
+
+LANGUAGE: tsx
+CODE:
+import { NuqsAdapter } from 'nuqs/adapters/react'
+
+createRoot(document.getElementById('root')!).render(
+  <NuqsAdapter>
+    <App />
+  </NuqsAdapter>
+)
+
+----------------------------------------
+
+TITLE: Installing nuqs v2
+DESCRIPTION: Command to install the latest version of nuqs package using pnpm package manager.
+
+LANGUAGE: bash
+CODE:
+pnpm add nuqs@latest
+
+----------------------------------------
+
+TITLE: Installing nuqs with pnpm
+DESCRIPTION: Command to install nuqs package using pnpm package manager.
+
+LANGUAGE: shell
+CODE:
+pnpm add nuqs
+
+----------------------------------------
+
+TITLE: Installing nuqs with npm
+DESCRIPTION: Command to install nuqs package using npm package manager.
+
+LANGUAGE: shell
+CODE:
+npm install nuqs
+
+----------------------------------------
+
+TITLE: Installing nuqs with yarn
+DESCRIPTION: Command to install nuqs package using yarn package manager.
+
+LANGUAGE: shell
+CODE:
+yarn add nuqs
+
+----------------------------------------
+
+TITLE: Installing nuqs with bun
+DESCRIPTION: Command to install nuqs package using bun package manager.
+
+LANGUAGE: shell
+CODE:
+bun add nuqs
+
+----------------------------------------
+
+TITLE: Installing Dependencies with pnpm
+DESCRIPTION: Command to install project dependencies using pnpm package manager
+
+LANGUAGE: bash
+CODE:
+pnpm install
+
+----------------------------------------
+
+TITLE: Starting Development Environment
+DESCRIPTION: Command to start the development environment which builds the library, starts the docs app, and launches test benches
+
+LANGUAGE: bash
+CODE:
+pnpm dev
+
+----------------------------------------
+
+TITLE: Running Test Suite
+DESCRIPTION: Command to run the complete integration test suite including unit tests and end-to-end tests
+
+LANGUAGE: bash
+CODE:
+pnpm test
+
+----------------------------------------
+
+TITLE: Running Linting Checks
+DESCRIPTION: Command to run linting checks across the project
+
+LANGUAGE: bash
+CODE:
+pnpm lint
+
+----------------------------------------
+
+TITLE: Installing Dependencies for React Router Template
+DESCRIPTION: Command to install the necessary dependencies for the React Router template project using npm.
+
+LANGUAGE: bash
+CODE:
+npm install
+
+----------------------------------------
+
+TITLE: Starting Development Server for React Router Project
+DESCRIPTION: Command to start the development server with Hot Module Replacement (HMR) for the React Router template project.
+
+LANGUAGE: bash
+CODE:
+npm run dev
+
+----------------------------------------
+
+TITLE: Building React Router Project for Production
+DESCRIPTION: Command to create a production build of the React Router template project.
+
+LANGUAGE: bash
+CODE:
+npm run build
+
+----------------------------------------
+
+TITLE: Docker Deployment Commands for React Router Project
+DESCRIPTION: Commands for building and running Docker containers for the React Router template project, supporting npm, pnpm, and bun package managers.
+
+LANGUAGE: bash
+CODE:
+# For npm
+docker build -t my-app .
+
+# For pnpm
+docker build -f Dockerfile.pnpm -t my-app .
+
+# For bun
+docker build -f Dockerfile.bun -t my-app .
+
+# Run the container
+docker run -p 3000:3000 my-app
+
+----------------------------------------
+
+TITLE: Configuring ESLint Parser Options for TypeScript in Vite React Project
+DESCRIPTION: This snippet shows how to configure the top-level parserOptions property in the ESLint configuration for a TypeScript React project using Vite. It specifies the project files and root directory for TypeScript configuration.
+
+LANGUAGE: javascript
+CODE:
+export default tseslint.config({
+  languageOptions: {
+    // other options...
+    parserOptions: {
+      project: ['./tsconfig.node.json', './tsconfig.app.json'],
+      tsconfigRootDir: import.meta.dirname,
+    },
+  },
+})
+
+----------------------------------------
+
+TITLE: Configuring ESLint with React Plugin for Vite TypeScript Project
+DESCRIPTION: This snippet demonstrates how to configure ESLint with the React plugin for a Vite TypeScript project. It sets the React version, adds the React plugin, and enables recommended rules for React and JSX runtime.
+
+LANGUAGE: javascript
+CODE:
+// eslint.config.js
+import react from 'eslint-plugin-react'
+
+export default tseslint.config({
+  // Set the react version
+  settings: { react: { version: '18.3' } },
+  plugins: {
+    // Add the react plugin
+    react,
+  },
+  rules: {
+    // other rules...
+    // Enable its recommended rules
+    ...react.configs.recommended.rules,
+    ...react.configs['jsx-runtime'].rules,
+  },
+})
+
+----------------------------------------
+
+TITLE: Configuring ESLint Parser Options for TypeScript in Vite React Project
+DESCRIPTION: This snippet shows how to configure the top-level parserOptions property in the ESLint configuration for a TypeScript React project using Vite. It specifies the project files and root directory for TypeScript configuration.
+
+LANGUAGE: javascript
+CODE:
+export default tseslint.config({
+  languageOptions: {
+    // other options...
+    parserOptions: {
+      project: ['./tsconfig.node.json', './tsconfig.app.json'],
+      tsconfigRootDir: import.meta.dirname,
+    },
+  },
+})
+
+----------------------------------------
+
+TITLE: Configuring ESLint with React Plugin for Vite TypeScript Project
+DESCRIPTION: This snippet demonstrates how to set up ESLint configuration for a React project using TypeScript and Vite. It includes importing the React plugin, setting the React version, and enabling recommended rules for React and JSX runtime.
+
+LANGUAGE: javascript
+CODE:
+// eslint.config.js
+import react from 'eslint-plugin-react'
+
+export default tseslint.config({
+  // Set the react version
+  settings: { react: { version: '18.3' } },
+  plugins: {
+    // Add the react plugin
+    react,
+  },
+  rules: {
+    // other rules...
+    // Enable its recommended rules
+    ...react.configs.recommended.rules,
+    ...react.configs['jsx-runtime'].rules,
+  },
+})
+
+----------------------------------------
+
+TITLE: Running Remix Development Server
+DESCRIPTION: Command to start the development server for a Remix project.
+
+LANGUAGE: shellscript
+CODE:
+npm run dev
+
+----------------------------------------
+
+TITLE: Building Remix Project for Production
+DESCRIPTION: Command to build the Remix application for production deployment.
+
+LANGUAGE: sh
+CODE:
+npm run build
+
+----------------------------------------
+
+TITLE: Running Remix Project in Production Mode
+DESCRIPTION: Command to start the Remix application in production mode after building.
+
+LANGUAGE: sh
+CODE:
+npm start
+
+----------------------------------------
+
+TITLE: Populating Search Params Cache in Next.js Page Component
+DESCRIPTION: This code snippet demonstrates how to properly populate a search params cache created with createSearchParamsCache in a Next.js page component. It shows the setup of the cache, parsing of search params, and accessing them in child components.
+
+LANGUAGE: tsx
+CODE:
+// page.tsx
+import {
+  createSearchParamsCache,
+  parseAsInteger,
+  parseAsString,
+  type SearchParams
+} from 'nuqs/server'
+
+const cache = createSearchParamsCache({
+  q: parseAsString,
+  maxResults: parseAsInteger.withDefault(10)
+})
+
+export default function Page({
+  searchParams
+}: {
+  searchParams: Promise<SearchParams>
+}) {
+  // ⚠️ Don't forget to call `parse` here:
+  const { q: query } = await cache.parse(searchParams)
+  return (
+    <div>
+      <h1>Search Results for {query}</h1>
+      <Results />
+    </div>
+  )
+}
+
+function Results() {
+  // In order to get search params from child server components:
+  const maxResults = cache.get('maxResults')
+  return <span>Showing up to {maxResults} results</span>
+}
+
+----------------------------------------
+
+TITLE: Implementing TanStack Table Pagination with URL State in TypeScript
+DESCRIPTION: This snippet demonstrates how to use nuqs to manage TanStack Table pagination state in the URL. It converts between zero-based and one-based page indices and handles the page size.
+
+LANGUAGE: typescript
+CODE:
+import { parseAsInteger, useQueryState } from 'nuqs'
+
+const [page, setPage] = useQueryState(
+  'page',
+  parseAsInteger.withDefault(1).withOptions({
+    startValue: 1
+  })
+)
+const [pageSize, setPageSize] = useQueryState(
+  'size',
+  parseAsInteger.withDefault(10)
+)
+
+// In your component:
+const instance = useReactTable({
+  ...
+  state: {
+    pagination: {
+      pageIndex: page - 1,
+      pageSize
+    }
+  },
+  onPaginationChange: updater => {
+    if (typeof updater === 'function') {
+      const newState = updater({
+        pageIndex: page - 1,
+        pageSize
+      })
+      setPage(newState.pageIndex + 1)
+      setPageSize(newState.pageSize)
+    } else {
+      setPage(updater.pageIndex + 1)
+      setPageSize(updater.pageSize)
+    }
+  },
+  ...
+})
+
+----------------------------------------
+
+TITLE: Running Next.js Development Server
+DESCRIPTION: Commands to start the Next.js development server using npm, pnpm, or yarn package managers. After running the server, the application can be accessed at http://localhost:3000.
+
+LANGUAGE: bash
+CODE:
+npm run dev
+# or
+pnpm dev
+# or
+yarn dev
+
+----------------------------------------
+
+TITLE: TypeScript useState Reference
+DESCRIPTION: Reference to React's useState hook mentioned in context of URL state management comparison.
+
+LANGUAGE: typescript
+CODE:
+useState

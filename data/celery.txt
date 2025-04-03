@@ -1,0 +1,5305 @@
+TITLE: Basic Task Definition with Request Timeout
+DESCRIPTION: Example showing how to define a basic task with proper request timeout handling using the requests library.
+
+LANGUAGE: python
+CODE:
+connect_timeout, read_timeout = 5.0, 30.0
+response = requests.get(URL, timeout=(connect_timeout, read_timeout))
+
+----------------------------------------
+
+TITLE: Running Celery Worker
+DESCRIPTION: Command to start a Celery worker process with INFO level logging.
+
+LANGUAGE: console
+CODE:
+$ celery -A tasks worker --loglevel=INFO
+
+----------------------------------------
+
+TITLE: Simple Task Creation with @task Decorator
+DESCRIPTION: Shows how to create a basic task using the @task decorator and interact with database models.
+
+LANGUAGE: python
+CODE:
+from .models import User
+
+@app.task
+def create_user(username, password):
+    User.objects.create(username=username, password=password)
+
+----------------------------------------
+
+TITLE: Simple Task Creation with @task Decorator
+DESCRIPTION: Shows how to create a basic task using the @task decorator and interact with database models.
+
+LANGUAGE: python
+CODE:
+from .models import User
+
+@app.task
+def create_user(username, password):
+    User.objects.create(username=username, password=password)
+
+----------------------------------------
+
+TITLE: Basic Celery Application Setup
+DESCRIPTION: Python code showing how to create a basic Celery application with a simple task definition.
+
+LANGUAGE: python
+CODE:
+from celery import Celery
+
+app = Celery('tasks', broker='pyamqp://guest@localhost//')
+
+@app.task
+def add(x, y):
+    return x + y
+
+----------------------------------------
+
+TITLE: Cassandra Result Backend Configuration
+DESCRIPTION: Example configuration for using Cassandra as the result backend
+
+LANGUAGE: python
+CODE:
+result_backend = 'cassandra://'
+cassandra_servers = ['localhost']
+cassandra_keyspace = 'celery'
+cassandra_table = 'tasks'
+cassandra_read_consistency = 'QUORUM'
+cassandra_write_consistency = 'QUORUM'
+cassandra_entry_ttl = 86400
+
+----------------------------------------
+
+TITLE: Creating a Simple Celery Application in Python
+DESCRIPTION: This snippet demonstrates how to create a basic Celery application with a single task. It initializes the Celery app with a broker URL and defines a 'hello' task that returns 'hello world'.
+
+LANGUAGE: python
+CODE:
+from celery import Celery
+
+app = Celery('hello', broker='amqp://guest@localhost//')
+
+@app.task
+def hello():
+    return 'hello world'
+
+----------------------------------------
+
+TITLE: Configuring Task Routes with Pattern Matching in Python
+DESCRIPTION: Example showing how to set up task routing using glob pattern matching and regular expressions to route tasks to specific queues based on task name patterns.
+
+LANGUAGE: python
+CODE:
+app.conf.task_routes = {'feed.tasks.*': {'queue': 'feeds'}}
+
+task_routes = ([
+    ('feed.tasks.*', {'queue': 'feeds'}),
+    ('web.tasks.*', {'queue': 'web'}),
+    (re.compile(r'(video|image)\.tasks\..*'), {'queue': 'media'}),
+],)
+
+----------------------------------------
+
+TITLE: Celery Configuration Example
+DESCRIPTION: Python code demonstrating Celery configuration using a dedicated configuration module.
+
+LANGUAGE: python
+CODE:
+broker_url = 'pyamqp://'
+result_backend = 'rpc://'
+
+task_serializer = 'json'
+result_serializer = 'json'
+accept_content = ['json']
+timezone = 'Europe/Oslo'
+enable_utc = True
+
+----------------------------------------
+
+TITLE: Simple Celery Task Definition Example
+DESCRIPTION: Basic example showing how to create a Celery application and define a simple task. Shows minimal configuration using AMQP broker.
+
+LANGUAGE: python
+CODE:
+from celery import Celery
+
+app = Celery('hello', broker='amqp://guest@localhost//')
+
+@app.task
+def hello():
+    return 'hello world'
+
+----------------------------------------
+
+TITLE: Checking Celery Cluster Status
+DESCRIPTION: Shows how to list active nodes in a Celery cluster using the status command.
+
+LANGUAGE: console
+CODE:
+$ celery -A proj status
+
+----------------------------------------
+
+TITLE: Basic Celery Configuration Example
+DESCRIPTION: A basic configuration example showing broker settings, task imports, and result backend configuration.
+
+LANGUAGE: python
+CODE:
+## Broker settings.
+broker_url = 'amqp://guest:guest@localhost:5672//'
+
+# List of modules to import when the Celery worker starts.
+imports = ('myapp.tasks',)
+
+## Using the database to store task state and results.
+result_backend = 'db+sqlite:///results.db'
+
+task_annotations = {'tasks.add': {'rate_limit': '10/s'}}
+
+----------------------------------------
+
+TITLE: Configuring JSON-only Content Acceptance in Celery
+DESCRIPTION: Example of restricting Celery to only accept JSON serialized content for improved security by preventing unsafe serializers like pickle.
+
+LANGUAGE: python
+CODE:
+accept_content = ['json']
+
+LANGUAGE: python
+CODE:
+accept_content = ['application/json']
+
+----------------------------------------
+
+TITLE: Running RabbitMQ using Docker
+DESCRIPTION: Docker command to run RabbitMQ container with exposed port 5672.
+
+LANGUAGE: console
+CODE:
+$ docker run -d -p 5672:5672 rabbitmq
+
+----------------------------------------
+
+TITLE: Implementing Task Locking with Memcached in Celery Python
+DESCRIPTION: A pattern for ensuring serial task execution using memcached locks. Implements a context manager for atomic locking and a Celery task that imports RSS feeds while preventing concurrent imports of the same feed. Uses Django's cache framework and MD5 hashing for lock identification.
+
+LANGUAGE: python
+CODE:
+import time
+from celery import task
+from celery.utils.log import get_task_logger
+from contextlib import contextmanager
+from django.core.cache import cache
+from hashlib import md5
+from djangofeeds.models import Feed
+
+logger = get_task_logger(__name__)
+
+LOCK_EXPIRE = 60 * 10  # Lock expires in 10 minutes
+
+@contextmanager
+def memcache_lock(lock_id, oid):
+    timeout_at = time.monotonic() + LOCK_EXPIRE - 3
+    # cache.add fails if the key already exists
+    status = cache.add(lock_id, oid, LOCK_EXPIRE)
+    try:
+        yield status
+    finally:
+        # memcache delete is very slow, but we have to use it to take
+        # advantage of using add() for atomic locking
+        if time.monotonic() < timeout_at and status:
+            # don't release the lock if we exceeded the timeout
+            # to lessen the chance of releasing an expired lock
+            # owned by someone else
+            # also don't release the lock if we didn't acquire it
+            cache.delete(lock_id)
+
+@task(bind=True)
+def import_feed(self, feed_url):
+    # The cache key consists of the task name and the MD5 digest
+    # of the feed URL.
+    feed_url_hexdigest = md5(feed_url).hexdigest()
+    lock_id = '{0}-lock-{1}'.format(self.name, feed_url_hexdigest)
+    logger.debug('Importing feed: %s', feed_url)
+    with memcache_lock(lock_id, self.app.oid) as acquired:
+        if acquired:
+            return Feed.objects.import_feed(feed_url).url
+    logger.debug(
+        'Feed %s is already being imported by another worker', feed_url)
+
+----------------------------------------
+
+TITLE: Initializing Celery Project Structure in Python
+DESCRIPTION: Sets up basic project structure with celery.py for app configuration and tasks.py for task definitions. Includes broker URL and result backend configuration.
+
+LANGUAGE: python
+CODE:
+src/
+    proj/__init__.py
+        /celery.py
+        /tasks.py
+
+----------------------------------------
+
+TITLE: Task Apply Async Example in Python
+DESCRIPTION: Example demonstrating how to call a task using apply_async with explicit arguments and keyword arguments.
+
+LANGUAGE: python
+CODE:
+task.apply_async(args=[arg1, arg2], kwargs={'kwarg1': 'x', 'kwarg2': 'y'})
+
+----------------------------------------
+
+TITLE: Task Definition with Custom Serializer
+DESCRIPTION: Example of defining a task with a specific serializer option.
+
+LANGUAGE: python
+CODE:
+@app.task(serializer='json')
+def create_user(username, password):
+    User.objects.create(username=username, password=password)
+
+----------------------------------------
+
+TITLE: Bound Task with Logging
+DESCRIPTION: Demonstrates how to create a bound task with access to task instance and logging.
+
+LANGUAGE: python
+CODE:
+logger = get_task_logger(__name__)
+
+@app.task(bind=True)
+def add(self, x, y):
+    logger.info(self.request.id)
+
+----------------------------------------
+
+TITLE: Setting Up Direct Queue for Celery Worker
+DESCRIPTION: Example of using the celeryd_after_setup signal to set up a direct queue for each Celery worker. This allows routing tasks to specific workers.
+
+LANGUAGE: python
+CODE:
+from celery.signals import celeryd_after_setup
+
+@celeryd_after_setup.connect
+def setup_direct_queue(sender, instance, **kwargs):
+    queue_name = '{0}.dq'.format(sender)  # sender is the nodename of the worker
+    instance.app.amqp.queues.select_add(queue_name)
+
+----------------------------------------
+
+TITLE: Setting Django Environment and Celery App Configuration
+DESCRIPTION: Core setup code for initializing Celery with Django settings. Sets the Django settings module and creates a Celery app instance with configuration from Django settings.
+
+LANGUAGE: python
+CODE:
+os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'proj.settings')
+app = Celery('proj')
+app.config_from_object('django.conf:settings', namespace='CELERY')
+
+----------------------------------------
+
+TITLE: Creating Groups of Tasks in Celery
+DESCRIPTION: Demonstrates how to create and execute groups of tasks in Celery.
+
+LANGUAGE: python
+CODE:
+from celery import group
+res = group(add.s(i, i) for i in range(10))()
+res.get(timeout=1)
+
+----------------------------------------
+
+TITLE: Django Settings Configuration for Celery
+DESCRIPTION: Example Django settings configuration showing common Celery settings with the CELERY_ prefix. Demonstrates timezone, task tracking, and time limit settings.
+
+LANGUAGE: python
+CODE:
+CELERY_TIMEZONE = "Australia/Tasmania"
+CELERY_TASK_TRACK_STARTED = True
+CELERY_TASK_TIME_LIMIT = 30 * 60
+
+----------------------------------------
+
+TITLE: Basic Task Delay Example in Python
+DESCRIPTION: Example showing how to call a task using the delay method, which provides a convenient function-like interface.
+
+LANGUAGE: python
+CODE:
+task.delay(arg1, arg2, kwarg1='x', kwarg2='y')
+
+----------------------------------------
+
+TITLE: Creating Chords in Celery
+DESCRIPTION: Shows how to create and execute chords (groups with callbacks) in Celery.
+
+LANGUAGE: python
+CODE:
+from celery import chord
+res = chord((add.s(i, i) for i in range(10)), tsum.s())()
+res.get()
+
+----------------------------------------
+
+TITLE: Implementing Soft Time Limit Handler
+DESCRIPTION: Python code example showing how to handle soft time limits in a Celery task.
+
+LANGUAGE: python
+CODE:
+from myapp import app
+from celery.exceptions import SoftTimeLimitExceeded
+
+@app.task
+def mytask():
+    try:
+        do_work()
+    except SoftTimeLimitExceeded:
+        clean_up_in_a_hurry()
+
+----------------------------------------
+
+TITLE: Composing Task Workflows with Groups and Chains
+DESCRIPTION: Shows how to create complex task workflows using groups for parallel execution and chains for sequential tasks.
+
+LANGUAGE: python
+CODE:
+>>> from celery import group, chain
+>>> group(add.s(i, i) for i in range(10))().get()
+>>> chain(add.s(4, 4) | mul.s(8))().get()
+
+----------------------------------------
+
+TITLE: Starting Flower Web Monitor
+DESCRIPTION: Shows how to start the Flower web-based monitor for Celery.
+
+LANGUAGE: console
+CODE:
+$ celery -A proj flower
+
+----------------------------------------
+
+TITLE: Unit Testing Celery Tasks with Mocking in Python
+DESCRIPTION: This snippet demonstrates how to write unit tests for a Celery task using mocking. It includes tests for both success and failure scenarios.
+
+LANGUAGE: python
+CODE:
+from pytest import raises
+
+from celery.exceptions import Retry
+
+# for python 2: use mock.patch from `pip install mock`.
+from unittest.mock import patch
+
+from proj.models import Product
+from proj.tasks import send_order
+
+class test_send_order:
+
+    @patch('proj.tasks.Product.order')  # < patching Product in module above
+    def test_success(self, product_order):
+        product = Product.objects.create(
+            name='Foo',
+        )
+        send_order(product.pk, 3, Decimal(30.3))
+        product_order.assert_called_with(3, Decimal(30.3))
+
+    @patch('proj.tasks.Product.order')
+    @patch('proj.tasks.send_order.retry')
+    def test_failure(self, send_order_retry, product_order):
+        product = Product.objects.create(
+            name='Foo',
+        )
+
+        # Set a side effect on the patched methods
+        # so that they raise the errors we want.
+        send_order_retry.side_effect = Retry()
+        product_order.side_effect = OperationalError()
+
+        with raises(Retry):
+            send_order(product.pk, 3, Decimal(30.6))
+
+----------------------------------------
+
+TITLE: Setting Timezone for Celery Beat Scheduler
+DESCRIPTION: Demonstrates how to set the timezone for the Celery Beat scheduler. This is important for ensuring tasks run at the correct local time.
+
+LANGUAGE: python
+CODE:
+timezone = 'Europe/London'
+
+----------------------------------------
+
+TITLE: Defining a Celery Task in Python
+DESCRIPTION: This snippet shows how to define a Celery task that handles ordering a product. It demonstrates error handling and retries.
+
+LANGUAGE: python
+CODE:
+from .models import Product
+
+@app.task(bind=True)
+def send_order(self, product_pk, quantity, price):
+    price = Decimal(price)  # json serializes this to string.
+
+    # models are passed by id, not serialized.
+    product = Product.objects.get(product_pk)
+
+    try:
+        product.order(quantity, price)
+    except OperationalError as exc:
+        raise self.retry(exc=exc)
+
+----------------------------------------
+
+TITLE: Setting a breakpoint in a Celery task using rdb
+DESCRIPTION: This snippet demonstrates how to use celery.contrib.rdb to set a breakpoint in a Celery task. It imports the necessary modules, defines a task, and uses rdb.set_trace() to create a breakpoint.
+
+LANGUAGE: python
+CODE:
+from celery import task
+from celery.contrib import rdb
+
+@task()
+def add(x, y):
+    result = x + y
+    rdb.set_trace()  # <- set break-point
+    return result
+
+----------------------------------------
+
+TITLE: Progress Tracking Task Example in Python
+DESCRIPTION: Example of a long-running task that reports progress updates during execution.
+
+LANGUAGE: python
+CODE:
+@app.task(bind=True)
+def hello(self, a, b):
+    time.sleep(1)
+    self.update_state(state="PROGRESS", meta={'progress': 50})
+    time.sleep(1)
+    self.update_state(state="PROGRESS", meta={'progress': 90})
+    time.sleep(1)
+    return 'hello world: %i' % (a+b)
+
+----------------------------------------
+
+TITLE: Defining Tasks with Celery Decorator
+DESCRIPTION: Shows how to define a task using the Celery task decorator and demonstrates task naming conventions.
+
+LANGUAGE: python
+CODE:
+>>> @app.task
+... def add(x, y):
+...     return x + y
+
+>>> add
+<@task: __main__.add>
+
+>>> add.name
+__main__.add
+
+>>> app.tasks['__main__.add']
+<@task: __main__.add>
+
+----------------------------------------
+
+TITLE: Creating a Celery Instance in Python
+DESCRIPTION: Demonstrates how to create a Celery instance and configure it using a configuration object or environment variable.
+
+LANGUAGE: python
+CODE:
+>>> from celery import Celery
+>>> app = Celery()
+>>> app.config_from_object('celeryconfig')
+>>> #app.config_from_envvar('CELERY_CONFIG_MODULE')
+
+----------------------------------------
+
+TITLE: Connecting to after_task_publish Signal in Celery
+DESCRIPTION: Example of connecting a handler to the after_task_publish signal in Celery. The handler prints information about the task after it has been published to the broker.
+
+LANGUAGE: python
+CODE:
+from celery.signals import after_task_publish
+
+@after_task_publish.connect
+def task_sent_handler(sender=None, headers=None, body=None, **kwargs):
+    # information about task are located in headers for task messages
+    # using the task protocol version 2.
+    info = headers if 'task' in headers else body
+    print('after_task_publish for task id {info[id]}'.format(
+        info=info,
+    ))
+
+----------------------------------------
+
+TITLE: Configuring Worker and Task Module
+DESCRIPTION: Example of a task module that includes worker configuration and task definition.
+
+LANGUAGE: python
+CODE:
+from celery import Celery
+app = Celery()
+
+@app.task
+def add(x, y): return x + y
+
+if __name__ == '__main__':
+    args = ['worker', '--loglevel=INFO']
+    app.worker_main(argv=args)
+
+----------------------------------------
+
+TITLE: Celery Core Class Structure Overview
+DESCRIPTION: Core class and attribute definitions for Celery's main functionality including task management, application configuration, worker control, and event handling. Contains essential methods for task execution, queue management, and application lifecycle.
+
+LANGUAGE: python
+CODE:
+:class:`Celery`       Celery application instance
+:class:`group`        group tasks together
+:class:`chain`        chain tasks together
+:class:`chord`        chords enable callbacks for groups
+:func:`signature`     create a new task signature
+:class:`Signature`    object describing a task invocation
+:data:`current_app`   proxy to the current application instance
+:data:`current_task`  proxy to the currently executing task
+
+----------------------------------------
+
+TITLE: Executing Celery Tasks with Signatures
+DESCRIPTION: Demonstrates various ways to execute Celery tasks using signatures.
+
+LANGUAGE: python
+CODE:
+add(2, 2)
+add.s(2, 2)()
+
+result = add.delay(2, 2)
+result.get()
+
+add.apply_async(args, kwargs, **options)
+add.signature(args, kwargs, **options).apply_async()
+
+add.apply_async((2, 2), countdown=1)
+add.signature((2, 2), countdown=1).apply_async()
+
+----------------------------------------
+
+TITLE: Starting Celery worker with SIGUSR2 signal enabled
+DESCRIPTION: This command demonstrates how to start a Celery worker with the CELERY_RDBSIG environment variable set, enabling the use of SIGUSR2 signal to trigger rdb sessions.
+
+LANGUAGE: bash
+CODE:
+$ CELERY_RDBSIG=1 celery worker -l INFO
+
+----------------------------------------
+
+TITLE: Basic Redis Broker Configuration
+DESCRIPTION: Configures the Redis broker URL for Celery application with default localhost settings.
+
+LANGUAGE: python
+CODE:
+app.conf.broker_url = 'redis://localhost:6379/0'
+
+----------------------------------------
+
+TITLE: Configuring Celery for pytest in Python
+DESCRIPTION: This snippet shows how to configure Celery for pytest by defining fixtures in a conftest.py file. It sets up the broker URL and result backend.
+
+LANGUAGE: python
+CODE:
+@pytest.fixture(scope='session')
+def celery_config():
+    return {
+        'broker_url': 'amqp://',
+        'result_backend': 'redis://'
+    }
+
+def test_add(celery_worker):
+    mytask.delay()
+
+
+# If you wish to override some setting in one test cases
+# only - you can use the ``celery`` mark:
+@pytest.mark.celery(result_backend='rpc')
+def test_other(celery_worker):
+    ...
+
+----------------------------------------
+
+TITLE: Using Crontab Schedules in Celery Beat
+DESCRIPTION: Shows how to use crontab expressions to define more complex scheduling patterns for periodic tasks. This example runs a task every Monday morning at 7:30 AM.
+
+LANGUAGE: python
+CODE:
+from celery.schedules import crontab
+
+app.conf.beat_schedule = {
+    # Executes every Monday morning at 7:30 a.m.
+    'add-every-monday-morning': {
+        'task': 'tasks.add',
+        'schedule': crontab(hour=7, minute=30, day_of_week=1),
+        'args': (16, 16),
+    },
+}
+
+----------------------------------------
+
+TITLE: Triggering rdb session with SIGUSR2 signal
+DESCRIPTION: This command shows how to use the kill command to send a SIGUSR2 signal to a Celery worker process, triggering an rdb debugging session.
+
+LANGUAGE: bash
+CODE:
+$ kill -USR2 <pid>
+
+----------------------------------------
+
+TITLE: Connecting to after_task_publish Signal with Specific Sender in Celery
+DESCRIPTION: Example of connecting a handler to the after_task_publish signal for a specific task in Celery. The handler is called only when the 'proj.tasks.add' task is published.
+
+LANGUAGE: python
+CODE:
+@after_task_publish.connect(sender='proj.tasks.add')
+def task_sent_handler(sender=None, headers=None, body=None, **kwargs):
+    # information about task are located in headers for task messages
+    # using the task protocol version 2.
+    info = headers if 'task' in headers else body
+    print('after_task_publish for task id {info[id]}'.format(
+        info=info,
+    ))
+
+----------------------------------------
+
+TITLE: Configuring Message Signing with Auth Serializer in Celery
+DESCRIPTION: Complete example of setting up cryptographic message signing in Celery using the auth serializer, including certificate paths and security settings.
+
+LANGUAGE: python
+CODE:
+app = Celery()
+app.conf.update(
+    security_key='/etc/ssl/private/worker.key'
+    security_certificate='/etc/ssl/certs/worker.pem'
+    security_cert_store='/etc/ssl/certs/*.pem',
+    security_digest='sha256',
+    task_serializer='auth',
+    event_serializer='auth',
+    accept_content=['auth']
+)
+app.setup_security()
+
+----------------------------------------
+
+TITLE: Enabling Logging for Celery Workers in pytest
+DESCRIPTION: This snippet demonstrates how to enable logging for embedded Celery workers in pytest by defining a fixture.
+
+LANGUAGE: python
+CODE:
+@pytest.fixture(scope='session')
+def celery_enable_logging():
+    return True
+
+----------------------------------------
+
+TITLE: Configuring Celery with Kafka Broker Settings
+DESCRIPTION: Configuration file for Celery that sets up Kafka as the message broker with SASL_SSL authentication. Includes settings for task serialization, broker connection retry, and security protocol configuration.
+
+LANGUAGE: python
+CODE:
+import os
+
+task_serializer = 'json'
+broker_transport_options = {
+    # "allow_create_topics": True,
+}
+broker_connection_retry_on_startup = True
+
+# For using SQLAlchemy as the backend
+# result_backend = 'db+postgresql://postgres:example@localhost/postgres'
+
+broker_transport_options.update({
+    "security_protocol": "SASL_SSL",
+    "sasl_mechanism": "SCRAM-SHA-512",
+})
+sasl_username = os.environ["SASL_USERNAME"]
+sasl_password = os.environ["SASL_PASSWORD"]
+broker_url = f"confluentkafka://{sasl_username}:{sasl_password}@broker:9094"
+broker_transport_options.update({
+    "kafka_admin_config": {
+        "sasl.username": sasl_username,
+        "sasl.password": sasl_password,
+    },
+    "kafka_common_config": {
+        "sasl.username": sasl_username,
+        "sasl.password": sasl_password,
+        "security.protocol": "SASL_SSL",
+        "sasl.mechanism": "SCRAM-SHA-512",
+        "bootstrap_servers": "broker:9094",
+    }
+})
+
+----------------------------------------
+
+TITLE: Celery systemd Service Configuration
+DESCRIPTION: Example systemd service file for running Celery workers. Defines the service type, user/group, working directory, and start/stop/reload commands.
+
+LANGUAGE: bash
+CODE:
+[Unit]
+Description=Celery Service
+After=network.target
+
+[Service]
+Type=forking
+User=celery
+Group=celery
+EnvironmentFile=/etc/conf.d/celery
+WorkingDirectory=/opt/celery
+ExecStart=/bin/sh -c '${CELERY_BIN} -A $CELERY_APP multi start $CELERYD_NODES \
+    --pidfile=${CELERYD_PID_FILE} --logfile=${CELERYD_LOG_FILE} \
+    --loglevel="${CELERYD_LOG_LEVEL}" $CELERYD_OPTS'
+ExecStop=/bin/sh -c '${CELERY_BIN} multi stopwait $CELERYD_NODES \
+    --pidfile=${CELERYD_PID_FILE} --logfile=${CELERYD_LOG_FILE} \
+    --loglevel="${CELERYD_LOG_LEVEL}"'
+ExecReload=/bin/sh -c '${CELERY_BIN} -A $CELERY_APP multi restart $CELERYD_NODES \
+    --pidfile=${CELERYD_PID_FILE} --logfile=${CELERYD_LOG_FILE} \
+    --loglevel="${CELERYD_LOG_LEVEL}" $CELERYD_OPTS'
+Restart=always
+
+[Install]
+WantedBy=multi-user.target
+
+----------------------------------------
+
+TITLE: Configuring RabbitMQ Broker URL in Python
+DESCRIPTION: Sets up the broker URL for connecting Celery to RabbitMQ with authentication details.
+
+LANGUAGE: python
+CODE:
+broker_url = 'amqp://myuser:mypassword@localhost:5672/myvhost'
+
+----------------------------------------
+
+TITLE: Configuring Celery App Parameters for pytest in Python
+DESCRIPTION: This snippet shows how to configure Celery app parameters for pytest by defining a fixture. It demonstrates setting a custom task class and disabling strict typing.
+
+LANGUAGE: python
+CODE:
+@pytest.fixture(scope='session')
+def celery_parameters():
+    return {
+        'task_cls':  my.package.MyCustomTaskClass,
+        'strict_typing': False,
+    }
+
+----------------------------------------
+
+TITLE: Retrieving Task Result
+DESCRIPTION: Demonstrates how to show the result of a specific task using its ID.
+
+LANGUAGE: console
+CODE:
+$ celery -A proj result -t tasks.add 4e196aa4-0141-4601-8138-7aa33db0f577
+
+----------------------------------------
+
+TITLE: Starting Multiple Named Celery Workers
+DESCRIPTION: Commands to start multiple Celery workers with custom hostnames and concurrency levels.
+
+LANGUAGE: console
+CODE:
+$ celery -A proj worker --loglevel=INFO --concurrency=10 -n worker1@%h
+$ celery -A proj worker --loglevel=INFO --concurrency=10 -n worker2@%h
+$ celery -A proj worker --loglevel=INFO --concurrency=10 -n worker3@%h
+
+----------------------------------------
+
+TITLE: Defining Python Package Dependencies for Celery
+DESCRIPTION: Specifies required packages and their versions for Celery project testing and development. Includes pytest and related plugins, AWS tools, mocking libraries, and type checking utilities. Version requirements are conditional based on Python version compatibility.
+
+LANGUAGE: plain
+CODE:
+pytest==8.3.5
+pytest-celery[all]>=1.2.0,<1.3.0
+pytest-rerunfailures>=14.0,<15.0; python_version >= "3.8" and python_version < "3.9"
+pytest-rerunfailures>=15.0; python_version >= "3.9" and python_version < "4.0"
+pytest-subtests<0.14.0; python_version < "3.9"
+pytest-subtests>=0.14.1; python_version >= "3.9"
+pytest-timeout==2.3.1
+pytest-click==1.1.0
+pytest-order==1.3.0
+boto3>=1.26.143
+moto>=4.1.11,<5.1.0
+# typing extensions
+mypy==1.14.1; platform_python_implementation=="CPython"
+pre-commit>=3.5.0,<3.8.0; python_version < '3.9'
+pre-commit>=4.0.1; python_version >= '3.9'
+-r extras/yaml.txt
+-r extras/msgpack.txt
+-r extras/mongodb.txt
+-r extras/gcs.txt
+-r extras/pydantic.txt
+
+----------------------------------------
+
+TITLE: Starting Celery Worker from Command Line
+DESCRIPTION: Shows how to start a Celery worker process with INFO level logging.
+
+LANGUAGE: console
+CODE:
+$ celery -A proj worker -l INFO
+
+----------------------------------------
+
+TITLE: Purging Task Queues
+DESCRIPTION: Shows how to purge messages from all configured task queues.
+
+LANGUAGE: console
+CODE:
+$ celery -A proj purge
+
+----------------------------------------
+
+TITLE: Custom Redis SSL Configuration
+DESCRIPTION: Example configuration for Redis result backend with SSL settings
+
+LANGUAGE: python
+CODE:
+result_backend = 'rediss://:password@host:port/db?\
+    ssl_cert_reqs=required\
+    &ssl_ca_certs=%2Fvar%2Fssl%2Fmyca.pem\
+    &ssl_certfile=%2Fvar%2Fssl%2Fredis-server-cert.pem\
+    &ssl_keyfile=%2Fvar%2Fssl%2Fprivate%2Fworker-key.pem'
+
+----------------------------------------
+
+TITLE: Real-time Event Processing
+DESCRIPTION: Demonstrates how to process Celery events in real-time using a custom monitor function.
+
+LANGUAGE: python
+CODE:
+from celery import Celery
+
+def my_monitor(app):
+    state = app.events.State()
+
+    def announce_failed_tasks(event):
+        state.event(event)
+        # task name is sent only with -received event, and state
+        # will keep track of this for us.
+        task = state.tasks.get(event['uuid'])
+
+        print('TASK FAILED: %s[%s] %s' % (
+            task.name, task.uuid, task.info(),))
+
+    with app.connection() as connection:
+        recv = app.events.Receiver(connection, handlers={
+                'task-failed': announce_failed_tasks,
+                '*': state.event,
+        })
+        recv.capture(limit=None, timeout=None, wakeup=True)
+
+if __name__ == '__main__':
+    app = Celery(broker='amqp://guest@localhost//')
+    my_monitor(app)
+
+----------------------------------------
+
+TITLE: Combining Celery Canvas Primitives
+DESCRIPTION: Demonstrates how to combine various Canvas primitives in Celery.
+
+LANGUAGE: python
+CODE:
+c1 = (add.s(4) | mul.s(8))
+
+c2 = (add.s(4, 16) | mul.s(2) | (add.s(4) | mul.s(8)))
+
+c3 = (group(add.s(i, i) for i in range(10)) | tsum.s())
+
+new_user_workflow = (create_user.s() | group(
+    import_contacts.s(),
+    send_welcome_email.s()))
+new_user_workflow.delay(username='artv',
+                        first='Art',
+                        last='Vandelay',
+                        email='art@vandelay.com')
+
+----------------------------------------
+
+TITLE: Pydantic Model Integration with Celery Tasks - Python
+DESCRIPTION: Example demonstrating how to use Pydantic models for task argument validation and result serialization in Celery tasks.
+
+LANGUAGE: python
+CODE:
+from pydantic import BaseModel
+
+class ArgModel(BaseModel):
+    value: int
+
+class ReturnModel(BaseModel):
+    value: str
+
+@app.task(pydantic=True)
+def x(arg: ArgModel) -> ReturnModel:
+    # args/kwargs type hinted as Pydantic model will be converted
+    assert isinstance(arg, ArgModel)
+
+    # The returned model will be converted to a dict automatically
+    return ReturnModel(value=f"example: {arg.value}")
+
+----------------------------------------
+
+TITLE: Task Routing Configuration
+DESCRIPTION: Example of routing tasks to specific queues using Celery configuration.
+
+LANGUAGE: python
+CODE:
+task_routes = {
+    'tasks.add': 'low-priority',
+}
+
+----------------------------------------
+
+TITLE: Shared Task Definition for Django
+DESCRIPTION: Shows how to create a shared task for use in Django applications.
+
+LANGUAGE: python
+CODE:
+from celery import shared_task
+
+@shared_task
+def add(x, y):
+    return x + y
+
+----------------------------------------
+
+TITLE: Inspecting Active Tasks
+DESCRIPTION: Demonstrates how to list currently executing tasks.
+
+LANGUAGE: console
+CODE:
+$ celery -A proj inspect active
+
+----------------------------------------
+
+TITLE: Calling Celery Tasks with Delay Method
+DESCRIPTION: Demonstrates different ways to call Celery tasks using delay() and apply_async() methods.
+
+LANGUAGE: python
+CODE:
+>>> from proj.tasks import add
+>>> add.delay(2, 2)
+>>> add.apply_async((2, 2))
+>>> add.apply_async((2, 2), queue='lopri', countdown=10)
+
+----------------------------------------
+
+TITLE: Multiple Decorator Task Definition
+DESCRIPTION: Example showing proper ordering of multiple decorators with task decorator.
+
+LANGUAGE: python
+CODE:
+@app.task
+@decorator2
+@decorator1
+def add(x, y):
+    return x + y
+
+----------------------------------------
+
+TITLE: Adding Custom Command-line Options in Celery
+DESCRIPTION: Demonstrates how to add custom command-line options to Celery commands using click.Option.
+
+LANGUAGE: python
+CODE:
+from celery import Celery
+from click import Option
+
+app = Celery(broker='amqp://')
+
+app.user_options['worker'].add(Option(('--enable-my-option',),
+                                      is_flag=True,
+                                      help='Enable custom option.'))
+
+----------------------------------------
+
+TITLE: Running Redis using Docker
+DESCRIPTION: Docker command to run Redis container with exposed port 6379.
+
+LANGUAGE: console
+CODE:
+$ docker run -d -p 6379:6379 redis
+
+----------------------------------------
+
+TITLE: Azure Block Blob Storage Result Backend
+DESCRIPTION: Added a new result backend using Azure Block Blob Storage, implemented on top of the azure-storage library. This provides a scalable, low-cost PaaS backend option.
+
+
+
+----------------------------------------
+
+TITLE: Creating Transient Queues in Celery
+DESCRIPTION: This snippet demonstrates how to create a transient queue in Celery for tasks that don't require durability. It uses the Queue and Exchange classes from kombu to define a non-durable queue with a delivery mode of 1.
+
+LANGUAGE: python
+CODE:
+from kombu import Exchange, Queue
+
+task_queues = (
+    Queue('celery', routing_key='celery'),
+    Queue('transient', Exchange('transient', delivery_mode=1),
+          routing_key='transient', durable=False),
+)
+
+----------------------------------------
+
+TITLE: Configuring Late Acknowledgment and Prefetch Multiplier in Celery
+DESCRIPTION: This code sets up Celery for late task acknowledgment and a prefetch multiplier of 1. This configuration ensures that workers only reserve as many tasks as there are worker processes, useful for idempotent tasks.
+
+LANGUAGE: python
+CODE:
+task_acks_late = True
+worker_prefetch_multiplier = 1
+
+----------------------------------------
+
+TITLE: Defining Core Dependencies for Celery Project
+DESCRIPTION: Lists required Python packages and their minimum versions needed for a Celery project with Django and SQLAlchemy integrations. Specifies Django 2.2.1+, SQLAlchemy 1.2.18+, and Celery 5.0.5+ as dependencies.
+
+LANGUAGE: plaintext
+CODE:
+django>=2.2.1
+sqlalchemy>=1.2.18
+celery>=5.0.5
+
+----------------------------------------
+
+TITLE: Defining Periodic Tasks with Celery Beat
+DESCRIPTION: Shows how to set up periodic tasks using the @app.on_after_configure decorator. This includes examples of tasks running at fixed intervals and using crontab schedules.
+
+LANGUAGE: python
+CODE:
+from celery import Celery
+from celery.schedules import crontab
+
+app = Celery()
+
+@app.on_after_configure.connect
+def setup_periodic_tasks(sender: Celery, **kwargs):
+    # Calls test('hello') every 10 seconds.
+    sender.add_periodic_task(10.0, test.s('hello'), name='add every 10')
+
+    # Calls test('hello') every 30 seconds.
+    # It uses the same signature of previous task, an explicit name is
+    # defined to avoid this task replacing the previous one defined.
+    sender.add_periodic_task(30.0, test.s('hello'), name='add every 30')
+
+    # Calls test('world') every 30 seconds
+    sender.add_periodic_task(30.0, test.s('world'), expires=10)
+
+    # Executes every Monday morning at 7:30 a.m.
+    sender.add_periodic_task(
+        crontab(hour=7, minute=30, day_of_week=1),
+        test.s('Happy Mondays!'),
+    )
+
+@app.task
+def test(arg):
+    print(arg)
+
+@app.task
+def add(x, y):
+    z = x + y
+    print(z)
+
+----------------------------------------
+
+TITLE: Task Rate Limiting Configuration
+DESCRIPTION: Configuration example for setting task rate limits using annotations.
+
+LANGUAGE: python
+CODE:
+task_annotations = {
+    'tasks.add': {'rate_limit': '10/m'}
+}
+
+----------------------------------------
+
+TITLE: Implementing Custom Message Consumer in Celery
+DESCRIPTION: Demonstrates how to create a custom Kombu consumer to manually process messages in Celery using the ConsumerStep bootstep class.
+
+LANGUAGE: python
+CODE:
+from celery import Celery
+from celery import bootsteps
+from kombu import Consumer, Exchange, Queue
+
+my_queue = Queue('custom', Exchange('custom'), 'routing_key')
+
+app = Celery(broker='amqp://')
+
+
+class MyConsumerStep(bootsteps.ConsumerStep):
+
+    def get_consumers(self, channel):
+        return [Consumer(channel,
+                         queues=[my_queue],
+                         callbacks=[self.handle_message],
+                         accept=['json'])]
+
+    def handle_message(self, body, message):
+        print('Received message: {0!r}'.format(body))
+        message.ack()
+app.steps['consumer'].add(MyConsumerStep)
+
+def send_me_a_message(who, producer=None):
+    with app.producer_or_acquire(producer) as producer:
+        producer.publish(
+            {'hello': who},
+            serializer='json',
+            exchange=my_queue.exchange,
+            routing_key='routing_key',
+            declare=[my_queue],
+            retry=True,
+        )
+
+if __name__ == '__main__':
+    send_me_a_message('world!')
+
+----------------------------------------
+
+TITLE: CosmosDB Result Backend
+DESCRIPTION: Added a new result backend using Azure CosmosDB, implemented using the pydocumentdb library. This offers a scalable, globally replicated, high-performance backend option.
+
+
+
+----------------------------------------
+
+TITLE: Creating a Worker Bootstep in Celery
+DESCRIPTION: Shows how to implement a Worker bootstep that performs actions at different stages of the worker lifecycle.
+
+LANGUAGE: python
+CODE:
+from celery import bootsteps
+
+class ExampleWorkerStep(bootsteps.StartStopStep):
+    requires = {'celery.worker.components:Pool'}
+
+    def __init__(self, worker, **kwargs):
+        print('Called when the WorkController instance is constructed')
+        print('Arguments to WorkController: {0!r}'.format(kwargs))
+
+    def create(self, worker):
+        # this method can be used to delegate the action methods
+        # to another object that implements ``start`` and ``stop``.
+        return self
+
+    def start(self, worker):
+        print('Called when the worker is started.')
+
+    def stop(self, worker):
+        print('Called when the worker shuts down.')
+
+    def terminate(self, worker):
+        print('Called when the worker terminates')
+
+----------------------------------------
+
+TITLE: Initializing Basic Celery Application
+DESCRIPTION: Creates a basic Celery application instance and demonstrates its string representation.
+
+LANGUAGE: python
+CODE:
+>>> from celery import Celery
+>>> app = Celery()
+>>> app
+<Celery __main__:0x100469fd0>
+
+----------------------------------------
+
+TITLE: Accessing Celery Configuration in Python
+DESCRIPTION: Demonstrates how to access and modify Celery configuration settings.
+
+LANGUAGE: python
+CODE:
+celery.conf.task_always_eager = True
+celery.conf['task_always_eager'] = True
+
+----------------------------------------
+
+TITLE: Adding New Celery Sub-commands
+DESCRIPTION: Shows how to add new sub-commands to the Celery umbrella command using setuptools entry-points.
+
+LANGUAGE: python
+CODE:
+setup(
+    name='flower',
+    entry_points={
+        'celery.commands': [
+           'flower = flower.command:flower',
+        ],
+    }
+)
+
+LANGUAGE: python
+CODE:
+import click
+
+@click.command()
+@click.option('--port', default=8888, type=int, help='Webserver port')
+@click.option('--debug', is_flag=True)
+def flower(port, debug):
+    print('Running our command')
+
+----------------------------------------
+
+TITLE: Celery Beat systemd Service Configuration
+DESCRIPTION: Example systemd service file for running Celery Beat. Defines the service type, user/group, working directory, and start command for the Beat scheduler.
+
+LANGUAGE: bash
+CODE:
+[Unit]
+Description=Celery Beat Service
+After=network.target
+
+[Service]
+Type=simple
+User=celery
+Group=celery
+EnvironmentFile=/etc/conf.d/celery
+WorkingDirectory=/opt/celery
+ExecStart=/bin/sh -c '${CELERY_BIN} -A ${CELERY_APP} beat  \
+    --pidfile=${CELERYBEAT_PID_FILE} \
+    --logfile=${CELERYBEAT_LOG_FILE} --loglevel=${CELERYD_LOG_LEVEL}'
+Restart=always
+
+[Install]
+WantedBy=multi-user.target
+
+----------------------------------------
+
+TITLE: Starting a Celery Worker in Python
+DESCRIPTION: Shows how to start a Celery worker with a specified log level.
+
+LANGUAGE: python
+CODE:
+worker = celery.Worker(loglevel='INFO')
+
+----------------------------------------
+
+TITLE: S3 Result Backend
+DESCRIPTION: Added a new result backend using Amazon S3 for result storage.
+
+
+
+----------------------------------------
+
+TITLE: Using Map and Starmap in Celery
+DESCRIPTION: Shows how to use map and starmap primitives in Celery.
+
+LANGUAGE: python
+CODE:
+~tsum.map([list(range(10)), list(range(100))])
+
+~add.starmap(zip(range(10), range(10)))
+
+----------------------------------------
+
+TITLE: Redis Result Backend Configuration
+DESCRIPTION: Configuration for storing task results and states in Redis, including global key prefix and connection timeouts.
+
+LANGUAGE: python
+CODE:
+app.conf.result_backend_transport_options = {
+    'global_keyprefix': 'my_prefix_',
+    'retry_policy': {
+       'timeout': 5.0
+    }
+}
+
+----------------------------------------
+
+TITLE: Controlling Celery Workers in Python
+DESCRIPTION: Shows various methods to control Celery workers, including inspecting active tasks, setting rate limits, and shutting down workers.
+
+LANGUAGE: python
+CODE:
+>>> celery.control.inspect().active()
+>>> celery.control.rate_limit(add.name, '100/m')
+>>> celery.control.broadcast('shutdown')
+>>> celery.control.discard_all()
+
+----------------------------------------
+
+TITLE: Inspecting Registered Tasks
+DESCRIPTION: Python code example showing how to inspect registered tasks on a Celery worker.
+
+LANGUAGE: python
+CODE:
+>>> i.registered()
+[{'worker1.example.com': ['tasks.add',
+                              'tasks.sleeptask']}]
+
+----------------------------------------
+
+TITLE: Installing Celery via pip
+DESCRIPTION: Command to install Celery package using pip package manager.
+
+LANGUAGE: console
+CODE:
+$ pip install celery
+
+----------------------------------------
+
+TITLE: Implementing App Dependency in Celery with Python
+DESCRIPTION: Demonstrates how to implement app dependency in Celery classes to maintain backward compatibility.
+
+LANGUAGE: python
+CODE:
+from celery.app import app_or_default
+
+class SomeClass:
+
+    def __init__(self, app=None):
+        self.app = app_or_default(app)
+
+----------------------------------------
+
+TITLE: Registering Class-Based Tasks in Celery
+DESCRIPTION: Example showing how to properly register a class-based task using the new app.register_task method introduced in Celery 4.0.1.
+
+LANGUAGE: python
+CODE:
+from celery import Celery, Task
+
+app = Celery()
+
+class CustomTask(Task):
+
+    def run(self):
+        return 'hello'
+
+app.register_task(CustomTask())
+
+----------------------------------------
+
+TITLE: Custom Remote Control Command Implementation
+DESCRIPTION: Python code example demonstrating how to implement a custom remote control command for Celery workers.
+
+LANGUAGE: python
+CODE:
+from celery.worker.control import control_command
+
+@control_command(
+    args=[('n', int)],
+    signature='[N=1]',  # <- used for help on the command-line.
+)
+def increase_prefetch_count(state, n=1):
+    state.consumer.qos.increment_eventually(n)
+    return {'ok': 'prefetch count incremented'}
+
+----------------------------------------
+
+TITLE: Implementing Worker Process Creation Signal Handler in Python
+DESCRIPTION: Example of connecting to the worker_before_create_process signal to clean up resources before child process creation in the prefork pool.
+
+LANGUAGE: python
+CODE:
+@signals.worker_before_create_process.connect
+def clean_channels(**kwargs):
+    grpc_singleton.clean_channel()
+
+----------------------------------------
+
+TITLE: Custom Camera for Event Snapshots
+DESCRIPTION: Defines a custom camera class for capturing and processing Celery event snapshots.
+
+LANGUAGE: python
+CODE:
+from pprint import pformat
+
+from celery.events.snapshot import Polaroid
+
+class DumpCam(Polaroid):
+    clear_after = True  # clear after flush (incl, state.event_count).
+
+    def on_shutter(self, state):
+        if not state.event_count:
+            # No new events since last snapshot.
+            return
+        print('Workers: {0}'.format(pformat(state.workers, indent=4)))
+        print('Tasks: {0}'.format(pformat(state.tasks, indent=4)))
+        print('Total: {0.event_count} events, {0.task_count} tasks'.format(
+            state))
+
+----------------------------------------
+
+TITLE: Adding Consumer to Queue at Runtime
+DESCRIPTION: Python code example demonstrating how to add a consumer to a queue at runtime using remote control commands.
+
+LANGUAGE: python
+CODE:
+>>> app.control.add_consumer('foo', reply=True)
+[{u'worker1.local': {u'ok': u"already consuming from u'foo'"}}]
+
+>>> app.control.add_consumer('foo', reply=True,
+...                          destination=['worker1@example.com'])
+[{u'worker1.local': {u'ok': u"already consuming from u'foo'"}}]
+
+----------------------------------------
+
+TITLE: Example Task Priority Inheritance Pattern
+DESCRIPTION: Code example demonstrating task priority inheritance between parent and child tasks
+
+LANGUAGE: python
+CODE:
+@app.task(bind=True)
+def child_task(self):
+    pass
+
+@app.task(bind=True) 
+def parent_task(self):
+    child_task.delay()
+
+# child_task will also have priority=5
+parent_task.apply_async(args=[], priority=5)
+
+----------------------------------------
+
+TITLE: Installing Celery Project Dependencies
+DESCRIPTION: Requirements file specifying the dependencies needed for Celery project, including Redis, Azure Blob Storage, authentication modules, memcache, pytest extensions and Kombu from GitHub.
+
+LANGUAGE: txt
+CODE:
+-r extras/redis.txt
+-r extras/azureblockblob.txt
+-r extras/auth.txt
+-r extras/memcache.txt
+pytest-rerunfailures>=11.1.2
+git+https://github.com/celery/kombu.git
+
+----------------------------------------
+
+TITLE: Stamping Celery Signatures
+DESCRIPTION: Shows how to use the Stamping API to label Celery signatures for debugging purposes.
+
+LANGUAGE: python
+CODE:
+sig1 = add.si(2, 2)
+sig1_res = sig1.freeze()
+g = group(sig1, add.si(3, 3))
+g.stamp(stamp='your_custom_stamp')
+res = g.apply_async()
+res.get(timeout=TIMEOUT)
+sig1_res._get_task_meta()['stamp']
+
+----------------------------------------
+
+TITLE: Starting Celery Worker in Foreground
+DESCRIPTION: Command to start a Celery worker in the foreground with INFO log level.
+
+LANGUAGE: console
+CODE:
+$ celery -A proj worker -l INFO
+
+----------------------------------------
+
+TITLE: PEP 420 Namespace Package Support for Task Loading
+DESCRIPTION: Added support for loading tasks from PEP 420 namespace packages, enabling more flexible task organization.
+
+
+
+----------------------------------------
+
+TITLE: Custom Stamping Visitor in Celery
+DESCRIPTION: Demonstrates how to create and use a custom stamping visitor in Celery.
+
+LANGUAGE: python
+CODE:
+class InGroupVisitor(StampingVisitor):
+    def __init__(self):
+        self.in_group = False
+
+    def on_group_start(self, group, **headers) -> dict:
+        self.in_group = True
+        return {"in_group": [self.in_group], "stamped_headers": ["in_group"]}
+
+    def on_group_end(self, group, **headers) -> None:
+        self.in_group = False
+
+    def on_chain_start(self, chain, **headers) -> dict:
+        return {"in_group": [self.in_group], "stamped_headers": ["in_group"]}
+
+    def on_signature(self, sig, **headers) -> dict:
+        return {"in_group": [self.in_group], "stamped_headers": ["in_group"]}
+
+----------------------------------------
+
+TITLE: Configuring Google Pub/Sub Broker URL in Celery
+DESCRIPTION: This snippet shows how to set the broker URL for Google Pub/Sub in Celery configuration. The URL format includes the Google Cloud project ID.
+
+LANGUAGE: text
+CODE:
+broker_url = 'gcpubsub://projects/project-id'
+
+----------------------------------------
+
+TITLE: DNS Seedlist Connection Format for MongoDB Result Backend
+DESCRIPTION: Added support for the DNS seedlist connection format in the MongoDB result backend. This requires the 'dnspython' package to be installed.
+
+
+
+----------------------------------------
+
+TITLE: Listing Celery Project Dependencies
+DESCRIPTION: This code snippet lists the required dependencies for the Celery project, including various extras and specific package versions. It includes references to other requirement files, a Git repository for Kombu, and a specific version requirement for urllib3.
+
+LANGUAGE: plaintext
+CODE:
+-r test-ci-base.txt
+-r extras/auth.txt
+-r extras/solar.txt
+-r extras/mongodb.txt
+-r extras/yaml.txt
+-r extras/tblib.txt
+-r extras/slmq.txt
+-r extras/msgpack.txt
+-r extras/memcache.txt
+-r extras/eventlet.txt
+-r extras/gevent.txt
+-r extras/thread.txt
+-r extras/elasticsearch.txt
+-r extras/couchdb.txt
+# -r extras/couchbase.txt
+-r extras/arangodb.txt
+-r extras/consul.txt
+-r extras/cosmosdbsql.txt
+-r extras/cassandra.txt
+-r extras/azureblockblob.txt
+git+https://github.com/celery/kombu.git
+
+# SQS dependencies other than boto
+urllib3>=1.26.16
+
+----------------------------------------
+
+TITLE: Monitoring ID Stamping Visitor in Celery
+DESCRIPTION: Shows how to create and use a monitoring ID stamping visitor in Celery.
+
+LANGUAGE: python
+CODE:
+class MonitoringIdStampingVisitor(StampingVisitor):
+    def on_signature(self, sig, **headers) -> dict:
+        return {'monitoring_id': uuid4().hex}
+
+sig_example = signature('t1')
+sig_example.stamp(visitor=MonitoringIdStampingVisitor())
+
+group_example = group([signature('t1'), signature('t2')])
+group_example.stamp(visitor=MonitoringIdStampingVisitor())
+
+chord_example = chord([signature('t1'), signature('t2')], signature('t3'))
+chord_example.stamp(visitor=MonitoringIdStampingVisitor())
+
+chain_example = chain(signature('t1'), group(signature('t2'), signature('t3')), signature('t4'))
+chain_example.stamp(visitor=MonitoringIdStampingVisitor())
+
+----------------------------------------
+
+TITLE: Manual Queue Configuration in Celery with Kombu
+DESCRIPTION: Demonstrates manual queue configuration using Kombu Queue objects to define exchange types, routing keys and queue settings.
+
+LANGUAGE: python
+CODE:
+from kombu import Queue
+
+app.conf.task_default_queue = 'default'
+app.conf.task_queues = (
+    Queue('default',    routing_key='task.#'),
+    Queue('feed_tasks', routing_key='feed.#'),
+)
+app.conf.task_default_exchange = 'tasks'
+app.conf.task_default_exchange_type = 'topic'
+app.conf.task_default_routing_key = 'task.default'
+
+----------------------------------------
+
+TITLE: Configuring Secure JSON-only Message Acceptance in Celery
+DESCRIPTION: Security configuration to explicitly allow only JSON serialized messages, addressing CELERYSA-0003 vulnerability in Celery 4.0.0.
+
+LANGUAGE: python
+CODE:
+app.conf.accept_content = ['json']
+
+----------------------------------------
+
+TITLE: Inspecting Signature Fields in Celery
+DESCRIPTION: Shows how to inspect different fields of a Celery signature.
+
+LANGUAGE: python
+CODE:
+s = add.signature((2, 2), {'debug': True}, countdown=10)
+s.args
+s.kwargs
+s.options
+
+----------------------------------------
+
+TITLE: SQS Broker URL Format
+DESCRIPTION: Shows the basic format for SQS broker URL configuration
+
+LANGUAGE: text
+CODE:
+sqs://aws_access_key_id:aws_secret_access_key@
+
+----------------------------------------
+
+TITLE: Creating a Chord in Celery 2.3
+DESCRIPTION: Example of creating a chord, which is a task that executes after all tasks in a taskset have finished. This sums the results of adding each number to itself for the range 0-99.
+
+LANGUAGE: Python
+CODE:
+chord(add.subtask((i, i))
+        for i in xrange(100))(tsum.subtask()).get()
+
+----------------------------------------
+
+TITLE: Specifying Python Package Dependencies for Celery AWS Integration
+DESCRIPTION: Defines the required Python package versions for AWS integration with Celery. Includes boto3 for AWS SDK, urllib3 for HTTP client functionality, and kombu with SQS extras for Amazon Simple Queue Service support.
+
+LANGUAGE: plaintext
+CODE:
+boto3>=1.26.143
+urllib3>=1.26.16
+kombu[sqs]>=5.3.4
+
+----------------------------------------
+
+TITLE: Configuring Celery Beat with init.d Script
+DESCRIPTION: Example configuration file for running Celery Beat using an init.d script. Defines settings like paths and options for the Beat scheduler.
+
+LANGUAGE: bash
+CODE:
+# Absolute or relative path to the 'celery' command:
+CELERY_BIN="/usr/local/bin/celery"
+#CELERY_BIN="/virtualenvs/def/bin/celery"
+
+# App instance to use
+# comment out this line if you don't use an app
+CELERY_APP="proj"
+# or fully qualified:
+#CELERY_APP="proj.tasks:app"
+
+# Where to chdir at start.
+CELERYBEAT_CHDIR="/opt/Myproject/"
+
+# Extra arguments to celerybeat
+CELERYBEAT_OPTS="--schedule=/var/run/celery/celerybeat-schedule"
+
+----------------------------------------
+
+TITLE: Manipulating variables in remote debugger
+DESCRIPTION: This snippet illustrates how to interact with the remote debugger, including reading variable values, modifying them, and continuing execution of the task.
+
+LANGUAGE: text
+CODE:
+(Pdb) result
+4
+(Pdb) result = 'hello from rdb'
+(Pdb) continue
+Connection closed by foreign host.
+
+----------------------------------------
+
+TITLE: Enabling Result Backend in Celery 2.3
+DESCRIPTION: Configuration to explicitly set the AMQP result backend, which was the default in previous versions but is now disabled by default in 2.3.
+
+LANGUAGE: Python
+CODE:
+CELERY_RESULT_BACKEND = 'amqp'
+
+----------------------------------------
+
+TITLE: Celery systemd Environment Configuration
+DESCRIPTION: Example environment configuration file for Celery systemd service. Defines various settings like nodes, paths, and options.
+
+LANGUAGE: bash
+CODE:
+# Name of nodes to start
+# here we have a single node
+CELERYD_NODES="w1"
+# or we could have three nodes:
+#CELERYD_NODES="w1 w2 w3"
+
+# Absolute or relative path to the 'celery' command:
+CELERY_BIN="/usr/local/bin/celery"
+#CELERY_BIN="/virtualenvs/def/bin/celery"
+
+# App instance to use
+# comment out this line if you don't use an app
+CELERY_APP="proj"
+# or fully qualified:
+#CELERY_APP="proj.tasks:app"
+
+# How to call manage.py
+CELERYD_MULTI="multi"
+
+# Extra command-line arguments to the worker
+CELERYD_OPTS="--time-limit=300 --concurrency=8"
+
+# - %n will be replaced with the first part of the nodename.
+# - %I will be replaced with the current child process index
+#   and is important when using the prefork pool to avoid race conditions.
+CELERYD_PID_FILE="/var/run/celery/%n.pid"
+CELERYD_LOG_FILE="/var/log/celery/%n%I.log"
+CELERYD_LOG_LEVEL="INFO"
+
+# you may wish to add these options for Celery Beat
+CELERYBEAT_PID_FILE="/var/run/celery/beat.pid"
+CELERYBEAT_LOG_FILE="/var/log/celery/beat.log"
+
+----------------------------------------
+
+TITLE: Creating a Signature for Celery Task
+DESCRIPTION: Demonstrates how to create a signature for a Celery task using different methods.
+
+LANGUAGE: python
+CODE:
+from celery import signature
+signature('tasks.add', args=(2, 2), countdown=10)
+
+add.signature((2, 2), countdown=10)
+
+add.s(2, 2)
+
+add.s(2, 2, debug=True)
+
+----------------------------------------
+
+TITLE: Using Pass-Through Options with Celery Multi in 2.3
+DESCRIPTION: Example of using pass-through options with celery multi to start workers with specific broker settings and disable rate limits.
+
+LANGUAGE: bash
+CODE:
+celery multi start 4  -c 2  -- broker.host=amqp.example.com \
+                                broker.vhost=/ \
+                                celery.disable_rate_limits=yes
+
+----------------------------------------
+
+TITLE: Specifying Redis Version Requirements for Celery
+DESCRIPTION: Dependency specification for Redis package compatibility with Celery. Requires Redis version 4.5.2 or higher, excludes version 4.5.5, and must be lower than version 6.0.0.
+
+LANGUAGE: requirements
+CODE:
+redis>=4.5.2,<6.0.0,!=4.5.5
+
+----------------------------------------
+
+TITLE: Using a custom task class with the task decorator
+DESCRIPTION: Example of using a custom task class with the @task decorator.
+
+LANGUAGE: python
+CODE:
+@app.task(bind=True, base=CustomTask)
+def custom(self):
+    print('running')
+
+----------------------------------------
+
+TITLE: Creating Chunks in Celery
+DESCRIPTION: Demonstrates how to create and use chunks in Celery.
+
+LANGUAGE: python
+CODE:
+add.chunks(zip(range(100), range(100)), 10)
+
+res = add.chunks(zip(range(100), range(100)), 10)()
+res.get()
+
+add.chunks(zip(range(100), range(100)), 10).apply_async()
+
+----------------------------------------
+
+TITLE: Task Definition with Request Context (New Style)
+DESCRIPTION: Modern way of defining a Celery task using the task request context instead of magic keyword arguments
+
+LANGUAGE: python
+CODE:
+from celery.task import task
+
+@task()
+def add(x, y):
+    print('In task %s' % add.request.id)
+    return x + y
+
+----------------------------------------
+
+TITLE: Defining a custom JSON serializable class
+DESCRIPTION: Example of defining a __json__ method on a custom class to support JSON serialization.
+
+LANGUAGE: python
+CODE:
+class Person:
+    first_name = None
+    last_name = None
+    address = None
+
+    def __json__(self):
+        return {
+            'first_name': self.first_name,
+            'last_name': self.last_name,
+            'address': self.address,
+        }
+
+----------------------------------------
+
+TITLE: Custom Stamping Visitor with Callbacks in Celery
+DESCRIPTION: Demonstrates how to create and use a custom stamping visitor with callbacks in Celery.
+
+LANGUAGE: python
+CODE:
+class CustomStampingVisitor(StampingVisitor):
+    def on_signature(self, sig, **headers) -> dict:
+        return {'header': 'value'}
+
+    def on_callback(self, callback, **header) -> dict:
+        return {'on_callback': True}
+
+    def on_errback(self, errback, **header) -> dict:
+        return {'on_errback': True}
+
+c = chord([add.s(1, 1), add.s(2, 2)], xsum.s())
+callback = signature('sig_link')
+errback = signature('sig_link_error')
+c.link(callback)
+c.link_error(errback)
+c.stamp(visitor=CustomStampingVisitor())
+
+----------------------------------------
+
+TITLE: Publisher Pool Usage Example
+DESCRIPTION: Example demonstrating how to use the experimental PublisherPool for connection reuse and retry functionality
+
+LANGUAGE: python
+CODE:
+from celery import current_app
+
+# Global pool
+pool = current_app().amqp.PublisherPool(limit=10)
+
+def my_view(request):
+    with pool.acquire() as publisher:
+        add.apply_async((2, 2), publisher=publisher, retry=True)
+
+----------------------------------------
+
+TITLE: Specifying Django Dependency Version for Celery
+DESCRIPTION: Dependency specification requiring Django version 2.2.28 or higher for compatibility with the Celery project. This follows the pip requirements.txt format for Python package dependencies.
+
+LANGUAGE: plaintext
+CODE:
+Django>=2.2.28
+
+----------------------------------------
+
+TITLE: Registering a custom task class manually
+DESCRIPTION: Example of manually registering a custom task class with the Celery app.
+
+LANGUAGE: python
+CODE:
+class CustomTask(Task):
+    def run(self):
+        print('running')
+CustomTask = app.register_task(CustomTask())
+
+----------------------------------------
+
+TITLE: Executing Multiple URL Open Tasks Concurrently in Python
+DESCRIPTION: Shows how to execute multiple URL open tasks concurrently using Celery's group functionality and iterate over the results.
+
+LANGUAGE: python
+CODE:
+>>> from tasks import urlopen
+>>> from celery import group
+>>> result = group(urlopen.s(url)
+...                     for url in LIST_OF_URLS).apply_async()
+>>> for incoming_result in result.iter_native():
+...     print(incoming_result)
+
+----------------------------------------
+
+TITLE: RabbitMQ User and Vhost Setup Commands
+DESCRIPTION: Series of commands to create RabbitMQ user, virtual host, and set permissions.
+
+LANGUAGE: console
+CODE:
+$ sudo rabbitmqctl add_user myuser mypassword
+
+LANGUAGE: console
+CODE:
+$ sudo rabbitmqctl add_vhost myvhost
+
+LANGUAGE: console
+CODE:
+$ sudo rabbitmqctl set_user_tags myuser mytag
+
+LANGUAGE: console
+CODE:
+$ sudo rabbitmqctl set_permissions -p myvhost myuser ".*" ".*" ".*"
+
+----------------------------------------
+
+TITLE: Disabling task argument checking
+DESCRIPTION: Example of disabling argument checking for a specific task.
+
+LANGUAGE: python
+CODE:
+@app.task(typing=False)
+def add(x, y):
+    return x + y
+
+----------------------------------------
+
+TITLE: Using Session-Scoped Celery Worker in pytest
+DESCRIPTION: This snippet shows how to use a session-scoped Celery worker in pytest tests. It demonstrates configuring the worker and using it in a test.
+
+LANGUAGE: python
+CODE:
+# Add this to your conftest.py
+@pytest.fixture(scope='session')
+def celery_config():
+    return {
+        'broker_url': 'amqp://',
+        'result_backend': 'rpc',
+    }
+
+# Do this in your tests.
+def test_add_task(celery_session_worker):
+    assert add.delay(2, 2).get() == 4
+
+----------------------------------------
+
+TITLE: MacOS PATH Configuration for RabbitMQ
+DESCRIPTION: Adds RabbitMQ sbin directory to system PATH in shell profile.
+
+LANGUAGE: bash
+CODE:
+PATH=$PATH:/usr/local/sbin
+
+----------------------------------------
+
+TITLE: Specifying Google Cloud and gRPC Dependencies
+DESCRIPTION: Defines the required Python package dependencies with version constraints for Google Cloud Storage (>= 2.10.0), Google Cloud Firestore (2.20.1), and gRPC (1.67.0).
+
+LANGUAGE: txt
+CODE:
+google-cloud-storage>=2.10.0
+google-cloud-firestore==2.20.1
+grpcio==1.67.0
+
+----------------------------------------
+
+TITLE: Using worker_direct for routing
+DESCRIPTION: Example of using worker_direct for routing in Celery 3.x.
+
+LANGUAGE: python
+CODE:
+from kombu import Exchange, Queue
+
+worker_direct_exchange = Exchange('C.dq2')
+
+def worker_direct(hostname):
+    return Queue(
+        '{hostname}.dq2'.format(hostname),
+        exchange=worker_direct_exchange,
+        routing_key=hostname,
+    )
+
+----------------------------------------
+
+TITLE: Including Additional Modules for Celery Workers in pytest
+DESCRIPTION: This snippet shows how to include additional modules when starting embedded Celery workers in pytest by defining a fixture.
+
+LANGUAGE: python
+CODE:
+@pytest.fixture(scope='session')
+def celery_includes():
+    return [
+        'proj.tests.tasks',
+        'proj.tests.celery_signal_handlers',
+    ]
+
+----------------------------------------
+
+TITLE: Redis Sentinel Configuration
+DESCRIPTION: Configuration for connecting to Redis Sentinel cluster with master name specification.
+
+LANGUAGE: python
+CODE:
+app.conf.broker_url = 'sentinel://localhost:26379;sentinel://localhost:26380;sentinel://localhost:26381'
+app.conf.broker_transport_options = { 'master_name': "cluster1" }
+
+----------------------------------------
+
+TITLE: Redis SSL Connection URI
+DESCRIPTION: Example of a Redis SSL connection URI with SSL parameters.
+
+LANGUAGE: python
+CODE:
+"rediss://localhost:3456?ssl_keyfile=keyfile.key&ssl_certfile=certificate.crt&ssl_ca_certs=ca.pem&ssl_cert_reqs=CERT_REQUIRED"
+
+----------------------------------------
+
+TITLE: Defining Base Task Class with Retry Attributes in Python
+DESCRIPTION: Example showing how to define a base task class with automatic retry configuration using class attributes like autoretry_for, retry_kwargs, retry_backoff, and retry_jitter.
+
+LANGUAGE: python
+CODE:
+class BaseTaskWithRetry(Task):
+  autoretry_for = (TypeError,)
+  retry_kwargs = {'max_retries': 5}
+  retry_backoff = True
+  retry_backoff_max = 700
+  retry_jitter = False
+
+----------------------------------------
+
+TITLE: Installing Celery with SQS Support
+DESCRIPTION: Command to install Celery with Amazon SQS dependencies using pip
+
+LANGUAGE: console
+CODE:
+$ pip install "celery[sqs]"
+
+----------------------------------------
+
+TITLE: Broadcasting to Multiple Pidboxes using Regex or Glob Pattern
+DESCRIPTION: Added support for broadcasting to multiple Pidboxes using regular expression or glob patterns. This allows inspecting or pinging multiple workers simultaneously.
+
+
+
+----------------------------------------
+
+TITLE: Task Chain with Priorities
+DESCRIPTION: Example of creating a task chain with different priorities set on tasks.
+
+LANGUAGE: python
+CODE:
+c = celery.chain(
+  add.s(2), # priority=None
+  add.s(3).set(priority=5), # priority=5
+  add.s(4), # priority=5
+  add.s(5).set(priority=3), # priority=3
+  add.s(6), # priority=3
+)
+
+----------------------------------------
+
+TITLE: Executing Single URL Open Task in Python
+DESCRIPTION: Demonstrates how to execute a single URL open task using Celery and retrieve the result.
+
+LANGUAGE: python
+CODE:
+>>> from tasks import urlopen
+>>> urlopen.delay('https://www.google.com/').get()
+9980
+
+----------------------------------------
+
+TITLE: Installing RabbitMQ Broker on Ubuntu/Debian
+DESCRIPTION: Command to install RabbitMQ message broker using apt package manager.
+
+LANGUAGE: console
+CODE:
+$ sudo apt-get install rabbitmq-server
+
+----------------------------------------
+
+TITLE: Configuring Redis Result Backend with Global Keyprefix in Python
+DESCRIPTION: Configuration example showing how to set a global key prefix for Redis result backend using result_backend_transport_options setting.
+
+LANGUAGE: python
+CODE:
+app.conf.result_backend_transport_options = {
+    'global_keyprefix': 'my_prefix_'
+}
+
+----------------------------------------
+
+TITLE: Exception Handling Pattern
+DESCRIPTION: Shows how to implement custom exceptions as class attributes for better discoverability and documentation.
+
+LANGUAGE: python
+CODE:
+class Empty(Exception):
+    pass
+
+class Queue:
+    Empty = Empty
+
+    def get(self):
+        """Get the next item from the queue.
+
+        :raises Queue.Empty: if there are no more items left.
+
+        """
+        try:
+            return self.queue.popleft()
+        except IndexError:
+            raise self.Empty()
+
+----------------------------------------
+
+TITLE: Specifying pyArango Dependency for Celery
+DESCRIPTION: This snippet defines a dependency requirement for the Celery project. It specifies that pyArango version 2.0.2 or higher is needed.
+
+LANGUAGE: text
+CODE:
+pyArango>=2.0.2
+
+----------------------------------------
+
+TITLE: Configuring Acknowledgment Deadline in Google Pub/Sub
+DESCRIPTION: This snippet shows how to set the acknowledgment deadline for Pub/Sub messages to 60 seconds using broker transport options.
+
+LANGUAGE: text
+CODE:
+broker_transport_options = {'ack_deadline_seconds': 60}  # 1 minute.
+
+----------------------------------------
+
+TITLE: Installing Celery with Pydantic Support - Bash
+DESCRIPTION: Command to install Celery with Pydantic model support via pip.
+
+LANGUAGE: bash
+CODE:
+pip install "celery[pydantic]"
+
+----------------------------------------
+
+TITLE: Creating Custom Task Base Class
+DESCRIPTION: Demonstrates how to create a custom task base class with debug logging capabilities.
+
+LANGUAGE: python
+CODE:
+from celery import Task
+
+class DebugTask(Task):
+
+    def __call__(self, *args, **kwargs):
+        print('TASK STARTING: {0.name}[{0.request.id}]'.format(self))
+        return self.run(*args, **kwargs)
+
+----------------------------------------
+
+TITLE: Specifying Cryptography Library Version for Celery
+DESCRIPTION: This snippet defines the required version of the cryptography library for the Celery project. It specifies that version 44.0.2 of cryptography is needed.
+
+LANGUAGE: plaintext
+CODE:
+cryptography==44.0.2
+
+----------------------------------------
+
+TITLE: Pydantic Task Result Example - Python
+DESCRIPTION: Example showing how to call a Pydantic-enabled Celery task and retrieve its results.
+
+LANGUAGE: python
+CODE:
+>>> result = x.delay({'value': 1})
+>>> result.get(timeout=1)
+{'value': 'example: 1'}
+
+----------------------------------------
+
+TITLE: Cleaning Up Channels Before Process Creation in Celery
+DESCRIPTION: Example of using the worker_before_create_process signal to clean up gRPC channels before a new child process is created in the prefork pool.
+
+LANGUAGE: python
+CODE:
+@signals.worker_before_create_process.connect
+def clean_channels(**kwargs):
+    grpc_singleton.clean_channel()
+
+----------------------------------------
+
+TITLE: Specifying Azure Storage Blob and Identity Dependencies for Celery
+DESCRIPTION: This snippet defines the minimum required versions of Azure Storage Blob and Azure Identity packages for integration with Celery. It ensures compatibility with Azure services when using Celery for distributed task processing.
+
+LANGUAGE: plaintext
+CODE:
+azure-storage-blob>=12.15.0
+azure-identity>=1.19.0
+
+----------------------------------------
+
+TITLE: Setting Task Message Properties for FIFO Queues
+DESCRIPTION: Example showing how to set MessageGroupId and MessageDeduplicationId for FIFO queues
+
+LANGUAGE: python
+CODE:
+message_properties = {
+    'MessageGroupId': '<YourMessageGroupId>',
+    'MessageDeduplicationId': '<YourMessageDeduplicationId>'
+}
+task.apply_async(**message_properties)
+
+----------------------------------------
+
+TITLE: Task Error Callback Example in Python
+DESCRIPTION: Example demonstrating how to use bound tasks as error callbacks in Celery 4.2, fixing a regression from 3.x
+
+LANGUAGE: python
+CODE:
+@app.task(name="raise_exception", bind=True)
+def raise_exception(self):
+    raise Exception("Bad things happened")
+
+
+@app.task(name="handle_task_exception", bind=True)
+def handle_task_exception(self):
+    print("Exception detected")
+
+subtask = raise_exception.subtask()
+
+subtask.apply_async(link_error=handle_task_exception.s())
+
+----------------------------------------
+
+TITLE: Configuring Celery Worker with celeryd_init Signal
+DESCRIPTION: Example of using the celeryd_init signal to set up worker-specific configuration in Celery. This sets the task_default_rate_limit for a specific worker.
+
+LANGUAGE: python
+CODE:
+from celery.signals import celeryd_init
+
+@celeryd_init.connect(sender='worker12@example.com')
+def configure_worker12(conf=None, **kwargs):
+    conf.task_default_rate_limit = '10/m'
+
+----------------------------------------
+
+TITLE: Specifying Brotli Dependencies for Celery Project
+DESCRIPTION: This snippet defines the required Brotli compression libraries for the Celery project, with different versions specified for PyPy and CPython implementations. For PyPy, brotlipy version 0.7.0 or higher is required, while for CPython, brotli version 1.0.0 or higher is needed.
+
+LANGUAGE: plaintext
+CODE:
+brotlipy>=0.7.0;platform_python_implementation=="PyPy"
+brotli>=1.0.0;platform_python_implementation=="CPython"
+
+----------------------------------------
+
+TITLE: Chaining Groups Example in Python
+DESCRIPTION: Example demonstrating how to chain groups of tasks together using Celery's canvas feature, showing that groups now execute sequentially rather than being joined into a single group.
+
+LANGUAGE: python
+CODE:
+result = group(add.si(1, 2), add.si(1, 2)) | group(tsum.s(), tsum.s()).delay()
+result.get()
+[6, 6]
+
+----------------------------------------
+
+TITLE: Updating task code to use new request API
+DESCRIPTION: Example of updating old task code to use the new request API instead of magic keyword arguments.
+
+LANGUAGE: python
+CODE:
+from celery import task
+
+@task(bind=True)
+def add(self, x, y):
+    print('My task id is {0.request.id}'.format(self))
+
+----------------------------------------
+
+TITLE: Specifying python-consul2 Dependency Version
+DESCRIPTION: Defines the required version of python-consul2 package to be installed. The package is pinned to version 0.1.5 for consistent dependency management.
+
+LANGUAGE: plaintext
+CODE:
+python-consul2==0.1.5
+
+----------------------------------------
+
+TITLE: Changing Task Rate Limits at Runtime
+DESCRIPTION: Python code example showing how to change rate limits for a specific task at runtime.
+
+LANGUAGE: python
+CODE:
+>>> app.control.rate_limit('myapp.mytask', '200/m')
+
+>>> app.control.rate_limit('myapp.mytask', '200/m',
+...            destination=['celery@worker1.example.com'])
+
+----------------------------------------
+
+TITLE: RST Markup for Change History Document
+DESCRIPTION: ReStructuredText markup for formatting the change history document, including release notes, dates, and version numbers.
+
+LANGUAGE: rst
+CODE:
+.. _changelog-5.3:
+
+================
+ Change history
+================
+
+This document contains change notes for bugfix & new features
+in the & 5.3.x series, please see :ref:`whatsnew-5.3` for
+an overview of what's new in Celery 5.3.
+
+----------------------------------------
+
+TITLE: Configuring Celery Worker with init.d Script
+DESCRIPTION: Example configuration file for running Celery workers using an init.d script. Defines various settings like nodes, paths, and options.
+
+LANGUAGE: bash
+CODE:
+# Names of nodes to start
+#   most people will only start one node:
+CELERYD_NODES="worker1"
+#   but you can also start multiple and configure settings
+#   for each in CELERYD_OPTS
+#CELERYD_NODES="worker1 worker2 worker3"
+#   alternatively, you can specify the number of nodes to start:
+#CELERYD_NODES=10
+
+# Absolute or relative path to the 'celery' command:
+CELERY_BIN="/usr/local/bin/celery"
+#CELERY_BIN="/virtualenvs/def/bin/celery"
+
+# App instance to use
+# comment out this line if you don't use an app
+CELERY_APP="proj"
+# or fully qualified:
+#CELERY_APP="proj.tasks:app"
+
+# Where to chdir at start.
+CELERYD_CHDIR="/opt/Myproject/"
+
+# Extra command-line arguments to the worker
+CELERYD_OPTS="--time-limit=300 --concurrency=8"
+# Configure node-specific settings by appending node name to arguments:
+#CELERYD_OPTS="--time-limit=300 -c 8 -c:worker2 4 -c:worker3 2 -Ofair:worker1"
+
+# Set logging level to DEBUG
+#CELERYD_LOG_LEVEL="DEBUG"
+
+# %n will be replaced with the first part of the nodename.
+CELERYD_LOG_FILE="/var/log/celery/%n%I.log"
+CELERYD_PID_FILE="/var/run/celery/%n.pid"
+
+# Workers should run as an unprivileged user.
+#   You need to create this user manually (or you can choose
+#   a user/group combination that already exists (e.g., nobody).
+CELERYD_USER="celery"
+CELERYD_GROUP="celery"
+
+# If enabled pid and log directories will be created if missing,
+# and owned by the userid/group configured.
+CELERY_CREATE_DIRS=1
+
+----------------------------------------
+
+TITLE: Specifying pycouchdb Dependency for Celery Project
+DESCRIPTION: This snippet defines a dependency on the pycouchdb library, version 1.16.0, for the Celery project. It is likely part of a requirements file used for managing project dependencies.
+
+LANGUAGE: plaintext
+CODE:
+pycouchdb==1.16.0
+
+----------------------------------------
+
+TITLE: RST Release Note Format
+DESCRIPTION: Standard format for individual release notes including release date and author information
+
+LANGUAGE: rst
+CODE:
+5.3.6
+=====
+
+:release-date: 2023-11-22  9:15 P.M GMT+6
+:release-by: Asif Saif Uddin
+
+This release is focused mainly to fix AWS SQS new feature comatibility issue and old regressions.
+The code changes are mostly fix for regressions.
+
+----------------------------------------
+
+TITLE: Running Celery Tasks in Django Shell
+DESCRIPTION: Example showing how to import and execute Celery tasks from the Django shell using delay_on_commit() for Django transaction support
+
+LANGUAGE: python
+CODE:
+>>> from demoapp.tasks import add, mul, xsum
+>>> res = add.delay_on_commit(2, 3)
+>>> res.get()
+5
+
+----------------------------------------
+
+TITLE: Specifying Boto3 Dependency for Celery
+DESCRIPTION: Defines the minimum required version of boto3 AWS SDK package for Celery's AWS integration features. Requires boto3 version 1.26.143 or higher.
+
+LANGUAGE: text
+CODE:
+boto3>=1.26.143
+
+----------------------------------------
+
+TITLE: Connecting to remote debugger via telnet
+DESCRIPTION: This snippet shows the command to connect to the remote debugger using telnet. It demonstrates how to access the pdb shell for debugging Celery tasks.
+
+LANGUAGE: bash
+CODE:
+$ telnet localhost 6900
+Connected to localhost.
+Escape character is '^]'.
+> /opt/devel/demoapp/tasks.py(128)add()
+-> return result
+(Pdb)
+
+----------------------------------------
+
+TITLE: Connecting Signal Handler as Decorator in Python
+DESCRIPTION: Example of using the connect() method of a Celery signal as a decorator to register a handler function.
+
+LANGUAGE: python
+CODE:
+from celery.signals import task_sent
+
+@task_sent.connect
+def on_task_sent(**kwargs):
+    print('sent task: %r' % (kwargs,))
+
+----------------------------------------
+
+TITLE: Sampling Memory Usage with Celery Debug Utils
+DESCRIPTION: Example demonstrates how to monitor memory usage while executing Celery tasks. Uses sample_mem() to track memory at intervals and memdump() to output final results. The code runs nested loops creating 10000 delayed task calls while sampling memory usage.
+
+LANGUAGE: python
+CODE:
+from celery.utils.debug import sample_mem, memdump
+
+from tasks import add
+
+
+try:
+    for i in range(100):
+        for j in range(100):
+            add.delay(i, j)
+        sample_mem()
+finally:
+    memdump()
+
+----------------------------------------
+
+TITLE: Specifying Eventlet Dependency for Python <3.10
+DESCRIPTION: Defines Eventlet library dependency with version >= 0.32.0, specifically for Python versions less than 3.10. This constraint ensures compatibility between Eventlet and older Python versions in Celery project.
+
+LANGUAGE: requirements
+CODE:
+eventlet>=0.32.0; python_version<"3.10"
+
+----------------------------------------
+
+TITLE: Remote Task Debugging Example
+DESCRIPTION: Example showing how to use remote debugging functionality in Celery tasks
+
+LANGUAGE: python
+CODE:
+from celery.contrib import rdb
+from celery.task import task
+
+@task()
+def add(x, y):
+    result = x + y
+    # set breakpoint
+    rdb.set_trace()
+    return result
+
+----------------------------------------
+
+TITLE: Adding Custom Command-Line Arguments to Celery
+DESCRIPTION: Example of using the user_preload_options signal to add a custom command-line argument to the Celery umbrella command.
+
+LANGUAGE: python
+CODE:
+from celery import Celery
+from celery import signals
+from celery.bin.base import Option
+
+app = Celery()
+app.user_options['preload'].add(Option(
+    '--monitoring', action='store_true',
+    help='Enable our external monitoring utility, blahblah',
+))
+
+@signals.user_preload_options.connect
+def handle_preload_options(options, **kwargs):
+    if options['monitoring']:
+        enable_monitoring()
+
+----------------------------------------
+
+TITLE: Specifying librabbitmq Dependency for Celery in Python
+DESCRIPTION: This snippet defines a dependency on librabbitmq version 2.0.0 or higher, but only for Python versions less than 3.11. This is likely used in a requirements file or setup configuration for the Celery project.
+
+LANGUAGE: Python
+CODE:
+librabbitmq>=2.0.0; python_version < '3.11'
+
+----------------------------------------
+
+TITLE: Installing Python Dependencies for Celery Development
+DESCRIPTION: Package requirements file that specifies the minimum versions of development dependencies including build tools, testing frameworks, documentation generators, and utilities. Contains commented out entry for cyanide package pending updates.
+
+LANGUAGE: plaintext
+CODE:
+setuptools>=40.8.0
+wheel>=0.33.1
+flake8>=3.8.3
+flake8-docstrings>=1.7.0
+pydocstyle==6.3.0
+tox>=3.8.4
+sphinx2rst>=1.0
+# Disable cyanide until it's fully updated.
+# cyanide>=1.0.1
+bumpversion==0.6.0
+pyperclip==1.9.0
+
+----------------------------------------
+
+TITLE: Initializing Django Celery Monitor Examples
+DESCRIPTION: Examples showing how to initialize and run the Django Celery monitor system using manage.py commands.
+
+LANGUAGE: console
+CODE:
+$ python manage.py syncdb
+$ python manage.py celerycam
+
+----------------------------------------
+
+TITLE: Configuring Beat Schedule in Celery Configuration
+DESCRIPTION: Demonstrates how to set up a periodic task directly in the Celery configuration using the beat_schedule setting. This example runs a task every 30 seconds.
+
+LANGUAGE: python
+CODE:
+app.conf.beat_schedule = {
+    'add-every-30-seconds': {
+        'task': 'tasks.add',
+        'schedule': 30.0,
+        'args': (16, 16)
+    },
+}
+app.conf.timezone = 'UTC'
+
+----------------------------------------
+
+TITLE: Specifying PyMongo Driver Version Requirement
+DESCRIPTION: Defines the exact version (4.10.1) of the PyMongo driver required for MongoDB integration with Celery. This ensures compatibility and consistent behavior across different environments.
+
+LANGUAGE: plaintext
+CODE:
+pymongo==4.10.1
+
+----------------------------------------
+
+TITLE: Configuring Celery Task Control Commands
+DESCRIPTION: Examples demonstrating how to use celeryctl to control and monitor tasks.
+
+LANGUAGE: console
+CODE:
+$ celeryctl apply tasks.add -a '[2, 2]' --countdown=10
+
+$ celeryctl inspect active
+$ celeryctl inspect registered_tasks
+$ celeryctl inspect scheduled
+$ celeryctl inspect --help
+$ celeryctl inspect apply --help
+
+----------------------------------------
+
+TITLE: Starting Celery Worker
+DESCRIPTION: Command to start the Celery worker process for processing tasks in the proj application with INFO level logging
+
+LANGUAGE: console
+CODE:
+$ celery -A proj worker -l INFO
+
+----------------------------------------
+
+TITLE: Specifying msgpack Dependency for Celery Project
+DESCRIPTION: This snippet defines a dependency on the msgpack library version 1.1.0. msgpack is a binary serialization format that is often used for efficient data transmission and storage in distributed systems like Celery.
+
+LANGUAGE: plaintext
+CODE:
+msgpack==1.1.0
+
+----------------------------------------
+
+TITLE: Specifying Cassandra Driver Dependency for Celery
+DESCRIPTION: Defines the required version range for the cassandra-driver package. It specifies a minimum version of 3.25.0 and excludes version 4 and above.
+
+LANGUAGE: plaintext
+CODE:
+cassandra-driver>=3.25.0,<4
+
+----------------------------------------
+
+TITLE: Deleting RabbitMQ Exchange Using Command Line
+DESCRIPTION: Example of deleting a RabbitMQ exchange named 'celeryresults' using the camqadm command line tool.
+
+LANGUAGE: console
+CODE:
+$ camqadm exchange.delete celeryresults
+
+----------------------------------------
+
+TITLE: Enabling Celery App Trap in pytest
+DESCRIPTION: This snippet demonstrates how to enable the Celery app trap in pytest, which raises an exception when falling back to the default app.
+
+LANGUAGE: python
+CODE:
+@pytest.fixture(scope='session')
+def use_celery_app_trap():
+    return True
+
+
+@pytest.mark.usefixtures('depends_on_current_app')
+def test_something():
+    something()
+
+----------------------------------------
+
+TITLE: Specifying pytest-celery Dependency with Version Constraints
+DESCRIPTION: This line defines a dependency on pytest-celery with a specific version range and includes all optional dependencies. It requires version 1.2.0 or higher, but less than 1.3.0, ensuring compatibility and including all extra features.
+
+LANGUAGE: Text
+CODE:
+pytest-celery[all]>=1.2.0,<1.3.0
+
+----------------------------------------
+
+TITLE: Chaining tasks with Celery 3.0
+DESCRIPTION: Example of chaining multiple tasks together using the new chaining syntax in Celery 3.0.
+
+LANGUAGE: python
+CODE:
+>>> from celery import chain
+
+# (2 + 2) * 8 / 2
+>>> res = chain(add.subtask((2, 2)),
+                mul.subtask((8,)),
+                div.subtask((2,))).apply_async()
+>>> res.get() == 16
+
+>>> res.parent.get() == 32
+
+>>> res.parent.parent.get() == 4
+
+----------------------------------------
+
+TITLE: Configuring Redis fanout options
+DESCRIPTION: Example of configuring Redis fanout options for backwards compatibility.
+
+LANGUAGE: python
+CODE:
+BROKER_TRANSPORT_OPTIONS = {
+    'fanout_patterns': True,
+    'fanout_prefix': True,
+}
+
+----------------------------------------
+
+TITLE: Specifying boto3 Dependency for Celery Project
+DESCRIPTION: This snippet defines a dependency on the boto3 library with a minimum version of 1.26.143. It is likely part of a requirements file for the Celery project.
+
+LANGUAGE: plaintext
+CODE:
+boto3>=1.26.143
+
+----------------------------------------
+
+TITLE: Specifying Pydantic Dependency for Celery
+DESCRIPTION: This line specifies that the Celery project requires pydantic version 2.4 or higher. It's typically found in a requirements.txt or similar dependency specification file.
+
+LANGUAGE: plaintext
+CODE:
+pydantic>=2.4
+
+----------------------------------------
+
+TITLE: Configuring Redis priority steps
+DESCRIPTION: Example of configuring priority steps for Redis broker in Celery 3.0.
+
+LANGUAGE: python
+CODE:
+>>> BROKER_TRANSPORT_OPTIONS = {
+...     'priority_steps': [0, 2, 4, 6, 8, 9],
+... }
+
+----------------------------------------
+
+TITLE: Example Priority Task Chain Pattern
+DESCRIPTION: Code example showing how to set task priorities in Celery chains
+
+LANGUAGE: python
+CODE:
+c = celery.chain(
+  add.s(2), # priority=None
+  add.s(3).set(priority=5), # priority=5
+  add.s(4), # priority=5 
+  add.s(5).set(priority=3), # priority=3
+  add.s(6), # priority=3
+)
+
+----------------------------------------
+
+TITLE: Specifying PyYAML Dependency for Celery Project
+DESCRIPTION: This snippet defines a dependency on PyYAML version 3.10 or higher for the Celery project. It is likely part of a requirements file or dependency specification.
+
+LANGUAGE: plaintext
+CODE:
+PyYAML>=3.10
+
+----------------------------------------
+
+TITLE: Using the new task logger in Celery 3.0
+DESCRIPTION: Example of using the new recommended task logger in Celery 3.0 tasks.
+
+LANGUAGE: python
+CODE:
+from celery.utils.log import get_task_logger
+
+logger = get_task_logger(__name__)
+
+@celery.task
+def add(x, y):
+    logger.debug('Adding %r + %r' % (x, y))
+    return x + y
+
+----------------------------------------
+
+TITLE: Setting Time Limits for Individual Tasks in Celery 2.3
+DESCRIPTION: Example of setting soft and hard time limits for a specific task using task decorators. This task will sleep for the specified number of seconds.
+
+LANGUAGE: Python
+CODE:
+import time
+
+@task(time_limit=60, soft_time_limit=30)
+def sleeptask(seconds):
+    time.sleep(seconds)
+
+----------------------------------------
+
+TITLE: Specifying PyZMQ Version Requirement
+DESCRIPTION: Defines the minimum required version of PyZMQ package as 22.3.0 using pip requirements format. This ensures compatibility with Celery's ZeroMQ message transport functionality.
+
+LANGUAGE: plaintext
+CODE:
+pyzmq>=22.3.0
+
+----------------------------------------
+
+TITLE: Specifying gevent Dependency for Celery
+DESCRIPTION: Defines the minimum required version of gevent package as 1.5.0 or higher. The gevent library is used for its async I/O capabilities and greenlet-based concurrency.
+
+LANGUAGE: plaintext
+CODE:
+gevent>=1.5.0
+
+----------------------------------------
+
+TITLE: Creating a custom Celery app with broker URL
+DESCRIPTION: Example of creating a Celery app instance with a broker URL in Celery 3.0.
+
+LANGUAGE: python
+CODE:
+app = Celery(broker='redis://')
+
+----------------------------------------
+
+TITLE: Crontab Task Scheduling Examples
+DESCRIPTION: Examples of using crontab scheduling for periodic tasks including daily, weekly and hourly schedules.
+
+LANGUAGE: python
+CODE:
+from celery.schedules import crontab
+from celery.decorators import periodic_task
+
+@periodic_task(run_every=crontab(hour=7, minute=30))
+def every_morning():
+    print('Runs every morning at 7:30a.m')
+
+@periodic_task(run_every=crontab(hour=7, minute=30, day_of_week='mon'))
+def every_monday_morning():
+    print('Run every monday morning at 7:30a.m')
+
+@periodic_task(run_every=crontab(minutes=30))
+def every_hour():
+    print('Runs every hour on the clock (e.g., 1:30, 2:30, 3:30 etc.).')
+
+----------------------------------------
+
+TITLE: Specifying zstandard Compression Library Version
+DESCRIPTION: Pins the zstandard compression library to version 0.23.0. The zstandard library provides high-performance compression capabilities that may be used by Celery for data compression.
+
+LANGUAGE: plaintext
+CODE:
+zstandard==0.23.0
+
+----------------------------------------
+
+TITLE: Installing Redis Dependencies for Celery
+DESCRIPTION: Command to install Celery with Redis support using pip package manager.
+
+LANGUAGE: console
+CODE:
+$ pip install -U "celery[redis]"
+
+----------------------------------------
+
+TITLE: Specifying Mock Package Version Requirement
+DESCRIPTION: Defines the minimum required version of the mock package, which must be version 1.3 or higher for compatibility with the Celery project.
+
+LANGUAGE: plaintext
+CODE:
+mock>=1.3
+
+----------------------------------------
+
+TITLE: Specifying Kazoo Package Dependency for Celery
+DESCRIPTION: Defines a dependency requirement for the Kazoo package with minimum version 1.3.1. Kazoo is a Python client library for Apache ZooKeeper, used by Celery for distributed coordination.
+
+LANGUAGE: plaintext
+CODE:
+kazoo>=1.3.1
+
+----------------------------------------
+
+TITLE: Installing Celery with Google Pub/Sub Support
+DESCRIPTION: This command installs Celery with the necessary dependencies for Google Pub/Sub support using pip.
+
+LANGUAGE: console
+CODE:
+$ pip install "celery[gcpubsub]"
+
+----------------------------------------
+
+TITLE: Listing Celery Commands
+DESCRIPTION: Shows how to list all available Celery commands using the --help flag.
+
+LANGUAGE: console
+CODE:
+$ celery --help
+
+----------------------------------------
+
+TITLE: Defining Documentation and Testing Dependencies for Celery
+DESCRIPTION: Specifies required Python packages and their versions for building Celery documentation, including Sphinx extensions, testing tools, and additional dependencies from external requirement files.
+
+LANGUAGE: txt
+CODE:
+sphinx_celery>=2.1.1
+Sphinx>=7.0.0
+sphinx-testing~=1.0.1
+sphinx-click==6.0.0
+-r extras/sqlalchemy.txt
+-r test.txt
+-r deps/mock.txt
+-r extras/auth.txt
+-r extras/sphinxautobuild.txt
+
+----------------------------------------
+
+TITLE: Setting Polling Interval for Google Pub/Sub
+DESCRIPTION: This configuration sets the polling interval for checking new messages in Pub/Sub to 0.3 seconds using broker transport options.
+
+LANGUAGE: text
+CODE:
+broker_transport_options = {'polling_interval': 0.3}
+
+----------------------------------------
+
+TITLE: Tasks Inheriting Parent Priority
+DESCRIPTION: Example of child tasks inheriting priority from parent tasks.
+
+LANGUAGE: python
+CODE:
+@app.task(bind=True)
+def child_task(self):
+    pass
+
+@app.task(bind=True)
+def parent_task(self):
+    child_task.delay()
+
+# child_task will also have priority=5
+parent_task.apply_async(args=[], priority=5)
+
+----------------------------------------
+
+TITLE: Including Authentication Dependencies for Celery
+DESCRIPTION: This line includes authentication-related dependencies for the Celery project by referencing another requirements file located in the extras directory.
+
+LANGUAGE: plaintext
+CODE:
+-r extras/auth.txt
+
+----------------------------------------
+
+TITLE: Event Message Structure Example in Python
+DESCRIPTION: Example structure of a task-succeeded event message showing properties, headers, and body format.
+
+LANGUAGE: python
+CODE:
+properties = {
+    'routing_key': 'task.succeeded',
+    'exchange': 'celeryev',
+    'content_type': 'application/json',
+    'content_encoding': 'utf-8',
+    'delivery_mode': 1,
+}
+headers = {
+    'hostname': 'worker1@george.vandelay.com',
+}
+body = {
+    'type': 'task-succeeded',
+    'hostname': 'worker1@george.vandelay.com',
+    'pid': 6335,
+    'clock': 393912923921,
+    'timestamp': 1401717709.101747,
+    'utcoffset': -1,
+    'uuid': '9011d855-fdd1-4f8f-adb3-a413b499eafb',
+    'retval': '4',
+    'runtime': 0.0003212,
+}
+
+----------------------------------------
+
+TITLE: Database Transaction Task Handling
+DESCRIPTION: Example of triggering Celery tasks after database transaction completion using Django's on_commit hook and the new delay_on_commit method.
+
+LANGUAGE: python
+CODE:
+# Before
+send_email.delay(user.pk)
+
+# After - Method 1
+transaction.on_commit(lambda: send_email.delay(user.pk))
+
+# After - Method 2
+send_email.delay_on_commit(user.pk)
+
+----------------------------------------
+
+TITLE: Celery Environment Variable Usage
+DESCRIPTION: Example showing usage of C_FAKEFORK environment variable for debugging init scripts
+
+LANGUAGE: bash
+CODE:
+$ C_FAKEFORK /etc/init.d/celeryd start
+
+----------------------------------------
+
+TITLE: Including Mock Dependencies in Celery Project
+DESCRIPTION: Requirements file directive that includes dependencies from a mock.txt file located in the deps directory. Used for managing Python package dependencies.
+
+LANGUAGE: plaintext
+CODE:
+-r deps/mock.txt
+
+----------------------------------------
+
+TITLE: Installing Required Dependencies for Celery Eventlet
+DESCRIPTION: Command to install necessary Python packages including eventlet, celery, and pybloom-live
+
+LANGUAGE: bash
+CODE:
+$ python -m pip install eventlet celery pybloom-live
+
+----------------------------------------
+
+TITLE: Config Example in Python for Quorum Queues
+DESCRIPTION: Example configuration for Quorum Queues in Celery showing recommended settings.
+
+LANGUAGE: python
+CODE:
+task_default_queue_type = "quorum"
+worker_detect_quorum_queues = True
+
+----------------------------------------
+
+TITLE: Example Task Message V1 Format in JSON
+DESCRIPTION: Example of a task message in version 1 protocol format, showing the JSON structure for a ping task.
+
+LANGUAGE: javascript
+CODE:
+{
+    "id": "4cc7438e-afd4-4f8f-a2f3-f46567e7ca77",
+    "task": "celery.task.PingTask",
+    "args": [],
+    "kwargs": {},
+    "retries": 0,
+    "eta": "2009-11-17T12:30:56.527191"
+}
+
+----------------------------------------
+
+TITLE: Converting Task ID Map to Worker Hostname Map with Python
+DESCRIPTION: Example of using a dictionary to map task IDs to worker hostnames in Celery 3.0
+
+LANGUAGE: python
+CODE:
+{task_id: worker_hostname, ...}
+
+----------------------------------------
+
+TITLE: Example Configuration for Soft Shutdown
+DESCRIPTION: Configuration example showing how to enable and customize soft shutdown behavior in Celery.
+
+LANGUAGE: python
+CODE:
+worker_soft_shutdown_timeout = 30
+worker_enable_soft_shutdown_on_idle = True
+
+----------------------------------------
+
+TITLE: Specifying Celery Project Dependencies
+DESCRIPTION: This snippet lists the required dependencies for the Celery project, including Git repository URLs for custom versions of py-amqp, kombu, and billiard, as well as version specifications for vine and isort.
+
+LANGUAGE: plaintext
+CODE:
+git+https://github.com/celery/py-amqp.git
+git+https://github.com/celery/kombu.git
+git+https://github.com/celery/billiard.git
+vine>=5.0.0
+isort==5.13.2
+
+----------------------------------------
+
+TITLE: Docker Compose Configuration for Development
+DESCRIPTION: Example Docker Compose configuration for running a Django project with Celery code mounted for development
+
+LANGUAGE: yaml
+CODE:
+version: "3"
+
+services:
+    celery:
+        image: celery/celery:dev
+        environment:
+            TEST_BROKER: amqp://rabbit:5672
+            TEST_BACKEND: redis://redis
+         volumes:
+             - ../../celery:/home/developer/celery
+             - ../my_project:/home/developer/my_project
+         depends_on:
+             - rabbit
+             - redis
+     rabbit:
+         image: rabbitmq:latest
+     redis:
+         image: redis:latest
+
+----------------------------------------
+
+TITLE: Installing Celery with MongoDB Result Backend
+DESCRIPTION: Command to install Celery with the MongoDB result backend dependency.
+
+LANGUAGE: bash
+CODE:
+$ pip install -U celery[mongodb]
+
+----------------------------------------
+
+TITLE: Configuring CLI Global Options in Python
+DESCRIPTION: Example showing the new required syntax for Celery 5.0 CLI where global options must come before subcommands.
+
+LANGUAGE: bash
+CODE:
+celery --app path.to.app worker
+
+----------------------------------------
+
+TITLE: Setting Vim Text Width
+DESCRIPTION: Vim configuration for enforcing 78 character line width limit
+
+LANGUAGE: vim
+CODE:
+set textwidth=78
+
+----------------------------------------
+
+TITLE: Configuring Celery Queue Settings with Python Dictionary
+DESCRIPTION: Example of configuring Celery queue settings using a Python dictionary to define exchange and routing key options.
+
+LANGUAGE: python
+CODE:
+CELERY_QUEUES = {'cpubound': {'exchange': 'cpubound',
+                                      'routing_key': 'cpubound'}}
+
+CELERY_ROUTES = {'tasks.add': {'queue': 'cpubound',
+                                       'routing_key': 'tasks.add',
+                                       'serializer': 'json'}}
+
+----------------------------------------
+
+TITLE: Package Requirements Example
+DESCRIPTION: Example requirements file for optional Cassandra backend feature
+
+LANGUAGE: text
+CODE:
+# pycassa 2.0 breaks Foo
+pycassa>=1.0,<2.0
+thrift
+
+----------------------------------------
+
+TITLE: Example Group and Chain Canvas Usage
+DESCRIPTION: Code example demonstrating how to use Celery's canvas with group and chain operations
+
+LANGUAGE: python
+CODE:
+c = chord(
+  group([
+      chain(
+          dummy.si(),
+          chord(
+              group([dummy.si(), dummy.si()]),
+              dummy.si(),
+          ),
+      ),
+      chain(
+          dummy.si(),
+          chord(
+              group([dummy.si(), dummy.si()]),
+              dummy.si(),
+          ),
+      ),
+  ]),
+  dummy.si()
+)
+
+c.delay().get()
+
+----------------------------------------
+
+TITLE: Checking systemd Version in Linux
+DESCRIPTION: Command to check if a Linux distribution uses systemd and view its version information.
+
+LANGUAGE: console
+CODE:
+$ systemctl --version
+systemd 249 (v249.9-1.fc35)
++PAM +AUDIT +SELINUX -APPARMOR +IMA +SMACK +SECCOMP +GCRYPT +GNUTLS +OPENSSL +ACL +BLKID +CURL +ELFUTILS +FIDO2 +IDN2 -IDN +IPTC +KMOD +LIBCRYPTSETUP +LIBFDISK +PCRE2 +PWQUALITY +P11KIT +QRENCODE +BZIP2 +LZ4 +XZ +ZLIB +ZSTD +XKBCOMMON +UTMP +SYSVINIT default-hierarchy=unified
+
+----------------------------------------
+
+TITLE: Including Celery Changelog in reStructuredText
+DESCRIPTION: This snippet uses the reStructuredText include directive to incorporate the Celery project's changelog from a parent directory into the current document.
+
+LANGUAGE: reStructuredText
+CODE:
+.. include:: ../Changelog.rst
+
+----------------------------------------
+
+TITLE: Installing python-dateutil version 1.5.0 with pip
+DESCRIPTION: Command to downgrade to python-dateutil 1.5.0 using pip package manager
+
+LANGUAGE: console
+CODE:
+$ pip install -U python-dateutil==1.5.0
+
+----------------------------------------
+
+TITLE: Defining Unicode Copyright Symbol in reStructuredText
+DESCRIPTION: This snippet defines a substitution for the copyright symbol using Unicode in reStructuredText format. It allows the symbol to be easily inserted into the document using the |copy| syntax.
+
+LANGUAGE: rst
+CODE:
+.. |copy|   unicode:: U+000A9 .. COPYRIGHT SIGN
+
+----------------------------------------
+
+TITLE: Complex Canvas with Error Callbacks
+DESCRIPTION: Fixed an issue where complex canvases with error callbacks were raising AttributeError, preventing their construction.
+
+
+
+----------------------------------------
+
+TITLE: Installing Celery via pip
+DESCRIPTION: This snippet shows how to install the latest version of Celery using pip. It updates any existing installation to the most recent version.
+
+LANGUAGE: console
+CODE:
+$ pip install -U Celery
+
+----------------------------------------
+
+TITLE: Including External reStructuredText File in Celery Documentation
+DESCRIPTION: This directive includes the contents of the CONTRIBUTING.rst file from the parent directory into the current document. It's commonly used in documentation to maintain a single source of truth for contributing guidelines.
+
+LANGUAGE: reStructuredText
+CODE:
+.. include:: ../CONTRIBUTING.rst
+
+----------------------------------------
+
+TITLE: Adding Creative Commons License Link in reStructuredText
+DESCRIPTION: This snippet creates a hyperlink to the Creative Commons Attribution-ShareAlike 4.0 International license using reStructuredText syntax. It provides the full URL and custom link text.
+
+LANGUAGE: rst
+CODE:
+`Creative Commons
+Attribution-ShareAlike 4.0 International`
+<https://creativecommons.org/licenses/by-sa/4.0/legalcode>`_
+
+----------------------------------------
+
+TITLE: Defining RST Documentation Structure for Celery Internals
+DESCRIPTION: reStructuredText markup defining the structure and organization of Celery's internal documentation. Includes section headers, release/date variables, and a table of contents directive pointing to various internal documentation files.
+
+LANGUAGE: rst
+CODE:
+.. _internals:
+
+===========
+ Internals
+===========
+
+:Release: |version|
+:Date: |today|
+
+.. toctree::
+    :maxdepth: 2
+
+    guide
+    deprecation
+    worker
+    protocol
+    app-overview
+    reference/index
+
+----------------------------------------
+
+TITLE: Custom Ping Endpoint API Call
+DESCRIPTION: Example of using a dedicated ping endpoint that demonstrates task-specific view implementation.
+
+LANGUAGE: bash
+CODE:
+$ curl http://localhost:8000/ping/
+{"ok": "true", "task_id": "383c902c-ba07-436b-b0f3-ea09cc22107c"}
+
+----------------------------------------
+
+TITLE: Creating a Note Block in reStructuredText
+DESCRIPTION: This snippet demonstrates how to create a note block in reStructuredText. It contains information about the different licenses used for Celery documentation and software.
+
+LANGUAGE: rst
+CODE:
+.. note::
+
+   While the *Celery* documentation is offered under the
+   Creative Commons *Attribution-ShareAlike 4.0 International* license
+   the Celery *software* is offered under the
+   `BSD License (3 Clause) <http://www.opensource.org/licenses/BSD-3-Clause>`_
+
+----------------------------------------
+
+TITLE: Scheduling Error Handlers Not Registered as Tasks
+DESCRIPTION: Allow scheduling of error handlers that are not registered as tasks in the current worker. This enables more flexible error handling configurations.
+
+LANGUAGE: Python
+CODE:
+from celery import Signature
+Signature(
+  'bar', args=['foo'],
+  link_error=Signature('msg.err', queue='msg')
+).apply_async()
+
+----------------------------------------
+
+TITLE: Creating Tasks in Celery with Python
+DESCRIPTION: Shows how to create a task using the @app.task decorator in Celery.
+
+LANGUAGE: python
+CODE:
+@app.task
+def add(x, y):
+    return x + y
+
+----------------------------------------
+
+TITLE: Basic Addition Task Definition in Python
+DESCRIPTION: Simple example task that adds two numbers together using the Celery task decorator.
+
+LANGUAGE: python
+CODE:
+@app.task
+def add(x, y):
+    return x + y
+
+----------------------------------------
+
+TITLE: Defining Task Message Protocol V2 Structure in Python
+DESCRIPTION: Schema definition for version 2 of the Celery task message protocol, specifying properties, headers and body structure.
+
+LANGUAGE: python
+CODE:
+properties = {
+    'correlation_id': uuid task_id,
+    'content_type': string mimetype,
+    'content_encoding': string encoding,
+
+    # optional
+    'reply_to': string queue_or_url,
+}
+headers = {
+    'lang': string 'py'
+    'task': string task,
+    'id': uuid task_id,
+    'root_id': uuid root_id,
+    'parent_id': uuid parent_id,
+    'group': uuid group_id,
+
+    # optional
+    'meth': string method_name,
+    'shadow': string alias_name,
+    'eta': iso8601 ETA,
+    'expires': iso8601 expires,
+    'retries': int retries,
+    'timelimit': (soft, hard),
+    'argsrepr': str repr(args),
+    'kwargsrepr': str repr(kwargs),
+    'origin': str nodename,
+    'replaced_task_nesting': int
+}
+
+----------------------------------------
+
+TITLE: Creating Custom Task Subclasses in Celery with Python
+DESCRIPTION: Demonstrates how to create a custom Task subclass with a debug feature and use it as a base for a task.
+
+LANGUAGE: python
+CODE:
+Task = celery.create_task_cls()
+
+class DebugTask(Task):
+
+    def on_failure(self, *args, **kwargs):
+        import pdb
+        pdb.set_trace()
+
+@app.task(base=DebugTask)
+def add(x, y):
+    return x + y
+
+----------------------------------------
+
+TITLE: RHEL Service Priority Configuration
+DESCRIPTION: Initialization script configuration for setting MySQL and Celery service start/stop priorities on RHEL systems
+
+LANGUAGE: text
+CODE:
+# chkconfig: - 64 36
+# chkconfig: - 85 15
+
+----------------------------------------
+
+TITLE: Example Task Message Using Protocol V2 in Python
+DESCRIPTION: Implementation example showing how to send a task message using version 2 of the protocol, including message formatting and headers.
+
+LANGUAGE: python
+CODE:
+import json
+import os
+import socket
+
+task_id = uuid()
+args = (2, 2)
+kwargs = {}
+basic_publish(
+    message=json.dumps((args, kwargs, None)),
+    application_headers={
+        'lang': 'py',
+        'task': 'proj.tasks.add',
+        'argsrepr': repr(args),
+        'kwargsrepr': repr(kwargs),
+        'origin': '@'.join([os.getpid(), socket.gethostname()])
+    }
+    properties={
+        'correlation_id': task_id,
+        'content_type': 'application/json',
+        'content_encoding': 'utf-8',
+    }
+)
+
+----------------------------------------
+
+TITLE: Configuring Flask App Settings for Celery
+DESCRIPTION: Example showing how to use Flask app config with Celery by adding default settings
+
+LANGUAGE: python
+CODE:
+flask_app = Flask()
+app = Celery()
+app.add_defaults(lambda: flask_app.config)
+
+----------------------------------------
+
+TITLE: Installing Celery 2.4.4 Security Update
+DESCRIPTION: Commands to upgrade Celery to version 2.4.4 to patch the privilege escalation vulnerability using pip or easy_install package managers.
+
+LANGUAGE: bash
+CODE:
+pip install -U celery
+
+LANGUAGE: bash
+CODE:
+easy_install -U celery
+
+----------------------------------------
+
+TITLE: MySQL Alter Table for NULL Results
+DESCRIPTION: SQL command to modify celery_taskmeta table to allow NULL values in result column.
+
+LANGUAGE: sql
+CODE:
+ALTER TABLE celery_taskmeta MODIFY result TEXT NULL
+
+----------------------------------------
+
+TITLE: RST Documentation Structure for Celery Worker Module
+DESCRIPTION: ReStructuredText documentation configuration for the celery.apps.worker module. Sets up the document structure with table of contents and automodule directives for automated documentation generation.
+
+LANGUAGE: rst
+CODE:
+=======================================
+ ``celery.apps.worker``
+=======================================
+
+.. contents::
+    :local:
+.. currentmodule:: celery.apps.worker
+
+.. automodule:: celery.apps.worker
+    :members:
+    :undoc-members:
+
+----------------------------------------
+
+TITLE: Installing Celery 2.3.4 Security Update
+DESCRIPTION: Commands to upgrade Celery to version 2.3.4 to patch the privilege escalation vulnerability using pip or easy_install package managers.
+
+LANGUAGE: bash
+CODE:
+pip install -U celery==2.3.4
+
+LANGUAGE: bash
+CODE:
+easy_install -U celery==2.3.4
+
+----------------------------------------
+
+TITLE: Upgrading Celery to Secure Version
+DESCRIPTION: Command to upgrade Celery to version 4.0.1, which addresses the security vulnerability.
+
+LANGUAGE: bash
+CODE:
+$ pip install -U celery
+
+----------------------------------------
+
+TITLE: RestructuredText Documentation Configuration for Celery Utils
+DESCRIPTION: Sphinx documentation configuration that sets up the structure for documenting the celery.app.utils module. It includes table of contents, module reference, and automodule directive for comprehensive API documentation.
+
+LANGUAGE: restructuredtext
+CODE:
+================================
+ ``celery.app.utils``
+================================
+
+.. contents::
+    :local:
+.. currentmodule:: celery.app.utils
+
+.. automodule:: celery.app.utils
+    :members:
+    :undoc-members:
+
+----------------------------------------
+
+TITLE: Cloning Celery Subtask with Modified Arguments in Python
+DESCRIPTION: Demonstrates how to clone an existing Celery subtask and augment its arguments and options using the clone() method.
+
+LANGUAGE: python
+CODE:
+>>> s = add.subtask((5,))
+>>> new = s.clone(args=(10,), countdown=5})
+>>> new.args
+(10, 5)
+
+>>> new.options
+{'countdown': 5}
+
+----------------------------------------
+
+TITLE: Installing Celery 2.2.8 Security Update
+DESCRIPTION: Commands to upgrade Celery to version 2.2.8 to patch the privilege escalation vulnerability using pip or easy_install package managers.
+
+LANGUAGE: bash
+CODE:
+pip install -U celery==2.2.8
+
+LANGUAGE: bash
+CODE:
+easy_install -U celery==2.2.8
+
+----------------------------------------
+
+TITLE: Configuring Secure Accept Content in Celery
+DESCRIPTION: A secure configuration to explicitly set accept_content to only allow JSON format, mitigating the vulnerability.
+
+LANGUAGE: python
+CODE:
+app.conf.accept_content = ['json']
+
+----------------------------------------
+
+TITLE: RestructuredText Documentation Structure for Celery Upgrade Module
+DESCRIPTION: Sphinx documentation structure defining the contents and automodule directives for the celery.bin.upgrade module. Includes local table of contents and configuration for documenting all module members.
+
+LANGUAGE: restructuredtext
+CODE:
+=====================================================
+ ``celery.bin.upgrade``
+=====================================================
+
+.. contents::
+    :local:
+.. currentmodule:: celery.bin.upgrade
+
+.. automodule:: celery.bin.upgrade
+    :members:
+    :undoc-members:
+
+----------------------------------------
+
+TITLE: Setting Secure Umask for Celery Worker
+DESCRIPTION: Command to start a Celery worker with a secure umask value of 022 (expressed as 18 in octal) to prevent world-writable file permissions. This is a workaround for the security vulnerability in affected versions.
+
+LANGUAGE: bash
+CODE:
+celery worker -l info --detach --umask=18   # (022)
+
+----------------------------------------
+
+TITLE: Configuring Default Accept Content in Celery 4.0.0
+DESCRIPTION: The default configuration in Celery 4.0.0 that allowed deserialization of multiple message formats, including potentially unsafe ones like pickle.
+
+LANGUAGE: python
+CODE:
+app.conf.accept_content = ['json', 'pickle', 'msgpack', 'yaml']
+
+----------------------------------------
+
+TITLE: RestructuredText Documentation Header for Celery Signals
+DESCRIPTION: Sphinx documentation header and configuration for the celery.signals module, including table of contents and module autodoc directives.
+
+LANGUAGE: restructuredtext
+CODE:
+======================================================
+ ``celery.signals``
+======================================================
+
+.. contents::
+    :local:
+.. currentmodule:: celery.signals
+
+.. automodule:: celery.signals
+    :members:
+    :undoc-members:
+
+----------------------------------------
+
+TITLE: Default AMQP Broker URL Example
+DESCRIPTION: Example of default AMQP broker URL configuration using the standardized URL format
+
+LANGUAGE: text
+CODE:
+amqp://guest:guest@localhost:5672//
+
+----------------------------------------
+
+TITLE: Defining Table of Contents for Celery Tutorials in reStructuredText
+DESCRIPTION: This snippet creates a table of contents for Celery tutorials using reStructuredText directives. It sets up metadata for the document and includes a reference to a task cookbook.
+
+LANGUAGE: reStructuredText
+CODE:
+===========
+ Tutorials
+===========
+
+:Release: |version|
+:Date: |today|
+
+.. toctree::
+    :maxdepth: 2
+
+    task-cookbook
+
+----------------------------------------
+
+TITLE: Class Naming Conventions in Python
+DESCRIPTION: Examples demonstrating correct class naming conventions in Celery. Test cases should be lower_case if they're verbs, while factory functions and methods should be CamelCase.
+
+LANGUAGE: python
+CODE:
+# - test case for a class
+class TestMyClass(Case):                # BAD
+    pass
+
+class test_MyClass(Case):               # GOOD
+    pass
+
+# - test case for a function
+class TestMyFunction(Case):             # BAD
+    pass
+
+class test_my_function(Case):           # GOOD
+    pass
+
+# - "action" class (verb)
+class UpdateTwitterStatus:    # BAD
+    pass
+
+class update_twitter_status:    # GOOD
+    pass
+
+----------------------------------------
+
+TITLE: RST Documentation Structure for Celery Consumer Module
+DESCRIPTION: Sphinx/RST documentation structure that defines the layout and content for the Celery worker consumer module documentation. Uses reStructuredText directives to set up the documentation hierarchy and module autodoc generation.
+
+LANGUAGE: rst
+CODE:
+==================================================
+ ``celery.worker.consumer.consumer``
+==================================================
+
+.. contents::
+    :local:
+.. currentmodule:: celery.worker.consumer.consumer
+
+.. automodule:: celery.worker.consumer.consumer
+    :members:
+    :undoc-members:
+
+----------------------------------------
+
+TITLE: Starting Celery Worker with Eventlet Pool
+DESCRIPTION: Command to start a Celery worker using Eventlet pool implementation with 1000 green threads. The -P flag specifies the pool type while -c sets the concurrency level.
+
+LANGUAGE: console
+CODE:
+$ celery -A proj worker -P eventlet -c 1000
+
+----------------------------------------
+
+TITLE: Specifying tblib Dependency for Celery Project
+DESCRIPTION: Defines the required version of tblib based on the Python version. For Python 3.8 and above, tblib 1.5.0 or higher is required. For Python versions below 3.8, tblib 1.3.0 or higher is required.
+
+LANGUAGE: requirements
+CODE:
+tblib>=1.5.0;python_version>='3.8.0'
+tblib>=1.3.0;python_version<'3.8.0'
+
+----------------------------------------
+
+TITLE: Configuring Sphinx Documentation for Celery Worker Module
+DESCRIPTION: This reStructuredText code snippet sets up the documentation structure for the celery.worker module. It includes directives for creating a table of contents, setting the current module, and auto-generating module documentation.
+
+LANGUAGE: reStructuredText
+CODE:
+========================================
+ ``celery.worker``
+========================================
+
+.. contents::
+    :local:
+.. currentmodule:: celery.worker
+
+.. automodule:: celery.worker
+    :members:
+    :undoc-members:
+
+----------------------------------------
+
+TITLE: Broker URL Format Example
+DESCRIPTION: Shows the format for specifying broker URLs, which allows configuring transport, auth credentials, hostname, port and virtual host
+
+LANGUAGE: text
+CODE:
+transport://user:password@hostname:port/virtual_host
+
+----------------------------------------
+
+TITLE: Enabling gevent Pool in Celery Worker
+DESCRIPTION: Command to start a Celery worker using the gevent pool with 1000 concurrent workers. Uses the -P or --pool flag to specify gevent as the pool implementation.
+
+LANGUAGE: console
+CODE:
+$ celery -A proj worker -P gevent -c 1000
+
+----------------------------------------
+
+TITLE: Specifying pylibmc Dependency for Celery on Non-Windows Systems
+DESCRIPTION: This requirement specifies the pylibmc library version 1.6.3 as a dependency for the Celery project, but only for systems that are not Windows. This is likely due to compatibility issues or different requirements for Windows environments.
+
+LANGUAGE: Plain Text
+CODE:
+pylibmc==1.6.3; platform_system != "Windows"
+
+----------------------------------------
+
+TITLE: RST Documentation Structure for Celery Annotations Module
+DESCRIPTION: Defines the documentation structure for the celery.app.annotations module using reStructuredText format. Includes section headers, table of contents directive, and module documentation directives.
+
+LANGUAGE: rst
+CODE:
+==========================================
+ ``celery.app.annotations``
+==========================================
+
+.. contents::
+    :local:
+.. currentmodule:: celery.app.annotations
+
+.. automodule:: celery.app.annotations
+    :members:
+    :undoc-members:
+
+----------------------------------------
+
+TITLE: Implementing Solar Schedules in Celery Beat
+DESCRIPTION: Demonstrates how to use solar schedules for tasks that should run based on sunrise, sunset, or other solar events. This example schedules a task to run at sunset in Melbourne.
+
+LANGUAGE: python
+CODE:
+from celery.schedules import solar
+
+app.conf.beat_schedule = {
+    # Executes at sunset in Melbourne
+    'add-at-melbourne-sunset': {
+        'task': 'tasks.add',
+        'schedule': solar('sunset', -37.81753, 144.96715),
+        'args': (16, 16),
+    },
+}
+
+----------------------------------------
+
+TITLE: ReStructuredText Documentation Structure
+DESCRIPTION: Core documentation structure using ReStructuredText directives to organize the Celery documentation into sections and subsections with table of contents.
+
+LANGUAGE: restructuredtext
+CODE:
+.. toctree::
+    :maxdepth: 1
+
+    copyright
+
+.. toctree::
+    :maxdepth: 2
+
+    getting-started/index
+    userguide/index
+
+.. toctree::
+    :maxdepth: 1
+
+    django/index
+    contributing
+    community
+    tutorials/index
+    faq
+    changelog
+    reference/index
+    internals/index
+    history/index
+    glossary
+
+----------------------------------------
+
+TITLE: Sphinx RestructuredText Module Documentation
+DESCRIPTION: RestructuredText markup for generating Sphinx documentation of the celery.events.snapshot module. Includes table of contents and automodule directives for comprehensive module documentation.
+
+LANGUAGE: restructuredtext
+CODE:
+==========================================
+ ``celery.events.snapshot``
+==========================================
+
+.. contents::
+    :local:
+.. currentmodule:: celery.events.snapshot
+
+.. automodule:: celery.events.snapshot
+    :members:
+    :undoc-members:
+
+----------------------------------------
+
+TITLE: Changing Time Limits at Runtime in Celery 2.3
+DESCRIPTION: Example of using the remote control command to change time limits for a task at runtime. This sets a soft limit of 60 seconds and a hard limit of 120 seconds.
+
+LANGUAGE: Python
+CODE:
+from celery.task import control
+control.time_limit('tasks.sleeptask',
+                   soft=60, hard=120, reply=True)
+
+----------------------------------------
+
+TITLE: Applying Task to Transient Queue in Celery
+DESCRIPTION: This snippet demonstrates how to direct a task to a transient queue when calling apply_async. It specifies the 'transient' queue as an argument to the method call.
+
+LANGUAGE: python
+CODE:
+task.apply_async(args, queue='transient')
+
+----------------------------------------
+
+TITLE: Sphinx Documentation for Celery States
+DESCRIPTION: ReStructuredText directives for auto-generating documentation of the celery.states module. Uses currentmodule to set context, contents for table of contents, and automodule for API documentation.
+
+LANGUAGE: rst
+CODE:
+.. currentmodule:: celery.states
+
+.. contents::
+    :local:
+
+.. automodule:: celery.states
+    :members:
+
+----------------------------------------
+
+TITLE: RST Documentation Structure for Celery Abstract Utils
+DESCRIPTION: Sphinx/RST documentation structure defining the layout and automated documentation generation for the celery.utils.abstract module. Uses automodule directive to generate comprehensive API documentation.
+
+LANGUAGE: rst
+CODE:
+===========================================
+ ``celery.utils.abstract``
+===========================================
+
+.. contents::
+    :local:
+.. currentmodule:: celery.utils.abstract
+
+.. automodule:: celery.utils.abstract
+    :members:
+    :undoc-members:
+
+----------------------------------------
+
+TITLE: Configuring Celery Worker Parameters for pytest in Python
+DESCRIPTION: This snippet demonstrates how to configure Celery worker parameters for pytest by defining a fixture. It shows how to enable heartbeats for the test worker.
+
+LANGUAGE: python
+CODE:
+# Put this in your conftest.py
+@pytest.fixture(scope="session")
+def celery_worker_parameters():
+    return {"without_heartbeat": False}
+    ...
+
+----------------------------------------
+
+TITLE: Documenting Celery Result Module in RST
+DESCRIPTION: ReStructuredText markup for documenting the celery.result module using Sphinx autodoc directives. Includes table of contents and module documentation directives.
+
+LANGUAGE: rst
+CODE:
+=============================
+ ``celery.result``
+=============================
+
+.. contents::
+    :local:
+.. currentmodule:: celery.result
+
+.. automodule:: celery.result
+    :members:
+    :undoc-members:
+
+----------------------------------------
+
+TITLE: Importing Celery ISO8601 Module
+DESCRIPTION: Module import reference showing the path to Celery's ISO8601 utilities. This module contains functionality for handling ISO8601 formatted dates and times in Celery applications.
+
+LANGUAGE: python
+CODE:
+celery.utils.iso8601
+
+----------------------------------------
+
+TITLE: Enabling Connection Pool in Celery 2.3
+DESCRIPTION: Configuration to enable the automatic connection pool feature introduced in Celery 2.3. This sets a maximum of 10 simultaneous connections.
+
+LANGUAGE: Python
+CODE:
+BROKER_POOL_LIMIT = 10
+
+----------------------------------------
+
+TITLE: Configuring Celery Worker Pool for pytest in Python
+DESCRIPTION: This snippet demonstrates how to configure the execution pool used for embedded Celery workers in pytest by defining a fixture.
+
+LANGUAGE: python
+CODE:
+@pytest.fixture(scope='session')
+def celery_worker_pool():
+    return 'prefork'
+
+----------------------------------------
+
+TITLE: Defining Security Module Documentation in RST
+DESCRIPTION: ReStructuredText markup for documenting the celery.security module, including table of contents and autodoc directives.
+
+LANGUAGE: restructuredtext
+CODE:
+========================
+ ``celery.security``
+========================
+
+.. contents::
+    :local:
+.. currentmodule:: celery.security
+
+.. automodule:: celery.security
+    :members:
+    :undoc-members:
+
+----------------------------------------
+
+TITLE: Defining RST Table of Contents for Celery Documentation
+DESCRIPTION: A reStructuredText directive defining the table of contents structure for Celery's user guide. Includes metadata like release version and date, followed by a toctree directive with maxdepth=1 listing all major documentation sections.
+
+LANGUAGE: rst
+CODE:
+.. _guide:\n\n============\n User Guide\n============\n\n:Release: |version|\n:Date: |today|\n\n.. toctree::\n    :maxdepth: 1\n\n    application\n    tasks\n    calling\n    canvas\n    workers\n    daemonizing\n    periodic-tasks\n    routing\n    monitoring\n    security\n    optimizing\n    debugging\n    concurrency/index\n    signals\n    testing\n    extending\n    configuration\n    sphinx
+
+----------------------------------------
+
+TITLE: Configuring Multiple Celery Workers with celeryd_init Signal
+DESCRIPTION: Example of using the celeryd_init signal to set up configuration for multiple Celery workers. This sets different configurations based on the worker's nodename.
+
+LANGUAGE: python
+CODE:
+from celery.signals import celeryd_init
+
+@celeryd_init.connect
+def configure_workers(sender=None, conf=None, **kwargs):
+    if sender in ('worker1@example.com', 'worker2@example.com'):
+        conf.task_default_rate_limit = '10/m'
+    if sender == 'worker3@example.com':
+        conf.worker_prefetch_multiplier = 0
+
+----------------------------------------
+
+TITLE: Importing Celery Task Module
+DESCRIPTION: This snippet demonstrates how to import the Task, Context, and TaskType classes from the celery.app.task module. These classes are essential for defining and managing tasks in Celery.
+
+LANGUAGE: Python
+CODE:
+from celery.app.task import Task, Context, TaskType
+
+----------------------------------------
+
+TITLE: Task Submission API Call
+DESCRIPTION: Example of submitting a Celery ping task using curl to the HTTP gateway's apply endpoint.
+
+LANGUAGE: bash
+CODE:
+$ curl http://localhost:8000/apply/celery.ping/
+{"ok": "true", "task_id": "e3a95109-afcd-4e54-a341-16c18fddf64b"}
+
+----------------------------------------
+
+TITLE: Task Definition with Magic Keywords (Old Style)
+DESCRIPTION: Example of defining a Celery task using deprecated magic keyword arguments from celery.decorators
+
+LANGUAGE: python
+CODE:
+from celery.decorators import task
+
+@task()
+def add(x, y, **kwargs):
+    print('In task %s' % kwargs['task_id'])
+    return x + y
+
+----------------------------------------
+
+TITLE: Setting Up Priority Queues in RabbitMQ
+DESCRIPTION: Shows how to configure priority queues in RabbitMQ by setting queue arguments and default priorities.
+
+LANGUAGE: python
+CODE:
+from kombu import Exchange, Queue
+
+app.conf.task_queues = [
+    Queue('tasks', Exchange('tasks'), routing_key='tasks',
+          queue_arguments={'x-max-priority': 10}),
+]
+
+app.conf.task_queue_max_priority = 10
+app.conf.task_default_priority = 5
+
+----------------------------------------
+
+TITLE: Configuring Sphinx Documentation for Celery Events Module
+DESCRIPTION: RST directives for configuring Sphinx documentation generation for the celery.app.events module. Sets up table of contents, current module context, and automated module documentation with all members and undocumented members included.
+
+LANGUAGE: rst
+CODE:
+================================
+ ``celery.app.events``
+================================
+
+.. contents::
+    :local:
+.. currentmodule:: celery.app.events
+
+.. automodule:: celery.app.events
+    :members:
+    :undoc-members:
+
+----------------------------------------
+
+TITLE: Installing Celery Helm Chart
+DESCRIPTION: Command to install the Celery Helm chart on a Kubernetes cluster from the project root.
+
+LANGUAGE: bash
+CODE:
+helm install celery helm-chart/
+
+----------------------------------------
+
+TITLE: RST Documentation Structure for Celery Binary Module
+DESCRIPTION: Sphinx/RST documentation structure that defines the layout and content for the celery.bin.celery module documentation. It includes section headers, table of contents, and module reference directives.
+
+LANGUAGE: rst
+CODE:
+==========================================
+ ``celery.bin.celery``
+==========================================
+
+.. contents::
+    :local:
+.. currentmodule:: celery.bin.celery
+
+.. automodule:: celery.bin.celery
+    :members:
+    :undoc-members:
+
+----------------------------------------
+
+TITLE: Defining Celery CLI Documentation Structure in reStructuredText
+DESCRIPTION: This snippet defines the structure of the Celery command line interface documentation using reStructuredText. It includes a note about environment variable prefixes and a directive for generating CLI documentation.
+
+LANGUAGE: restructuredtext
+CODE:
+=======================
+ Command Line Interface
+=======================
+
+.. NOTE:: The prefix `CELERY_` must be added to the names of the environment
+   variables described below. E.g., `APP` becomes `CELERY_APP`.
+
+.. click:: celery.bin.celery:celery
+   :prog: celery
+   :nested: full
+
+----------------------------------------
+
+TITLE: Migrating Task Module Imports
+DESCRIPTION: Demonstrates migration from deprecated celery.task imports to new shared_task and Task class imports
+
+LANGUAGE: python
+CODE:
+from celery.task import task
+
+LANGUAGE: python
+CODE:
+from celery import shared_task
+
+LANGUAGE: python
+CODE:
+from celery.task import Task
+
+LANGUAGE: python
+CODE:
+from celery import Task
+
+----------------------------------------
+
+TITLE: Celery Logging Configuration Example
+DESCRIPTION: Example showing how to configure custom logging for Celery using the setup_logging signal.
+
+LANGUAGE: python
+CODE:
+from logging.config import fileConfig
+from celery import signals
+
+@signals.setup_logging.connect
+def setup_logging(**kwargs):
+    fileConfig('logging.conf')
+
+----------------------------------------
+
+TITLE: RST Documentation Structure for celery.bin.control
+DESCRIPTION: ReStructuredText documentation template that defines the structure for the celery.bin.control module documentation. It includes a table of contents and automodule directive for automatic documentation generation.
+
+LANGUAGE: rst
+CODE:
+=====================================================
+ ``celery.bin.control``
+=====================================================
+
+.. contents::
+    :local:
+.. currentmodule:: celery.bin.control
+
+.. automodule:: celery.bin.control
+    :members:
+    :undoc-members:
+
+----------------------------------------
+
+TITLE: Generating Documentation for celery.bin.shell Module in reStructuredText
+DESCRIPTION: This snippet sets up the structure for documenting the celery.bin.shell module using reStructuredText directives. It includes a title, table of contents, current module declaration, and automodule directive for comprehensive documentation generation.
+
+LANGUAGE: reStructuredText
+CODE:
+=====================================================
+ ``celery.bin.shell``
+=====================================================
+
+.. contents::
+    :local:
+.. currentmodule:: celery.bin.shell
+
+.. automodule:: celery.bin.shell
+    :members:
+    :undoc-members:
+
+----------------------------------------
+
+TITLE: Installing Celery with Eventlet Support
+DESCRIPTION: Command to install Celery with the eventlet workers pool dependency.
+
+LANGUAGE: bash
+CODE:
+$ pip install -U celery[eventlet]
+
+----------------------------------------
+
+TITLE: RST Documentation Structure for Celery Abortable Module
+DESCRIPTION: ReStructuredText documentation configuration that sets up the documentation structure for the celery.contrib.abortable module. It includes table of contents, module reference, and autodoc directives.
+
+LANGUAGE: rst
+CODE:
+=======================================================
+ ``celery.contrib.abortable``
+=======================================================
+
+.. contents::
+    :local:
+
+.. currentmodule:: celery.contrib.abortable
+
+.. automodule:: celery.contrib.abortable
+    :members:
+    :undoc-members:
+
+----------------------------------------
+
+TITLE: RST Documentation Structure for celery.bin.amqp
+DESCRIPTION: ReStructuredText directives for generating module documentation, including a table of contents and module member documentation.
+
+LANGUAGE: rst
+CODE:
+====================
+ ``celery.bin.amqp``
+====================
+
+.. contents::
+   :local:
+.. currentmodule:: celery.bin.amqp
+
+.. automodule:: celery.bin.amqp
+   :members:
+   :undoc-members:
+
+----------------------------------------
+
+TITLE: Installing Celery with MessagePack Serializer
+DESCRIPTION: Commands to uninstall the old msgpack-python package and install Celery with the new msgpack serializer dependency.
+
+LANGUAGE: bash
+CODE:
+$ pip uninstall msgpack-python -y
+$ pip install -U celery[msgpack]
+
+----------------------------------------
+
+TITLE: Celery Multi-Worker Management Commands
+DESCRIPTION: Examples showing how to manage multiple Celery worker nodes using celeryd-multi.
+
+LANGUAGE: console
+CODE:
+$ celeryd-multi start jerry elaine george kramer
+$ celeryd-multi stop jerry elaine george kramer
+$ celeryd-multi restart jerry elaine george kramer
+$ celeryd-multi kill jerry elaine george kramer
+
+----------------------------------------
+
+TITLE: Remote Debugger Module Reference (Python)
+DESCRIPTION: Reference documentation for celery.contrib.rdb module components including set_trace(), debugger(), and Rdb class. These components enable remote debugging functionality for Celery tasks.
+
+LANGUAGE: python
+CODE:
+celery.contrib.rdb
+
+set_trace()
+debugger()
+class Rdb
+
+----------------------------------------
+
+TITLE: Sphinx Documentation Structure for Celery SafeRepr Module
+DESCRIPTION: RestructuredText markup for documenting the celery.utils.saferepr module. Uses Sphinx directives to generate API documentation including a table of contents and module member documentation.
+
+LANGUAGE: restructuredtext
+CODE:
+===========================================
+ ``celery.utils.saferepr``
+===========================================
+
+.. contents::
+    :local:
+.. currentmodule:: celery.utils.saferepr
+
+.. automodule:: celery.utils.saferepr
+    :members:
+    :undoc-members:
+
+----------------------------------------
+
+TITLE: Executing Celery CLI Command with Global Options
+DESCRIPTION: Demonstrates the new CLI implementation in Celery 5.0+ where global options must be positioned before the sub-command.
+
+LANGUAGE: bash
+CODE:
+celery --app path.to.app worker
+
+----------------------------------------
+
+TITLE: Configuring RestructuredText Documentation for Celery Timer2 Module
+DESCRIPTION: RestructuredText directives for generating API documentation for the celery.utils.timer2 module. Sets up table of contents, current module context, and automodule configuration.
+
+LANGUAGE: restructuredtext
+CODE:
+.. contents::
+    :local:
+.. currentmodule:: celery.utils.timer2
+
+.. automodule:: celery.utils.timer2
+    :members:
+    :undoc-members:
+
+----------------------------------------
+
+TITLE: Getting Help for a Specific Celery Command
+DESCRIPTION: Demonstrates how to get help for a specific Celery command.
+
+LANGUAGE: console
+CODE:
+$ celery <command> --help
+
+----------------------------------------
+
+TITLE: Using Complex Crontab Expressions in Celery
+DESCRIPTION: Examples showing how to use complex crontab expressions for periodic tasks in Celery.
+
+LANGUAGE: python
+CODE:
+>>> crontab(minute='*/15')
+
+>>> crontab(minute='*/30', hour='8-17,1-2', day_of_week='thu-fri')
+
+----------------------------------------
+
+TITLE: RST Documentation Structure for Celery Consumer Agent
+DESCRIPTION: ReStructuredText documentation structure defining the layout and content for the celery.worker.consumer.agent module documentation. Uses Sphinx directives for automatic module documentation generation.
+
+LANGUAGE: rst
+CODE:
+==================================================
+ ``celery.worker.consumer.agent``
+==================================================
+
+.. contents::
+    :local:
+.. currentmodule:: celery.worker.consumer.agent
+
+.. automodule:: celery.worker.consumer.agent
+    :members:
+    :undoc-members:
+
+----------------------------------------
+
+TITLE: Sphinx Documentation Structure for Celery Utils
+DESCRIPTION: ReStructuredText directives for documenting the celery.utils module. Sets up table of contents, current module context, and auto-documentation parameters.
+
+LANGUAGE: restructuredtext
+CODE:
+==========================
+ ``celery.utils``
+==========================
+
+.. contents::
+    :local:
+.. currentmodule:: celery.utils
+
+.. automodule:: celery.utils
+    :members:
+    :undoc-members:
+
+----------------------------------------
+
+TITLE: Deleting old broadcast exchanges using celery amqp command
+DESCRIPTION: Commands to manually delete old broadcast exchanges that are no longer used in Celery 3.0.
+
+LANGUAGE: bash
+CODE:
+$ celery amqp exchange.delete celeryd.pidbox
+$ celery amqp exchange.delete reply.celeryd.pidbox
+
+----------------------------------------
+
+TITLE: RST Documentation Structure for Celery Heart Module
+DESCRIPTION: Sphinx/RST documentation structure defining the layout and configuration for the celery.worker.consumer.heart module documentation. Includes section headers, table of contents, and module reference directives.
+
+LANGUAGE: rst
+CODE:
+==================================================
+ ``celery.worker.consumer.heart``
+==================================================
+
+.. contents::
+    :local:
+.. currentmodule:: celery.worker.consumer.heart
+
+.. automodule:: celery.worker.consumer.heart
+    :members:
+    :undoc-members:
+
+----------------------------------------
+
+TITLE: RST Documentation Structure for Celery Events Dumper
+DESCRIPTION: ReStructuredText documentation template defining the structure for the celery.events.dumper module documentation. Includes table of contents, module reference and member listings.
+
+LANGUAGE: rst
+CODE:
+==========================================
+ ``celery.events.dumper``
+==========================================
+
+.. contents::
+    :local:
+.. currentmodule:: celery.events.dumper
+
+.. automodule:: celery.events.dumper
+    :members:
+    :undoc-members:
+
+----------------------------------------
+
+TITLE: Using transaction.on_commit for task execution in Django
+DESCRIPTION: Example of using Django's transaction.on_commit to ensure a task is only executed after a transaction is committed.
+
+LANGUAGE: python
+CODE:
+from functools import partial
+from django.db import transaction
+
+from .models import Article, Log
+from .tasks import send_article_created_notification
+
+def create_article(request):
+    with transaction.atomic():
+        article = Article.objects.create(**request.POST)
+        # send this task only if the rest of the transaction succeeds.
+        transaction.on_commit(partial(
+            send_article_created_notification.delay, article_id=article.pk))
+        Log.objects.create(type=Log.ARTICLE_CREATED, object_pk=article.pk)
+
+----------------------------------------
+
+TITLE: Configuring Database Result Backend with SQLAlchemy URI
+DESCRIPTION: Example connection strings for configuring Celery's database result backend using SQLAlchemy URIs for different databases.
+
+LANGUAGE: python
+CODE:
+# sqlite (filename)
+CELERY_RESULT_DBURI = 'sqlite:///celerydb.sqlite'
+
+# mysql
+CELERY_RESULT_DBURI = 'mysql://scott:tiger@localhost/foo'
+
+# postgresql
+CELERY_RESULT_DBURI = 'postgresql://scott:tiger@localhost/mydatabase'
+
+# oracle
+CELERY_RESULT_DBURI = 'oracle://scott:tiger@127.0.0.1:1521/sidname'
+
+----------------------------------------
+
+TITLE: Generating Documentation for celery.concurrency Module
+DESCRIPTION: This reStructuredText code snippet sets up the documentation structure for the celery.concurrency module. It includes a title, table of contents, and uses the automodule directive to automatically document all members of the module.
+
+LANGUAGE: reStructuredText
+CODE:
+==================================
+ ``celery.concurrency``
+==================================
+
+.. contents::
+    :local:
+.. currentmodule:: celery.concurrency
+
+.. automodule:: celery.concurrency
+    :members:
+    :undoc-members:
+
+----------------------------------------
+
+TITLE: Stopping Celery Workers with pkill
+DESCRIPTION: Command to forcefully terminate all Celery worker processes using pkill.
+
+LANGUAGE: console
+CODE:
+$ pkill -9 -f 'celery worker'
+
+----------------------------------------
+
+TITLE: Configuring reStructuredText Documentation for DynamoDB Backend
+DESCRIPTION: Sets up the documentation structure for the DynamoDB backend module using reStructuredText directives. Includes table of contents, module reference, and member documentation settings.
+
+LANGUAGE: rst
+CODE:
+===========================================
+ ``celery.backends.dynamodb``
+===========================================
+
+.. contents::
+    :local:
+.. currentmodule:: celery.backends.dynamodb
+
+.. automodule:: celery.backends.dynamodb
+    :members:
+    :undoc-members:
+
+----------------------------------------
+
+TITLE: Restarting Celery Workers with celery multi
+DESCRIPTION: Commands to restart Celery workers using celery multi with specific PID file locations.
+
+LANGUAGE: console
+CODE:
+$ celery multi start 1 -A proj -l INFO -c4 --pidfile=/var/run/celery/%n.pid
+$ celery multi restart 1 --pidfile=/var/run/celery/%n.pid
+
+----------------------------------------
+
+TITLE: PostgreSQL Alter Table for NULL Results
+DESCRIPTION: SQL command to modify celery_taskmeta table to allow NULL values in result column.
+
+LANGUAGE: sql
+CODE:
+ALTER TABLE celery_taskmeta ALTER COLUMN result DROP NOT NULL
+
+----------------------------------------
+
+TITLE: Sphinx Documentation Structure for Celery Cache Backend
+DESCRIPTION: ReStructuredText documentation configuration that sets up the module documentation for celery.backends.cache. It includes table of contents and automodule directives for generating API documentation.
+
+LANGUAGE: rst
+CODE:
+===========================================
+ ``celery.backends.cache``
+===========================================
+
+.. contents::
+    :local:
+.. currentmodule:: celery.backends.cache
+
+.. automodule:: celery.backends.cache
+    :members:
+    :undoc-members:
+
+----------------------------------------
+
+TITLE: Configuring Task Routes for Transient Delivery in Celery
+DESCRIPTION: This code snippet shows how to use task_routes in Celery to configure a specific task for transient delivery. It sets the queue to 'celery' and the delivery mode to 'transient' for the 'proj.tasks.add' task.
+
+LANGUAGE: python
+CODE:
+task_routes = {
+    'proj.tasks.add': {'queue': 'celery', 'delivery_mode': 'transient'}
+}
+
+----------------------------------------
+
+TITLE: Configuring PGP Security Key for Celery
+DESCRIPTION: PGP public key used for encrypting sensitive security reports sent to security@celeryproject.org
+
+LANGUAGE: text
+CODE:
+-----BEGIN PGP PUBLIC KEY BLOCK-----
+Version: GnuPG v1.4.15 (Darwin)
+
+mQENBFJpWDkBCADFIc9/Fpgse4owLNvsTC7GYfnJL19XO0hnL99sPx+DPbfr+cSE
+9wiU+Wp2TfUX7pCLEGrODiEP6ZCZbgtiPgId+JYvMxpP6GXbjiIlHRw1EQNH8RlX
+cVxy3rQfVv8PGGiJuyBBjxzvETHW25htVAZ5TI1+CkxmuyyEYqgZN2fNd0wEU19D
++c10G1gSECbCQTCbacLSzdpngAt1Gkrc96r7wGHBBSvDaGDD2pFSkVuTLMbIRrVp
+lnKOPMsUijiip2EMr2DvfuXiUIUvaqInTPNWkDynLoh69ib5xC19CSVLONjkKBsr
+Pe+qAY29liBatatpXsydY7GIUzyBT3MzgMJlABEBAAG0MUNlbGVyeSBTZWN1cml0
+eSBUZWFtIDxzZWN1cml0eUBjZWxlcnlwcm9qZWN0Lm9yZz6JATgEEwECACIFAlJp
+WDkCGwMGCwkIBwMCBhUIAgkKCwQWAgMBAh4BAheAAAoJEOArFOUDCicIw1IH/26f
+CViDC7/P13jr+srRdjAsWvQztia9HmTlY8cUnbmkR9w6b6j3F2ayw8VhkyFWgYEJ
+wtPBv8mHKADiVSFARS+0yGsfCkia5wDSQuIv6XqRlIrXUyqJbmF4NUFTyCZYoh+C
+ZiQpN9xGhFPr5QDlMx2izWg1rvWlG1jY2Es1v/xED3AeCOB1eUGvRe/uJHKjGv7J
+rj0pFcptZX+WDF22AN235WYwgJM6TrNfSu8sv8vNAQOVnsKcgsqhuwomSGsOfMQj
+LFzIn95MKBBU1G5wOs7JtwiV9jefGqJGBO2FAvOVbvPdK/saSnB+7K36dQcIHqms
+5hU4Xj0RIJiod5idlRC5AQ0EUmlYOQEIAJs8OwHMkrdcvy9kk2HBVbdqhgAREMKy
+gmphDp7prRL9FqSY/dKpCbG0u82zyJypdb7QiaQ5pfPzPpQcd2dIcohkkh7G3E+e
+hS2L9AXHpwR26/PzMBXyr2iNnNc4vTksHvGVDxzFnRpka6vbI/hrrZmYNYh9EAiv
+uhE54b3/XhXwFgHjZXb9i8hgJ3nsO0pRwvUAM1bRGMbvf8e9F+kqgV0yWYNnh6QL
+4Vpl1+epqp2RKPHyNQftbQyrAHXT9kQF9pPlx013MKYaFTADscuAp4T3dy7xmiwS
+crqMbZLzfrxfFOsNxTUGE5vmJCcm+mybAtRo4aV6ACohAO9NevMx8pUAEQEAAYkB
+HwQYAQIACQUCUmlYOQIbDAAKCRDgKxTlAwonCNFbB/9esir/f7TufE+isNqErzR/
+aZKZo2WzZR9c75kbqo6J6DYuUHe6xI0OZ2qZ60iABDEZAiNXGulysFLCiPdatQ8x
+8zt3DF9BMkEck54ZvAjpNSern6zfZb1jPYWZq3TKxlTs/GuCgBAuV4i5vDTZ7xK/
+aF+OFY5zN7ciZHkqLgMiTZ+RhqRcK6FhVBP/Y7d9NlBOcDBTxxE1ZO1ute6n7guJ
+ciw4hfoRk8qNN19szZuq3UU64zpkM2sBsIFM9tGF2FADRxiOaOWZHmIyVZriPFqW
+RUwjSjs7jBVNq0Vy4fCu/5+e+XLOUBOoqtM5W7ELt0t1w9tXebtPEetV86in8fU2
+=0chn
+-----END PGP PUBLIC KEY BLOCK-----
+
+----------------------------------------
+
+TITLE: RST Documentation Structure for Celery Base Loader
+DESCRIPTION: Sphinx/RST documentation template that sets up the structure for documenting the celery.loaders.base module. Includes table of contents, module reference and member documentation directives.
+
+LANGUAGE: rst
+CODE:
+===========================================
+ ``celery.loaders.base``
+===========================================
+
+.. contents::
+    :local:
+.. currentmodule:: celery.loaders.base
+
+.. automodule:: celery.loaders.base
+    :members:
+    :undoc-members:
+
+----------------------------------------
+
+TITLE: Deleting RabbitMQ Exchange Using Django Management Command
+DESCRIPTION: Example of deleting a RabbitMQ exchange using Django's management command interface.
+
+LANGUAGE: console
+CODE:
+$ python manage.py camqadm exchange.delete celeryresults
+
+----------------------------------------
+
+TITLE: Helm Chart Directory Structure
+DESCRIPTION: Shows the hierarchical structure of the Helm chart directory containing configuration files and templates.
+
+LANGUAGE: plaintext
+CODE:
+helm-chart
+├── Chart.yaml
+├── README.rst
+├── templates
+│   ├── _helpers.tpl
+│   ├── configmap.yaml
+│   ├── deployment.yaml
+│   ├── secret.yaml
+│   └── serviceaccount.yaml
+└── values.yaml
+
+----------------------------------------
+
+TITLE: ReStructuredText Documentation Header for Celery Testing App
+DESCRIPTION: Sphinx documentation header and structure for the celery.contrib.testing.app module, including table of contents and automodule directives.
+
+LANGUAGE: rst
+CODE:
+====================================
+ ``celery.contrib.testing.app``
+====================================
+
+.. contents::
+    :local:
+
+API Reference
+=============
+
+.. currentmodule:: celery.contrib.testing.app
+
+.. automodule:: celery.contrib.testing.app
+    :members:
+    :undoc-members:
+
+----------------------------------------
+
+TITLE: Configuring Sphinx AutoDoc for Celery Module
+DESCRIPTION: Sphinx documentation configuration that sets up automatic documentation generation for the celery.contrib.sphinx module. Uses the currentmodule directive to set the context and automodule to generate member documentation.
+
+LANGUAGE: rst
+CODE:
+================================
+ celery.contrib.sphinx
+================================
+
+.. currentmodule:: celery.contrib.sphinx
+
+.. automodule:: celery.contrib.sphinx
+    :members:
+
+----------------------------------------
+
+TITLE: Defining RST Table of Contents
+DESCRIPTION: RestructuredText markup defining the table of contents tree for Celery's getting started documentation with a maximum depth of 2 levels.
+
+LANGUAGE: restructuredtext
+CODE:
+.. toctree::
+    :maxdepth: 2
+
+    introduction
+    backends-and-brokers/index
+    first-steps-with-celery
+    next-steps
+    resources
+
+----------------------------------------
+
+TITLE: Specifying Couchbase Requirements for Celery
+DESCRIPTION: Dependency requirement specifying Couchbase version 3.0.0 or higher, excluding PyPy implementation and Windows systems with Python 3.10+. This ensures compatibility between Celery and Couchbase across supported platforms.
+
+LANGUAGE: pip
+CODE:
+couchbase>=3.0.0; platform_python_implementation!='PyPy' and (platform_system != 'Windows' or python_version < '3.10')
+
+----------------------------------------
+
+TITLE: Importing Celery Text Utils Module
+DESCRIPTION: Example showing how to import and access the celery.utils.text module.
+
+LANGUAGE: python
+CODE:
+from celery.utils.text import *
+
+----------------------------------------
+
+TITLE: Installing Celery with Environment-Specific Values
+DESCRIPTION: Command to install Celery using environment-specific values file to override default parameters.
+
+LANGUAGE: bash
+CODE:
+helm install celery helm-chart/ --values helm-chart/values_dev.yaml
+
+----------------------------------------
+
+TITLE: RST Documentation Structure for Celery Imports Module
+DESCRIPTION: ReStructuredText documentation setup for the celery.utils.imports module, including table of contents and automodule directives.
+
+LANGUAGE: rst
+CODE:
+=====================================================
+ ``celery.utils.imports``
+=====================================================
+
+.. contents::
+    :local:
+.. currentmodule:: celery.utils.imports
+
+.. automodule:: celery.utils.imports
+    :members:
+    :undoc-members:
+
+----------------------------------------
+
+TITLE: Documenting Celery Solo Concurrency Module in RST
+DESCRIPTION: ReStructuredText documentation configuration for the celery.concurrency.solo module. Sets up table of contents, current module context, and automodule documentation generation.
+
+LANGUAGE: rst
+CODE:
+===================================================================
+ ``celery.concurrency.solo``
+===================================================================
+
+.. contents::
+    :local:
+.. currentmodule:: celery.concurrency.solo
+
+.. automodule:: celery.concurrency.solo
+    :members:
+    :undoc-members:
+
+----------------------------------------
+
+TITLE: Generating Documentation for celery.concurrency.prefork Module in reStructuredText
+DESCRIPTION: This snippet sets up the structure for auto-generating documentation for the celery.concurrency.prefork module. It includes directives for creating a table of contents, setting the current module, and documenting all members and undocumented members.
+
+LANGUAGE: reStructuredText
+CODE:
+=============================================================
+ ``celery.concurrency.prefork``
+=============================================================
+
+.. contents::
+    :local:
+.. currentmodule:: celery.concurrency.prefork
+
+.. automodule:: celery.concurrency.prefork
+    :members:
+    :undoc-members:
+
+----------------------------------------
+
+TITLE: Configuring reStructuredText Documentation for celery.concurrency.gevent Module
+DESCRIPTION: This snippet sets up the structure for auto-generating documentation for the celery.concurrency.gevent module. It includes directives for creating a table of contents, setting the current module, and using automodule to document all members.
+
+LANGUAGE: reStructuredText
+CODE:
+=============================================================
+ ``celery.concurrency.gevent``
+=============================================================
+
+.. contents::
+    :local:
+.. currentmodule:: celery.concurrency.gevent
+
+.. automodule:: celery.concurrency.gevent
+    :members:
+    :undoc-members:
+
+----------------------------------------
+
+TITLE: Generating S3 Backend Documentation for Celery
+DESCRIPTION: This reStructuredText snippet sets up the documentation structure for the celery.backends.s3 module. It includes a title, table of contents, and automodule directive for comprehensive documentation generation.
+
+LANGUAGE: reStructuredText
+CODE:
+==========================================
+ ``celery.backends.s3``
+==========================================
+
+.. contents::
+    :local:
+.. currentmodule:: celery.backends.s3
+
+.. automodule:: celery.backends.s3
+    :members:
+    :undoc-members:
+
+----------------------------------------
+
+TITLE: ReST Documentation Structure for Celery CouchDB Backend
+DESCRIPTION: ReStructuredText documentation template that sets up the module documentation for celery.backends.couchdb, including table of contents and autodoc directives.
+
+LANGUAGE: rst
+CODE:
+===========================================
+ ``celery.backends.couchdb``
+===========================================
+
+.. contents::
+    :local:
+.. currentmodule:: celery.backends.couchdb
+
+.. automodule:: celery.backends.couchdb
+    :members:
+    :undoc-members:
+
+----------------------------------------
+
+TITLE: Single-Mode vs App-Based Tasks
+DESCRIPTION: Compares the implementation of Celery tasks using both single-mode and app-based approaches.
+
+LANGUAGE: python
+CODE:
+from celery import task
+from celery.task.control import inspect
+
+from .models import CeleryStats
+
+@task
+def write_stats_to_db():
+    stats = inspect().stats(timeout=1)
+    for node_name, reply in stats:
+        CeleryStats.objects.update_stat(node_name, stats)
+
+LANGUAGE: python
+CODE:
+from .celery import celery
+from .models import CeleryStats
+
+@app.task
+def write_stats_to_db():
+    stats = celery.control.inspect().stats(timeout=1)
+    for node_name, reply in stats:
+        CeleryStats.objects.update_stat(node_name, stats)
+
+----------------------------------------
+
+TITLE: Composite Class Pattern
+DESCRIPTION: Demonstrates implementation of composite classes that can be overridden through inheritance or instantiation.
+
+LANGUAGE: python
+CODE:
+class Worker:
+    Consumer = Consumer
+
+    def __init__(self, connection, consumer_cls=None):
+        self.Consumer = consumer_cls or self.Consumer
+
+    def do_work(self):
+        with self.Consumer(self.connection) as consumer:
+            self.connection.drain_events()
+
+----------------------------------------
+
+TITLE: Class Attribute Default Values
+DESCRIPTION: Demonstrates how to implement default values using class attributes that can be overridden through inheritance or instantiation parameters.
+
+LANGUAGE: python
+CODE:
+class Producer:
+    active = True
+    serializer = 'json'
+
+    def __init__(self, serializer=None, active=None):
+        self.serializer = serializer or self.serializer
+
+        # must check for None when value can be false-y
+        self.active = active if active is not None else self.active
+
+----------------------------------------
+
+TITLE: Importing heapq Module for Timer in Python
+DESCRIPTION: The timer component of the Celery worker uses the heapq module for efficient scheduling of internal functions. It can handle hundreds of thousands of entries effectively.
+
+LANGUAGE: python
+CODE:
+from heapq import heappush, heappop
+
+----------------------------------------
+
+TITLE: Task Method Invocation Changes
+DESCRIPTION: Shows the change in how task methods should be called, requiring instance creation instead of direct class access
+
+LANGUAGE: pycon
+CODE:
+>>> MyTask.delay()          # NO LONGER WORKS
+
+
+>>> MyTask().delay()        # WORKS!
+
+----------------------------------------
+
+TITLE: Updating Task Import Statement - Old to New
+DESCRIPTION: Shows how to migrate from deprecated celery.decorators import to the new recommended import style
+
+LANGUAGE: python
+CODE:
+from celery.decorators import task
+
+LANGUAGE: python
+CODE:
+from celery import task
+
+----------------------------------------
+
+TITLE: Defining ReStructuredText Document Structure for Django-Celery Integration
+DESCRIPTION: This snippet defines the structure of a ReStructuredText document for Django integration with Celery. It sets up the document title, release version, date, and a table of contents linking to a guide for first steps with Django.
+
+LANGUAGE: restructuredtext
+CODE:
+.. _django:
+
+=========
+ Django
+=========
+
+:Release: |version|
+:Date: |today|
+
+.. toctree::
+    :maxdepth: 2
+
+    first-steps-with-django
+
+----------------------------------------
+
+TITLE: Defining Table of Contents for Celery Internal Modules in reStructuredText
+DESCRIPTION: This snippet defines a table of contents (toctree) for the internal modules of Celery. It includes maxdepth setting and a list of all the module paths to be included in the reference documentation.
+
+LANGUAGE: reStructuredText
+CODE:
+.. toctree::
+    :maxdepth: 1
+
+    celery.worker.components
+    celery.worker.loops
+    celery.worker.heartbeat
+    celery.worker.control
+    celery.worker.pidbox
+    celery.worker.autoscale
+    celery.concurrency
+    celery.concurrency.solo
+    celery.concurrency.prefork
+    celery.concurrency.eventlet
+    celery.concurrency.gevent
+    celery.concurrency.thread
+    celery.concurrency.base
+    celery.backends
+    celery.backends.base
+    celery.backends.asynchronous
+    celery.backends.azureblockblob
+    celery.backends.rpc
+    celery.backends.database
+    celery.backends.cache
+    celery.backends.consul
+    celery.backends.couchdb
+    celery.backends.mongodb
+    celery.backends.elasticsearch
+    celery.backends.redis
+    celery.backends.cassandra
+    celery.backends.couchbase
+    celery.backends.arangodb
+    celery.backends.dynamodb
+    celery.backends.filesystem
+    celery.backends.cosmosdbsql
+    celery.backends.s3
+    celery.backends.gcs
+    celery.app.trace
+    celery.app.annotations
+    celery.app.routes
+    celery.security.certificate
+    celery.security.key
+    celery.security.serialization
+    celery.security.utils
+    celery.events.snapshot
+    celery.events.cursesmon
+    celery.events.dumper
+    celery.backends.database.models
+    celery.backends.database.session
+    celery.utils
+    celery.utils.abstract
+    celery.utils.collections
+    celery.utils.nodenames
+    celery.utils.deprecated
+    celery.utils.functional
+    celery.utils.graph
+    celery.utils.objects
+    celery.utils.term
+    celery.utils.time
+    celery.utils.iso8601
+    celery.utils.saferepr
+    celery.utils.serialization
+    celery.utils.sysinfo
+    celery.utils.threads
+    celery.utils.timer2
+    celery.utils.imports
+    celery.utils.log
+    celery.utils.text
+    celery.utils.dispatch
+    celery.utils.dispatch.signal
+    celery.platforms
+    celery._state
+
+----------------------------------------
+
+TITLE: Configuring Test Dependencies for Celery Project
+DESCRIPTION: Defines required test packages and their versions, with conditional pytest-cov versioning based on Python version. Includes references to additional feature-specific requirement files for Redis, SQLAlchemy, PyMemcache, threading, and authentication support.
+
+LANGUAGE: plaintext
+CODE:
+pytest-cov==5.0.0; python_version<"3.9"
+pytest-cov==6.0.0; python_version>="3.9"
+pytest-github-actions-annotate-failures==0.3.0
+-r extras/redis.txt
+-r extras/sqlalchemy.txt
+-r extras/pymemcache.txt
+-r extras/thread.txt
+-r extras/auth.txt
+
+----------------------------------------
+
+TITLE: Specifying futures Package Requirement for Python 2
+DESCRIPTION: Defines a dependency on the futures package version 3.1.1 or higher, specifically for Python versions below 3.0. This is needed for backported functionality from Python 3's concurrent.futures to Python 2.
+
+LANGUAGE: requirements
+CODE:
+futures>=3.1.1; python_version < '3.0'
+
+----------------------------------------
+
+TITLE: Specifying Sphinx-Autobuild Version Requirements
+DESCRIPTION: Defines version requirements for sphinx-autobuild package, requiring version 2021.3.14 or higher but explicitly excluding version 2024.9.3.
+
+LANGUAGE: text
+CODE:
+sphinx-autobuild>=2021.3.14,!=2024.9.3
+
+----------------------------------------
+
+TITLE: Installing ephem Package with Python Implementation Condition
+DESCRIPTION: Specifies ephem package version 4.2 with a platform conditional that excludes PyPy implementation. The package will only be installed when running on standard CPython or other non-PyPy Python implementations.
+
+LANGUAGE: requirements
+CODE:
+ephem==4.2; platform_python_implementation!="PyPy"
+
+----------------------------------------
+
+TITLE: Specifying Pyro4 Version Requirement
+DESCRIPTION: Defines a conditional dependency requirement for Pyro4 version 4.82 that applies only for Python versions less than 3.11.
+
+LANGUAGE: plaintext
+CODE:
+pyro4==4.82; python_version < '3.11'
+
+----------------------------------------
+
+TITLE: Specifying Python-Memcached Dependency for Celery
+DESCRIPTION: This line specifies that the Celery project requires python-memcached version 1.61 or higher. It's likely part of a requirements file used for managing project dependencies.
+
+LANGUAGE: plaintext
+CODE:
+python-memcached>=1.61
+
+----------------------------------------
+
+TITLE: Specifying pydocumentdb Dependency for Celery Project in Python
+DESCRIPTION: This snippet defines a dependency on the pydocumentdb package, version 2.3.5, which is likely used for interacting with Azure Cosmos DB in the Celery project. This dependency is typically specified in a requirements.txt file for Python projects.
+
+LANGUAGE: Python
+CODE:
+pydocumentdb==2.3.5
+
+----------------------------------------
+
+TITLE: Installing Celery Test Requirements with pip
+DESCRIPTION: Commands to install both default and test requirements for running Celery test suite. This includes both base dependencies and additional testing dependencies.
+
+LANGUAGE: bash
+CODE:
+$ pip install -U -r requirements/default.txt
+$ pip install -U -r requirements/test.txt
+
+----------------------------------------
+
+TITLE: Uninstalling Celery Helm Chart
+DESCRIPTION: Command to remove the Celery installation from the Kubernetes cluster.
+
+LANGUAGE: bash
+CODE:
+helm uninstall celery
+
+----------------------------------------
+
+TITLE: Upgrading Celery Helm Installation
+DESCRIPTION: Commands to upgrade an existing Celery installation, with optional environment-specific values.
+
+LANGUAGE: bash
+CODE:
+helm upgrade --install celery helm-chart/
+
+or
+
+helm upgrade --install celery helm-chart/ --values helm-chart/values_dev.yaml
+
+----------------------------------------
+
+TITLE: RST Module Documentation Structure
+DESCRIPTION: ReStructuredText documentation template defining the structure for the celery.contrib.pytest module documentation
+
+LANGUAGE: rst
+CODE:
+====================================
+ ``celery.contrib.pytest``
+====================================
+
+.. contents::
+    :local:
+
+API Reference
+=============
+
+.. currentmodule:: celery.contrib.pytest
+
+.. automodule:: celery.contrib.pytest
+    :members:
+    :undoc-members:
+
+----------------------------------------
+
+TITLE: Defining ReStructuredText Documentation Section
+DESCRIPTION: Sets up the documentation structure for the celery.bootsteps module with table of contents and automodule directives.
+
+LANGUAGE: rst
+CODE:
+==========================================
+ ``celery.bootsteps``
+==========================================
+
+.. contents::
+    :local:
+.. currentmodule:: celery.bootsteps
+
+.. automodule:: celery.bootsteps
+    :members:
+    :undoc-members:
+
+----------------------------------------
+
+TITLE: Python Module Reference - celery.bin.list
+DESCRIPTION: Reference documentation for the celery.bin.list module using Sphinx automodule directive. It shows all module members including undocumented ones.
+
+LANGUAGE: rst
+CODE:
+.. contents::
+    :local:
+.. currentmodule:: celery.bin.list
+
+.. automodule:: celery.bin.list
+    :members:
+    :undoc-members:
+
+----------------------------------------
+
+TITLE: Redis Visibility Timeout Configuration
+DESCRIPTION: Sets the visibility timeout for Redis broker to control task message redelivery timing.
+
+LANGUAGE: python
+CODE:
+app.conf.broker_transport_options = {'visibility_timeout': 3600}  # 1 hour.
+
+----------------------------------------
+
+TITLE: Redis Unix Socket Connection Format
+DESCRIPTION: Format for connecting to Redis using Unix socket instead of TCP/IP.
+
+LANGUAGE: text
+CODE:
+redis+socket:///path/to/redis.sock
+
+----------------------------------------
+
+TITLE: Configuring Quorum Queues in Celery
+DESCRIPTION: Sets up Quorum Queues in Celery with required queue arguments and transport options.
+
+LANGUAGE: python
+CODE:
+from kombu import Queue
+
+task_queues = [Queue('my-queue', queue_arguments={'x-queue-type': 'quorum'})]
+broker_transport_options = {"confirm_publish": True}
+
+----------------------------------------
+
+TITLE: Creating Basic Celery Application with Task
+DESCRIPTION: Example of creating a basic Celery application that loads configuration from celeryconfig.py and defines a simple addition task.
+
+LANGUAGE: python
+CODE:
+from celery import Celery
+
+app = Celery('tasks')
+app.config_from_object('celeryconfig')
+
+
+@app.task
+def add(x, y):
+    return x + y
+
+----------------------------------------
+
+TITLE: Configuring Queue Name Prefix for Google Pub/Sub
+DESCRIPTION: This snippet demonstrates how to set a custom prefix for queue names in Pub/Sub using broker transport options.
+
+LANGUAGE: text
+CODE:
+broker_transport_options = {'queue_name_prefix': 'kombu-'}
+
+----------------------------------------
+
+TITLE: Setting Message Expiration in Google Pub/Sub
+DESCRIPTION: This configuration sets the expiration time for Pub/Sub messages and subscriptions to 24 hours (86400 seconds).
+
+LANGUAGE: text
+CODE:
+expiration_seconds = 86400
+
+----------------------------------------
+
+TITLE: Configuring SQS Credentials with URL Encoding
+DESCRIPTION: Python code showing how to properly encode AWS credentials in the broker URL using safequote
+
+LANGUAGE: python
+CODE:
+from kombu.utils.url import safequote
+
+aws_access_key = safequote("ABCDEFGHIJKLMNOPQRST")
+aws_secret_key = safequote("ZYXK7NiynG/TogH8Nj+P9nlE73sq3")
+
+broker_url = "sqs://{aws_access_key}:{aws_secret_key}@".format(
+    aws_access_key=aws_access_key, aws_secret_key=aws_secret_key,
+)
+
+----------------------------------------
+
+TITLE: Configuring Sphinx Documentation for Celery
+DESCRIPTION: Sets up documentation structure using Sphinx with a 2-level deep table of contents and automatic module documentation generation for 'foo' module.
+
+LANGUAGE: rst
+CODE:
+Documentation
+===============
+.. toctree::
+   :maxdepth: 2
+
+.. automodule:: foo
+   :members:

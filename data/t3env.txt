@@ -1,0 +1,748 @@
+TITLE: Creating Environment Schema with T3 Env
+DESCRIPTION: Demonstrates how to create a typed environment schema using T3 Env and Zod for both server and client-side variables in Next.js.
+
+LANGUAGE: typescript
+CODE:
+import { createEnv } from "@t3-oss/env-nextjs";
+import { z } from "zod";
+
+export const env = createEnv({
+  server: {
+    DATABASE_URL: z.string().url(),
+    OPEN_AI_API_KEY: z.string().min(1),
+  },
+  client: {
+    NEXT_PUBLIC_PUBLISHABLE_KEY: z.string().min(1),
+  },
+  runtimeEnv: {
+    DATABASE_URL: process.env.DATABASE_URL,
+    OPEN_AI_API_KEY: process.env.OPEN_AI_API_KEY,
+    NEXT_PUBLIC_PUBLISHABLE_KEY: process.env.NEXT_PUBLIC_PUBLISHABLE_KEY,
+  },
+});
+
+----------------------------------------
+
+TITLE: Creating Environment Schema with T3 Env Core
+DESCRIPTION: Example of creating a schema for both server and client environment variables using T3 Env core with Zod validation.
+
+LANGUAGE: typescript
+CODE:
+import { createEnv } from "@t3-oss/env-core";
+import { z } from "zod";
+
+export const env = createEnv({
+  server: {
+    DATABASE_URL: z.string().url(),
+    OPEN_AI_API_KEY: z.string().min(1),
+  },
+
+  clientPrefix: "PUBLIC_",
+
+  client: {
+    PUBLIC_CLERK_PUBLISHABLE_KEY: z.string().min(1),
+  },
+
+  runtimeEnv: process.env,
+
+  emptyStringAsUndefined: true,
+});
+
+----------------------------------------
+
+TITLE: Configuring Boolean Environment Variables with t3-env and Zod
+DESCRIPTION: Demonstrates two approaches for transforming string environment variables into booleans using Zod transforms and refinements. Includes methods for strict boolean parsing and general coercion.
+
+LANGUAGE: typescript
+CODE:
+export const env = createEnv({
+  server: {
+    COERCED_BOOLEAN: z
+      .string()
+      // transform to boolean using preferred coercion logic
+      .transform((s) => s !== "false" && s !== "0"),
+
+    ONLY_BOOLEAN: z
+      .string()
+      // only allow "true" or "false"
+      .refine((s) => s === "true" || s === "false")
+      // transform to boolean
+      .transform((s) => s === "true"),
+  },
+  // ...
+});
+
+----------------------------------------
+
+TITLE: Using Environment Variables in API Endpoint
+DESCRIPTION: Example of using the typed environment variables in an API endpoint.
+
+LANGUAGE: typescript
+CODE:
+import { env } from "~/env";
+
+export const GET = async () => {
+  const magic = await fetch("...", {
+    headers: { Authorization: env.OPEN_AI_API_KEY },
+  });
+};
+
+----------------------------------------
+
+TITLE: Simple Environment Variable Validation in TypeScript
+DESCRIPTION: Demonstrates a basic approach to validating environment variables using Zod, including type inference for ProcessEnv.
+
+LANGUAGE: typescript
+CODE:
+import { z } from "zod";
+
+const envVariables = z.object({
+  DATABASE_URL: z.string(),
+  CUSTOM_STUFF: z.string(),
+});
+
+envVariables.parse(process.env);
+
+declare global {
+  namespace NodeJS {
+    interface ProcessEnv extends z.infer<typeof envVariables> {}
+  }
+}
+
+----------------------------------------
+
+TITLE: Converting String Environment Variables to Numbers in t3-env
+DESCRIPTION: Shows two methods for handling numeric environment variables: using parseInt with pipe validation, and using Zod's built-in number coercion.
+
+LANGUAGE: typescript
+CODE:
+export const env = createEnv({
+  server: {
+    SOME_NUMBER: z
+      .string()
+      // transform to number
+      .transform((s) => parseInt(s, 10))
+      // make sure transform worked
+      .pipe(z.number()),
+
+    // Alternatively, use Zod's default primitives coercion
+    // https://zod.dev/?id=coercion-for-primitives
+    ZOD_NUMBER_COERCION: z.coerce.number(),
+  },
+  // ...
+});
+
+----------------------------------------
+
+TITLE: Server-Only Environment Schema
+DESCRIPTION: Example of creating a server-only environment schema for sensitive variables.
+
+LANGUAGE: typescript
+CODE:
+import { createEnv } from "@t3-oss/env-core";
+import { z } from "zod";
+
+export const env = createEnv({
+  server: {
+    DATABASE_URL: z.string().url(),
+    OPEN_AI_API_KEY: z.string().min(1),
+  },
+  runtimeEnv: process.env,
+});
+
+----------------------------------------
+
+TITLE: Split Server Environment Configuration
+DESCRIPTION: Server-side environment configuration when splitting server and client schemas for enhanced security.
+
+LANGUAGE: typescript
+CODE:
+import { createEnv } from "@t3-oss/env-nextjs";
+import { z } from "zod";
+
+export const env = createEnv({
+  server: {
+    DATABASE_URL: z.string().url(),
+    OPEN_AI_API_KEY: z.string().min(1),
+  },
+  experimental__runtimeEnv: process.env
+});
+
+----------------------------------------
+
+TITLE: Extending Presets in T3 Env
+DESCRIPTION: Shows how to extend presets in T3 Env, which can be used to include system environment variables for specific deployment providers or shared variables in a monorepo setup.
+
+LANGUAGE: typescript
+CODE:
+import { createEnv } from "@t3-oss/env-core";
+import { vercel } from "@t3-oss/env-core/presets-zod";
+
+export const env = createEnv({
+  // ...
+  // Extend the Vercel preset.
+  extends: [vercel()],
+});
+
+env.VERCEL_URL; // string
+
+----------------------------------------
+
+TITLE: Overriding Default Error Handlers in T3 Env
+DESCRIPTION: Shows how to override the default error handlers in T3 Env for validation errors and invalid access to server-side variables on the client.
+
+LANGUAGE: typescript
+CODE:
+import { createEnv } from "@t3-oss/env-core";
+
+export const env = createEnv({
+  // ...
+  // Called when the schema validation fails.
+  onValidationError: (issues: StandardSchemaV1.Issue[]) => {
+    console.error(
+      "❌ Invalid environment variables:",
+      issues
+    );
+    throw new Error("Invalid environment variables");
+  },
+  // Called when server variables are accessed on the client.
+  onInvalidAccess: (variable: string) => {
+    throw new Error(
+      "❌ Attempted to access a server-side environment variable on the client"
+    );
+  },
+});
+
+----------------------------------------
+
+TITLE: Defining Environment Schema with Next.js
+DESCRIPTION: Example of creating a typed environment configuration using createEnv from @t3-oss/env-nextjs with server-side and client-side variables
+
+LANGUAGE: typescript
+CODE:
+// src/env.mjs
+import { createEnv } from "@t3-oss/env-nextjs";
+import { z } from "zod";
+
+export const env = createEnv({
+  /*
+   * Serverside Environment variables, not available on the client.
+   * Will throw if you access these variables on the client.
+   */
+  server: {
+    DATABASE_URL: z.string().url(),
+    OPEN_AI_API_KEY: z.string().min(1),
+  },
+  /*
+   * Environment variables available on the client (and server).
+   *
+   * 💡 You'll get type errors if these are not prefixed with NEXT_PUBLIC_.
+   */
+  client: {
+    NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: z.string().min(1),
+  },
+  /*
+   * Due to how Next.js bundles environment variables on Edge and Client,
+   * we need to manually destructure them to make sure all are included in bundle.
+   *
+   * 💡 You'll get type errors if not all variables from `server` & `client` are included here.
+   */
+  runtimeEnv: {
+    DATABASE_URL: process.env.DATABASE_URL,
+    OPEN_AI_API_KEY: process.env.OPEN_AI_API_KEY,
+    NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY:
+      process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY,
+  },
+});
+
+----------------------------------------
+
+TITLE: Integrating t3-env with Storybook Configuration
+DESCRIPTION: Example showing how to configure Storybook to properly handle t3-env environment variables by extending the Storybook config.
+
+LANGUAGE: typescript
+CODE:
+// .storybook/main.ts
+
+import { env as t3Env } from "~/env/client.mjs";
+
+const config: StorybookConfig = {
+  // other Storybook config...
+  env: (config1) => ({
+    ...config1,
+    ...t3Env,
+  })
+};
+
+export default config;
+
+----------------------------------------
+
+TITLE: Strict Runtime Environment Configuration
+DESCRIPTION: Example of using strict runtime environment configuration for explicit variable access.
+
+LANGUAGE: typescript
+CODE:
+import { createEnv } from "@t3-oss/env-core";
+
+export const env = createEnv({
+  clientPrefix: "PUBLIC_",
+  server: {
+    DATABASE_URL: z.string().url(),
+    OPEN_AI_API_KEY: z.string().min(1),
+  },
+  client: {
+    PUBLIC_PUBLISHABLE_KEY: z.string().min(1),
+  },
+  runtimeEnvStrict: {
+    DATABASE_URL: process.env.DATABASE_URL,
+    OPEN_AI_API_KEY: process.env.OPEN_AI_API_KEY,
+    PUBLIC_PUBLISHABLE_KEY: process.env.PUBLIC_PUBLISHABLE_KEY,
+  },
+});
+
+----------------------------------------
+
+TITLE: Creating Combined Environment Schema
+DESCRIPTION: Defines a combined schema for both server and client environment variables using T3 Env and Zod validation.
+
+LANGUAGE: typescript
+CODE:
+import { createEnv } from "@t3-oss/env-nuxt";
+import { z } from "zod";
+
+export const env = createEnv({
+  server: {
+    DATABASE_URL: z.string().url(),
+    OPEN_AI_API_KEY: z.string().min(1),
+  },
+  client: {
+    NUXT_PUBLIC_PUBLISHABLE_KEY: z.string().min(1),
+  },
+});
+
+----------------------------------------
+
+TITLE: Installing T3 Env Core Dependencies
+DESCRIPTION: Command to install the core package and its Zod dependency for environment variable validation.
+
+LANGUAGE: bash
+CODE:
+npm install @t3-oss/env-core zod
+
+----------------------------------------
+
+TITLE: Detecting Server Context in T3 Env
+DESCRIPTION: Illustrates how to tell T3 Env when it's running in a server context, which is important for determining variable access permissions.
+
+LANGUAGE: typescript
+CODE:
+import { createEnv } from "@t3-oss/env-core";
+
+export const env = createEnv({
+  // ...
+  // Tell the library when we're in a server context.
+  isServer: typeof window === "undefined",
+});
+
+----------------------------------------
+
+TITLE: Build-time Environment Validation Configuration
+DESCRIPTION: Next.js configuration for validating environment variables during build time using jiti for TypeScript imports.
+
+LANGUAGE: javascript
+CODE:
+import { fileURLToPath } from "node:url";
+import createJiti from "jiti";
+const jiti = createJiti(fileURLToPath(import.meta.url));
+
+jiti("./app/env");
+
+export default {
+  /** ... */
+};
+
+----------------------------------------
+
+TITLE: Split Client Environment Configuration
+DESCRIPTION: Client-side environment configuration when splitting server and client schemas for enhanced security.
+
+LANGUAGE: typescript
+CODE:
+import { createEnv } from "@t3-oss/env-nextjs";
+import { z } from "zod";
+
+export const env = createEnv({
+  client: {
+    NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: z.string().min(1),
+  },
+  runtimeEnv: {
+    NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY,
+  },
+});
+
+----------------------------------------
+
+TITLE: Using Environment Variables in Server API
+DESCRIPTION: Example of using typed environment variables in a Nuxt server API endpoint.
+
+LANGUAGE: typescript
+CODE:
+import { env } from "~~/env"; // On server
+
+export default defineEventHandler(() => {
+  // do fancy ai stuff
+  const magic = await fetch("...", {
+    headers: { Authorization: env.OPEN_AI_API_KEY },
+  });
+  // ...
+});
+
+----------------------------------------
+
+TITLE: Using Environment Variables in Next.js Route
+DESCRIPTION: Example of accessing typed environment variables in a Next.js route handler
+
+LANGUAGE: typescript
+CODE:
+// src/app/hello/route.ts
+import { env } from "../env.mjs";
+
+export const GET = (req: Request) => {
+  const DATABASE_URL = env.DATABASE_URL;
+  // use it...
+};
+
+----------------------------------------
+
+TITLE: Using Environment Variables in Vue Component
+DESCRIPTION: Example of using typed environment variables in a Vue component template.
+
+LANGUAGE: vue
+CODE:
+<script setup lang="ts">
+import { env } from "~~/env"; // On client - same import!
+</script>
+<template>
+  <div>Client says {{ env.NUXT_PUBLIC_GREETING }}!</div>
+  <a href="/api/hello">See what the server has to say!</a>
+</template>
+
+----------------------------------------
+
+TITLE: Installing T3 Env Dependencies for Next.js
+DESCRIPTION: Command to install the required dependencies for T3 Env in a Next.js project.
+
+LANGUAGE: bash
+CODE:
+pnpm add @t3-oss/env-nextjs zod
+
+----------------------------------------
+
+TITLE: Installing T3 Env Nuxt Dependencies
+DESCRIPTION: Command to install the required dependencies for T3 Env Nuxt integration including the core package and Zod validator.
+
+LANGUAGE: bash
+CODE:
+pnpm add @t3-oss/env-nuxt zod
+
+----------------------------------------
+
+TITLE: Installing t3env Dependencies
+DESCRIPTION: Commands for installing the core package or Next.js-specific package along with Zod dependency
+
+LANGUAGE: bash
+CODE:
+# Core package, no framework specific features
+pnpm add @t3-oss/env-core zod
+# or, with options preconfigured for Next.js
+pnpm add @t3-oss/env-nextjs zod
+
+----------------------------------------
+
+TITLE: Treating Empty Strings as Undefined in T3 Env
+DESCRIPTION: Demonstrates how to configure T3 Env to treat empty strings as undefined, which can be useful for handling empty environment variables in .env files.
+
+LANGUAGE: typescript
+CODE:
+import { createEnv } from "@t3-oss/env-core";
+
+export const env = createEnv({
+  // ...
+  // Treat empty strings as undefined.
+  emptyStringAsUndefined: false,
+});
+
+----------------------------------------
+
+TITLE: Skipping Validation in T3 Env
+DESCRIPTION: Demonstrates how to skip validation in T3 Env. This is not recommended as it can lead to type and runtime value mismatches, but can be useful for linting or Docker builds where not all environment variables are present.
+
+LANGUAGE: typescript
+CODE:
+import { createEnv } from "@t3-oss/env-core";
+
+export const env = createEnv({
+  // ...
+  // Tell the library to skip validation if condition is true.
+  skipValidation: false,
+});
+
+----------------------------------------
+
+TITLE: Creating Server Environment Schema
+DESCRIPTION: Defines a separate server-only environment schema for sensitive variables using T3 Env and Zod validation.
+
+LANGUAGE: typescript
+CODE:
+import { createEnv } from "@t3-oss/env-nuxt";
+import { z } from "zod";
+
+export const env = createEnv({
+  server: {
+    DATABASE_URL: z.string().url(),
+    OPEN_AI_API_KEY: z.string().min(1),
+  },
+});
+
+----------------------------------------
+
+TITLE: Creating Client Environment Schema
+DESCRIPTION: Defines a separate client-only environment schema for public variables using T3 Env and Zod validation.
+
+LANGUAGE: typescript
+CODE:
+import { createEnv } from "@t3-oss/env-nuxt";
+import { z } from "zod";
+
+export const env = createEnv({
+  client: {
+    PUBLIC_CLERK_PUBLISHABLE_KEY: z.string().min(1),
+  },
+});
+
+----------------------------------------
+
+TITLE: Client-Only Environment Schema
+DESCRIPTION: Example of creating a client-only environment schema for public variables.
+
+LANGUAGE: typescript
+CODE:
+import { createEnv } from "@t3-oss/env-core";
+import { z } from "zod";
+
+export const env = createEnv({
+  clientPrefix: "PUBLIC_",
+  client: {
+    PUBLIC_CLERK_PUBLISHABLE_KEY: z.string().min(1),
+  },
+  runtimeEnv: process.env,
+});
+
+----------------------------------------
+
+TITLE: Next.js Standalone Configuration
+DESCRIPTION: Configuration for Next.js standalone output with T3 Env package transpilation settings.
+
+LANGUAGE: typescript
+CODE:
+import type { NextConfig } from "next"
+
+const nextConfig: NextConfig = {
+  output: "standalone",
+  transpilePackages: ["@t3-oss/env-nextjs", "@t3-oss/env-core"],
+}
+
+export default nextConfig
+
+----------------------------------------
+
+TITLE: Configuring Nuxt for Environment Validation
+DESCRIPTION: Imports the environment schema in Nuxt configuration to enable build-time validation.
+
+LANGUAGE: typescript
+CODE:
+import "./env";
+
+export default defineNuxtConfig({
+  // ...
+});
+
+----------------------------------------
+
+TITLE: Using Shared Variables in v0.6.0
+DESCRIPTION: Example of using the new 'shared' section for shared variables introduced in version 0.6.0. These variables are available in all runtimes without prefixes.
+
+LANGUAGE: typescript
+CODE:
+const env = createEnv({
+  shared: {
+    NODE_ENV: z.enum(['development', 'production', 'test']),
+  },
+  // ... other configurations
+})
+
+----------------------------------------
+
+TITLE: Updating Validator Schema in v0.12.0
+DESCRIPTION: Example of updating the validator schema to support Standard Schema in version 0.12.0. This change allows using validators that support Standard Schema, like Zod and Valibot.
+
+LANGUAGE: typescript
+CODE:
+// Before
+onValidationError: (error: ZodError) => void
+
+// After
+onValidationError: (error: StandardSchemaV1.Issue[]) => void
+
+----------------------------------------
+
+TITLE: Updating Preset Imports in v0.12.0
+DESCRIPTION: Example of updating preset imports in version 0.12.0. Zod presets are now imported from '/presets-zod' and new Valibot presets are available from '/presets-valibot'.
+
+LANGUAGE: typescript
+CODE:
+// Before
+import { somePreset } from '@t3-oss/env-nextjs/presets'
+
+// After (for Zod)
+import { somePreset } from '@t3-oss/env-nextjs/presets-zod'
+
+// After (for Valibot)
+import { somePreset } from '@t3-oss/env-nextjs/presets-valibot'
+
+----------------------------------------
+
+TITLE: Updating Vercel Preset Usage in TypeScript
+DESCRIPTION: This code snippet demonstrates how to update the usage of the Vercel preset in the createEnv function. The change requires calling the preset as a function instead of passing it directly.
+
+LANGUAGE: typescript
+CODE:
+import { vercel } from '@t3-oss/env-core/presets'
+
+const env = createEnv({
+    /** ... */
+-     extends: [vercel],
++     extends: [vercel()],
+})
+
+----------------------------------------
+
+TITLE: Updating Preset Usage in v0.10.0
+DESCRIPTION: Example of updating preset usage in version 0.10.0. Presets are now functions that need to be called when used.
+
+LANGUAGE: typescript
+CODE:
+import { vercel } from '@t3-oss/env-core/presets'
+
+const env = createEnv({
+  // Before
+  extends: [vercel],
+  // After
+  extends: [vercel()],
+})
+
+----------------------------------------
+
+TITLE: Installing Dependencies in Nuxt 3
+DESCRIPTION: Commands for installing project dependencies using different package managers (yarn, npm, and pnpm)
+
+LANGUAGE: bash
+CODE:
+# yarn
+yarn install
+
+# npm
+npm install
+
+# pnpm
+pnpm install
+
+----------------------------------------
+
+TITLE: Starting Nuxt 3 Development Server
+DESCRIPTION: Command to start the development server which runs on http://localhost:3000
+
+LANGUAGE: bash
+CODE:
+npm run dev
+
+----------------------------------------
+
+TITLE: Building Nuxt 3 for Production
+DESCRIPTION: Command to build the application for production deployment
+
+LANGUAGE: bash
+CODE:
+npm run build
+
+----------------------------------------
+
+TITLE: Previewing Nuxt 3 Production Build
+DESCRIPTION: Command to locally preview the production build before deployment
+
+LANGUAGE: bash
+CODE:
+npm run preview
+
+----------------------------------------
+
+TITLE: Updating Dependencies in package.json
+DESCRIPTION: Example of updating dependencies in package.json for @t3-oss/env-core to version 0.12.0.
+
+LANGUAGE: json
+CODE:
+"dependencies": {
+  "@t3-oss/env-core": "0.12.0"
+}
+
+----------------------------------------
+
+TITLE: Migrating Preset Usage in TypeScript
+DESCRIPTION: Example of migrating the usage of env presets from static references to function calls.
+
+LANGUAGE: typescript
+CODE:
+import { vercel } from '@t3-oss/env-core/presets'
+
+const env = createEnv({
+  /** ... */
+  extends: [vercel()],
+})
+
+----------------------------------------
+
+TITLE: Exporting Metadata in TypeScript
+DESCRIPTION: Defines and exports metadata for the documentation page, including title and description.
+
+LANGUAGE: typescript
+CODE:
+export const metadata = {
+  title: "Introduction",
+  description:
+    "Forgetting environment variables during build can be a hassle and difficult to debug if a bug is caused by a missing environment variable. This package provides a simple way to define environment variables validation for your app.",
+};
+
+----------------------------------------
+
+TITLE: Rendering Link Component in JSX
+DESCRIPTION: Renders a Link component using Next.js and custom UI components, directing users to the installation documentation.
+
+LANGUAGE: jsx
+CODE:
+<Link href="/docs/core" className={cn(buttonVariants(), "mt-4")}>
+  Take me to the installation!
+</Link>
+
+----------------------------------------
+
+TITLE: Configuring Metadata for T3 Env Nuxt Documentation
+DESCRIPTION: Exports metadata configuration including title and description for the T3 Env Nuxt integration documentation.
+
+LANGUAGE: typescript
+CODE:
+export const metadata = {
+  title: "Nuxt",
+  description: "Nuxt integration for T3 Env",
+  foo: 5445,
+};

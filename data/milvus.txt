@@ -1,0 +1,5919 @@
+TITLE: Defining Root Coordinator Interface in Go
+DESCRIPTION: Defines the RootCoord interface with methods for collection management, index operations, timestamp allocation, and other core functionalities of the Root Coordinator in Milvus.
+
+LANGUAGE: go
+CODE:
+type RootCoord interface {
+	Component
+	TimeTickProvider
+
+	// DDL request
+	CreateCollection(ctx context.Context, req *milvuspb.CreateCollectionRequest) (*commonpb.Status, error)
+	DropCollection(ctx context.Context, req *milvuspb.DropCollectionRequest) (*commonpb.Status, error)
+	HasCollection(ctx context.Context, req *milvuspb.HasCollectionRequest) (*milvuspb.BoolResponse, error)
+	DescribeCollection(ctx context.Context, req *milvuspb.DescribeCollectionRequest) (*milvuspb.DescribeCollectionResponse, error)
+	ShowCollections(ctx context.Context, req *milvuspb.ShowCollectionsRequest) (*milvuspb.ShowCollectionsResponse, error)
+	CreatePartition(ctx context.Context, req *milvuspb.CreatePartitionRequest) (*commonpb.Status, error)
+	DropPartition(ctx context.Context, req *milvuspb.DropPartitionRequest) (*commonpb.Status, error)
+	HasPartition(ctx context.Context, req *milvuspb.HasPartitionRequest) (*milvuspb.BoolResponse, error)
+	ShowPartitions(ctx context.Context, req *milvuspb.ShowPartitionsRequest) (*milvuspb.ShowPartitionsResponse, error)
+
+	//index builder service
+	CreateIndex(ctx context.Context, req *milvuspb.CreateIndexRequest) (*commonpb.Status, error)
+	DescribeIndex(ctx context.Context, req *milvuspb.DescribeIndexRequest) (*milvuspb.DescribeIndexResponse, error)
+	DropIndex(ctx context.Context, req *milvuspb.DropIndexRequest) (*commonpb.Status, error)
+
+	//global timestamp allocator
+	AllocTimestamp(ctx context.Context, req *rootcoordpb.AllocTimestampRequest) (*rootcoordpb.AllocTimestampResponse, error)
+	AllocID(ctx context.Context, req *rootcoordpb.AllocIDRequest) (*rootcoordpb.AllocIDResponse, error)
+	UpdateChannelTimeTick(ctx context.Context, req *internalpb.ChannelTimeTickMsg) (*commonpb.Status, error)
+
+	//segment
+	DescribeSegment(ctx context.Context, req *milvuspb.DescribeSegmentRequest) (*milvuspb.DescribeSegmentResponse, error)
+	ShowSegments(ctx context.Context, req *milvuspb.ShowSegmentsRequest) (*milvuspb.ShowSegmentsResponse, error)
+	ReleaseDQLMessageStream(ctx context.Context, in *proxypb.ReleaseDQLMessageStreamRequest) (*commonpb.Status, error)
+
+	SegmentFlushCompleted(ctx context.Context, in *datapb.SegmentFlushCompletedMsg) (*commonpb.Status, error)
+	GetMetrics(ctx context.Context, req *milvuspb.GetMetricsRequest) (*milvuspb.GetMetricsResponse, error)
+}
+
+----------------------------------------
+
+TITLE: Defining External Segment Interface Methods in C++
+DESCRIPTION: Core external interface methods for segment operations including row counting, schema retrieval, memory usage calculation, search operations and result filling.
+
+LANGUAGE: cpp
+CODE:
+get_row_count()
+get_schema()
+GetMemoryUsageInBytes()
+Search(plan, placeholderGroup, timestamp) -> QueryResult
+FillTargetEntry(plan, &queryResult)
+
+----------------------------------------
+
+TITLE: Defining Collection Schema Structure in Go
+DESCRIPTION: Definition of the CollectionSchema struct that represents the schema configuration for a Milvus collection, including name, description, auto ID and fields.
+
+LANGUAGE: go
+CODE:
+type CollectionSchema struct {
+	Name        string
+	Description string
+	AutoId      bool
+	Fields      []*FieldSchema
+}
+
+----------------------------------------
+
+TITLE: Implementing Core Knowhere Interfaces in C++
+DESCRIPTION: Defines the major interfaces for Knowhere, including serialization, index building, querying, and utility functions. These interfaces handle operations like creating vector indexes, performing KNN queries, and managing index data.
+
+LANGUAGE: C++
+CODE:
+/*
+ * Serialize
+ * @return: serialization data
+ */
+BinarySet
+Serialize();
+
+/*
+ * Load from serialization data
+ * @param [in] dataset_ptr: serialization data
+ */
+void
+Load(const BinarySet&);
+
+/*
+ * Create index
+ * @param [in] dataset_ptr: index data (key of the Dataset is "tensor", "rows" and "dim")
+ * @parma [in] config: index param
+ */
+void
+BuildAll(const DatasetPtr& dataset_ptr, const Config& config);
+
+/*
+ * KNN (K-Nearest Neighbors) Query
+ * @param [in] dataset_ptr: query data (key of the Dataset is "tensor" and "rows")
+ * @parma [in] config: query param
+ * @parma [out] blacklist: mark for deletion
+ * @return: query result (key of the Dataset is "ids" and "distance")
+ */
+DatasetPtr
+Query(const DatasetPtr& dataset_ptr, const Config& config, BitsetView blacklist);
+
+/*
+ * Copy the index from GPU to CPU
+ * @return: CPU vector index
+ * @notes: Only valid of the GPU indexes
+ */
+VecIndexPtr
+CopyGpuToCpu();
+
+/*
+ * If the user IDs has been set, they will be returned in the Query interface;
+ * else the range of the returned IDs is [0, row_num-1].
+ * @parma [in] uids: user ids
+ */
+void
+SetUids(std::shared_ptr<std::vector<IDType>> uids);
+
+/*
+ * Get the size of the index in memory.
+ * @return: index memory size
+ */
+int64_t
+Size();
+
+----------------------------------------
+
+TITLE: Defining DataCoord Interface in Go for Milvus
+DESCRIPTION: This snippet defines the DataCoord interface, which includes methods for flushing, assigning segment IDs, retrieving segment states and information, and managing various data-related operations in Milvus.
+
+LANGUAGE: go
+CODE:
+type DataCoord interface {
+	Component
+	TimeTickProvider
+
+  // Flush notifies DataCoord to flush all current growing segments of specified Collection
+	Flush(ctx context.Context, req *datapb.FlushRequest) (*datapb.FlushResponse, error)
+	// AssignSegmentID applies allocations for specified Coolection/Partition and related Channel Name(Virtial Channel)
+	AssignSegmentID(ctx context.Context, req *datapb.AssignSegmentIDRequest) (*datapb.AssignSegmentIDResponse, error)
+  // GetSegmentStates requests segment state information
+	GetSegmentStates(ctx context.Context, req *datapb.GetSegmentStatesRequest) (*datapb.GetSegmentStatesResponse, error)
+	// GetInsertBinlogPaths requests binlog paths for specified segment
+	GetInsertBinlogPaths(ctx context.Context, req *datapb.GetInsertBinlogPathsRequest) (*datapb.GetInsertBinlogPathsResponse, error)
+  // GetSegmentInfoChannel legacy API, returns segment info statistics channel
+	GetSegmentInfoChannel(ctx context.Context) (*milvuspb.StringResponse, error)
+  // GetCollectionStatistics requests collection statistics
+	GetCollectionStatistics(ctx context.Context, req *datapb.GetCollectionStatisticsRequest) (*datapb.GetCollectionStatisticsResponse, error)
+  // GetParititonStatistics requests partition statistics
+	GetPartitionStatistics(ctx context.Context, req *datapb.GetPartitionStatisticsRequest) (*datapb.GetPartitionStatisticsResponse, error)
+  // GetSegmentInfo requests segment info
+	GetSegmentInfo(ctx context.Context, req *datapb.GetSegmentInfoRequest) (*datapb.GetSegmentInfoResponse, error)
+  // GetRecoveryInfo request segment recovery info of collection/partition
+	GetRecoveryInfo(ctx context.Context, req *datapb.GetRecoveryInfoRequest) (*datapb.GetRecoveryInfoResponse, error)
+	// SaveBinlogPaths updates segments binlogs(including insert binlogs, stats logs and delta logs)
+	SaveBinlogPaths(ctx context.Context, req *datapb.SaveBinlogPathsRequest) (*commonpb.Status, error)
+	// GetFlushedSegments returns flushed segment list of requested collection/parition
+	GetFlushedSegments(ctx context.Context, req *datapb.GetFlushedSegmentsRequest) (*datapb.GetFlushedSegmentsResponse, error)
+  // GetMetrics gets the metrics about DataCoord
+	GetMetrics(ctx context.Context, req *milvuspb.GetMetricsRequest) (*milvuspb.GetMetricsResponse, error)
+  // CompleteCompaction completes a compaction with the result
+	CompleteCompaction(ctx context.Context, req *datapb.CompactionResult) (*commonpb.Status, error)
+}
+
+----------------------------------------
+
+TITLE: Initializing Milvus Client
+DESCRIPTION: Example code showing how to initialize a Milvus client either with local storage or remote connection credentials
+
+LANGUAGE: python
+CODE:
+from pymilvus import MilvusClient
+
+# Local client
+client = MilvusClient("milvus_demo.db")
+
+# Remote client
+client = MilvusClient(
+    uri="<endpoint_of_self_hosted_milvus_or_zilliz_cloud>",
+    token="<username_and_password_or_zilliz_cloud_api_key>")
+
+----------------------------------------
+
+TITLE: Defining MilvusService Interface in Go
+DESCRIPTION: Defines the MilvusService interface with methods for various operations like creating collections, inserting data, and performing searches.
+
+LANGUAGE: go
+CODE:
+type MilvusService interface {
+  // CreateCollection creates a collection
+	CreateCollection(ctx context.Context, request *milvuspb.CreateCollectionRequest) (*commonpb.Status, error)
+	DropCollection(ctx context.Context, request *milvuspb.DropCollectionRequest) (*commonpb.Status, error)
+	HasCollection(ctx context.Context, request *milvuspb.HasCollectionRequest) (*milvuspb.BoolResponse, error)
+	// ... (other methods omitted for brevity)
+	Insert(ctx context.Context, request *milvuspb.InsertRequest) (*milvuspb.InsertResponse, error)
+	Search(ctx context.Context, request *milvuspb.SearchRequest) (*milvuspb.SearchResults, error)
+	Flush(ctx context.Context, request *milvuspb.FlushRequest) (*commonpb.Status, error)
+	// ... (other methods omitted for brevity)
+}
+
+----------------------------------------
+
+TITLE: Implementing Core Component Interface in Go
+DESCRIPTION: Defines the base Component interface that all Milvus components must implement, including initialization, lifecycle management, and state reporting methods.
+
+LANGUAGE: go
+CODE:
+type Component interface {
+	Init() error
+	Start() error
+	Stop() error
+	GetComponentStates(ctx context.Context) (*milvuspb.ComponentStates, error)
+	GetStatisticsChannel(ctx context.Context) (*milvuspb.StringResponse, error)
+	Register() error
+}
+
+----------------------------------------
+
+TITLE: Defining ErrorCode Enum in Protobuf for Milvus
+DESCRIPTION: This snippet defines an enum called ErrorCode in protobuf format. It includes a comprehensive list of error conditions, each assigned a unique numeric code. The enum covers various scenarios such as connection failures, permission issues, illegal arguments, and internal errors.
+
+LANGUAGE: protobuf
+CODE:
+enum ErrorCode {
+    Success = 0;
+    UnexpectedError = 1;
+    ConnectFailed = 2;
+    PermissionDenied = 3;
+    CollectionNotExists = 4;
+    IllegalArgument = 5;
+    IllegalDimension = 7;
+    IllegalIndexType = 8;
+    IllegalCollectionName = 9;
+    IllegalTOPK = 10;
+    IllegalRowRecord = 11;
+    IllegalVectorID = 12;
+    IllegalSearchResult = 13;
+    FileNotFound = 14;
+    MetaFailed = 15;
+    CacheFailed = 16;
+    CannotCreateFolder = 17;
+    CannotCreateFile = 18;
+    CannotDeleteFolder = 19;
+    CannotDeleteFile = 20;
+    BuildIndexError = 21;
+    IllegalNLIST = 22;
+    IllegalMetricType = 23;
+    OutOfMemory = 24;
+    IndexNotExist = 25;
+    EmptyCollection = 26;
+
+    // internal error code.
+    DDRequestRace = 1000;
+}
+
+----------------------------------------
+
+TITLE: Inserting Data into Milvus
+DESCRIPTION: Example of inserting vector data into a Milvus collection
+
+LANGUAGE: python
+CODE:
+res = client.insert(collection_name="demo_collection", data=data)
+
+----------------------------------------
+
+TITLE: QueryCoord Interface Implementation in Go
+DESCRIPTION: Main interface definition for Query Coordinator component that handles collection management, querying, and metrics collection. Includes methods for loading/releasing collections and partitions.
+
+LANGUAGE: go
+CODE:
+type QueryCoord interface {
+	Component
+	TimeTickProvider
+
+	ShowCollections(ctx context.Context, req *querypb.ShowCollectionsRequest) (*querypb.ShowCollectionsResponse, error)
+	LoadCollection(ctx context.Context, req *querypb.LoadCollectionRequest) (*commonpb.Status, error)
+	ReleaseCollection(ctx context.Context, req *querypb.ReleaseCollectionRequest) (*commonpb.Status, error)
+	ShowPartitions(ctx context.Context, req *querypb.ShowPartitionsRequest) (*querypb.ShowPartitionsResponse, error)
+	LoadPartitions(ctx context.Context, req *querypb.LoadPartitionsRequest) (*commonpb.Status, error)
+	ReleasePartitions(ctx context.Context, req *querypb.ReleasePartitionsRequest) (*commonpb.Status, error)
+	CreateQueryChannel(ctx context.Context) (*querypb.CreateQueryChannelResponse, error)
+	GetPartitionStates(ctx context.Context, req *querypb.GetPartitionStatesRequest) (*querypb.GetPartitionStatesResponse, error)
+	GetSegmentInfo(ctx context.Context, req *querypb.GetSegmentInfoRequest) (*querypb.GetSegmentInfoResponse, error)
+	GetMetrics(ctx context.Context, req *milvuspb.GetMetricsRequest) (*milvuspb.GetMetricsResponse, error)
+}
+
+----------------------------------------
+
+TITLE: Performing Vector Search in Milvus
+DESCRIPTION: Code showing how to perform vector similarity search with filters and return specified fields
+
+LANGUAGE: python
+CODE:
+query_vectors = embedding_fn.encode_queries(["Who is Alan Turing?", "What is AI?"])
+res = client.search(
+    collection_name="demo_collection",  # target collection
+    data=query_vectors,  # a list of one or more query vectors, supports batch
+    limit=2,  # how many results to return (topK)
+    output_fields=["vector", "text", "subject"],  # what fields to return
+)
+
+----------------------------------------
+
+TITLE: Defining IndexCoord Interface in Go for Milvus Index Service
+DESCRIPTION: Defines the IndexCoord interface with methods for building, dropping, and querying index states and file paths. It includes TimeTickProvider and Component interfaces.
+
+LANGUAGE: go
+CODE:
+type IndexCoord interface {
+	Component
+  // TimeTickProvider is the interface all services implement
+	TimeTickProvider
+
+	// BuildIndex receives requests from RootCoordinator to build an index.
+	// Index building is asynchronous, so when an index building request comes, an IndexBuildID is assigned to the task and
+	// the task is recorded in Meta. The background process assignTaskLoop will find this task and assign it to IndexNode for
+	// execution.
+	BuildIndex(ctx context.Context, req *indexpb.BuildIndexRequest) (*indexpb.BuildIndexResponse, error)
+
+	// DropIndex deletes indexes based on IndexID. One IndexID corresponds to the index of an entire column. A column is
+	// divided into many segments, and each segment corresponds to an IndexBuildID. IndexCoord uses IndexBuildID to record
+	// index tasks. Therefore, when DropIndex is called, delete all tasks corresponding to IndexBuildID corresponding to IndexID.
+	DropIndex(ctx context.Context, req *indexpb.DropIndexRequest) (*commonpb.Status, error)
+
+	// GetIndexStates gets the index states of the IndexBuildIDs in the request from RootCoordinator.
+	GetIndexStates(ctx context.Context, req *indexpb.GetIndexStatesRequest) (*indexpb.GetIndexStatesResponse, error)
+
+	// GetIndexFilePaths gets the index files of the IndexBuildIDs in the request from RootCoordinator.
+	GetIndexFilePaths(ctx context.Context, req *indexpb.GetIndexFilePathsRequest) (*indexpb.GetIndexFilePathsResponse, error)
+
+  // GetMetrics gets the metrics about IndexCoord.
+	GetMetrics(ctx context.Context, req *milvuspb.GetMetricsRequest) (*milvuspb.GetMetricsResponse, error)
+}
+
+----------------------------------------
+
+TITLE: Defining Data Types in Protobuf
+DESCRIPTION: Enumeration of supported data types in Milvus including scalar types (bool, integers, floats) and vector types (binary and float vectors).
+
+LANGUAGE: protobuf
+CODE:
+enum DataType {
+  NONE  = 0;
+  BOOL  = 1;
+  INT8  = 2;
+  INT16 = 3;
+  INT32 = 4;
+  INT64 = 5;
+
+  FLOAT  = 10;
+  DOUBLE = 11;
+
+  STRING = 20;
+
+  VECTOR_BINARY = 100;
+  VECTOR_FLOAT  = 101;
+}
+
+----------------------------------------
+
+TITLE: Defining FieldSchema in Protobuf
+DESCRIPTION: Defines the schema for individual fields within a collection. It includes properties such as field ID, name, data type, and index parameters.
+
+LANGUAGE: protobuf
+CODE:
+message FieldSchema {
+  int64 fieldID = 1;
+  string name = 2;
+  bool is_primary_key = 3;
+  string description = 4;
+  DataType data_type = 5;
+  repeated common.KeyValuePair type_params = 6;
+  repeated common.KeyValuePair index_params = 7;
+}
+
+----------------------------------------
+
+TITLE: Creating Milvus Collection
+DESCRIPTION: Code demonstrating how to create a new collection in Milvus with specified dimensions
+
+LANGUAGE: python
+CODE:
+client.create_collection(
+    collection_name="demo_collection",
+    dimension=768,  # The vectors we will use in this demo has 768 dimensions
+)
+
+----------------------------------------
+
+TITLE: Implementing K-Way Merge Algorithm in Golang
+DESCRIPTION: Algorithm for merging multiple sorted search results from different query nodes. Takes n arrays of topk results and merges them while maintaining sort order based on scores. Uses multiple pointers to track positions in each result set and iteratively selects the highest scoring result.
+
+LANGUAGE: golang
+CODE:
+n = 4
+multiple_results = [[topk results 1], [topk results 2], [topk results 3], [topk results 4]]
+locs = [0, 0, 0, 0]
+topk_results = []
+for i -> topk:
+	score = min_score
+	choice = -1
+	for j -> n:
+		choiceOffset = locs[j]
+		if choiceOffset > topk:
+			// all result from this way has been got, got from other way
+			continue
+		score_this_way = multiple_results[j][choiceOffset]
+		if score_this_way > score:
+			choice = j
+			score = score_this_way
+	if choice != -1:
+		// update location
+		locs[choice]++
+		topk_results = append(topk_results, choice)
+
+----------------------------------------
+
+TITLE: Defining Field Schema Structure in Go
+DESCRIPTION: Definition of the FieldSchema struct that specifies the configuration for individual fields within a collection, including data type, primary key status, and index parameters.
+
+LANGUAGE: go
+CODE:
+type FieldSchema struct {
+	FieldID      int64
+	Name         string
+	IsPrimaryKey bool
+	Description  string
+	DataType     DataType
+	TypeParams   []*commonpb.KeyValuePair
+	IndexParams  []*commonpb.KeyValuePair
+	AutoID       bool
+}
+
+----------------------------------------
+
+TITLE: Installing Milvus Python SDK
+DESCRIPTION: Commands to install pymilvus, the Python SDK for interacting with Milvus vector database
+
+LANGUAGE: bash
+CODE:
+$ pip install -U pymilvus
+
+----------------------------------------
+
+TITLE: SegmentGrowing Interface Definitions
+DESCRIPTION: Core interfaces for managing growing segments, including PreInsert for space reservation and Insert for concurrent data writing. Handles row IDs, timestamps, and column data in both row-based and column-based formats.
+
+LANGUAGE: markdown
+CODE:
+PreInsert(size) -> reservedOffset
+Insert(reservedOffset, size, ...Data...)
+PreDelete & Delete(reservedOffset, row_ids, timestamps)
+
+----------------------------------------
+
+TITLE: Entity Retrieval API Implementation in Go
+DESCRIPTION: API function for retrieving entities from a collection using primary keys. The function accepts collection name, list of IDs, output fields, and optional partition names, returning matched entities or an empty result if not found.
+
+LANGUAGE: go
+CODE:
+// pseudo-code
+func get(collection_name string,
+         ids list[string],
+         output_fields list[string],
+         partition_names list[string]) (list[entity], error)
+// Example
+// entities = get("collection1", ["103"], ["_id", "age"], nil)
+
+----------------------------------------
+
+TITLE: Message Stream Interface - Go
+DESCRIPTION: Core message stream interface defining methods for message production, consumption, and stream management.
+
+LANGUAGE: go
+CODE:
+type MsgStream interface {
+	Start()
+	Close()
+	Chan() <-chan *MsgPack
+	AsProducer(channels []string)
+	AsConsumer(channels []string, subName string)
+	SetRepackFunc(repackFunc RepackFunc)
+	ComputeProduceChannelIndexes(tsMsgs []TsMsg) [][]int32
+	GetProduceChannels() []string
+	Produce(*MsgPack) error
+	Broadcast(*MsgPack) error
+	BroadcastMark(*MsgPack) (map[string][]MessageID, error)
+	Consume() *MsgPack
+	Seek(offset []*MsgPosition) error
+}
+
+----------------------------------------
+
+TITLE: Initializing Milvus Client in Go
+DESCRIPTION: Import the Milvus client package and create a new client instance with the specified Milvus endpoint address. This snippet demonstrates how to set up a context and handle potential errors during client initialization.
+
+LANGUAGE: go
+CODE:
+import "github.com/milvus-io/milvus/client/v2/milvusclient"
+
+//...other snippet ...
+ctx, cancel := context.WithCancel(context.Background())
+defer cancel()
+
+milvusAddr := "YOUR_MILVUS_ENDPOINT"
+
+cli, err := milvusclient.New(ctx, &milvusclient.ClientConfig{
+	Address: milvusAddr,
+})
+if err != nil {
+	// handle error
+}
+
+// Do your work with milvus client
+
+----------------------------------------
+
+TITLE: Sealed Segment Time Travel Implementation
+DESCRIPTION: Details the structure and algorithm for time travel in sealed segments, including chunk organization properties and the three-step process for implementing time travel functionality.
+
+LANGUAGE: markdown
+CODE:
+1. During load, data is placed in a continuous memory area named chunk, with the following properties:
+   1. Data is divided into multiple segments.
+   2. Data in one segment is ordered by primary key.
+   3. Data between Segments is in timestamp order. That is, the timestamp of every entity in the previous segment must be less than the timestamp of the first entity in the next segment.
+
+2. The Algorithm for time travel is:
+   1. Use get_active_count interface, find the last segment containing a legal ts, and return the last element position of this segment as vec_count.
+   2. Calculate the bitset mask with a timestamp. Due to the above properties, all the entities of the previous segment meet the conditions, and all the subsequent segments do not meet the conditions. Only the "last segment" needs to be calculated.
+   3. the calculated results of Bitset and DSL are combined and sent to vector search interface.
+
+----------------------------------------
+
+TITLE: Defining Milvus Query Expression Grammar in EBNF
+DESCRIPTION: Specifies the grammar rules for constructing query expressions in Milvus using EBNF notation. It covers logical operations, comparisons, arithmetic operations, and constant arrays.
+
+LANGUAGE: haskell
+CODE:
+Expr :=
+    LogicalExpr | NIL
+
+LogicalExpr :=
+    LogicalExpr BinaryLogicalOp LogicalExpr
+  | UnaryLogicalOp LogicalExpr
+  | "(" LogicalExpr ")"
+  | SingleExpr
+
+BinaryLogicalOp :=
+    "&&" | "and"
+  | "||" | "or"
+
+UnaryLogicalOp :=
+    "not"
+
+SingleExpr :=
+    TermExpr
+  | CompareExpr
+
+TermExpr :=
+    IDENTIFIER "in" ConstantArray
+
+ConstantArray :=
+    "[" ConstantExpr { "," ConstantExpr } "]"
+
+ConstantExpr :=
+    Constant
+  | ConstantExpr BinaryArithOp ConstantExpr
+  | UnaryArithOp ConstantExpr
+
+Constant :=
+    INTEGER
+  | FLOAT_NUMBER
+
+UnaryArithOp :=
+    "+"
+  | "-"
+
+BinaryArithOp :=
+    "+"
+  | "-"
+  | "*"
+  | "/"
+  | "%"
+  | "**"
+
+CompareExpr :=
+    IDENTIFIER CmpOp IDENTIFIER
+  | IDENTIFIER CmpOp ConstantExpr
+  | ConstantExpr CmpOp IDENTIFIER
+  | ConstantExpr CmpOpRestricted IDENTIFIER CmpOpRestricted ConstantExpr
+
+CmpOpRestricted :=
+    "<"
+  | "<="
+
+CmpOp :=
+    ">"
+  | ">="
+  | "<"
+  | "<="
+  | "=="
+  | "!="
+
+INTEGER := 整数
+FLOAT_NUM := 浮点数
+IDENTIFIER := 列名
+
+----------------------------------------
+
+TITLE: Installing Milvus Dependencies
+DESCRIPTION: Bash command to install dependencies required for Milvus development using a provided script.
+
+LANGUAGE: bash
+CODE:
+./scripts/install_deps.sh
+
+----------------------------------------
+
+TITLE: Structuring Basic Test Case for Milvus Go Client
+DESCRIPTION: Demonstrates the basic structure of a test case in the Milvus Go Client test framework, including setup, collection preparation, data insertion, test execution, and result validation.
+
+LANGUAGE: go
+CODE:
+func TestYourFeature(t *testing.T) {
+    // 1. Setup context and client
+    ctx := hp.CreateContext(t, time.Second*common.DefaultTimeout)
+    mc := createDefaultMilvusClient(ctx, t)
+
+    // 2. Prepare collection
+    prepare, schema := hp.CollPrepare.CreateCollection(
+        ctx, t, mc,
+        hp.NewCreateCollectionParams(hp.Int64Vec),
+        hp.TNewFieldsOption(),
+        hp.TNewSchemaOption(),
+    )
+
+    // 3. Insert test data
+    prepare.InsertData(ctx, t, mc,
+        hp.NewInsertParams(schema),
+        hp.TNewDataOption(),
+    )
+
+    // 4. Execute test operations
+    // ... your test logic here ...
+
+    // 5. Validate results
+    require.NoError(t, err)
+    require.Equal(t, expected, actual)
+}
+
+----------------------------------------
+
+TITLE: SegmentSealedImpl Internal Data Structure
+DESCRIPTION: Documents the internal data structures used in SegmentSealedImpl including row counts, bitsets, indexes, and data storage mechanisms.
+
+LANGUAGE: markdown
+CODE:
+1. `row_count_opt_`:
+   1. Fill row count when loading the first entity
+   2. All the other columns loaded must match the same row count
+3. `xxx_ready_bitset_` & `system_ready_count_`
+   1. Used to record whether the corresponding column is loaded. Bitset corresponds to FieldOffset
+   2. Query is executable if and only if all the following conditions are met:
+      1. system_ready_count_ == 2， which means all the system columns' RowId/Timestamp are loaded
+      2. The scalar columns involved in the query is loaded
+      3. For the vector columns involved in the query, either the original data or the index is loaded
+4. `scalar_indexings_`: store scalar index
+   1. Use StructuredSortedIndex in Knowhere
+5. `primary_key_index_`: store index for pk column
+   1. Use brand new ScalarIndexBase format
+   2. **Note: The functions here may overlap with scalar indexes. It is recommended to replace scalar index with ScalarIndexBase**
+6. `field_datas_`: store original data
+   1. `aligned_vector<char>` format guarantees `int/float` data are aligned
+7. `SealedIndexingRecord vecindexs_`: store vector index
+8. `row_ids_/timestamps_`: RowId/Timestamp data
+9. `TimestampIndex`: Index for Timestamp column
+10. `schema`: schema
+
+----------------------------------------
+
+TITLE: Defining CreateCollectionRequest in Protobuf
+DESCRIPTION: Specifies the structure for creating a new collection in Milvus. It includes fields for database name, collection name, and schema.
+
+LANGUAGE: protobuf
+CODE:
+message CreateCollectionRequest {
+  common.MsgBase base = 1;
+  string db_name = 2;
+  string collection_name = 3;
+  // `schema` is the serialized `schema.CollectionSchema`
+  bytes schema = 4;
+}
+
+message CollectionSchema {
+  string name = 1;
+  string description = 2;
+  bool autoID = 3;
+  repeated FieldSchema fields = 4;
+}
+
+----------------------------------------
+
+TITLE: Example JSON Records Structure
+DESCRIPTION: Sample JSON data showing the structure of records with both dense and sparse fields. Demonstrates how different attributes are distributed across records.
+
+LANGUAGE: json
+CODE:
+[
+    {"id": 1, "attr1": "value1", "attr2": 100},
+    {"id": 2, "attr1": "value2", "attr3": true},
+    {"id": 3, "attr1": "value3", "attr4": "extra", "attr5": 3.14}
+]
+
+----------------------------------------
+
+TITLE: Building Milvus from Source
+DESCRIPTION: Bash commands to build Milvus from source code, including options to skip third-party dependency checks.
+
+LANGUAGE: bash
+CODE:
+make
+
+# To skip 3rd-party dependency checks
+make SKIP_3RDPARTY=1
+
+----------------------------------------
+
+TITLE: Implementing CreateCollection Task Interface in Go
+DESCRIPTION: Go interface and struct definitions for handling CreateCollection tasks in the Proxy component, including task execution phases.
+
+LANGUAGE: go
+CODE:
+type task interface {
+	TraceCtx() context.Context
+	ID() UniqueID
+	SetID(uid UniqueID)
+	Name() string
+	Type() commonpb.MsgType
+	BeginTs() Timestamp
+	EndTs() Timestamp
+	SetTs(ts Timestamp)
+	OnEnqueue() error
+	PreExecute(ctx context.Context) error
+	Execute(ctx context.Context) error
+	PostExecute(ctx context.Context) error
+	WaitToFinish() error
+	Notify(err error)
+}
+
+type createCollectionTask struct {
+	Condition
+	*milvuspb.CreateCollectionRequest
+	ctx       context.Context
+	rootCoord types.RootCoord
+	result    *commonpb.Status
+	schema    *schemapb.CollectionSchema
+}
+
+----------------------------------------
+
+TITLE: Message Types and Constants - Go
+DESCRIPTION: Comprehensive enumeration of message types used in the system, including collection, partition, segment, index, and system control messages.
+
+LANGUAGE: go
+CODE:
+type MsgType uint32
+const (
+	MsgType_Undefined MsgType = 0
+	// DEFINITION REQUESTS: COLLECTION
+	MsgType_CreateCollection   MsgType = 100
+	MsgType_DropCollection     MsgType = 101
+	// ... additional message types ...
+)
+
+----------------------------------------
+
+TITLE: Defining Task Interface in Go
+DESCRIPTION: Defines the task interface with methods for managing task execution and lifecycle.
+
+LANGUAGE: go
+CODE:
+type task interface {
+	TraceCtx() context.Context
+	ID() UniqueID       // return ReqID
+	SetID(uid UniqueID) // set ReqID
+	Name() string
+	Type() commonpb.MsgType
+	BeginTs() Timestamp
+	EndTs() Timestamp
+	SetTs(ts Timestamp)
+	OnEnqueue() error
+	PreExecute(ctx context.Context) error
+	Execute(ctx context.Context) error
+	PostExecute(ctx context.Context) error
+	WaitToFinish() error
+	Notify(err error)
+}
+
+----------------------------------------
+
+TITLE: Compiling Milvus Project
+DESCRIPTION: This command compiles the Milvus project inside the development container.
+
+LANGUAGE: shell
+CODE:
+make milvus
+
+----------------------------------------
+
+TITLE: Defining Milvus Service Flush Protocol
+DESCRIPTION: Protocol buffer definitions for the Flush service endpoints and message structures used between SDK and Proxy.
+
+LANGUAGE: proto
+CODE:
+service MilvusService {
+  ...
+  rpc Flush(FlushRequest) returns (FlushResponse) {}
+  ...
+}
+
+message FlushRequest {
+  common.MsgBase base = 1;
+  string db_name = 2;
+  repeated string collection_names = 3;
+}
+
+message FlushResponse{
+  common.Status status = 1;
+  string db_name = 2;
+  map<string, schema.LongArray> coll_segIDs = 3;
+}
+
+----------------------------------------
+
+TITLE: Defining SegmentStatisticsMsg Structure in Go for Milvus
+DESCRIPTION: This snippet defines the SegmentStatisticsMsg structure, which is used for updating segment statistics in Milvus. It includes information such as segment ID, memory size, number of rows, and time-related data.
+
+LANGUAGE: go
+CODE:
+type SegmentStatisticsUpdates struct {
+	SegmentID     UniqueID
+	MemorySize    int64
+	NumRows       int64
+	CreateTime    uint64
+	EndTime       uint64
+	StartPosition *msgpb.MsgPosition
+	EndPosition   *msgpb.MsgPosition
+}
+
+type SegmentStatistics struct {
+	Base                 *commonpb.MsgBase
+	SegStats             []*SegmentStatisticsUpdates
+}
+
+type SegmentStatisticsMsg struct {
+	BaseMsg
+	SegmentStatistics
+}
+
+----------------------------------------
+
+TITLE: Defining Worker Interface in Go
+DESCRIPTION: Interface definition for the Worker component that handles pure computing tasks and provides search/query services for segments. Includes methods for segment operations and health checks.
+
+LANGUAGE: Go
+CODE:
+type Worker interface {
+        LoadSegments(context.Context, *querypb.LoadSegmentsRequest) error
+        ReleaseSegments(context.Context, *querypb.ReleaseSegmentsRequest) error
+        Delete(ctx context.Context, req *querypb.DeleteRequest) error
+        Search(ctx context.Context, req *querypb.SearchRequest) (*internalpb.SearchResults, error)
+        Query(ctx context.Context, req *querypb.QueryRequest) (*internalpb.RetrieveResults, error)
+        GetStatistics(ctx context.Context, req *querypb.GetStatisticsRequest) (*internalpb.GetStatisticsResponse, error)
+
+
+        IsHealthy() bool
+        Stop()
+}
+
+----------------------------------------
+
+TITLE: Defining TaskScheduler Structure in Go
+DESCRIPTION: Defines the TaskScheduler structure responsible for managing different task queues and allocators.
+
+LANGUAGE: go
+CODE:
+type taskScheduler struct {
+	DdQueue TaskQueue
+	DmQueue TaskQueue
+	DqQueue TaskQueue
+
+	idAllocator  *allocator.IDAllocator
+	tsoAllocator *allocator.TimestampAllocator
+
+	wg     sync.WaitGroup
+	ctx    context.Context
+	cancel context.CancelFunc
+
+	msFactory msgstream.Factory
+}
+
+----------------------------------------
+
+TITLE: Creating a Collection with Clustering Key in Python
+DESCRIPTION: Python code using pymilvus to create a collection schema with a clustering key. This demonstrates how to define fields including a clustering key field.
+
+LANGUAGE: python
+CODE:
+from pymilvus import (FieldSchema, CollectionSchema, DataType, Collection)
+
+default_fields = [
+   FieldSchema(name="id", dtype=DataType.INT64, is_primary=True),
+   FieldSchema(name="key", dtype=DataType.INT64, is_clustering_key=True),
+   FieldSchema(name="var", dtype=DataType.VARCHAR, max_length=1000, is_primary=False),
+   FieldSchema(name="embeddings", dtype=DataType.FLOAT_VECTOR, dim=dim)
+]
+
+default_schema = CollectionSchema(fields=default_fields, description="test clustering-key collection")
+coll = Collection(name="clustering_test", schema=default_schema)
+
+----------------------------------------
+
+TITLE: Defining InsertMsg Structure in Go for Milvus
+DESCRIPTION: This snippet defines the InsertMsg structure, which is used for inserting data into Milvus. It includes fields for database, collection, partition information, and the actual row data to be inserted.
+
+LANGUAGE: go
+CODE:
+type InsertRequest struct {
+	Base           *commonpb.MsgBase
+	DbName         string
+	CollectionName string
+	PartitionName  string
+	DbID           UniqueID
+	CollectionID   UniqueID
+	PartitionID    UniqueID
+	SegmentID      UniqueID
+	ChannelID      string
+	Timestamps     []uint64
+	RowIDs         []int64
+	RowData        []*commonpb.Blob
+}
+
+type InsertMsg struct {
+	BaseMsg
+	InsertRequest
+}
+
+----------------------------------------
+
+TITLE: Defining IndexNode Interface in Go for Milvus Index Service
+DESCRIPTION: Defines the IndexNode interface with methods for building and dropping indexes. It includes TimeTickProvider and Component interfaces.
+
+LANGUAGE: go
+CODE:
+type IndexNode interface {
+	Component
+	// TimeTickProvider is the interface all services implement
+	TimeTickProvider
+
+	// CreateIndex receives requests from IndexCoordinator to build an index.
+	// Index building is asynchronous, so when an index building request comes, IndexNode records the task and returns.
+	BuildIndex(ctx context.Context, req *indexpb.BuildIndexRequest) (*commonpb.Status, error)
+	// GetMetrics gets the metrics about IndexNode.
+	DropIndex(ctx context.Context, req *indexpb.DropIndexRequest) (*commonpb.Status, error)
+}
+
+----------------------------------------
+
+TITLE: Manually Triggering Clustering Compaction in Python
+DESCRIPTION: Python code snippet showing how to manually trigger clustering compaction on a collection, check its state, and wait for completion using pymilvus.
+
+LANGUAGE: python
+CODE:
+coll.compact(is_clustering=True)
+coll.get_compaction_state(is_clustering=True)
+coll.wait_for_compaction_completed(is_clustering=True)
+
+----------------------------------------
+
+TITLE: Configuring VSCode for Milvus Development
+DESCRIPTION: JSON configuration for VSCode to integrate C++ and Go development environments for Milvus, including environment variables and build settings.
+
+LANGUAGE: json
+CODE:
+{
+    "go.toolsEnvVars": {
+        "PKG_CONFIG_PATH": "${env:PKG_CONFIG_PATH}:${workspaceFolder}/internal/core/output/lib/pkgconfig:${workspaceFolder}/internal/core/output/lib64/pkgconfig",
+        "LD_LIBRARY_PATH": "${env:LD_LIBRARY_PATH}:${workspaceFolder}/internal/core/output/lib:${workspaceFolder}/internal/core/output/lib64",
+        "RPATH": "${env:RPATH}:${workspaceFolder}/internal/core/output/lib:${workspaceFolder}/internal/core/output/lib64"
+    },
+    "go.testEnvVars": {
+        "PKG_CONFIG_PATH": "${env:PKG_CONFIG_PATH}:${workspaceFolder}/internal/core/output/lib/pkgconfig:${workspaceFolder}/internal/core/output/lib64/pkgconfig",
+        "LD_LIBRARY_PATH": "${env:LD_LIBRARY_PATH}:${workspaceFolder}/internal/core/output/lib:${workspaceFolder}/internal/core/output/lib64",
+        "RPATH": "${env:RPATH}:${workspaceFolder}/internal/core/output/lib:${workspaceFolder}/internal/core/output/lib64"
+    },
+    "go.buildFlags": [
+        "-ldflags=-r=/Users/zilliz/workspace/milvus/internal/core/output/lib"
+    ],
+    "terminal.integrated.env.linux": {
+        "PKG_CONFIG_PATH": "${env:PKG_CONFIG_PATH}:${workspaceFolder}/internal/core/output/lib/pkgconfig:${workspaceFolder}/internal/core/output/lib64/pkgconfig",
+        "LD_LIBRARY_PATH": "${env:LD_LIBRARY_PATH}:${workspaceFolder}/internal/core/output/lib:${workspaceFolder}/internal/core/output/lib64",
+        "RPATH": "${env:RPATH}:${workspaceFolder}/internal/core/output/lib:${workspaceFolder}/internal/core/output/lib64"
+    },
+    "go.useLanguageServer": true,
+    "gopls": {
+        "formatting.gofumpt": true
+    },
+    "go.formatTool": "gofumpt",
+    "go.lintTool": "golangci-lint",
+    "go.testTags": "test,dynamic",
+    "go.testTimeout": "10m"
+}
+
+----------------------------------------
+
+TITLE: Implementing SearchByPK Function in Golang for Milvus
+DESCRIPTION: This function allows searching in Milvus using primary keys instead of query vectors. It takes various parameters including context, collection name, partitions, expression, output fields, primary keys, vector field, metric type, top-K, and search parameters.
+
+LANGUAGE: golang
+CODE:
+func SearchByPK(
+    ctx context.Context, 
+    collName string, 
+    partitions []string,
+	expr string, 
+    outputFields []string, 
+    primaryKeys []entity.PrimaryKey, 
+    vectorField string, 
+    metricType entity.MetricType, 
+    topK int, 
+    sp entity.SearchParam, 
+    opts ...SearchQueryOptionFunc,
+) ([]SearchResult, error)
+
+----------------------------------------
+
+TITLE: Defining DataNode and DataSyncService Structures in Go
+DESCRIPTION: Go structure definitions for DataNode and DataSyncService. These structures represent the core components of the DataNode, including management of vchannels, flowgraphs, and synchronization services.
+
+LANGUAGE: go
+CODE:
+// DataNode
+type DataNode struct {
+    ...
+    vchan2Sync map[string]*dataSyncService
+    vchan2FlushCh map[string]chan<- *flushMsg
+
+    clearSignal chan UniqueID
+    ...
+}
+
+// DataSyncService
+type dataSyncService struct {
+	ctx          context.Context
+	fg           *flowgraph.TimeTickedFlowGraph
+	flushChan    <-chan *flushMsg
+	replica      Replica
+	idAllocator  allocatorInterface
+	msFactory    msgstream.Factory
+	collectionID UniqueID
+}
+
+----------------------------------------
+
+TITLE: Defining MilvusService CreateCollection Protocol Buffer Schema
+DESCRIPTION: Protocol Buffer definitions for the CreateCollection service endpoint and related message structures including CollectionSchema.
+
+LANGUAGE: protobuf
+CODE:
+service MilvusService {
+    ...
+    rpc CreateCollection(CreateCollectionRequest) returns (common.Status) {}
+    ...
+}
+
+message CreateCollectionRequest {
+  common.MsgBase base = 1;
+  string db_name = 2;
+  string collection_name = 3;
+  bytes schema = 4;
+  int32 shards_num = 5;
+}
+
+message CollectionSchema {
+  string name = 1;
+  string description = 2;
+  bool autoID = 3;
+  repeated FieldSchema fields = 4;
+}
+
+----------------------------------------
+
+TITLE: SegmentSealed Interface Definition
+DESCRIPTION: Defines the extended interface methods for SegmentSealed including LoadIndex, LoadFieldData, DropIndex, and DropFieldData operations.
+
+LANGUAGE: markdown
+CODE:
+1. `LoadIndex(loadIndexInfo)`: load the index. indexInfo contains:
+    1. `FieldId`
+    2. `IndexParams`: index parameters in KV structure KV
+    3. `VecIndex`: vector index
+2. `LoadFieldData(loadFieldDataInfo)`: load column data, could be either scalar column or vector column
+    1. Note: indexes and vector data for the same column may coexist. Indexes are prioritized in the search
+3. `DropIndex(fieldId)`: drop and release an existing index of a specified field
+4. `DropFieldData(fieldId)`: drop and release existing data for a specified field
+
+----------------------------------------
+
+TITLE: Starting etcd Service for Milvus
+DESCRIPTION: Downloads, extracts, and runs etcd v3.5.0 for Linux AMD64. It configures etcd to listen on all interfaces and use a specific data directory.
+
+LANGUAGE: shell
+CODE:
+$ wget https://github.com/etcd-io/etcd/releases/download/v3.5.0/etcd-v3.5.0-linux-amd64.tar.gz
+$ tar zxvf etcd-v3.5.0-linux-amd64.tar.gz
+$ cd etcd-v3.5.0-linux-amd64
+$ ./etcd -advertise-client-urls=http://127.0.0.1:2379 -listen-client-urls http://0.0.0.0:2379 --data-dir /etcd
+
+----------------------------------------
+
+TITLE: Implementing Execution Plan Visitor in C++
+DESCRIPTION: Defines the ExecPlanNodeVisitor class, which is responsible for executing physical plan nodes. Currently, it only supports ANNS (Approximate Nearest Neighbor Search) nodes.
+
+LANGUAGE: C++
+CODE:
+// ${internal/core/src/query}
+ExecPlanNodeVistor
+
+----------------------------------------
+
+TITLE: C++ Binlog Interface
+DESCRIPTION: C++ interface definitions for reading and writing binlog payloads. Includes functions for handling different data types and memory management.
+
+LANGUAGE: c++
+CODE:
+typedef void* CPayloadWriter
+typedef struct CBuffer {
+  char* data;
+  int length;
+} CBuffer
+
+typedef struct CStatus {
+  int error_code;
+  const char* error_msg;
+} CStatus
+
+
+// C++ interface
+// writer
+CPayloadWriter NewPayloadWriter(int columnType);
+CStatus AddBooleanToPayload(CPayloadWriter payloadWriter, bool *values, int length);
+CStatus AddInt8ToPayload(CPayloadWriter payloadWriter, int8_t *values, int length);
+CStatus AddInt16ToPayload(CPayloadWriter payloadWriter, int16_t *values, int length);
+CStatus AddInt32ToPayload(CPayloadWriter payloadWriter, int32_t *values, int length);
+CStatus AddInt64ToPayload(CPayloadWriter payloadWriter, int64_t *values, int length);
+CStatus AddFloatToPayload(CPayloadWriter payloadWriter, float *values, int length);
+CStatus AddDoubleToPayload(CPayloadWriter payloadWriter, double *values, int length);
+CStatus AddOneStringToPayload(CPayloadWriter payloadWriter, char *cstr, int str_size);
+CStatus AddBinaryVectorToPayload(CPayloadWriter payloadWriter, uint8_t *values, int dimension, int length);
+CStatus AddFloatVectorToPayload(CPayloadWriter payloadWriter, float *values, int dimension, int length);
+
+CStatus FinishPayloadWriter(CPayloadWriter payloadWriter);
+CBuffer GetPayloadBufferFromWriter(CPayloadWriter payloadWriter);
+int GetPayloadLengthFromWriter(CPayloadWriter payloadWriter);
+CStatus ReleasePayloadWriter(CPayloadWriter handler);
+
+// reader
+CPayloadReader NewPayloadReader(int columnType, uint8_t *buffer, int64_t buf_size);
+CStatus GetBoolFromPayload(CPayloadReader payloadReader, bool **values, int *length);
+CStatus GetInt8FromPayload(CPayloadReader payloadReader, int8_t **values, int *length);
+CStatus GetInt16FromPayload(CPayloadReader payloadReader, int16_t **values, int *length);
+CStatus GetInt32FromPayload(CPayloadReader payloadReader, int32_t **values, int *length);
+CStatus GetInt64FromPayload(CPayloadReader payloadReader, int64_t **values, int *length);
+CStatus GetFloatFromPayload(CPayloadReader payloadReader, float **values, int *length);
+CStatus GetDoubleFromPayload(CPayloadReader payloadReader, double **values, int *length);
+CStatus GetOneStringFromPayload(CPayloadReader payloadReader, int idx, char **cstr, int *str_size);
+CStatus GetBinaryVectorFromPayload(CPayloadReader payloadReader, uint8_t **values, int *dimension, int *length);
+CStatus GetFloatVectorFromPayload(CPayloadReader payloadReader, float **values, int *dimension, int *length);
+
+int GetPayloadLengthFromReader(CPayloadReader payloadReader);
+CStatus ReleasePayloadReader(CPayloadReader payloadReader);
+
+----------------------------------------
+
+TITLE: Parsing Hybrid Timestamp in Go
+DESCRIPTION: Go implementation for parsing a hybrid timestamp into physical time and logical components. The function takes a uint64 timestamp and returns a time.Time object for the physical portion and the logical bits as a uint64.
+
+LANGUAGE: go
+CODE:
+const (
+	logicalBits     = 18
+	logicalBitsMask = (1 << logicalBits) - 1
+)
+
+// ParseTS parses the ts to (physical,logical).
+func ParseTS(ts uint64) (time.Time, uint64) {
+	logical := ts & logicalBitsMask
+	physical := ts >> logicalBits
+	physicalTime := time.Unix(int64(physical/1000), int64(physical)%1000*time.Millisecond.Nanoseconds())
+	return physicalTime, logical
+}
+
+----------------------------------------
+
+TITLE: Starting MinIO Service for Milvus
+DESCRIPTION: Downloads the MinIO server binary for Linux AMD64, sets the execute permission, and starts the MinIO server with a specified data directory.
+
+LANGUAGE: shell
+CODE:
+$ wget https://dl.min.io/server/minio/release/linux-amd64/minio
+$ chmod +x minio
+$ ./minio server /minio
+
+----------------------------------------
+
+TITLE: Setting TTL for New Milvus Collection in Python
+DESCRIPTION: Creates a new collection with a TTL setting of 15 seconds using the Milvus Python SDK. The TTL is configured through the properties parameter during collection initialization.
+
+LANGUAGE: python
+CODE:
+collection = Collection(name=name,vschema=schema,properties={"collection.ttl.seconds": 15})
+
+----------------------------------------
+
+TITLE: Defining Vector Search Plan Nodes in C++
+DESCRIPTION: Defines physical plan nodes for vector search operations, including FloatVectorANNS for float vector searches and BinaryVectorANNS for binary vector searches.
+
+LANGUAGE: C++
+CODE:
+// ${internal/core}/src/query/PlanNode.h
+FloatVectorANNS
+BinaryVectorANNS
+
+----------------------------------------
+
+TITLE: Implementing Internal Segment Interface Methods in C++
+DESCRIPTION: Internal interface methods for segment management including chunk operations, data access, index management, and search functionality.
+
+LANGUAGE: cpp
+CODE:
+num_chunk()
+size_per_chunk()
+get_active_count(Timestamp)
+chunk_data(FieldOffset, chunk_id) -> Span<T>
+chunk_scalar_index(FieldOffset, chunk_id) -> const StructuredIndex<T>&
+num_chunk_index
+debug()
+vector_search(vec_count, query..., timestamp, bitset, output)
+bulk_subscript(FieldOffset|SystemField, seg_offsets..., output)
+search_ids(IdArray, timestamp) -> pair<IdArray, SegOffsets>
+check_search(Plan)
+
+----------------------------------------
+
+TITLE: Defining DataNode Interface in Go for Milvus
+DESCRIPTION: This snippet defines the DataNode interface, which includes methods for watching data manipulation channels, flushing segments, getting metrics, and performing compaction in Milvus.
+
+LANGUAGE: go
+CODE:
+type DataNode interface {
+	Component
+
+  /// WatchDmChannels watches the channels about data manipulation.
+	WatchDmChannels(ctx context.Context, req *datapb.WatchDmChannelsRequest) (*commonpb.Status, error)
+	// FlushSegments notifies DataNode to flush the segments req provids. The flush tasks are async to this rpc, DataNode will flush the segments in the background.
+	FlushSegments(ctx context.Context, req *datapb.FlushSegmentsRequest) (*commonpb.Status, error)
+  // GetMetrics gets the metrics about DataNode.
+	GetMetrics(ctx context.Context, req *milvuspb.GetMetricsRequest) (*milvuspb.GetMetricsResponse, error)
+	// Compaction will add a compaction task according to the request plan
+	Compaction(ctx context.Context, req *datapb.CompactionPlan) (*commonpb.Status, error)
+}
+
+----------------------------------------
+
+TITLE: Syncing Forked Repository for Milvus Contribution
+DESCRIPTION: Commands to sync a forked repository with the upstream Milvus repository before making contributions. This ensures the fork is up-to-date to minimize merge conflicts.
+
+LANGUAGE: shell
+CODE:
+git remote add upstream git@github.com:milvus-io/milvus.git
+git fetch upstream
+git checkout upstream/master -b my-topic-branch
+
+----------------------------------------
+
+TITLE: Defining RootCoord CreateIndex gRPC Service
+DESCRIPTION: Proto definition for the CreateIndex gRPC service in RootCoord, which is called by the Proxy component.
+
+LANGUAGE: proto
+CODE:
+service RootCoord {
+  ...
+
+   rpc CreateIndex(milvus.CreateIndexRequest) returns (common.Status) {}
+
+  ...
+}
+
+----------------------------------------
+
+TITLE: Configuring Python Dependencies for Milvus Project
+DESCRIPTION: Requirements file that specifies necessary Python package dependencies including Docker client, gRPC libraries, Milvus Python client, and data analysis tools. Includes specific version constraints for compatibility.
+
+LANGUAGE: plaintext
+CODE:
+--extra-index-url https://test.pypi.org/simple/
+docker==5.0.0
+grpcio==1.53.2
+grpcio-tools==1.37.1
+pymilvus==2.0.0rc8
+
+# for test result anaylszer
+prettytable==3.8.0
+pyarrow==14.0.1
+fastparquet==2023.7.0
+
+----------------------------------------
+
+TITLE: Implementing RootCoord Request Task Interface in Go
+DESCRIPTION: Go interface and struct definitions for handling CreateCollection request tasks in the RootCoord component.
+
+LANGUAGE: go
+CODE:
+type reqTask interface {
+	Ctx() context.Context
+	Type() commonpb.MsgType
+	Execute(ctx context.Context) error
+	Core() *Core
+}
+
+type CreateCollectionReqTask struct {
+	baseReqTask
+	Req *milvuspb.CreateCollectionRequest
+}
+
+----------------------------------------
+
+TITLE: Signing Git Commits for Milvus DCO
+DESCRIPTION: Example of how to sign Git commits to adhere to the Developer Certificate of Origin (DCO) required for Milvus contributions. This can be done manually or using Git's -s flag.
+
+LANGUAGE: shell
+CODE:
+$ git commit -s -m 'This is my commit message'
+
+----------------------------------------
+
+TITLE: Creating Shared Library Target
+DESCRIPTION: Defines the milvus_core shared library target and its object file dependencies.
+
+LANGUAGE: cmake
+CODE:
+add_library(milvus_core SHARED
+    $<TARGET_OBJECTS:milvus_pb>
+    $<TARGET_OBJECTS:milvus_log>
+    $<TARGET_OBJECTS:milvus_config>
+    $<TARGET_OBJECTS:milvus_common>
+    $<TARGET_OBJECTS:milvus_monitor>
+    $<TARGET_OBJECTS:milvus_storage>
+    $<TARGET_OBJECTS:milvus_index>
+    $<TARGET_OBJECTS:milvus_query>
+    $<TARGET_OBJECTS:milvus_segcore>
+    $<TARGET_OBJECTS:milvus_indexbuilder>
+    $<TARGET_OBJECTS:milvus_clustering>
+    $<TARGET_OBJECTS:milvus_exec>
+    $<TARGET_OBJECTS:milvus_bitset>
+    $<TARGET_OBJECTS:milvus_futures>
+)
+
+----------------------------------------
+
+TITLE: Defining IndexNode CreateIndex gRPC Service
+DESCRIPTION: Proto definition for the CreateIndex gRPC service in IndexNode, used to perform the actual index creation on a node.
+
+LANGUAGE: proto
+CODE:
+service IndexNode {
+  ...
+
+  rpc CreateIndex(CreateIndexRequest) returns (common.Status){}
+
+  ...
+}
+
+message CreateIndexRequest {
+  int64 indexBuildID = 1;
+  string index_name = 2;
+  int64 indexID = 3;
+  int64 version = 4;
+  string meta_path = 5;
+  repeated string data_paths = 6;
+  repeated common.KeyValuePair type_params = 7;
+  repeated common.KeyValuePair index_params = 8;
+}
+
+----------------------------------------
+
+TITLE: Defining ShardDelegator Interface in Go
+DESCRIPTION: Interface definition for the ShardDelegator component that handles segment distribution and DML channel consumption. Includes methods for search, query, and segment management operations.
+
+LANGUAGE: Go
+CODE:
+type ShardDelegator interface {
+        // Search & Query APIs
+        Search(ctx context.Context, req *querypb.SearchRequest) ([]*internalpb.SearchResults, error)
+        Query(ctx context.Context, req *querypb.QueryRequest) ([]*internalpb.RetrieveResults, error)
+        GetStatistics(ctx context.Context, req *querypb.GetStatisticsRequest) ([]*internalpb.GetStatisticsResponse, error)
+
+
+        // Distribution & dml related APIs
+        ProcessInsert(insertRecords map[int64]*InsertData)
+        ProcessDelete(deleteData []*DeleteData, ts uint64)
+        LoadGrowing(ctx context.Context, infos []*querypb.SegmentLoadInfo, version int64) error
+        LoadSegments(ctx context.Context, req *querypb.LoadSegmentsRequest) error
+        ReleaseSegments(ctx context.Context, req *querypb.ReleaseSegmentsRequest, force bool) error
+        SyncDistribution(ctx context.Context, entries ...SegmentEntry)
+}
+
+----------------------------------------
+
+TITLE: Implementing Flush Task Interface in Go
+DESCRIPTION: Go interface and struct definitions for handling Flush operations in the Proxy component.
+
+LANGUAGE: go
+CODE:
+type task interface {
+	TraceCtx() context.Context
+	ID() UniqueID       // return ReqID
+	SetID(uid UniqueID) // set ReqID
+	Name() string
+	Type() commonpb.MsgType
+	BeginTs() Timestamp
+	EndTs() Timestamp
+	SetTs(ts Timestamp)
+	OnEnqueue() error
+	PreExecute(ctx context.Context) error
+	Execute(ctx context.Context) error
+	PostExecute(ctx context.Context) error
+	WaitToFinish() error
+	Notify(err error)
+}
+
+type FlushTask struct {
+	Condition
+	*milvuspb.FlushRequest
+	ctx       context.Context
+	dataCoord types.DataCoord
+	result    *milvuspb.FlushResponse
+}
+
+----------------------------------------
+
+TITLE: Starting Milvus Dev Containers
+DESCRIPTION: This command starts the Milvus development containers using a custom script.
+
+LANGUAGE: shell
+CODE:
+$ ./scripts/devcontainer.sh up
+
+----------------------------------------
+
+TITLE: Defining IndexCoord BuildIndex gRPC Service
+DESCRIPTION: Proto definition for the BuildIndex gRPC service in IndexCoord, used to initiate index building on segments.
+
+LANGUAGE: proto
+CODE:
+service IndexCoord {
+  ...
+
+  rpc BuildIndex(BuildIndexRequest) returns (BuildIndexResponse){}
+
+  ...
+}
+
+message BuildIndexRequest {
+  int64 indexBuildID = 1;
+  string index_name = 2;
+  int64 indexID = 3;
+  repeated string data_paths = 5;
+  repeated common.KeyValuePair type_params = 6;
+  repeated common.KeyValuePair index_params = 7;
+}
+
+message BuildIndexResponse {
+  common.Status status = 1;
+  int64 indexBuildID = 2;
+}
+
+----------------------------------------
+
+TITLE: Defining CreateIndex gRPC Service in Milvus
+DESCRIPTION: Proto definition for the CreateIndex gRPC service in MilvusService, including the CreateIndexRequest message structure.
+
+LANGUAGE: proto
+CODE:
+service MilvusService {
+    ...
+
+    rpc CreateIndex(CreateIndexRequest) returns (common.Status) {}
+
+    ...
+}
+
+message CreateIndexRequest {
+  common.MsgBase base = 1;
+  string db_name = 2;
+  string collection_name = 3;
+  string field_name = 4;
+  int64 dbID = 5;
+  int64 collectionID = 6;
+  int64 fieldID = 7;
+  repeated common.KeyValuePair extra_params = 8;
+}
+
+----------------------------------------
+
+TITLE: Drop Collection Service Definition in Proto
+DESCRIPTION: Protocol buffer definition for the drop collection service interface and request message structure in the MilvusService.
+
+LANGUAGE: proto
+CODE:
+service MilvusService {
+    ...
+    rpc DropCollection(DropCollectionRequest) returns (common.Status) {}
+    ...
+}
+
+message DropCollectionRequest {
+  common.MsgBase base = 1;
+  string db_name = 2;
+  string collection_name = 3;
+}
+
+----------------------------------------
+
+TITLE: Checking Dev Container Status
+DESCRIPTION: This command displays the status of running Milvus development containers.
+
+LANGUAGE: shell
+CODE:
+$ docker compose -f docker-compose-devcontainer.yml ps
+
+----------------------------------------
+
+TITLE: Drop Collection Task Interface in Go
+DESCRIPTION: Go interface and struct definitions for the drop collection task implementation in the Proxy component.
+
+LANGUAGE: go
+CODE:
+type task interface {
+	TraceCtx() context.Context
+	ID() UniqueID
+	SetID(uid UniqueID)
+	Name() string
+	Type() commonpb.MsgType
+	BeginTs() Timestamp
+	EndTs() Timestamp
+	SetTs(ts Timestamp)
+	OnEnqueue() error
+	PreExecute(ctx context.Context) error
+	Execute(ctx context.Context) error
+	PostExecute(ctx context.Context) error
+	WaitToFinish() error
+	Notify(err error)
+}
+
+type DropCollectionTask struct {
+	Condition
+	*milvuspb.DropCollectionRequest
+	ctx       context.Context
+	rootCoord types.RootCoord
+	result    *commonpb.Status
+	chMgr     channelsMgr
+	chTicker  channelsTimeTicker
+}
+
+----------------------------------------
+
+TITLE: Defining DataCoord GetInsertBinlogPaths gRPC Service
+DESCRIPTION: Proto definition for the GetInsertBinlogPaths gRPC service in DataCoord, used to retrieve binlog paths for segments.
+
+LANGUAGE: proto
+CODE:
+service DataCoord {
+    ...
+
+    rpc GetInsertBinlogPaths(GetInsertBinlogPathsRequest) returns (GetInsertBinlogPathsResponse) {}
+
+    ...
+}
+
+message GetInsertBinlogPathsRequest {
+  common.MsgBase base = 1;
+  int64 segmentID = 2;
+}
+
+message GetInsertBinlogPathsResponse {
+  repeated int64 fieldIDs = 1;
+  repeated internal.StringList paths = 2;
+  common.Status status = 3;
+}
+
+----------------------------------------
+
+TITLE: Implementing CreateIndexTask in Go for Milvus Proxy
+DESCRIPTION: Go struct definitions for the task interface and createIndexTask, used in the Proxy component to handle index creation requests.
+
+LANGUAGE: go
+CODE:
+type task interface {
+	TraceCtx() context.Context
+	ID() UniqueID       // return ReqID
+	SetID(uid UniqueID) // set ReqID
+	Name() string
+	Type() commonpb.MsgType
+	BeginTs() Timestamp
+	EndTs() Timestamp
+	SetTs(ts Timestamp)
+	OnEnqueue() error
+	PreExecute(ctx context.Context) error
+	Execute(ctx context.Context) error
+	PostExecute(ctx context.Context) error
+	WaitToFinish() error
+	Notify(err error)
+}
+
+type createIndexTask struct {
+	Condition
+	*milvuspb.CreateIndexRequest
+	ctx       context.Context
+	rootCoord types.RootCoord
+	result    *commonpb.Status
+}
+
+----------------------------------------
+
+TITLE: Updating Data Coordinator Proto Definition
+DESCRIPTION: Example of modifying the SyncSegmentsRequest message in data_coord.proto to include the new TestObject field
+
+LANGUAGE: proto
+CODE:
+message SyncSegmentsRequest {
+  int64 planID = 1;
+  int64 compacted_to = 2;
+  int64 num_of_rows = 3;
+  repeated int64 compacted_from = 4;
+  repeated FieldBinlog stats_logs = 5;
+  string channel_name = 6;
+  int64 partition_id = 7;
+  int64 collection_id = 8;
+  common.TestObject obj = 9; // added field
+}
+
+----------------------------------------
+
+TITLE: Accessing Milvus Builder Container
+DESCRIPTION: This command provides interactive shell access to the Milvus builder container.
+
+LANGUAGE: shell
+CODE:
+docker exec -ti milvus_builder_1 bash
+
+----------------------------------------
+
+TITLE: Defining RootCoord CreateCollection Protocol Buffer Service
+DESCRIPTION: Protocol Buffer definition for the RootCoord service's CreateCollection endpoint.
+
+LANGUAGE: protobuf
+CODE:
+service RootCoord {
+    ...
+    rpc CreateCollection(milvus.CreateCollectionRequest) returns (common.Status){}
+    ...
+}
+
+----------------------------------------
+
+TITLE: Delete Request gRPC Definition in Go
+DESCRIPTION: gRPC interface definition for the Delete operation, specifying the method signature and return types.
+
+LANGUAGE: Go
+CODE:
+Delete(context.Context, *querypb.DeleteRequest) (*commonpb.Status, error)
+
+----------------------------------------
+
+TITLE: Data Sync Service Implementation in Go
+DESCRIPTION: Service responsible for data synchronization between nodes, managing flow graphs for collections and partitions.
+
+LANGUAGE: go
+CODE:
+type dataSyncService struct {
+	ctx    context.Context
+
+	mu                   sync.Mutex
+	collectionFlowGraphs map[UniqueID]map[Channel]*queryNodeFlowGraph
+	partitionFlowGraphs  map[UniqueID]map[Channel]*queryNodeFlowGraph
+
+	streamingReplica ReplicaInterface
+	tSafeReplica     TSafeReplicaInterface
+	msFactory        msgstream.Factory
+}
+
+----------------------------------------
+
+TITLE: Running Milvus Unit Tests
+DESCRIPTION: Bash commands to set up a Docker environment and run Milvus unit tests, including options for specific test suites.
+
+LANGUAGE: bash
+CODE:
+cd deployments/docker/dev
+docker compose up -d
+cd ../../../
+make unittest
+
+# Run only cpp tests
+make test-cpp
+
+# Run only go tests
+make test-go
+
+# Run a single test case
+source scripts/setenv.sh && go test -v ./internal/proxy/ -test.run TestSearchTask
+
+----------------------------------------
+
+TITLE: Defining DropIndex Structure in Go for Milvus Index Service
+DESCRIPTION: Defines the DropIndexRequest structure for dropping indexes based on IndexID.
+
+LANGUAGE: go
+CODE:
+type DropIndexRequest struct {
+	IndexID      UniqueID
+}
+
+----------------------------------------
+
+TITLE: Defining CreateCollection Message Stream Protocol Buffer Schema
+DESCRIPTION: Protocol Buffer message definition for CreateCollection requests in the message stream system.
+
+LANGUAGE: protobuf
+CODE:
+message CreateCollectionRequest {
+  common.MsgBase base = 1;
+  string db_name = 2;
+  string collectionName = 3;
+  string partitionName = 4;
+  int64 dbID = 5;
+  int64 collectionID = 6;
+  int64 partitionID = 7;
+  bytes schema = 8;
+  repeated string virtualChannelNames = 9;
+  repeated string physicalChannelNames = 10;
+}
+
+----------------------------------------
+
+TITLE: Configuring GPU/CPU Project Settings in CMake
+DESCRIPTION: Conditionally sets up the project with CUDA support if GPU version is enabled, otherwise configures for CPU-only build.
+
+LANGUAGE: cmake
+CODE:
+if(MILVUS_GPU_VERSION STREQUAL "ON")
+    project(core CXX C CUDA)
+else()
+    project(core CXX C)
+endif()
+
+----------------------------------------
+
+TITLE: Defining NotifyBuildIndex Structure in Go for Milvus Index Service
+DESCRIPTION: Defines the NotifyBuildIndexRequest structure for notifying about index building completion.
+
+LANGUAGE: go
+CODE:
+type NotifyBuildIndexRequest struct {
+	Status         *commonpb.Status
+	IndexBuildID   UniqueID
+	IndexFilePaths []string
+	NodeID         UniqueID
+}
+
+----------------------------------------
+
+TITLE: Generating Code Coverage Reports for Milvus
+DESCRIPTION: Bash commands to generate and view code coverage reports for Milvus, including options for Go and C++ separately.
+
+LANGUAGE: bash
+CODE:
+make codecov
+
+# Generate Go coverage report
+make codecov-go
+
+# Generate C++ coverage report
+make codecov-cpp
+
+----------------------------------------
+
+TITLE: Proxy Cache Invalidation Proto
+DESCRIPTION: Protocol buffer definitions for invalidating collection metadata cache in Proxy.
+
+LANGUAGE: proto
+CODE:
+service Proxy {
+    ...
+    rpc InvalidateCollectionMetaCache(InvalidateCollMetaCacheRequest) returns (common.Status) {}
+    ...
+}
+
+message InvalidateCollMetaCacheRequest {
+  common.MsgBase base = 1;
+  string db_name = 2;
+  string collection_name = 3;
+}
+
+----------------------------------------
+
+TITLE: Drop Collection Request Task in Go
+DESCRIPTION: Go interface and struct definitions for the request task handling in RootCoord.
+
+LANGUAGE: go
+CODE:
+type reqTask interface {
+	Ctx() context.Context
+	Type() commonpb.MsgType
+	Execute(ctx context.Context) error
+	Core() *Core
+}
+
+type DropCollectionReqTask struct {
+	baseReqTask
+	Req *milvuspb.DropCollectionRequest
+}
+
+----------------------------------------
+
+TITLE: Segment Info Protocol Definition
+DESCRIPTION: Protocol buffer definitions for retrieving segment information and status from DataCoord.
+
+LANGUAGE: proto
+CODE:
+service DataCoord {
+  ...
+  rpc GetSegmentInfo(GetSegmentInfoRequest) returns (GetSegmentInfoResponse) {}
+  ...
+}
+
+message GetSegmentInfoRequest {
+  common.MsgBase base = 1;
+  repeated int64 segmentIDs = 2;
+}
+
+message GetSegmentInfoResponse {
+  common.Status status = 1;
+  repeated SegmentInfo infos = 2;
+}
+
+message SegmentInfo {
+  int64 ID = 1;
+  int64 collectionID = 2;
+  int64 partitionID = 3;
+  string insert_channel = 4;
+  int64 num_of_rows = 5;
+  common.SegmentState state = 6;
+  msgpb.MsgPosition dml_position = 7;
+  int64 max_row_num = 8;
+  uint64 last_expire_time = 9;
+  msgpb.MsgPosition start_position = 10;
+}
+
+enum SegmentState {
+    SegmentStateNone = 0;
+    NotExist = 1;
+    Growing = 2;
+    Sealed = 3;
+    Flushed = 4;
+    Flushing = 5;
+}
+
+----------------------------------------
+
+TITLE: Modifying TTL for Existing Milvus Collection in Python
+DESCRIPTION: Updates the TTL setting to 1800 seconds for an existing collection using the Milvus Python SDK. The modification is done through the set_properties method.
+
+LANGUAGE: python
+CODE:
+collection.set_properties(properties={"collection.ttl.seconds": 1800})
+
+----------------------------------------
+
+TITLE: DataNode Timestamp Message Protocol
+DESCRIPTION: Protocol buffer definition for DataNode timestamp reporting messages.
+
+LANGUAGE: proto
+CODE:
+message DataNodeTtMsg {
+  common.MsgBase base = 1;
+  string channel_name = 2;
+  uint64 timestamp = 3;
+}
+
+----------------------------------------
+
+TITLE: RootCoord Drop Collection Proto Definition
+DESCRIPTION: Protocol buffer service definition for the RootCoord drop collection functionality.
+
+LANGUAGE: proto
+CODE:
+service RootCoord {
+    ...
+    rpc DropCollection(milvus.DropCollectionRequest) returns (common.Status) {}
+    ...
+}
+
+----------------------------------------
+
+TITLE: Adding Subdirectories for Milvus Components in CMake
+DESCRIPTION: Adds various subdirectories to the CMake build, including core components and third-party libraries like RocksDB and Kafka.
+
+LANGUAGE: CMake
+CODE:
+add_subdirectory(knowhere)
+
+add_subdirectory(boost_ext)
+add_subdirectory(rocksdb)
+add_subdirectory(rdkafka)
+add_subdirectory(simdjson)
+if (USE_OPENDAL)
+    add_subdirectory(opendal)
+endif()
+add_subdirectory(tantivy)
+
+if (LINUX)
+    add_subdirectory(jemalloc)
+endif()
+
+add_subdirectory(milvus-storage)
+
+----------------------------------------
+
+TITLE: Defining Meta Structure in Go
+DESCRIPTION: Defines the Meta structure used to record the state of the index in IndexCoord. It includes the indexMeta and revision fields.
+
+LANGUAGE: go
+CODE:
+type Meta struct {
+        indexMeta *indexpb.IndexMeta
+        revision  int64
+}
+
+----------------------------------------
+
+TITLE: Checking CPU SIMD Support in Linux
+DESCRIPTION: This command checks if the CPU supports specific SIMD instruction sets required by Milvus for efficient vector operations.
+
+LANGUAGE: bash
+CODE:
+lscpu | grep -e sse4_2 -e avx -e avx2 -e avx512
+
+----------------------------------------
+
+TITLE: Defining Fetch RPC in Proto for Milvus QueryNode
+DESCRIPTION: This Proto definition adds a new RPC interface for the QueryNode to fetch data by primary keys. It's designed to be more efficient than the existing Query interface for this specific use case.
+
+LANGUAGE: proto
+CODE:
+rpc Fetch(FetchRequest) returns (FetchResponse) {}
+
+----------------------------------------
+
+TITLE: QueryCoord Release Collection Proto
+DESCRIPTION: Protocol buffer service and message definitions for collection release in QueryCoord.
+
+LANGUAGE: proto
+CODE:
+service QueryCoord {
+    ...
+    rpc ReleaseCollection(ReleaseCollectionRequest) returns (common.Status) {}
+    ...
+}
+
+message ReleaseCollectionRequest {
+  common.MsgBase base = 1;
+  int64 dbID = 2;
+  int64 collectionID = 3;
+  int64 nodeID = 4;
+}
+
+----------------------------------------
+
+TITLE: Session Configuration in JSON
+DESCRIPTION: JSON structure for storing service session information including server ID, name, address and exclusivity settings.
+
+LANGUAGE: json
+CODE:
+{
+  "ServerID": "ServerID",
+  "ServerName": "ServerName",
+  "Address": "ip:port",
+  "Exclusive": "Exclusive"
+}
+
+----------------------------------------
+
+TITLE: Running Go Static Code Check for Milvus
+DESCRIPTION: Command to run golangci-lint for static code checking in Milvus Go codebase. This should be executed before submitting a pull request to ensure code quality.
+
+LANGUAGE: shell
+CODE:
+$ make static-check
+
+----------------------------------------
+
+TITLE: Defining New Message in Protocol Buffers
+DESCRIPTION: Example of adding a new TestObject message definition in common.proto file
+
+LANGUAGE: proto
+CODE:
+message TestObject {
+    int64 value = 1;
+}
+
+----------------------------------------
+
+TITLE: Defining Cache Interface in Go
+DESCRIPTION: Interface definition for the globalMetaCache component in Proxy, responsible for caching collection and partition metadata.
+
+LANGUAGE: Go
+CODE:
+type Cache interface {
+   GetCollectionID(ctx context.Context, collectionName string) (typeutil.UniqueID, error)
+   GetPartitionID(ctx context.Context, collectionName string, partitionName string) (typeutil.UniqueID, error)
+   GetPartitions(ctx context.Context, collectionName string) (map[string]typeutil.UniqueID, error)
+   GetCollectionSchema(ctx context.Context, collectionName string) (*schemapb.CollectionSchema, error)
+   RemoveCollection(ctx context.Context, collectionName string)
+   RemovePartition(ctx context.Context, collectionName string, partitionName string)
+}
+
+----------------------------------------
+
+TITLE: Drop Collection Message Stream Proto
+DESCRIPTION: Protocol buffer message definition for drop collection requests in the message stream.
+
+LANGUAGE: proto
+CODE:
+message DropCollectionRequest {
+  common.MsgBase base = 1;
+  string db_name = 2;
+  string collectionName = 3;
+  int64 dbID = 4;
+  int64 collectionID = 5;
+}
+
+----------------------------------------
+
+TITLE: Defining Message Base Structure in Go
+DESCRIPTION: Defines the MsgBase structure used as a base for various messages in the Milvus system.
+
+LANGUAGE: go
+CODE:
+type MsgBase struct {
+	MsgType   MsgType
+	MsgID	    UniqueID
+	Timestamp Timestamp
+	SourceID  UniqueID
+}
+
+----------------------------------------
+
+TITLE: Formatting Go Code in Milvus
+DESCRIPTION: Command to format Go code in the Milvus project using the project's defined formatting rules.
+
+LANGUAGE: shell
+CODE:
+$ make fmt
+
+----------------------------------------
+
+TITLE: Defining channelsTimeTicker Interface in Go
+DESCRIPTION: Interface definition for the channelsTimeTicker component in Proxy, responsible for collecting timestamp information for physical channels.
+
+LANGUAGE: Go
+CODE:
+type channelsTimeTicker interface {
+   start() error
+   close() error
+   addPChan(pchan pChan) error
+   removePChan(pchan pChan) error
+   getLastTick(pchan pChan) (Timestamp, error)
+   getMinTsStatistics() (map[pChan]Timestamp, error)
+}
+
+----------------------------------------
+
+TITLE: Defining channelsMgr Interface in Go
+DESCRIPTION: Interface definition for the channelsMgr component in Proxy, responsible for managing message streams and channels.
+
+LANGUAGE: Go
+CODE:
+type channelsMgr interface {
+   getChannels(collectionID UniqueID) ([]pChan, error)
+   getVChannels(collectionID UniqueID) ([]vChan, error)
+   createDQLStream(collectionID UniqueID) error
+   getDQLStream(collectionID UniqueID) (msgstream.MsgStream, error)
+   removeDQLStream(collectionID UniqueID) error
+   removeAllDQLStream() error
+   createDMLMsgStream(collectionID UniqueID) error
+   getDMLStream(collectionID UniqueID) (msgstream.MsgStream, error)
+   removeDMLStream(collectionID UniqueID) error
+   removeAllDMLStream() error
+}
+
+----------------------------------------
+
+TITLE: Defining Root Coordinator Core Structure in Go
+DESCRIPTION: Defines the Core structure for the Root Coordinator, including various components and functions for managing Milvus operations.
+
+LANGUAGE: go
+CODE:
+type Core struct {
+	MetaTable *metaTable
+	IDAllocator       func(count uint32) (typeutil.UniqueID, typeutil.UniqueID, error)
+	IDAllocatorUpdate func() error
+	TSOAllocator       func(count uint32) (typeutil.Timestamp, error)
+	TSOAllocatorUpdate func() error
+	ctx     context.Context
+	cancel  context.CancelFunc
+	etcdCli *clientv3.Client
+	kvBase  *etcdkv.etcdKV
+	SendTimeTick func(t typeutil.Timestamp) error
+	SendDdCreateCollectionReq func(ctx context.Context, req *msgpb.CreateCollectionRequest, channelNames []string) error
+	SendDdDropCollectionReq func(ctx context.Context, req *msgpb.DropCollectionRequest, channelNames []string) error
+	SendDdCreatePartitionReq func(ctx context.Context, req *msgpb.CreatePartitionRequest, channelNames []string) error
+	SendDdDropPartitionReq func(ctx context.Context, req *msgpb.DropPartitionRequest, channelNames []string) error
+	DataCoordSegmentChan <-chan *ms.MsgPack
+	DataNodeFlushedSegmentChan <-chan *ms.MsgPack
+	CallGetBinlogFilePathsService func(segID typeutil.UniqueID, fieldID typeutil.UniqueID) ([]string, error)
+	CallGetNumRowsService         func(segID typeutil.UniqueID, isFromFlushedChan bool) (int64, error)
+	CallBuildIndexService func(ctx context.Context, binlog []string, field *schemapb.FieldSchema, idxInfo *etcdpb.IndexInfo) (typeutil.UniqueID, error)
+	CallDropIndexService  func(ctx context.Context, indexID typeutil.UniqueID) error
+	NewProxyClient func(sess *sessionutil.Session) (types.Proxy, error)
+	CallReleaseCollectionService func(ctx context.Context, ts typeutil.Timestamp, dbID typeutil.UniqueID, collectionID typeutil.UniqueID) error
+	ddReqQueue chan reqTask
+	dmlChannels *dmlChannels
+	proxyManager *proxyManager
+	proxyClientManager *proxyClientManager
+	chanTimeTick *timetickSync
+	lastTimeTick typeutil.Timestamp
+	stateCode atomic.Value
+	initOnce  sync.Once
+	startOnce sync.Once
+	session     *sessionutil.Session
+	sessCloseCh <-chan bool
+	msFactory ms.Factory
+}
+
+----------------------------------------
+
+TITLE: Installing clang-format for C++ Code Styling in Milvus
+DESCRIPTION: Command to install clang-format, which is used for C++ code formatting in the Milvus project.
+
+LANGUAGE: shell
+CODE:
+$ sudo apt-get install clang-format
+
+----------------------------------------
+
+TITLE: Component State Management Structures
+DESCRIPTION: Defines data structures for managing component states including state codes, component info, and overall component states.
+
+LANGUAGE: go
+CODE:
+type StateCode = int
+
+const (
+	INITIALIZING StateCode = 0
+	HEALTHY      StateCode = 1
+	ABNORMAL     StateCode = 2
+)
+
+type ComponentInfo struct {
+	NodeID    UniqueID
+	Role      string
+	StateCode StateCode
+	ExtraInfo []*commonpb.KeyValuePair
+}
+
+type ComponentStates struct {
+	State                *ComponentInfo
+	SubcomponentStates   []*ComponentInfo
+	Status               *commonpb.Status
+}
+
+----------------------------------------
+
+TITLE: Defining pChanStatInfo Struct in Go
+DESCRIPTION: Structure definition for storing timestamp statistics for physical channels in the Proxy's taskScheduler.
+
+LANGUAGE: Go
+CODE:
+type Timestamp = uint64
+type pChan = string
+
+type pChanStatInfo struct {
+   maxTs Timestamp
+   minTs Timestamp
+  tsSet map[Timestamp] struct{}
+}
+
+----------------------------------------
+
+TITLE: Configuring Milvus Storage Package in CMake
+DESCRIPTION: Sets up the Milvus Storage package configuration, including version, repository URL, and build options. It uses FetchContent to download and build the package from source.
+
+LANGUAGE: CMake
+CODE:
+milvus_add_pkg_config("milvus-storage")
+set_property(DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR} PROPERTY INCLUDE_DIRECTORIES "")
+set( milvus-storage_VERSION 26992ec )
+set( GIT_REPOSITORY  "https://github.com/milvus-io/milvus-storage.git")
+message(STATUS "milvus-storage repo: ${GIT_REPOSITORY}")
+message(STATUS "milvus-storage version: ${milvus-storage_VERSION}")
+
+message(STATUS "Building milvus-storage-${milvus-storage_SOURCE_VER} from source")
+message(STATUS ${CMAKE_BUILD_TYPE})
+
+if ( ENABLE_AZURE_FS STREQUAL "ON" )
+    set(WITH_AZURE_FS ON CACHE BOOL "" FORCE )
+else ()
+    set(WITH_AZURE_FS OFF CACHE BOOL "" FORCE )
+endif ()
+
+set( CMAKE_PREFIX_PATH ${CONAN_BOOST_ROOT} )
+FetchContent_Declare(
+        milvus-storage
+        GIT_REPOSITORY  ${GIT_REPOSITORY}
+        GIT_TAG         ${milvus-storage_VERSION}
+        SOURCE_DIR      ${CMAKE_CURRENT_BINARY_DIR}/milvus-storage-src
+        BINARY_DIR      ${CMAKE_CURRENT_BINARY_DIR}/milvus-storage-build
+        SOURCE_SUBDIR   cpp
+        DOWNLOAD_DIR    ${THIRDPARTY_DOWNLOAD_PATH} )
+
+FetchContent_GetProperties( milvus-storage )
+if ( NOT milvus-storage_POPULATED )
+    FetchContent_Populate( milvus-storage )
+
+    # Adding the following target:
+    # milvus-storage
+    add_subdirectory( ${milvus-storage_SOURCE_DIR}/cpp
+                      ${milvus-storage_BINARY_DIR} )
+endif()
+
+set( MILVUS_STORAGE_INCLUDE_DIR ${milvus-storage_SOURCE_DIR}/cpp/include CACHE INTERNAL "Path to milvus-storage include directory" )
+
+----------------------------------------
+
+TITLE: Message Pack Filtering Algorithm
+DESCRIPTION: Pseudocode implementation for filtering message packs based on segment positions during recovery. Handles multiple segments and their corresponding positions using time-based thresholds.
+
+LANGUAGE: go
+CODE:
+const filter_threshold = recovery_time
+// mp means msgPack
+for mp := seeking(p1) {
+    if mp.position.endtime < filter_threshold {
+        if mp.position < p3 {
+            filter s3
+        }
+        if mp.position < p2 {
+            filter s2
+        }
+    }
+}
+
+----------------------------------------
+
+TITLE: Checking C++ Code Style in Milvus
+DESCRIPTION: Command to run the C++ code style check in the Milvus project using the project's defined style rules.
+
+LANGUAGE: shell
+CODE:
+$ make cppcheck
+
+----------------------------------------
+
+TITLE: Defining task Interface in Go
+DESCRIPTION: Interface definition for individual tasks managed by the Proxy's taskScheduler. Specifies methods for task lifecycle and execution.
+
+LANGUAGE: Go
+CODE:
+type task interface {
+  TraceCtx() context.Context
+  ID() UniqueID       // return ReqID
+  SetID(uid UniqueID) // set ReqID
+  Name() string
+  Type() commonpb.MsgType
+  BeginTs() Timestamp
+  EndTs() Timestamp
+  SetTs(ts Timestamp)
+  OnEnqueue() error
+  PreExecute(ctx context.Context) error
+  Execute(ctx context.Context) error
+  PostExecute(ctx context.Context) error
+  WaitToFinish() error
+  Notify(err error)
+}
+
+----------------------------------------
+
+TITLE: Adding rdkafka Package Configuration in CMake for Milvus
+DESCRIPTION: This snippet adds the rdkafka package configuration to the Milvus project using a custom CMake function. It ensures that the necessary Kafka-related dependencies are properly linked.
+
+LANGUAGE: CMake
+CODE:
+milvus_add_pkg_config("rdkafka")
+
+----------------------------------------
+
+TITLE: Defining SaveBinlogPathsRequest Protocol Buffer for DataCoord RPC
+DESCRIPTION: Protocol buffer definition for the SaveBinlogPaths RPC in DataCoord. It includes structures for ID2PathList, CheckPoint, and SaveBinlogPathsRequest, which are used to save binlog paths and checkpoint information.
+
+LANGUAGE: proto
+CODE:
+rpc SaveBinlogPaths(SaveBinlogPathsRequest) returns (common.Status){}
+message ID2PathList {
+    int64 ID = 1;
+    repeated string Paths = 2;
+}
+
+message CheckPoint {
+    int64 segmentID = 1;
+    msgpb.MsgPosition position = 2;
+    int64 num_of_rows = 3;
+}
+
+message SaveBinlogPathsRequest {
+    common.MsgBase base = 1;
+    int64 segmentID = 2;
+    int64 collectionID = 3;
+    repeated ID2PathList field2BinlogPaths = 4;
+    repeated CheckPoint checkPoints = 7;
+    repeated SegmentStartPosition start_positions = 6;
+    bool flushed = 7;
+ }
+
+----------------------------------------
+
+TITLE: Running All Go Unit Tests in Milvus
+DESCRIPTION: Command to run all Go unit tests in the Milvus project using make.
+
+LANGUAGE: shell
+CODE:
+$ make test-go
+
+----------------------------------------
+
+TITLE: Parsing Hybrid Timestamp in Python
+DESCRIPTION: Python implementation for parsing a hybrid timestamp, demonstrating how to extract the physical timestamp and convert it to a human-readable datetime format. The example includes constants for bit manipulation and a complete usage example.
+
+LANGUAGE: python
+CODE:
+>>> import datetime
+>>> LOGICAL_BITS = 18
+>>> LOGICAL_BITS_MASK = (1 << LOGICAL_BITS) - 1
+>>> def parse_ts(ts):
+...     logical = ts & LOGICAL_BITS_MASK
+...     physical = ts >> LOGICAL_BITS
+...     return physical, logical
+... 
+>>> ts = 429164525386203142
+>>> utc_ts_in_milliseconds, _ = parse_ts(ts)
+>>> d = datetime.datetime.fromtimestamp(utc_ts_in_milliseconds / 1000.0)
+>>> d.strftime('%Y-%m-%d %H:%M:%S')
+'2021-11-17 15:05:41'
+>>> 
+
+----------------------------------------
+
+TITLE: Defining InsertRequest in Protobuf
+DESCRIPTION: Specifies the structure for inserting data into a collection or partition. It includes fields for collection and partition names, and row data.
+
+LANGUAGE: protobuf
+CODE:
+message InsertRequest {
+  common.MsgBase base = 1;
+  string db_name = 2;
+  string collection_name = 3;
+  string partition_name = 4;
+  repeated common.Blob row_data = 5;
+  repeated uint32 hash_keys = 6;
+}
+
+message Blob {
+  bytes value = 1;
+}
+
+----------------------------------------
+
+TITLE: Defining ChannelTimeTickMsg for Timestamp Reporting in Protocol Buffers
+DESCRIPTION: This proto definition specifies the ChannelTimeTickMsg structure used by Proxy to report timestamps to RootCoord. It includes the UpdateChannelTimeTick RPC method and the message structure for channel names and timestamps.
+
+LANGUAGE: proto
+CODE:
+service RootCoord {
+    ...
+    rpc UpdateChannelTimeTick(internal.ChannelTimeTickMsg) returns (common.Status) {}
+    ... 
+}
+
+message ChannelTimeTickMsg {
+  common.MsgBase base = 1;
+  repeated string channelNames = 2;
+  repeated uint64 timestamps = 3;
+  uint64 default_timestamp = 4;
+}
+
+----------------------------------------
+
+TITLE: MEP Template Structure in Markdown
+DESCRIPTION: Standardized template for documenting Milvus Enhancement Proposals with sections for proposal status, summary, motivation, interfaces, design details, compatibility, testing, alternatives, and references.
+
+LANGUAGE: markdown
+CODE:
+# MEP(Milvus Enhancement Proposals) Templates
+
+Current state: [One of "Under Discussion", "Accepted", "Rejected"]
+
+ISSUE: link to the GitHub issue
+
+Keywords: list keywords about this MEP
+
+Released: <Milvus Release Version>
+
+## Summary(required)
+
+What are we going to do?
+
+## Motivation(required)
+
+Why are we doing this?
+
+## Public Interfaces(optional)
+
+Briefly list any new interfaces that will be introduced as part of this proposal or any existing interfaces that will be removed or changed.
+
+## Design Details(required)
+
+Describe the new thing you want to do in appropriate detail. This may be fairly extensive and have large subsections of its own. Or it may be a few sentences. Use judgment based on the scope of the change.
+
+## Compatibility, Deprecation, and Migration Plan(optional)
+
+- What impact (if any) will there be on existing users?
+- If we are changing behaviors how will we phase out the older behavior?
+- If we need special migration tools, describe them here.
+- When will we remove the existing behavior?
+
+## Test Plan(required)
+
+Describe in a few sentences how the MEP will be tested. We are mostly interested in system tests (since unit tests are specific to implementation details). How will we know that the implementation works as expected? How will we know nothing broke?
+
+## Rejected Alternatives(optional)
+
+If there are alternative ways of accomplishing the same thing, what were they? The purpose of this section is to motivate why the design is the way it is and not some other ways.
+
+## References(optional)
+
+Briefly list all references
+
+----------------------------------------
+
+TITLE: Running Specific Go Package Tests in Milvus
+DESCRIPTION: Example of running unit tests for a specific Go package (datanode) in Milvus, including coverage information.
+
+LANGUAGE: shell
+CODE:
+$ go test ./internal/datanode -cover
+
+----------------------------------------
+
+TITLE: Defining Status Response in Protobuf
+DESCRIPTION: Specifies the structure for status responses from the Milvus server. It includes an error code and a reason string.
+
+LANGUAGE: protobuf
+CODE:
+message Status {
+  ErrorCode error_code = 1;
+  string reason = 2;
+}
+
+----------------------------------------
+
+TITLE: Apache 2.0 License Header for Milvus
+DESCRIPTION: Standard copyright and license notice that appears at the top of Milvus source files. Includes copyright statement, Apache 2.0 license reference, and standard disclaimer about software being provided as-is.
+
+LANGUAGE: plaintext
+CODE:
+// Copyright (C) 2019-2020 Zilliz. All rights reserved.
+//
+// Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except in compliance
+// with the License. You may obtain a copy of the License at
+//
+// http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software distributed under the License
+// is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express
+// or implied. See the License for the specific language governing permissions and limitations under the License
+
+----------------------------------------
+
+TITLE: Introducing LazyPkStats in Milvus pkoracle Package
+DESCRIPTION: Explains the LazyPkStats wrapper, which allows for lazy loading of PkStats. It can be added asynchronously but is not suitable for growing segments.
+
+LANGUAGE: Markdown
+CODE:
+## LazyPkStats
+
+A wrapper for lazy loading PkStats. The inner PkStats could be added async.
+
+*CANNOT* be used for growing segment.
+
+----------------------------------------
+
+TITLE: Running Specific Go Sub-tests in Milvus
+DESCRIPTION: Example of running a specific sub-test within the Go tests for Milvus, focusing on 'SegmentReplica' and 'segmentFlushed' tests.
+
+LANGUAGE: shell
+CODE:
+$ go test ./internal/datanode -run SegmentReplica/segmentFlushed
+
+----------------------------------------
+
+TITLE: Defining Dependency Versions for Milvus Project
+DESCRIPTION: This snippet specifies the version numbers for various dependencies used in the Milvus project. It includes versions for Google Test, yaml-cpp, OpenTracing, Protocol Buffers, libunwind, gperftools, and jemalloc.
+
+LANGUAGE: plaintext
+CODE:
+GTEST_VERSION=1.8.1
+YAMLCPP_VERSION=0.6.3
+OPENTRACING_VERSION=v1.5.1
+PROTOBUF_VERSION=3.9.0
+LIBUNWIND_VERSION=1.6.2
+GPERFTOOLS_VERSION=2.9.1
+MILVUS_JEMALLOC_BUILD_VERSION=5.2.1
+
+----------------------------------------
+
+TITLE: Defining MsgBase Structure in Protobuf
+DESCRIPTION: Defines the base message structure used in Milvus requests. It includes fields for message type, ID, timestamp, and source ID.
+
+LANGUAGE: protobuf
+CODE:
+message MsgBase {
+  MsgType msg_type = 1;
+  int64  msgID = 2;
+  uint64 timestamp = 3;
+  int64 sourceID = 4;
+}
+
+----------------------------------------
+
+TITLE: Defining Proxy Interface in Go
+DESCRIPTION: Defines the Proxy interface with a method for invalidating collection metadata cache.
+
+LANGUAGE: go
+CODE:
+type Proxy interface {
+	Component
+
+	// InvalidateCollectionMetaCache notifies Proxy to clear all the meta cache of specific collection.
+	InvalidateCollectionMetaCache(ctx context.Context, request *proxypb.InvalidateCollMetaCacheRequest) (*commonpb.Status, error)
+}
+
+----------------------------------------
+
+TITLE: Environment Requirements for Milvus
+DESCRIPTION: Lists the required operating system and development tools versions needed for Milvus compilation.
+
+LANGUAGE: plaintext
+CODE:
+OS: Ubuntu 20.04
+go：1.21
+cmake: >=3.18
+gcc： 7.5
+
+----------------------------------------
+
+TITLE: Generating Mockery Implementations for Milvus
+DESCRIPTION: Command to generate mock implementations using Mockery for unit test dependencies in Milvus.
+
+LANGUAGE: shell
+CODE:
+make generate-mockery
+
+----------------------------------------
+
+TITLE: Defining Create Collection Request in Go
+DESCRIPTION: Defines the CreateCollectionRequest structure used for creating a new collection in Milvus.
+
+LANGUAGE: go
+CODE:
+type CreateCollectionRequest struct {
+	Base           *commonpb.MsgBase
+	DbName         string
+	CollectionName string
+	Schema         []byte
+    ShardsNum      int32
+}
+
+----------------------------------------
+
+TITLE: Declaring and Fetching simdjson Library with CMake
+DESCRIPTION: Uses FetchContent to declare and make available the simdjson library version 3.12.2. Sets up the include directory for the fetched library.
+
+LANGUAGE: CMake
+CODE:
+FetchContent_Declare(
+    simdjson
+    URL https://github.com/simdjson/simdjson/archive/refs/tags/v3.12.2.tar.gz
+    URL_HASH MD5=79dcf1a542c6a5e6fe7214f6b1a38303
+)
+FetchContent_MakeAvailable(simdjson)
+
+set( SIMDJSON_INCLUDE_DIR ${simdjson_SOURCE_DIR}/include CACHE INTERNAL "Path to simdjson include directory" )
+
+----------------------------------------
+
+TITLE: Running Unit Tests
+DESCRIPTION: Commands for running various unit tests including Go and C++ test cases.
+
+LANGUAGE: shell
+CODE:
+$ make unittest
+$ make test-go
+$ make test-cpp
+
+----------------------------------------
+
+TITLE: Installing lcov for C++ Code Coverage in Milvus
+DESCRIPTION: Command to install lcov, which is used for generating C++ code coverage reports in Milvus.
+
+LANGUAGE: shell
+CODE:
+$ sudo apt-get install lcov
+
+----------------------------------------
+
+TITLE: Running Milvus Benchmark Test Suite Locally
+DESCRIPTION: Executes a specific test suite locally using the milvus_benchmark tool, specifying host, port, and suite file.
+
+LANGUAGE: bash
+CODE:
+$ cd milvus_benchmark/ && python main.py --local --host=* --port=19530 --suite=suites/2_insert_data.yaml
+
+----------------------------------------
+
+TITLE: Defining MsgBase Structure in Go
+DESCRIPTION: Defines the MsgBase structure containing basic message information such as type, ID, timestamp, and source ID.
+
+LANGUAGE: go
+CODE:
+type MsgBase struct {
+	MsgType   MsgType
+	MsgID     UniqueID
+	Timestamp uint64
+	SourceID  UniqueID
+}
+
+----------------------------------------
+
+TITLE: Configuring GCP Native Storage Build in CMake
+DESCRIPTION: Enables GCP native storage support by adding compiler definitions and including the GCP native storage subdirectory
+
+LANGUAGE: cmake
+CODE:
+if (ENABLE_GCP_NATIVE)
+    add_definitions(-DENABLE_GCP_NATIVE)
+    add_subdirectory(gcp-native-storage)
+endif()
+
+----------------------------------------
+
+TITLE: Configuring Milvus Server for Benchmark Testing
+DESCRIPTION: Kubernetes ConfigMap for specifying Milvus server configuration in a cluster deployment mode.
+
+LANGUAGE: yaml
+CODE:
+kind: ConfigMap
+apiVersion: v1
+metadata:
+  name: server-cluster-8c16m
+  namespace: qa
+  uid: 3752f85c-c840-40c6-a5db-ae44146ad8b5
+  resourceVersion: '42213135'
+  creationTimestamp: '2021-05-14T07:00:53Z'
+  managedFields:
+    - manager: dashboard
+      operation: Update
+      apiVersion: v1
+      time: '2021-05-14T07:00:53Z'
+      fieldsType: FieldsV1
+      fieldsV1:
+        'f:data':
+          .: {}
+          'f:config.yaml': {}
+data:
+  config.yaml: |
+    server:
+      server_tag: "8c16m"
+    milvus:
+      deploy_mode: "cluster"
+
+----------------------------------------
+
+TITLE: Running C++ Unit Tests with Code Coverage in Milvus
+DESCRIPTION: Command to run C++ unit tests and generate code coverage reports in the Milvus project.
+
+LANGUAGE: shell
+CODE:
+$ make codecov-cpp
+
+----------------------------------------
+
+TITLE: RocksMQ Implementation - Go
+DESCRIPTION: RocksDB-based messaging queue implementation with support for channels, consumer groups, and message operations.
+
+LANGUAGE: go
+CODE:
+type RocksMQ struct {
+	store		*gorocksdb.DB
+	kv			kv.Base
+	idAllocator IDAllocator
+	produceMu	sync.Mutex
+	consumeMu	sync.Mutex
+}
+
+----------------------------------------
+
+TITLE: Building Index Builder Benchmark Executable
+DESCRIPTION: Creates and configures the index builder benchmark executable with its required dependencies.
+
+LANGUAGE: cmake
+CODE:
+add_executable(indexbuilder_bench ${indexbuilder_bench_srcs})
+target_link_libraries(indexbuilder_bench
+        milvus_core
+        knowhere
+        pthread
+        )
+
+target_link_libraries(indexbuilder_bench benchmark_main)
+
+----------------------------------------
+
+TITLE: Starting Docker Components for Integration Tests
+DESCRIPTION: Command to start required third-party components using Docker Compose for integration testing.
+
+LANGUAGE: bash
+CODE:
+cd [milvus-folder]/deployments/docker/dev && docker compose up -d
+
+----------------------------------------
+
+TITLE: Cloning Milvus Repository and Preparing Build Environment
+DESCRIPTION: Commands to clone the Milvus repository and set up the build directory structure
+
+LANGUAGE: bash
+CODE:
+git clone https://github.com/milvus-io/milvus.git
+cp -r milvus/build/deb .
+cd deb
+
+----------------------------------------
+
+TITLE: Running Full Integration Test Suite
+DESCRIPTION: Commands to compile Milvus and execute the complete integration test suite.
+
+LANGUAGE: bash
+CODE:
+cd [milvus-folder]
+make milvus # milvus needs to be compiled to make cpp build ready
+./scripts/run_intergration_test.sh
+
+----------------------------------------
+
+TITLE: Message Stream Service Client Interface - Go
+DESCRIPTION: Defines the core client interface for message stream service with methods for creating, destroying, and describing channels.
+
+LANGUAGE: go
+CODE:
+type Client interface {
+	CreateChannels(req CreateChannelRequest) (CreateChannelResponse, error)
+	DestroyChannels(req DestroyChannelRequest) error
+	DescribeChannels(req DescribeChannelRequest) (DescribeChannelResponse, error)
+}
+
+----------------------------------------
+
+TITLE: Configuring Milvus Clustering Library Build in CMake
+DESCRIPTION: Configures the build system to create an object library named milvus_clustering. Uses a helper function to recursively add source files from the current directory.
+
+LANGUAGE: cmake
+CODE:
+add_source_at_current_directory_recursively()
+add_library(milvus_clustering OBJECT ${SOURCE_FILES})
+
+----------------------------------------
+
+TITLE: Verifying Docker Compose Version
+DESCRIPTION: Command to check Docker Compose version and its dependencies including docker-py, CPython, and OpenSSL versions.
+
+LANGUAGE: shell
+CODE:
+$ docker compose version
+
+docker compose version 1.25.5, build 8a1c60f6
+docker-py version: 4.1.0
+CPython version: 3.7.5
+OpenSSL version: OpenSSL 1.1.1f  31 Mar 2020
+
+----------------------------------------
+
+TITLE: Building Milvus Deb Package in Docker Container
+DESCRIPTION: Commands to run Docker container and build the Deb package with version and maintainer information
+
+LANGUAGE: bash
+CODE:
+sudo docker run -v .:/deb -ti --entrypoint /bin/bash milvusdb/milvus:v$VERSION
+# in the container
+cd /deb
+bash build_deb.sh $VERSION $VERSION $MAINTAINER $DEBEMAIL
+
+----------------------------------------
+
+TITLE: Defining DropIndex Structure for IndexNode in Go for Milvus Index Service
+DESCRIPTION: Defines the DropIndexRequest structure for the IndexNode's DropIndex method, using IndexID to identify the index to be dropped.
+
+LANGUAGE: go
+CODE:
+type DropIndexRequest struct {
+	IndexID UniqueID
+}
+
+----------------------------------------
+
+TITLE: Defining Python Package Dependencies
+DESCRIPTION: Specifies required Python packages and their versions for test result analysis functionality. Includes prettytable for formatted output, pyarrow for Apache Arrow support, and fastparquet for Parquet file handling.
+
+LANGUAGE: text
+CODE:
+prettytable==3.8.0
+pyarrow==14.0.1
+fastparquet==2023.7.0
+
+----------------------------------------
+
+TITLE: Defining Directory Structure for Milvus Go Client Test Framework
+DESCRIPTION: Illustrates the directory structure of the Milvus Go Client test framework, showing the organization of test cases, helper functions, and common utilities.
+
+LANGUAGE: plaintext
+CODE:
+/go_client/
+├── testcases/           # Main test cases
+│   ├── helper/          # Helper functions and utilities
+│   │   ├── helper.go
+│   │   ├── data_helper.go
+│   │   └── collection_helper.go
+│   ├── search_test.go   # Search functionality tests
+│   ├── index_test.go    # Index management tests
+│   └── ...
+├── common/             # Common utilities and constants
+└── base/               # Base infrastructure code
+
+----------------------------------------
+
+TITLE: Installing Milvus Deb Package
+DESCRIPTION: Commands to update package lists and install the Milvus Deb package on Ubuntu
+
+LANGUAGE: bash
+CODE:
+sudo apt-get update
+sudo dpkg -i milvus_$VERSION-1_amd64.deb # This package is in the milvus-deb directory
+sudo apt-get -f install
+
+----------------------------------------
+
+TITLE: Running Tests for Milvus Go Client
+DESCRIPTION: Provides commands for running tests in the Milvus Go Client test framework, including running all tests, specific tests, and using gotestsum for advanced test execution options.
+
+LANGUAGE: bash
+CODE:
+# Run all tests
+go test ./testcases/...
+
+# Run specific test
+go test -run TestYourFeature ./testcases/
+
+# Run with verbose output
+go test -v ./testcases/...
+
+# gotestsum
+Recommend you to use gotestsum https://github.com/gotestyourself/gotestsum
+
+# Run all default cases
+gotestsum --format testname --hide-summary=output -v ./testcases/... --addr=127.0.0.1:19530 -timeout=30m
+
+# Run a specified file
+gotestsum --format testname --hide-summary=output ./testcases/collection_test.go ./testcases/main_test.go --addr=127.0.0.1:19530
+
+# Run L3 rg cases
+gotestsum --format testname --hide-summary=output -v ./testcases/advcases/... --addr=127.0.0.1:19530 -timeout=30m -tags=rg
+
+# Run advanced rg cases and default cases
+# rg cases conflicts with default cases, so -p=1 is required
+gotestsum --format testname --hide-summary=output -v ./testcases/... --addr=127.0.0.1:19530 -timeout=30m -tags=rg -p 1
+
+----------------------------------------
+
+TITLE: Defining GetIndexFilePaths Structures in Go for Milvus Index Service
+DESCRIPTION: Defines structures for getting index file paths, including GetIndexFilePathsRequest, IndexFilePathInfo, and GetIndexFilePathsResponse.
+
+LANGUAGE: go
+CODE:
+type GetIndexFilePathsRequest struct {
+	IndexBuildIDs []UniqueID
+}
+
+type IndexFilePathInfo struct {
+	Status         *commonpb.Status
+	IndexBuildID   UniqueID
+	IndexFilePaths []string
+}
+
+type GetIndexFilePathsResponse struct {
+	Status    *commonpb.Status
+	FilePaths []*IndexFilePathInfo
+}
+
+----------------------------------------
+
+TITLE: Library Target Definition
+DESCRIPTION: Creates the Milvus bitset library target as an object library using the configured source files.
+
+LANGUAGE: cmake
+CODE:
+add_library(milvus_bitset OBJECT ${BITSET_SRCS})
+
+----------------------------------------
+
+TITLE: Installing PyMilvus Test Dependencies
+DESCRIPTION: Command to install required Python packages for running PyMilvus tests from the requirements.txt file
+
+LANGUAGE: bash
+CODE:
+$ pip install -r requirements.txt
+
+----------------------------------------
+
+TITLE: Checking Milvus Service Status
+DESCRIPTION: Command to verify the running status of Milvus service
+
+LANGUAGE: bash
+CODE:
+sudo systemctl status milvus
+
+----------------------------------------
+
+TITLE: Defining GetIndexStates Structures in Go for Milvus Index Service
+DESCRIPTION: Defines structures for getting index states, including GetIndexStatesRequest, IndexState constants, IndexInfo, and GetIndexStatesResponse.
+
+LANGUAGE: go
+CODE:
+type GetIndexStatesRequest struct {
+	IndexBuildIDs []UniqueID
+}
+
+const (
+	IndexState_IndexStateNone IndexState = 0
+	IndexState_Unissued       IndexState = 1
+	IndexState_InProgress     IndexState = 2
+	IndexState_Finished       IndexState = 3
+	IndexState_Failed         IndexState = 4
+	IndexState_Deleted        IndexState = 5
+)
+
+type IndexInfo struct {
+	State        commonpb.IndexState
+	IndexBuildID UniqueID
+	IndexID      UniqueID
+	IndexName    string
+	Reason       string
+}
+
+type GetIndexStatesResponse struct {
+	Status *commonpb.Status
+	States []*IndexInfo
+}
+
+----------------------------------------
+
+TITLE: Building Milvus Futures Library in CMake
+DESCRIPTION: This snippet adds source files recursively from the current directory and creates an object library named 'milvus_futures' using those source files.
+
+LANGUAGE: CMake
+CODE:
+add_source_at_current_directory_recursively()
+add_library(milvus_futures OBJECT ${SOURCE_FILES})
+
+----------------------------------------
+
+TITLE: Setting Test Log Path Environment Variable
+DESCRIPTION: Command to configure the path where test logs will be stored
+
+LANGUAGE: bash
+CODE:
+$ export CI_LOG_PATH=/tmp/ci_logs/test/
+
+----------------------------------------
+
+TITLE: Uninstalling Milvus Package
+DESCRIPTION: Command to completely remove Milvus package from the system
+
+LANGUAGE: bash
+CODE:
+sudo dpkg -P milvus
+
+----------------------------------------
+
+TITLE: Querying Search Vector Count Rate in Proxy
+DESCRIPTION: PromQL query to calculate the average number of vectors queried per second by each proxy within the past two minutes.
+
+LANGUAGE: PromQL
+CODE:
+sum(increase(milvus_proxy_search_vectors_count{app_kubernetes_io_instance=~"$instance", app_kubernetes_io_name="$app_name", namespace="$namespace"}[2m])/120) by (pod, node_id)
+
+----------------------------------------
+
+TITLE: Defining RegisterNode Structures in Go for Milvus Index Service
+DESCRIPTION: Defines structures for registering nodes in the Index Service, including MsgBase, Address, RegisterNodeRequest, InitParams, and RegisterNodeResponse.
+
+LANGUAGE: go
+CODE:
+type MsgBase struct {
+	MsgType   MsgType
+	MsgID     UniqueID
+	Timestamp uint64
+	SourceID  UniqueID
+}
+
+type Address struct {
+	Ip   string
+	Port int64
+}
+
+type RegisterNodeRequest struct {
+	Base    *commonpb.MsgBase
+	Address *commonpb.Address
+}
+
+type InitParams struct {
+	NodeID      UniqueID
+	StartParams []*commonpb.KeyValuePair
+}
+
+type RegisterNodeResponse struct {
+	InitParams *internalpb.InitParams
+	Status     *commonpb.Status
+}
+
+----------------------------------------
+
+TITLE: Building Milvus Log Library with CMake
+DESCRIPTION: This snippet defines the build process for the Milvus log library. It recursively adds source files from the current directory and creates an object library named 'milvus_log'.
+
+LANGUAGE: CMake
+CODE:
+add_source_at_current_directory_recursively()
+add_library(milvus_log OBJECT ${SOURCE_FILES})
+
+----------------------------------------
+
+TITLE: Calculating Search Latency in Proxy
+DESCRIPTION: PromQL queries to calculate the average latency and 99th percentile of search and query request latency in proxy.
+
+LANGUAGE: PromQL
+CODE:
+histogram_quantile(0.99, sum by (le, query_type, pod, node_id) (rate(milvus_proxy_sq_latency_bucket{app_kubernetes_io_instance=~"$instance", app_kubernetes_io_name="$app_name", namespace="$namespace"}[2m])))
+
+LANGUAGE: PromQL
+CODE:
+sum(increase(milvus_proxy_sq_latency_sum{app_kubernetes_io_instance=~"$instance", app_kubernetes_io_name="$app_name", namespace="$namespace"}[2m])) by (pod, node_id, query_type) / sum(increase(milvus_proxy_sq_latency_count{app_kubernetes_io_instance=~"$instance", app_kubernetes_io_name="$app_name", namespace="$namespace"}[2m])) by (pod, node_id, query_type)
+
+----------------------------------------
+
+TITLE: Accessing Milvus Configuration File
+DESCRIPTION: Command to edit Milvus configuration file for external service setup
+
+LANGUAGE: bash
+CODE:
+sudo vim /etc/milvus/configs/milvus.yaml
+
+----------------------------------------
+
+TITLE: Starting Milvus Standalone Service
+DESCRIPTION: Sets up the environment and starts the Milvus standalone service using the extracted binary files.
+
+LANGUAGE: shell
+CODE:
+$ cd milvus
+$ export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:$PWD/lib
+$ ./bin/milvus run standalone
+
+----------------------------------------
+
+TITLE: Defining TimeTick Structure in Go
+DESCRIPTION: Defines the TimeTick structure responsible for managing time synchronization and tick updates.
+
+LANGUAGE: go
+CODE:
+type timeTick struct {
+	lastTick Timestamp
+	currentTick Timestamp
+	wallTick Timestamp
+	tickStep Timestamp
+	syncInterval Timestamp
+
+	tsAllocator *TimestampAllocator
+	scheduler *taskScheduler
+	ttStream *MessageStream
+
+	ctx context.Context
+}
+
+----------------------------------------
+
+TITLE: Monitoring Collection Loaded Number in Query Node
+DESCRIPTION: PromQL query to count the number of collections loaded into memory by each query node.
+
+LANGUAGE: PromQL
+CODE:
+sum(milvus_querynode_collection_num{app_kubernetes_io_instance=~"$instance", app_kubernetes_io_name="$app_name", namespace="$namespace"}) by (pod, node_id)
+
+----------------------------------------
+
+TITLE: Configuring External Services for Milvus
+DESCRIPTION: YAML configuration for setting up external etcd and MinIO services
+
+LANGUAGE: yaml
+CODE:
+etcd:
+  endpoints: etcd-ip:2379
+  ...
+  use:
+    embed: false
+minio:
+  address: minio-ip
+  ...
+common:
+  storageType: remote
+
+----------------------------------------
+
+TITLE: Basic Milvus Upgrade Command (Shell)
+DESCRIPTION: Specifies the Milvus instance name, source version, and target version for the upgrade process.
+
+LANGUAGE: shell
+CODE:
+./migrate.sh -i my-release -s 2.1.1 -t 2.2.0
+
+----------------------------------------
+
+TITLE: Installing Milvus Dependencies
+DESCRIPTION: Installs the required system libraries for Milvus, including OpenBLAS, GNU OpenMP, and Intel Threading Building Blocks.
+
+LANGUAGE: shell
+CODE:
+$ sudo apt-get install libopenblas-dev
+$ sudo apt-get install libgomp1
+$ sudo apt-get install libtbb2
+
+----------------------------------------
+
+TITLE: Running Single Integration Test Case
+DESCRIPTION: Commands to execute a specific test case with race condition detection and verbose output.
+
+LANGUAGE: bash
+CODE:
+# mq, etcd, minio ready before
+cd [milvus-folder]
+source scripts/setenv.sh
+cd tests/integration/[testcase-folder]/
+go test -run "$testCaseName^" -testify.m "$subTestifyCaseName^" -race -v
+
+----------------------------------------
+
+TITLE: Milvus Upgrade with Custom Namespace (Shell)
+DESCRIPTION: Upgrades Milvus in a specific Kubernetes namespace, useful when Milvus is not installed in the default namespace.
+
+LANGUAGE: shell
+CODE:
+./migrate.sh -i my-release -n milvus -s 2.1.1 -t 2.2.0
+
+----------------------------------------
+
+TITLE: Installing Compilation Dependencies
+DESCRIPTION: Installs necessary development libraries and tools using apt package manager and configures Go environment.
+
+LANGUAGE: shell
+CODE:
+$ sudo apt install -y g++ gcc make libssl-dev zlib1g-dev libboost-regex-dev \
+    libboost-program-options-dev libboost-system-dev libboost-filesystem-dev \
+    libboost-serialization-dev python3-dev libboost-python-dev libcurl4-openssl-dev gfortran libtbb-dev
+$ export GO111MODULE=on
+$ go get github.com/golang/protobuf/protoc-gen-go@v1.3.2
+
+----------------------------------------
+
+TITLE: Defining FlushAndDrop Protocol Buffer Message Structure
+DESCRIPTION: Protocol buffer message definitions for the FlushAndDrop RPC request. Includes structures for handling collection dropping with segment binlog paths and related metadata.
+
+LANGUAGE: protobuf
+CODE:
+message FlushAndDropRequest {
+  common.MsgBase base = 1;
+  string channelID = 2;
+  int64 collectionID = 3;
+  repeated SegmentBinlogPaths segment_binlog_paths = 6;
+}
+
+message SegmentBinlogPaths {
+  int64 segmentID = 1;
+  CheckPoint checkPoint = 2;
+  repeated FieldBinlog field2BinlogPaths = 2;
+  repeated FieldBinlog field2StatslogPaths = 3;
+  repeated DeltaLogInfo deltalogs = 4;
+}
+
+----------------------------------------
+
+TITLE: Running All Test Tasks with Bash Script
+DESCRIPTION: Executes all test tasks using the run.sh script. It requires the root password as a parameter for deleting volume directories.
+
+LANGUAGE: bash
+CODE:
+$ bash run.sh -p ${Password}
+# Password, the password of root"
+
+----------------------------------------
+
+TITLE: Milvus Upgrade with Custom Root Path (Shell)
+DESCRIPTION: Upgrades Milvus with a custom root path, necessary when Milvus is installed with a non-default rootpath.
+
+LANGUAGE: shell
+CODE:
+./migrate.sh -i my-release -n milvus -s 2.1.1 -t 2.2.0 -r by-dev
+
+----------------------------------------
+
+TITLE: Installing OpenBLAS via APT
+DESCRIPTION: Installs OpenBLAS library using Ubuntu's package manager.
+
+LANGUAGE: shell
+CODE:
+sudo apt install -y libopenblas-dev
+
+----------------------------------------
+
+TITLE: Milvus Upgrade with Custom Image Tag (Shell)
+DESCRIPTION: Upgrades Milvus using a specific image tag, useful for installations with custom images.
+
+LANGUAGE: shell
+CODE:
+./migrate.sh -i my-release -n milvus -s 2.1.1 -t 2.2.0 -r by-dev -w milvusdb/milvus:master-20221016-15878781
+
+----------------------------------------
+
+TITLE: Named Arguments Implementation
+DESCRIPTION: Shows two approaches to implementing named arguments using strong types: direct parameter passing and the argument nested type syntax.
+
+LANGUAGE: cpp
+CODE:
+using FirstName = NamedType<std::string, struct FirstNameTag>;
+using LastName = NamedType<std::string, struct LastNameTag>;
+
+static const FirstName::argument firstName;
+static const LastName::argument lastName;
+
+void displayName(FirstName const& theFirstName, LastName const& theLastName);
+
+// Call site
+displayName(firstName = "John", lastName = "Doe");
+
+----------------------------------------
+
+TITLE: Setting Up Environment Variables for Cargo in CMake
+DESCRIPTION: This snippet sets up environment variables for Cargo, specifically modifying the PATH to include the user's .cargo/bin directory. It's used to ensure Cargo is available for the build process.
+
+LANGUAGE: CMake
+CODE:
+set(HOME_VAR $ENV{HOME})
+set(PATH_VAR $ENV{PATH})
+set(ENV{PATH} ${HOME_VAR}/.cargo/bin:${PATH_VAR})
+message($ENV{PATH})
+
+----------------------------------------
+
+TITLE: Milvus Upgrade with Automatic Cleanup (Shell)
+DESCRIPTION: Upgrades Milvus and automatically removes the migration pod after completion.
+
+LANGUAGE: shell
+CODE:
+./migrate.sh -i my-release -n milvus -s 2.1.1 -t 2.2.0 -w milvusdb/milvus:master-20221016-15878781 -d true
+
+----------------------------------------
+
+TITLE: Installing Docker Compose
+DESCRIPTION: Downloads and installs Docker Compose binary with proper permissions and symlinks.
+
+LANGUAGE: shell
+CODE:
+$ sudo curl -L "https://github.com/docker/compose/releases/download/1.27.4/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose
+$ sudo chmod +x /usr/local/bin/docker-compose
+$ sudo ln -s /usr/local/bin/docker-compose /usr/bin/docker-compose
+$ docker-compose --version
+$ docker compose --version
+
+----------------------------------------
+
+TITLE: Inheriting Underlying Type Operations
+DESCRIPTION: Demonstrates how to inherit specific operations from the underlying type using operation traits like Addable and Printable.
+
+LANGUAGE: cpp
+CODE:
+using Meter = NamedType<double, MeterTag, Addable, Printable>
+
+----------------------------------------
+
+TITLE: Generating Milvus Parser Code with Go
+DESCRIPTION: This command uses Go's generate feature to run the Antlr4 tool and create parser code for the Milvus project. The generated code will be placed in the 'generated' directory.
+
+LANGUAGE: shell
+CODE:
+go generate
+
+----------------------------------------
+
+TITLE: Milvus Upgrade Rollback and Retry (Shell)
+DESCRIPTION: Demonstrates how to rollback a failed migration and then reattempt the upgrade process.
+
+LANGUAGE: shell
+CODE:
+./migrate.sh -i my-release -n milvus -s 2.1.1 -t 2.2.0 -r by-dev -o rollback -w <milvus-2-1-1-image>
+./migrate.sh -i my-release -n milvus -s 2.1.1 -t 2.2.0 -r by-dev -o migrate -w <milvus-2-2-0-image>
+
+----------------------------------------
+
+TITLE: Starting Milvus Services
+DESCRIPTION: Commands for starting both third-party services and Milvus cluster components.
+
+LANGUAGE: shell
+CODE:
+$ cd [milvus project path]/deployments/docker/cluster
+$ docker-compose up -d
+$ docker compose up -d
+$ cd [milvus project path]
+$ ./scripts/start_cluster.sh
+
+----------------------------------------
+
+TITLE: Milvus Upgrade with Custom Storage Class (Shell)
+DESCRIPTION: Upgrades Milvus using a specific storage class for the meta migration PVC.
+
+LANGUAGE: shell
+CODE:
+./migrate.sh -i my-release -n milvus -s 2.1.4 -t 2.2.0 -c <special-storage-class>
+
+----------------------------------------
+
+TITLE: Defining Basic Strong Types in C++
+DESCRIPTION: Demonstrates how to create strongly-typed aliases for primitive types using the NamedType template class. This allows creating distinct types for width and height measurements.
+
+LANGUAGE: cpp
+CODE:
+using Width = NamedType<double, struct WidthTag>;
+using Height = NamedType<double, struct HeightTag>;
+
+----------------------------------------
+
+TITLE: Configuration File Reference Path
+DESCRIPTION: Reference path for the segcore configuration YAML file containing default parameters and settings.
+
+LANGUAGE: yaml
+CODE:
+${milvus}/internal/core/unittest/test_utils/test_segcore.yaml
+
+----------------------------------------
+
+TITLE: Milvus Upgrade with External Etcd Service (Shell)
+DESCRIPTION: Upgrades Milvus while specifying an external etcd service, useful for setups not using the default etcd installed with Milvus.
+
+LANGUAGE: shell
+CODE:
+./migrate.sh -i my-release -n milvus -s 2.1.4 -t 2.2.0 -e <etcd-svc-ip:etcd-svc-port>
+
+----------------------------------------
+
+TITLE: Running Code Coverage
+DESCRIPTION: Commands for generating code coverage reports for both Go and C++ code.
+
+LANGUAGE: shell
+CODE:
+$ make codecov
+$ make codecov-go
+$ make codecov-cpp
+
+----------------------------------------
+
+TITLE: Creating Milvus Storage Library in CMake
+DESCRIPTION: Creates the main Milvus storage library as an object library using the configured source files
+
+LANGUAGE: cmake
+CODE:
+add_library(milvus_storage OBJECT ${SOURCE_FILES})
+
+----------------------------------------
+
+TITLE: Strong Typing with Generic Lambda Functions
+DESCRIPTION: Demonstrates how to create strong types for generic types like lambda functions using the Comparator template.
+
+LANGUAGE: cpp
+CODE:
+template<typename Function>
+using Comparator = NamedType<Function, struct ComparatorTag>;
+
+template <typename Function>
+void performAction(Comparator<Function> comp)
+{
+    comp.get()();
+}
+
+performAction(make_named<Comparator>([](){ std::cout << "compare\n"; }));
+
+----------------------------------------
+
+TITLE: Saving Docker Images for Docker Compose Installation
+DESCRIPTION: Installs required Python packages and saves Docker images specified in the docker-compose.yml file.
+
+LANGUAGE: shell
+CODE:
+$ pip3 install -r requirements.txt
+$ python3 save_image.py --manifest docker-compose.yml
+
+----------------------------------------
+
+TITLE: Running Milvus Unit Tests
+DESCRIPTION: This command executes the unit tests for the Milvus project inside the development container.
+
+LANGUAGE: shell
+CODE:
+make unittest
+
+----------------------------------------
+
+TITLE: Setting Up Helm Repository
+DESCRIPTION: Adds and updates the Milvus Helm repository for Kubernetes installation.
+
+LANGUAGE: shell
+CODE:
+$ helm repo add milvus https://zilliztech.github.io/milvus-helm/
+$ helm repo update
+
+----------------------------------------
+
+TITLE: Configuring OpenDAL Storage Build in CMake
+DESCRIPTION: Configures OpenDAL storage support by setting include directories and adding OpenDAL chunk manager source files
+
+LANGUAGE: cmake
+CODE:
+if(USE_OPENDAL)
+    include_directories(${OPENDAL_INCLUDE_DIR})
+    set(SOURCE_FILES ${SOURCE_FILES} opendal/OpenDALChunkManager.cpp)
+endif()
+
+----------------------------------------
+
+TITLE: x86_64 Platform Configuration
+DESCRIPTION: Configures additional source files and compiler flags for x86_64 architecture, enabling AVX2 and AVX512 optimizations.
+
+LANGUAGE: cmake
+CODE:
+if (${CMAKE_SYSTEM_PROCESSOR} STREQUAL "x86_64")
+    list(APPEND BITSET_SRCS
+        detail/platform/x86/avx2-inst.cpp
+        detail/platform/x86/avx512-inst.cpp
+        detail/platform/x86/instruction_set.cpp
+    )
+
+    set_source_files_properties(detail/platform/x86/avx512-inst.cpp PROPERTIES COMPILE_FLAGS "-mavx512f -mavx512bw -mavx512vl -mavx512dq -mavx512cd -mbmi")
+    set_source_files_properties(detail/platform/x86/avx2-inst.cpp PROPERTIES COMPILE_FLAGS "-mavx2 -mavx -mfma -mbmi")
+
+----------------------------------------
+
+TITLE: Generating Kubernetes Manifests
+DESCRIPTION: Creates Kubernetes manifests for either standalone or cluster Milvus deployment using Helm.
+
+LANGUAGE: shell
+CODE:
+$ helm template my-release milvus/milvus --set cluster.enabled=false --set pulsar.enabled=false --set minio.mode=standalone --set etcd.replicaCount=1 > milvus_manifest.yaml
+
+LANGUAGE: shell
+CODE:
+$ helm template my-release milvus/milvus > milvus_manifest.yaml
+
+----------------------------------------
+
+TITLE: Stopping Milvus Dev Containers
+DESCRIPTION: This command stops and removes the Milvus development containers.
+
+LANGUAGE: shell
+CODE:
+./scripts/devcontainer.sh down
+
+----------------------------------------
+
+TITLE: Configuring Azure Blob Storage Build in CMake
+DESCRIPTION: Sets up Azure Blob Storage integration including compiler definitions, include directories, and imported library configurations. Manages build paths and library properties for Azure integration.
+
+LANGUAGE: cmake
+CODE:
+if (DEFINED AZURE_BUILD_DIR)
+    add_definitions(-DAZURE_BUILD_DIR)
+    include_directories(azure-blob-storage)
+    include_directories("${AZURE_BUILD_DIR}/vcpkg_installed/${VCPKG_TARGET_TRIPLET}/include")
+    set(SOURCE_FILES ${SOURCE_FILES} azure/AzureChunkManager.cpp)
+    add_library(azure_blob_chunk_manager SHARED IMPORTED)
+    set_target_properties(azure_blob_chunk_manager
+        PROPERTIES
+        IMPORTED_GLOBAL TRUE
+        IMPORTED_LOCATION "${AZURE_BUILD_DIR}/libblob-chunk-manager${CMAKE_SHARED_LIBRARY_SUFFIX}"
+    )
+    get_target_property(AZURE_IMPORTED_LOCATION azure_blob_chunk_manager IMPORTED_LOCATION)
+    get_target_property(AZURE_INTERFACE_INCLUDE_DIRECTORIES azure_blob_chunk_manager INTERFACE_INCLUDE_DIRECTORIES)
+    message("AZURE_IMPORTED_LOCATION: ${AZURE_IMPORTED_LOCATION}")
+    message("AZURE_INTERFACE_INCLUDE_DIRECTORIES: ${AZURE_INTERFACE_INCLUDE_DIRECTORIES}")
+endif()
+
+----------------------------------------
+
+TITLE: Implementing Scalar Expression Plan Nodes in C++
+DESCRIPTION: Defines various physical plan nodes for scalar expressions, including term expressions, range comparisons, column comparisons, and logical operations.
+
+LANGUAGE: C++
+CODE:
+// ${internal/core}/src/query/Expr.h
+TermExpr
+RangeExpr
+CompareExpr
+LogicalBinaryExpr
+LogicalUnaryExpr
+
+----------------------------------------
+
+TITLE: Loading Docker Images
+DESCRIPTION: Loads the saved Docker images from the images directory into the local Docker environment.
+
+LANGUAGE: shell
+CODE:
+$ for image in $(find . -type f -wholename "./images/*.tar.gz") ; do gunzip -c $image | docker load; done;
+
+----------------------------------------
+
+TITLE: Starting Milvus for E2E Testing
+DESCRIPTION: These commands start a Milvus instance for running end-to-end tests, using either standalone or cluster mode.
+
+LANGUAGE: shell
+CODE:
+cd deployments/docker/dev
+docker compose up -d
+cd ../../../
+build/builder.sh /bin/bash -c "export ROCKSMQ_PATH='/tmp/milvus/rdb_data' && ./scripts/start_standalone.sh && cat"
+
+LANGUAGE: shell
+CODE:
+build/builder.sh /bin/bash -c "./scripts/start_cluster.sh && cat"
+
+----------------------------------------
+
+TITLE: Installing Milvus
+DESCRIPTION: Commands for installing Milvus using either Docker Compose or Kubernetes.
+
+LANGUAGE: shell
+CODE:
+$ docker compose -f docker-compose.yml up -d
+
+LANGUAGE: shell
+CODE:
+$ kubectl apply -f milvus_manifest.yaml
+
+----------------------------------------
+
+TITLE: Configuring Azure Blob Storage Library Build
+DESCRIPTION: Configures the compilation of blob-chunk-manager shared library with Azure storage and identity dependencies, including compiler flags and installation settings.
+
+LANGUAGE: cmake
+CODE:
+find_package(azure-storage-blobs-cpp CONFIG REQUIRED)
+find_package(azure-identity-cpp CONFIG REQUIRED)
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wno-unused-parameter -Wno-return-type -Wno-pedantic -fPIC")
+add_library(blob-chunk-manager SHARED AzureBlobChunkManager.cpp)
+target_link_libraries(blob-chunk-manager PUBLIC Azure::azure-identity Azure::azure-storage-blobs)
+install(TARGETS blob-chunk-manager DESTINATION "${CMAKE_INSTALL_LIBDIR}")
+
+if ( BUILD_UNIT_TEST STREQUAL "ON" )
+    add_subdirectory(test)
+endif ()
+
+----------------------------------------
+
+TITLE: Certificate Generation Script
+DESCRIPTION: Shell script to generate CA, server, and client certificates with custom parameters
+
+LANGUAGE: shell
+CODE:
+#!/usr/bin/env sh
+# your variables
+Country="CN"
+State="Shanghai"
+Location="Shanghai"
+Organization="milvus"
+OrganizationUnit="milvus"
+CommonName="localhost"
+
+echo "generate ca.key"
+openssl genpkey -algorithm RSA -out ca.key
+
+echo "generate ca.pem"
+openssl req -new -x509 -key ca.key -out ca.pem -days 3650 -subj "/C=$Country/ST=$State/L=$Location/O=$Organization/OU=$OrganizationUnit/CN=$CommonName"
+
+echo "generate server SAN certificate"
+openssl genpkey -algorithm RSA -out server.key
+openssl req -new -nodes -key server.key -out server.csr -days 3650 -subj "/C=$Country/O=$Organization/OU=$OrganizationUnit/CN=$CommonName" -config ./openssl.cnf -extensions v3_req
+openssl x509 -req -days 3650 -in server.csr -out server.pem -CA ca.pem -CAkey ca.key -CAcreateserial -extfile ./openssl.cnf -extensions v3_req
+
+echo "generate client SAN certificate"
+openssl genpkey -algorithm RSA -out client.key
+openssl req -new -nodes -key client.key -out client.csr -days 3650 -subj "/C=$Country/O=$Organization/OU=$OrganizationUnit/CN=$CommonName" -config ./openssl.cnf -extensions v3_req
+openssl x509 -req -days 3650 -in client.csr -out client.pem -CA ca.pem -CAkey ca.key -CAcreateserial -extfile ./openssl.cnf -extensions v3_req
+
+----------------------------------------
+
+TITLE: Uninstalling Milvus
+DESCRIPTION: Commands for uninstalling Milvus from either Docker Compose or Kubernetes environment.
+
+LANGUAGE: shell
+CODE:
+$ docker compose -f docker-compose.yml down
+
+LANGUAGE: shell
+CODE:
+$ kubectl delete -f milvus_manifest.yaml
+
+----------------------------------------
+
+TITLE: Running Milvus E2E Tests
+DESCRIPTION: These commands set up and run the end-to-end tests for Milvus using Python SDK and pytest.
+
+LANGUAGE: shell
+CODE:
+MILVUS_SERVICE_IP=$(docker inspect -f '{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}' $(docker compose ps -q builder))
+cd tests/docker
+docker compose run --rm pytest /bin/bash -c "pytest --host ${MILVUS_SERVICE_IP}"
+
+----------------------------------------
+
+TITLE: Building Milvus Segcore Library with CMake
+DESCRIPTION: Configures and builds the Milvus segcore library as an object library, with conditional debug checking for sorted data
+
+LANGUAGE: cmake
+CODE:
+add_source_at_current_directory_recursively()
+add_library(milvus_segcore OBJECT ${SOURCE_FILES})
+
+if(CMAKE_BUILD_TYPE STREQUAL "Debug")
+    set(CHECK_SORTED ON)
+else()
+    set(CHECK_SORTED OFF)
+endif()
+
+add_definitions(-DCHECK_SORTED=${CHECK_SORTED})
+
+----------------------------------------
+
+TITLE: Activating Git Hooks in Repository
+DESCRIPTION: This command installs the git hooks in the current repository, enabling them for use in the project.
+
+LANGUAGE: shell
+CODE:
+git hooks install
+
+----------------------------------------
+
+TITLE: Exporting Milvus Logs with Default Settings
+DESCRIPTION: This command exports logs for a Milvus instance installed via Helm. It uses default settings for namespace and log storage directory.
+
+LANGUAGE: shell
+CODE:
+./export-milvus-log.sh -i my-release
+
+----------------------------------------
+
+TITLE: Running Milvus E2E Tests
+DESCRIPTION: Bash commands to set up a Milvus environment and run E2E tests using Python SDK.
+
+LANGUAGE: bash
+CODE:
+cd deployments/docker/dev
+docker compose up -d
+cd ../../../
+./scripts/start_cluster.sh
+
+cd tests/python_client
+pip install -r requirements.txt
+pytest --tags=L0 -n auto
+
+----------------------------------------
+
+TITLE: Exporting Milvus Logs for Operator-Installed Instance
+DESCRIPTION: This command exports logs for a Milvus instance installed via the Milvus operator. The -o flag is required for operator-installed instances.
+
+LANGUAGE: shell
+CODE:
+./export-milvus-log.sh -i my-release -o
+
+----------------------------------------
+
+TITLE: Configuring Library Dependencies
+DESCRIPTION: Sets up linking configuration for various dependencies including conditional cloud storage options.
+
+LANGUAGE: cmake
+CODE:
+set(LINK_TARGETS 
+    boost_bitset_ext
+    simdjson
+    tantivy_binding
+    knowhere
+    milvus-storage
+    ${OpenMP_CXX_FLAGS}
+    ${CONAN_LIBS})
+
+if(USE_OPENDAL)
+    set(LINK_TARGETS ${LINK_TARGETS} opendal)
+endif()
+
+if(DEFINED AZURE_BUILD_DIR)
+    set(LINK_TARGETS ${LINK_TARGETS} azure_blob_chunk_manager)
+endif()
+
+if (ENABLE_GCP_NATIVE)
+    set(LINK_TARGETS ${LINK_TARGETS} gcp-native-storage)
+endif()
+
+----------------------------------------
+
+TITLE: Defining taskQueue Interface in Go
+DESCRIPTION: Interface definition for the taskQueue used by the Proxy's taskScheduler component. Includes methods for managing tasks in the queue.
+
+LANGUAGE: Go
+CODE:
+type taskQueue interface {
+  utChan() <-chan int
+  utEmpty() bool
+  utFull() bool
+  addUnissuedTask(t task) error
+  FrontUnissuedTask() task
+  PopUnissuedTask() task
+  AddActiveTask(t task)
+  PopActiveTask(tID UniqueID) task
+  getTaskByReqID(reqID UniqueID) task
+  TaskDoneTest(ts Timestamp) bool
+  Enqueue(t task) error
+	setMaxTaskNum(num int64)
+	getMaxTaskNum() int64
+}
+
+----------------------------------------
+
+TITLE: Exporting Milvus Logs with Custom Namespace and Directory
+DESCRIPTION: This command exports Milvus logs specifying a custom namespace and log storage directory.
+
+LANGUAGE: shell
+CODE:
+./export-milvus-log.sh -i my-release -n milvus -d ./logs
+
+----------------------------------------
+
+TITLE: Specifying Hardware Requirements for Milvus Development
+DESCRIPTION: YAML configuration specifying the recommended hardware resources for building and running Milvus from source code.
+
+LANGUAGE: yaml
+CODE:
+- 8GB of RAM
+- 50GB of free disk space
+
+----------------------------------------
+
+TITLE: Setting Up Include Directories
+DESCRIPTION: Configures include paths for Milvus core and third-party dependencies.
+
+LANGUAGE: cmake
+CODE:
+include_directories(${MILVUS_ENGINE_SRC})
+include_directories(${MILVUS_THIRDPARTY_SRC})
+include_directories(
+    ${KNOWHERE_INCLUDE_DIR}
+    ${SIMDJSON_INCLUDE_DIR}
+    ${TANTIVY_INCLUDE_DIR}
+    ${CONAN_INCLUDE_DIRS}
+    ${MILVUS_STORAGE_INCLUDE_DIR}
+)
+
+----------------------------------------
+
+TITLE: Defining CreateIndexRequest in Protobuf
+DESCRIPTION: Specifies the structure for creating an index on a field in a collection. It includes fields for collection name, field name, and extra parameters.
+
+LANGUAGE: protobuf
+CODE:
+message CreateIndexRequest {
+  common.MsgBase base = 1;
+  string db_name = 2;
+  string collection_name = 3;
+  string field_name = 4;
+  repeated common.KeyValuePair extra_params = 5;
+}
+
+----------------------------------------
+
+TITLE: Executing Rolling Update for Milvus using Shell Script
+DESCRIPTION: Shell command to perform a rolling update of Milvus to version 2.2.3. The script accepts parameters for namespace (-n), instance name (-i), operation type (-o), target version (-t), and image tag (-w).
+
+LANGUAGE: shell
+CODE:
+sh rollingUpdate.sh -n default -i my-release -o update -t 2.2.3 -w 'milvusdb/milvus:v2.2.3'
+
+----------------------------------------
+
+TITLE: Creating Custom Commands and Targets for Tantivy Binding in CMake
+DESCRIPTION: This snippet defines custom commands and targets for compiling the Tantivy binding. It includes commands to list Cargo, compile the binding, and install the resulting library and headers.
+
+LANGUAGE: CMake
+CODE:
+add_custom_command(OUTPUT ls_cargo
+        COMMENT "ls cargo"
+        COMMAND ls ${HOME_VAR}/.cargo/bin/
+        )
+add_custom_target(ls_cargo_target DEPENDS ls_cargo)
+
+add_custom_command(OUTPUT compile_tantivy
+        COMMENT "Compiling tantivy binding"
+        COMMAND CARGO_TARGET_DIR=${CMAKE_CURRENT_BINARY_DIR} ${CARGO_CMD}
+        WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/tantivy-binding)
+add_custom_target(tantivy_binding_target DEPENDS compile_tantivy ls_cargo_target)
+
+set(INSTALL_COMMAND
+        cp ${LIB_HEADER_FOLDER}/tantivy-binding.h ${TANTIVY_INCLUDE_DIR}/ &&
+        cp ${CMAKE_CURRENT_SOURCE_DIR}/*.h ${TANTIVY_INCLUDE_DIR}/ &&
+        cp ${LIB_FILE} ${TANTIVY_LIB_DIR}/)
+add_custom_command(OUTPUT install_tantivy
+        COMMENT "Install tantivy target ${LIB_FILE} to ${TANTIVY_LIB_DIR}"
+        COMMAND ${INSTALL_COMMAND}
+        )
+add_custom_target(install_tantivy_target DEPENDS install_tantivy tantivy_binding_target)
+
+----------------------------------------
+
+TITLE: Configuring Tantivy Build Settings in CMake
+DESCRIPTION: This snippet sets up build configurations for the Tantivy binding based on the CMAKE_BUILD_TYPE. It defines variables for the Cargo command, target directory, and library paths.
+
+LANGUAGE: CMake
+CODE:
+if (CMAKE_BUILD_TYPE STREQUAL "Debug")
+    set(CARGO_CMD cargo build)
+    set(TARGET_DIR "debug")
+else ()
+    set(CARGO_CMD cargo build --release)
+    set(TARGET_DIR "release")
+endif ()
+
+set(TANTIVY_LIB_DIR "${CMAKE_INSTALL_PREFIX}/lib")
+set(TANTIVY_INCLUDE_DIR "${CMAKE_INSTALL_PREFIX}/include")
+set(TANTIVY_NAME "libtantivy_binding${CMAKE_STATIC_LIBRARY_SUFFIX}")
+
+set(LIB_FILE "${CMAKE_CURRENT_BINARY_DIR}/${TARGET_DIR}/${TANTIVY_NAME}")
+set(LIB_HEADER_FOLDER "${CMAKE_CURRENT_SOURCE_DIR}/tantivy-binding/include")
+
+----------------------------------------
+
+TITLE: Configuring Embedded Milvus Mode
+DESCRIPTION: Sets up compilation definitions for embedded Milvus mode when enabled.
+
+LANGUAGE: cmake
+CODE:
+option( EMBEDDED_MILVUS "Enable embedded Milvus" OFF )
+if ( EMBEDDED_MILVUS )
+    add_compile_definitions( EMBEDDED_MILVUS )
+endif()
+
+----------------------------------------
+
+TITLE: Defining IndexCoord GetIndexStates gRPC Service
+DESCRIPTION: Proto definition for the GetIndexStates gRPC service in IndexCoord, used to check the status of index creation processes.
+
+LANGUAGE: proto
+CODE:
+service IndexCoord {
+  ...
+
+  rpc GetIndexStates(GetIndexStatesRequest) returns (GetIndexStatesResponse) {}
+
+  ...
+}
+
+message GetIndexStatesRequest {
+  repeated int64 indexBuildIDs = 1;
+}
+
+message GetIndexStatesResponse {
+  common.Status status = 1;
+  repeated IndexInfo states = 2;
+}
+
+message IndexInfo {
+  common.IndexState state = 1;
+  int64 indexBuildID = 2;
+  int64 indexID = 3;
+  string index_name = 4;
+  string reason = 5;
+}
+
+enum IndexState {
+    IndexStateNone = 0;
+    Unissued = 1;
+    InProgress = 2;
+    Finished = 3;
+    Failed = 4;
+}
+
+----------------------------------------
+
+TITLE: Configuring Optional Unit Tests and Demos in CMake
+DESCRIPTION: This snippet sets up optional builds for unit tests and demo executables. It defines several executables and links them with the Tantivy binding and other required libraries.
+
+LANGUAGE: CMake
+CODE:
+option(BUILD_TANTIVY_WITH_UT "compile tantivy with ut" OFF)
+
+if (BUILD_TANTIVY_WITH_UT)
+    message(STATUS "compile tantivy with ut")
+
+    add_executable(test_tantivy test.cpp)
+    target_link_libraries(test_tantivy
+            tantivy_binding
+            boost_filesystem
+            dl
+            )
+
+    add_executable(bench_tantivy bench.cpp)
+    target_link_libraries(bench_tantivy
+            tantivy_binding
+            boost_filesystem
+            dl
+            )
+
+    add_executable(ffi_demo ffi_demo.cpp)
+    target_link_libraries(ffi_demo
+            tantivy_binding
+            dl
+            )
+
+    add_executable(tokenizer_demo tokenizer_demo.cpp)
+    target_link_libraries(tokenizer_demo
+            tantivy_binding
+            dl
+            )
+
+    add_executable(text_demo text_demo.cpp)
+    target_link_libraries(text_demo
+            tantivy_binding
+            dl
+        )
+
+    add_executable(jieba_demo jieba_demo.cpp)
+    target_link_libraries(jieba_demo
+            tantivy_binding
+            dl
+        )
+else ()
+endif ()
+
+----------------------------------------
+
+TITLE: Configuring Tantivy Binding Library in CMake
+DESCRIPTION: This snippet sets up the Tantivy binding as an imported static library in CMake. It defines the library's properties including its location and include directories.
+
+LANGUAGE: CMake
+CODE:
+add_library(tantivy_binding STATIC IMPORTED)
+add_dependencies(tantivy_binding
+        install_tantivy_target
+        )
+
+set_target_properties(tantivy_binding
+        PROPERTIES
+        IMPORTED_GLOBAL TRUE
+        IMPORTED_LOCATION "${TANTIVY_LIB_DIR}/${TANTIVY_NAME}"
+        INTERFACE_INCLUDE_DIRECTORIES "${CMAKE_INSTALL_PREFIX}/include")
+
+----------------------------------------
+
+TITLE: Configuring OpenDAL Build Target in CMake
+DESCRIPTION: Sets up a custom target to build OpenDAL using Cargo and configures the library as an imported static library with the necessary properties.
+
+LANGUAGE: CMake
+CODE:
+add_custom_target(build_opendal
+    COMMAND ${CARGO_CMD}
+    WORKING_DIRECTORY ${SOURCE_DIR}/bindings/c
+)
+
+add_library(opendal STATIC IMPORTED)
+add_dependencies(opendal build_opendal)
+set_target_properties(opendal
+    PROPERTIES
+    IMPORTED_GLOBAL TRUE
+    IMPORTED_LOCATION "${OPENDAL_LIB_DIR}/${OPENDAL_LIB}"
+    INTERFACE_INCLUDE_DIRECTORIES "${OPENDAL_INCLUDE_DIR}")
+
+----------------------------------------
+
+TITLE: Implementing CreateIndexReqTask in Go for RootCoord
+DESCRIPTION: Go struct definitions for the reqTask interface and CreateIndexReqTask, used in the RootCoord component to handle index creation requests.
+
+LANGUAGE: go
+CODE:
+type reqTask interface {
+	Ctx() context.Context
+	Type() commonpb.MsgType
+	Execute(ctx context.Context) error
+	Core() *Core
+}
+
+type CreateIndexReqTask struct {
+	baseReqTask
+	Req *milvuspb.CreateIndexRequest
+}
+
+----------------------------------------
+
+TITLE: Adding RocksDB Package Configuration in CMake for Milvus
+DESCRIPTION: This snippet adds RocksDB as a package configuration to the Milvus project using a custom CMake function 'milvus_add_pkg_config'. This likely sets up necessary compile and link flags for RocksDB.
+
+LANGUAGE: CMake
+CODE:
+milvus_add_pkg_config("rocksdb")
+
+----------------------------------------
+
+TITLE: Setting Debug Compile Options in CMake
+DESCRIPTION: This snippet adds specific compile and link options for Debug builds, including options for stack protection, frame pointers, and address sanitizer.
+
+LANGUAGE: CMake
+CODE:
+if (CMAKE_BUILD_TYPE STREQUAL "Debug")
+        add_compile_options(-fno-stack-protector -fno-omit-frame-pointer -fno-var-tracking -fsanitize=address)
+        add_link_options(-fno-stack-protector -fno-omit-frame-pointer -fno-var-tracking -fsanitize=address)
+endif()
+
+----------------------------------------
+
+TITLE: Installing RocksDB Headers in CMake for Milvus
+DESCRIPTION: This CMake command installs the RocksDB header files from the Conan package to the specified installation directory. It ensures that the necessary RocksDB headers are available for compilation in the Milvus project.
+
+LANGUAGE: CMake
+CODE:
+install(DIRECTORY "${CONAN_INCLUDE_DIRS_ROCKSDB}/rocksdb/" DESTINATION "${CMAKE_INSTALL_PREFIX}/include/rocksdb/")
+
+----------------------------------------
+
+TITLE: Fetching OpenDAL Source with FetchContent in CMake
+DESCRIPTION: Uses CMake's FetchContent module to declare and populate the OpenDAL source code from the specified Git repository.
+
+LANGUAGE: CMake
+CODE:
+FetchContent_Declare(
+        opendal
+        GIT_REPOSITORY  ${GIT_REPOSITORY}
+        GIT_TAG         ${GIT_TAG}
+        GIT_SHALLOW     TRUE
+        SOURCE_DIR      ${SOURCE_DIR}
+        DOWNLOAD_DIR    ${THIRDPARTY_DOWNLOAD_PATH})
+
+FetchContent_GetProperties(opendal)
+if ( NOT opendal_POPULATED )
+    FetchContent_Populate(opendal)
+endif()
+
+----------------------------------------
+
+TITLE: Defining BuildIndex Structure for IndexNode in Go for Milvus Index Service
+DESCRIPTION: Defines the BuildIndexRequest structure for the IndexNode's BuildIndex method, including index parameters and data paths.
+
+LANGUAGE: go
+CODE:
+type KeyValuePair struct {
+	Key   string
+	Value string
+}
+
+type BuildIndexRequest struct {
+	IndexBuildID UniqueID
+	IndexName    string
+	IndexID      UniqueID
+	DataPaths    []string
+	TypeParams   []*commonpb.KeyValuePair
+	IndexParams  []*commonpb.KeyValuePair
+}
+
+----------------------------------------
+
+TITLE: Installing librdkafka Include Files in CMake for Milvus
+DESCRIPTION: This CMake command installs the librdkafka include files to the specified installation directory. It copies the header files from the Conan-managed include directory to the project's include directory.
+
+LANGUAGE: CMake
+CODE:
+install(DIRECTORY "${CONAN_INCLUDE_DIRS_LIBRDKAFKA}/librdkafka/" DESTINATION "${CMAKE_INSTALL_PREFIX}/include/librdkafka/")
+
+----------------------------------------
+
+TITLE: Configuring OpenDAL Git Source in CMake
+DESCRIPTION: Sets up the Git repository and tag for fetching OpenDAL source code. Configures build commands based on the build type (Debug or Release).
+
+LANGUAGE: CMake
+CODE:
+message(STATUS "Building (vendored) opendal from source")
+
+set(GIT_REPOSITORY  "https://github.com/apache/opendal.git")
+set(GIT_TAG "v0.43.0-rc.2")
+
+if (CMAKE_BUILD_TYPE STREQUAL "Debug")
+    set(CARGO_CMD cargo +1.83 build --verbose)
+    set(TARGET_DIR "debug")
+else ()
+    set(CARGO_CMD cargo +1.83 build --release --verbose)
+    set(TARGET_DIR "release")
+endif ()
+
+----------------------------------------
+
+TITLE: Fetching and Building Knowhere Library
+DESCRIPTION: Uses CMake FetchContent to download, configure and build the Knowhere library from the specified Git repository. Sets up the build directories and includes the library in the project.
+
+LANGUAGE: cmake
+CODE:
+set( CMAKE_PREFIX_PATH ${CONAN_BOOST_ROOT} )
+FetchContent_Declare(
+        knowhere
+        GIT_REPOSITORY  ${GIT_REPOSITORY}
+        GIT_TAG         ${KNOWHERE_VERSION}
+        SOURCE_DIR      ${CMAKE_CURRENT_BINARY_DIR}/knowhere-src
+        BINARY_DIR      ${CMAKE_CURRENT_BINARY_DIR}/knowhere-build
+        DOWNLOAD_DIR    ${THIRDPARTY_DOWNLOAD_PATH} )
+
+FetchContent_GetProperties( knowhere )
+if ( NOT knowhere_POPULATED )
+    FetchContent_Populate( knowhere )
+    add_subdirectory( ${knowhere_SOURCE_DIR}
+                      ${knowhere_BINARY_DIR} )
+endif()
+
+----------------------------------------
+
+TITLE: Defining BuildIndex Structures in Go for Milvus Index Service
+DESCRIPTION: Defines structures for building indexes, including KeyValuePair, BuildIndexRequest, and BuildIndexResponse.
+
+LANGUAGE: go
+CODE:
+type KeyValuePair struct {
+	Key   string
+	Value string
+}
+
+type BuildIndexRequest struct {
+	IndexBuildID UniqueID
+	IndexName    string
+	IndexID      UniqueID
+	DataPaths    []string
+	TypeParams   []*commonpb.KeyValuePair
+	IndexParams  []*commonpb.KeyValuePair
+}
+
+type BuildIndexResponse struct {
+	Status       *commonpb.Status
+	IndexBuildID UniqueID
+}
+
+----------------------------------------
+
+TITLE: Configuring Knowhere Package in CMake
+DESCRIPTION: Initial setup of Knowhere package configuration and version settings. Sets the version and repository URL for the Knowhere dependency.
+
+LANGUAGE: cmake
+CODE:
+milvus_add_pkg_config("knowhere")
+set_property(DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR} PROPERTY INCLUDE_DIRECTORIES "")
+set( KNOWHERE_VERSION 810a0c8d )
+set( GIT_REPOSITORY  "https://github.com/zilliztech/knowhere.git")
+
+----------------------------------------
+
+TITLE: Logging OpenDAL Configuration in CMake
+DESCRIPTION: Retrieves and logs the configured properties of the OpenDAL library, including its imported location and interface include directories.
+
+LANGUAGE: CMake
+CODE:
+get_target_property(OPENDAL_IMPORTED_LOCATION opendal IMPORTED_LOCATION)
+get_target_property(OPENDAL_INTERFACE_INCLUDE_DIRECTORIES opendal INTERFACE_INCLUDE_DIRECTORIES)
+message("OPENDAL_IMPORTED_LOCATION: ${OPENDAL_IMPORTED_LOCATION}")
+message("OPENDAL_INTERFACE_INCLUDE_DIRECTORIES: ${OPENDAL_INTERFACE_INCLUDE_DIRECTORIES}")
+
+----------------------------------------
+
+TITLE: Configuring Build Options for Knowhere
+DESCRIPTION: Sets various build configuration options for Knowhere based on project settings, including DiskANN, Cardinal indexing, and GPU support.
+
+LANGUAGE: cmake
+CODE:
+if ( BUILD_DISK_ANN STREQUAL "ON" )
+    set(WITH_DISKANN ON CACHE BOOL "" FORCE )
+else ()
+    set(WITH_DISKANN OFF CACHE BOOL "" FORCE )
+endif ()
+
+if ( INDEX_ENGINE STREQUAL "cardinal" )
+    set(WITH_CARDINAL ON CACHE BOOL "" FORCE )
+else ()
+    set(WITH_CARDINAL OFF CACHE BOOL "" FORCE )
+endif()
+
+if ( MILVUS_GPU_VERSION STREQUAL "ON" )
+    set(WITH_CUVS ON CACHE BOOL "" FORCE )
+endif ()
+
+----------------------------------------
+
+TITLE: Configuring FetchContent for Dependency Management in CMake
+DESCRIPTION: Sets up FetchContent for managing third-party dependencies, specifying the download directory and verbosity.
+
+LANGUAGE: CMake
+CODE:
+include(FetchContent)
+set(FETCHCONTENT_BASE_DIR  ${MILVUS_BINARY_DIR}/3rdparty_download)
+set(FETCHCONTENT_QUIET     OFF)
+
+----------------------------------------
+
+TITLE: FieldData Message Structure Definition
+DESCRIPTION: Defines the structure for field data containing either scalar or vector fields.
+
+LANGUAGE: proto
+CODE:
+message FieldData {
+  ...
+  oneof field {
+    ScalarField scalars = 3;
+    VectorField vectors = 4;
+  }
+}
+
+----------------------------------------
+
+TITLE: Detecting AArch64 Architecture
+DESCRIPTION: Macro to detect if the target architecture is AArch64 by checking for the __aarch64__ symbol.
+
+LANGUAGE: cmake
+CODE:
+macro(detect_aarch64_target_arch)
+  check_symbol_exists(__aarch64__ "" __AARCH64)
+endmacro()
+detect_aarch64_target_arch()
+
+----------------------------------------
+
+TITLE: Configuring Jemalloc Source URL
+DESCRIPTION: Sets up the source URL for downloading Jemalloc, either from an environment variable or a default GitHub release URL.
+
+LANGUAGE: cmake
+CODE:
+if (DEFINED ENV{MILVUS_JEMALLOC_URL})
+    set(JEMALLOC_SOURCE_URL "$ENV{MILVUS_JEMALLOC_URL}")
+else ()
+    set(JEMALLOC_SOURCE_URL
+            "https://github.com/jemalloc/jemalloc/releases/download/${MILVUS_JEMALLOC_BUILD_VERSION}/jemalloc-${MILVUS_JEMALLOC_BUILD_VERSION}.tar.bz2")
+endif ()
+
+----------------------------------------
+
+TITLE: Setting Up Dependencies for Milvus Core
+DESCRIPTION: Configures and includes necessary dependencies for the Milvus core project, including Conan packages and third-party libraries.
+
+LANGUAGE: CMake
+CODE:
+list( APPEND CMAKE_MODULE_PATH ${CMAKE_BINARY_DIR}/conan )
+include( ${CMAKE_BINARY_DIR}/conan/conanbuildinfo.cmake )
+set( CONAN_DISABLE_CHECK_COMPILER ON )
+conan_basic_setup( KEEP_RPATHS )
+
+set( CMAKE_PREFIX_PATH ${CMAKE_PREFIX_PATH} ${CONAN_PROTOBUF_ROOT})
+
+include( ExternalProject )
+include( GNUInstallDirs )
+include( FetchContent )
+
+include_directories( thirdparty )
+
+set( FETCHCONTENT_BASE_DIR ${MILVUS_BINARY_DIR}/3rdparty_download )
+set( FETCHCONTENT_QUIET OFF )
+include( ThirdPartyPackages )
+
+----------------------------------------
+
+TITLE: Configuring Jemalloc Build Parameters
+DESCRIPTION: Sets up build configuration parameters for Jemalloc including installation paths, compiler settings, and architecture-specific options.
+
+LANGUAGE: cmake
+CODE:
+set(JEMALLOC_PREFIX "${CMAKE_INSTALL_PREFIX}")
+set(JEMALLOC_LIB_DIR "${JEMALLOC_PREFIX}/lib")
+set(JEMALLOC_STATIC_LIB "${JEMALLOC_LIB_DIR}/libjemalloc_pic${CMAKE_STATIC_LIBRARY_SUFFIX}")
+set(JEMALLOC_CONFIGURE_COMMAND ./configure "AR=${CMAKE_AR}" "CC=${CMAKE_C_COMPILER}")
+
+----------------------------------------
+
+TITLE: Creating Jemalloc Imported Target
+DESCRIPTION: Creates and configures a shared library imported target for Jemalloc with appropriate properties and dependencies.
+
+LANGUAGE: cmake
+CODE:
+add_library(jemalloc SHARED IMPORTED)
+set_target_properties(jemalloc
+        PROPERTIES INTERFACE_LINK_LIBRARIES Threads::Threads
+        IMPORTED_LOCATION "${JEMALLOC_PREFIX}/${CMAKE_INSTALL_LIBDIR}/libjemalloc.so"
+        INTERFACE_INCLUDE_DIRECTORIES "${JEMALLOC_PREFIX}/jemalloc/include")
+add_dependencies(jemalloc jemalloc_ep)
+
+----------------------------------------
+
+TITLE: Setting Up Jemalloc External Project
+DESCRIPTION: Configures Jemalloc as an external project with CMake's ExternalProject_Add, including download, build, and installation steps.
+
+LANGUAGE: cmake
+CODE:
+ExternalProject_Add(
+        jemalloc_ep
+        PREFIX ${CMAKE_BINARY_DIR}/3rdparty_download/jemalloc-subbuild
+        URL ${JEMALLOC_SOURCE_URL}
+        PATCH_COMMAND touch doc/jemalloc.3 doc/jemalloc.html
+        CONFIGURE_COMMAND ${JEMALLOC_CONFIGURE_COMMAND}
+        BUILD_IN_SOURCE 1
+        BUILD_COMMAND ${JEMALLOC_BUILD_COMMAND}
+        BUILD_BYPRODUCTS "${JEMALLOC_STATIC_LIB}"
+        INSTALL_COMMAND ${MAKE} install)
+
+----------------------------------------
+
+TITLE: Configuring Compiler Flags for Milvus Core
+DESCRIPTION: Sets compiler flags for different platforms (Linux, macOS) and build types, including optimization and warning flags.
+
+LANGUAGE: CMake
+CODE:
+if (LINUX OR MSYS)
+    append_flags( CMAKE_CXX_FLAGS
+                  FLAGS
+                  "-fPIC"
+                  "-DELPP_THREAD_SAFE"
+                  "-fopenmp"
+                  "-Wno-error"
+                  "-Wno-all"
+                  )
+    if (CMAKE_BUILD_TYPE STREQUAL "Release")
+        append_flags( CMAKE_CXX_FLAGS
+                "-O3"
+                )
+    endif()
+endif ()
+
+if ( APPLE )
+    append_flags( CMAKE_CXX_FLAGS
+            FLAGS
+            "-fPIC"
+            "-DELPP_THREAD_SAFE"
+            "-fopenmp"
+            "-pedantic"
+            "-Wall"
+            "-D_DARWIN_C_SOURCE"
+            "-Wno-gnu-zero-variadic-macro-arguments"
+            "-Wno-variadic-macros"
+            "-Wno-reorder-ctor"
+            "-DBOOST_STACKTRACE_GNU_SOURCE_NOT_REQUIRED=1"
+            )
+endif ()
+
+----------------------------------------
+
+TITLE: Setting Compiler Flags for Milvus in CMake
+DESCRIPTION: Appends specific compiler flags for C++ compilation in the Milvus project, including optimization, position-independent code, and OpenMP support.
+
+LANGUAGE: CMake
+CODE:
+append_flags(CMAKE_CXX_FLAGS FLAGS "-O3 -fPIC -Wno-error -fopenmp -Wno-macro-redefined")
+
+----------------------------------------
+
+TITLE: Setting Include Directories for Milvus Unit Tests in CMake
+DESCRIPTION: Configures include directories for Milvus unit tests, including project source, third-party libraries, and external dependencies.
+
+LANGUAGE: CMake
+CODE:
+include_directories(${CMAKE_HOME_DIRECTORY}/src)
+include_directories(${CMAKE_HOME_DIRECTORY}/src/thirdparty)
+include_directories(
+    ${KNOWHERE_INCLUDE_DIR}
+    ${SIMDJSON_INCLUDE_DIR}
+    ${TANTIVY_INCLUDE_DIR}
+    ${CONAN_INCLUDE_DIRS}
+    ${MILVUS_STORAGE_INCLUDE_DIR}
+)
+
+----------------------------------------
+
+TITLE: Creating Milvus Unit Test Executable in CMake
+DESCRIPTION: Defines and configures the main unit test executable 'all_tests' using the previously defined test files and links it with required libraries.
+
+LANGUAGE: CMake
+CODE:
+add_executable(all_tests
+        ${MILVUS_TEST_FILES}
+        )
+
+target_link_libraries(all_tests
+        gtest
+        milvus_core
+        knowhere
+        milvus-storage
+        )
+
+install(TARGETS all_tests DESTINATION unittest)
+
+----------------------------------------
+
+TITLE: Building Milvus Query Library in CMake
+DESCRIPTION: This snippet configures the build process for the Milvus query library. It recursively adds all source files in the current directory and its subdirectories, then creates an object library named 'milvus_query' using these source files.
+
+LANGUAGE: cmake
+CODE:
+add_source_at_current_directory_recursively()
+add_library(milvus_query OBJECT ${SOURCE_FILES})
+
+----------------------------------------
+
+TITLE: Configuring Additional Test Executables in CMake
+DESCRIPTION: Creates additional test executables such as 'index_builder_test' and 'bitset_test', specifying their source files and library dependencies.
+
+LANGUAGE: CMake
+CODE:
+add_executable(index_builder_test
+        ${INDEX_BUILDER_TEST_FILES}
+        )
+
+target_link_libraries(index_builder_test
+        gtest
+        milvus_core
+        knowhere
+        milvus-storage
+        )
+
+add_executable(bitset_test 
+        test_bitset.cpp
+)
+target_link_libraries(bitset_test 
+        milvus_bitset 
+        gtest 
+        ${CONAN_LIBS}
+)
+
+----------------------------------------
+
+TITLE: Building Milvus Executable Library with CMake
+DESCRIPTION: This snippet adds all source files in the current directory recursively and creates an object library named 'milvus_exec'. It's part of the build process for the Milvus project.
+
+LANGUAGE: CMake
+CODE:
+add_source_at_current_directory_recursively()
+add_library(milvus_exec OBJECT ${SOURCE_FILES})
+
+----------------------------------------
+
+TITLE: Defining Milvus Test Files in CMake
+DESCRIPTION: Sets a list of test files to be included in the Milvus unit test suite. This list can be conditionally extended based on build configurations.
+
+LANGUAGE: CMake
+CODE:
+set(MILVUS_TEST_FILES
+        init_gtest.cpp
+        test_packed_c.cpp
+        test_arrow_fs_c.cpp
+        # ... (other test files)
+        test_random_sample.cpp
+        )
+
+----------------------------------------
+
+TITLE: Configuring Milvus Object Library in CMake
+DESCRIPTION: Creates an object library named milvus_config that includes all source files from the current directory recursively. Uses a custom CMake function to gather source files.
+
+LANGUAGE: cmake
+CODE:
+add_source_at_current_directory_recursively()
+add_library(milvus_config OBJECT ${SOURCE_FILES})
+
+----------------------------------------
+
+TITLE: Configuring Milvus Common Library Build in CMake
+DESCRIPTION: Creates an object library named milvus_common using recursively collected source files from the current directory. The library compilation uses the SOURCE_FILES variable which is populated by the recursive directory function.
+
+LANGUAGE: cmake
+CODE:
+add_source_at_current_directory_recursively()
+add_library(milvus_common OBJECT ${SOURCE_FILES})
+
+----------------------------------------
+
+TITLE: Defining Benchmark Source Files
+DESCRIPTION: Defines source file lists for the main benchmarks and index builder benchmarks.
+
+LANGUAGE: cmake
+CODE:
+set(bench_srcs
+    bench_naive.cpp
+    bench_search.cpp
+)
+
+set(indexbuilder_bench_srcs
+        bench_indexbuilder.cpp
+)
+
+----------------------------------------
+
+TITLE: Base Bitset Source Configuration
+DESCRIPTION: Defines the base source files required for the bitset library implementation.
+
+LANGUAGE: cmake
+CODE:
+set(BITSET_SRCS
+    detail/platform/dynamic.cpp
+)
+
+----------------------------------------
+
+TITLE: Building Milvus Index Builder Library with CMake
+DESCRIPTION: This snippet adds all source files in the current directory and its subdirectories to the build, then creates an object library named 'milvus_indexbuilder' using these source files.
+
+LANGUAGE: CMake
+CODE:
+add_source_at_current_directory_recursively()
+add_library(milvus_indexbuilder OBJECT ${SOURCE_FILES})
+
+----------------------------------------
+
+TITLE: ARM Platform Configuration
+DESCRIPTION: Configures additional source files for ARM architecture, including NEON and SVE instruction set implementations.
+
+LANGUAGE: cmake
+CODE:
+elseif (${CMAKE_SYSTEM_PROCESSOR} MATCHES "arm*")
+    list(APPEND BITSET_SRCS
+        detail/platform/arm/neon-inst.cpp
+        detail/platform/arm/sve-inst.cpp
+        detail/platform/arm/instruction_set.cpp
+    )
+
+----------------------------------------
+
+TITLE: Milvus Compilation Commands
+DESCRIPTION: Series of make commands for generating protobuf files, checking code specifications, and compiling Milvus.
+
+LANGUAGE: shell
+CODE:
+$ make check-proto-product
+$ make verifiers
+$ make milvus
+
+----------------------------------------
+
+TITLE: Initializing CMake Project for Milvus Core
+DESCRIPTION: Sets up the CMake project for Milvus core, including version requirements, build type, and basic project information.
+
+LANGUAGE: CMake
+CODE:
+cmake_minimum_required( VERSION 3.18 )
+
+project(core)
+set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD_REQUIRED on)
+
+get_milvus_version( TARGET MILVUS_VERSION DEFAULT "2.0" )
+project( milvus VERSION "${MILVUS_VERSION}" )
+
+----------------------------------------
+
+TITLE: Building Milvus Monitor Library in CMake
+DESCRIPTION: CMake commands to build the milvus_monitor component as an OBJECT library. Recursively gathers source files from the current directory and adds them to the library build.
+
+LANGUAGE: cmake
+CODE:
+add_source_at_current_directory_recursively()
+add_library(milvus_monitor OBJECT ${SOURCE_FILES})
+
+----------------------------------------
+
+TITLE: Building OpenBLAS from Source
+DESCRIPTION: Downloads and compiles OpenBLAS library from source code with specific optimization parameters.
+
+LANGUAGE: shell
+CODE:
+$ wget https://github.com/xianyi/OpenBLAS/archive/v0.3.9.tar.gz && \
+$ tar zxvf v0.3.9.tar.gz && cd OpenBLAS-0.3.9 && \
+$ make TARGET=CORE2 DYNAMIC_ARCH=1 DYNAMIC_OLDER=1 USE_THREAD=0 USE_OPENMP=0 FC=gfortran CC=gcc COMMON_OPT="-O3 -g -fPIC" FCOMMON_OPT="-O3 -g -fPIC -frecursive" NMAX="NUM_THREADS=128" LIBPREFIX="libopenblas" INTERFACE64=0 NO_STATIC=1 && \
+$ make PREFIX=/usr install
+
+----------------------------------------
+
+TITLE: Defining Custom Targets for Code Quality in Milvus Core
+DESCRIPTION: Sets up custom targets for linting, formatting, and static analysis using tools like cpplint, clang-format, and clang-tidy.
+
+LANGUAGE: CMake
+CODE:
+add_custom_target(lint
+    ${PYTHON_EXECUTABLE}    ${BUILD_SUPPORT_DIR}/run_cpplint.py
+                            --cpplint_binary    ${CPPLINT_BIN}
+                            --exclude_globs     ${LINT_EXCLUSIONS_FILE}
+                            --source_dir            ${CMAKE_CURRENT_SOURCE_DIR}/src
+                            ${MILVUS_LINT_QUIET}
+                            )
+
+if ( ${CLANG_FORMAT_FOUND} )
+    add_custom_target( clang-format
+        ${PYTHON_EXECUTABLE}    ${BUILD_SUPPORT_DIR}/run_clang_format.py
+                                --clang_format_binary   ${CLANG_FORMAT_BIN}
+                                --exclude_globs         ${LINT_EXCLUSIONS_FILE}
+                                --source_dir            ${CMAKE_CURRENT_SOURCE_DIR}/src
+                                --fix
+                                ${MILVUS_LINT_QUIET} )
+endif ()
+
+if ( ${CLANG_TIDY_FOUND} )
+    add_custom_target( clang-tidy
+        ${PYTHON_EXECUTABLE}    ${BUILD_SUPPORT_DIR}/run_clang_tidy.py
+                                --clang_tidy_binary ${CLANG_TIDY_BIN}
+                                --exclude_globs     ${LINT_EXCLUSIONS_FILE}
+                                --compile_commands  ${CMAKE_BINARY_DIR}/compile_commands.json
+                                --source_dir        ${CMAKE_CURRENT_SOURCE_DIR}/src
+                                --fix
+                                ${MILVUS_LINT_QUIET} )
+endif ()
+
+----------------------------------------
+
+TITLE: Initializing CMake Project with Azure Dependencies
+DESCRIPTION: Sets up CMake project configuration with C++17 standard, integrates Azure vcpkg package manager, and configures NuGet package dependencies for Microsoft Attestation Client.
+
+LANGUAGE: cmake
+CODE:
+cmake_minimum_required (VERSION 3.12)
+set(CMAKE_CXX_STANDARD 17)
+list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake-modules")
+message("${CMAKE_CURRENT_SOURCE_DIR}")
+include(AzureVcpkg)
+az_vcpkg_integrate()
+
+project(azure-blob-storage)
+
+find_program(NUGET_EXE NAMES nuget)
+
+if(NOT NUGET_EXE)
+    message(FATAL "CMake could not find the nuget command line tool. Please install it from https://www.nuget.org/downloads!")
+else()
+    exec_program(${NUGET_EXE}
+        ARGS install "Microsoft.Attestation.Client" -Version 0.1.181 -ExcludeVersion -OutputDirectory ${CMAKE_BINARY_DIR}/packages)
+endif()
+
+----------------------------------------
+
+TITLE: Configuring Installation for Milvus Core
+DESCRIPTION: Sets up installation rules for Milvus core headers and libraries, specifying directories and file patterns to be installed.
+
+LANGUAGE: CMake
+CODE:
+install(DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/src/storage/
+        DESTINATION include/storage
+        FILES_MATCHING PATTERN "*_c.h"
+)
+
+install(DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/src/segcore/
+        DESTINATION include/segcore
+        FILES_MATCHING PATTERN "*_c.h"
+)
+
+install(DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/src/exec/expression/function/
+        DESTINATION include/exec/expression/function
+        FILES_MATCHING PATTERN "*_c.h"
+)
+
+install(DIRECTORY ${CMAKE_BINARY_DIR}/lib/
+        DESTINATION ${CMAKE_INSTALL_FULL_LIBDIR}
+)
+
+----------------------------------------
+
+TITLE: Defining Python Package Dependencies for Milvus Project
+DESCRIPTION: This code snippet specifies the required Python packages and their versions for the Milvus project. It includes packages for testing (pytest and related plugins), data processing (numpy, pandas), machine learning (scikit-learn), cloud operations (kubernetes), and various utilities.
+
+LANGUAGE: plaintext
+CODE:
+--extra-index-url https://test.pypi.org/simple/
+pytest-cov==2.8.1
+requests==2.26.0
+scikit-learn==1.1.3
+timeout_decorator==0.5.0
+ujson==5.5.0
+pytest==8.3.4
+pytest-asyncio==0.24.0
+pytest-assume==2.4.3
+pytest-timeout==1.3.3
+pytest-repeat==0.8.0
+allure-pytest==2.7.0
+pytest-print==0.2.1
+pytest-level==0.1.1
+pytest-xdist==2.5.0
+
+pytest-rerunfailures==14.0
+git+https://github.com/Projectplace/pytest-tags
+ndg-httpsclient
+pyopenssl
+pyasn1
+pytest-html==3.1.1
+delayed-assert==0.3.5
+kubernetes==17.17.0
+PyYAML==6.0
+pytest-sugar==0.9.5
+pytest-parallel
+pytest-random-order
+
+# pymilvus
+pymilvus==2.6.0rc84
+pymilvus[bulk_writer]==2.6.0rc84
+
+
+# for customize config test
+python-benedict==0.24.3
+timeout-decorator==0.5.0
+
+# for bulk insert test
+minio==7.1.5
+npy-append-array==0.9.15
+Faker==19.2.0
+
+# for benchmark
+h5py==3.8.0
+
+# for log
+loguru==0.7.0
+
+# util
+psutil==5.9.4
+pandas==1.5.3
+numpy==1.26.4
+tenacity==8.1.0
+rich==13.7.0
+# for standby test
+etcd-sdk-python==0.0.4
+deepdiff==6.7.1
+
+# for test result analyzer
+prettytable==3.8.0
+pyarrow==14.0.1
+fastparquet==2023.7.0
+
+# for bf16 datatype
+ml-dtypes==0.2.0
+
+# for full text search
+tantivy==0.22.0
+bm25s==0.2.0
+jieba==0.42.1
+Unidecode==1.3.8
+
+
+# for perf test
+locust==2.25.0
+
+# for supporting higher python version
+typing_extensions==4.12.2
+
+----------------------------------------
+
+TITLE: Apache 2.0 License Header Text
+DESCRIPTION: Standard Apache License 2.0 header text with Zilliz copyright notice. Specifies usage terms, distribution rights, and warranty disclaimers for the Milvus project code.
+
+LANGUAGE: plaintext
+CODE:
+# Copyright (C) 2019-2020 Zilliz. All rights reserved.
+#
+# Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except in compliance
+# with the License. You may obtain a copy of the License at
+#
+# http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software distributed under the License
+# is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express
+# or implied. See the License for the specific language governing permissions and limitations under the License
+
+----------------------------------------
+
+TITLE: Configuring Azure Blob Test Build in CMake
+DESCRIPTION: Sets up a CMake project for Azure Blob testing. Creates an executable that links against Azure Identity, Azure Storage Blobs, and Google Test frameworks. The test executable includes both the test file and the actual blob manager implementation.
+
+LANGUAGE: cmake
+CODE:
+project(azure-blob-test)
+
+add_executable(azure-blob-test test_azure_blob_chunk_manager.cpp ../AzureBlobChunkManager.cpp)
+find_package(GTest CONFIG REQUIRED)
+target_link_libraries(azure-blob-test PRIVATE Azure::azure-identity Azure::azure-storage-blobs GTest::gtest blob-chunk-manager)
+
+----------------------------------------
+
+TITLE: Sample Partition Test Implementation
+DESCRIPTION: Example test case showing how to verify partition creation against a dropped collection
+
+LANGUAGE: python
+CODE:
+@pytest.mark.tags(CaseLabel.L1)
+@pytest.mark.parametrize("partition_name", [cf.gen_unique_str(prefix)])
+def test_partition_dropped_collection(self, partition_name):
+    """
+    target: verify create partition against a dropped collection
+    method: 1. create collection1
+            2. drop collection1
+            3. create partition in collection1
+    expected: raise exception
+    """
+    collection_w = self.init_collection_wrap()
+    collection_w.drop()
+    self.partition_wrap.init_partition(collection_w.collection, partition_name, check_task=CheckTasks.err_res, check_items={ct.err_code: 4, ct.err_msg: "collection not found"})
+
+----------------------------------------
+
+TITLE: Registering WAL Implementation in Go
+DESCRIPTION: Example of how to register a new WAL implementation using the registry package. This code registers a custom OpenerBuilderImpls implementation.
+
+LANGUAGE: Go
+CODE:
+import "github.com/milvus-io/milvus/pkg/streaming/walimpls/registry"
+
+var _ OpenerBuilderImpls = b{};
+registry.RegisterBuilder(b{})
+
+----------------------------------------
+
+TITLE: Configuring CMake Build for GCP Native Storage
+DESCRIPTION: Sets up CMake build requirements and creates an object library for GCP native storage components. Specifies CMake minimum version 3.12, sets C++17 standard, and defines library compilation from source files.
+
+LANGUAGE: cmake
+CODE:
+cmake_minimum_required (VERSION 3.12)
+set(CMAKE_CXX_STANDARD 17)
+
+add_library(gcp-native-storage OBJECT GcpNativeChunkManager.cpp GcpNativeClientManager.cpp)
+
+----------------------------------------
+
+TITLE: Specifying Python Package Dependencies for Milvus
+DESCRIPTION: This snippet lists the required Python packages and their versions for the Milvus project. It includes packages for gRPC, data analysis, machine learning, and various utilities. Some packages are commented out, indicating they may be optional or for specific use cases.
+
+LANGUAGE: Text
+CODE:
+# for local install
+# --extra-index-url https://test.pypi.org/simple/
+# pymilvus==2.0.0rc3.dev8
+
+grpcio==1.53.2
+grpcio-testing==1.37.1
+grpcio-tools==1.37.1
+
+pandas==1.1.5
+scipy==1.10.0
+scikit-learn==0.19.1
+h5py==2.7.1
+# influxdb==5.2.2
+pyyaml>=5.1
+tableprint==0.8.0
+ansicolors==1.1.8
+kubernetes==10.0.1
+# rq==1.2.0
+locust>=1.3.2
+pymongo==4.6.3
+apscheduler==3.7.0
+
+----------------------------------------
+
+TITLE: Running PyTest Test Cases
+DESCRIPTION: Command to execute specific test files using pytest
+
+LANGUAGE: bash
+CODE:
+$ python3 -W ignore -m pytest <test_file_name>
+
+----------------------------------------
+
+TITLE: Milvus Project Dependencies Configuration
+DESCRIPTION: Requirements file listing Python packages and their versions required for the Milvus project. Includes core dependencies like pymilvus, testing frameworks (pytest), data manipulation libraries (numpy), machine learning tools (scikit-learn), and utility packages.
+
+LANGUAGE: plaintext
+CODE:
+--extra-index-url https://test.pypi.org/simple/
+requests==2.32.0
+urllib3==1.26.19
+pytest==7.2.0
+pyyaml==6.0
+numpy==1.24.3
+allure-pytest>=2.8.18
+Faker==19.2.0
+pymilvus==2.5.0rc108
+scikit-learn~=1.5.0
+pytest-xdist==2.5.0
+minio==7.1.14
+tenacity==8.1.0
+# for bf16 datatype
+ml-dtypes==0.2.0
+
+----------------------------------------
+
+TITLE: Configuring Protobuf Library for Milvus
+DESCRIPTION: CMake configuration that finds the required Protobuf package and creates a Milvus protobuf object library from source files in the current directory.
+
+LANGUAGE: cmake
+CODE:
+find_package(Protobuf REQUIRED)
+
+add_source_at_current_directory_recursively()
+add_library(milvus_pb OBJECT ${SOURCE_FILES})
+
+----------------------------------------
+
+TITLE: Package Requirements Definition for Milvus Testing Environment
+DESCRIPTION: Defines the specific versions of Python packages required for the Milvus testing environment. Includes testing frameworks, data processing libraries, and the Milvus client library. Uses an additional test PyPI index for some packages.
+
+LANGUAGE: plaintext
+CODE:
+--extra-index-url https://test.pypi.org/simple/
+requests==2.32.0
+urllib3==1.26.19
+pytest==7.2.0
+pytest-assume==2.4.3
+pytest-timeout==1.3.3
+pytest-repeat==0.8.0
+allure-pytest==2.7.0
+pytest-print==0.2.1
+pytest-level==0.1.1
+pytest-xdist==2.5.0
+pytest-html==3.1.1
+pytest-sugar==0.9.5
+pytest-parallel
+pytest-random-order
+PyYAML==6.0
+numpy==1.24.3
+allure-pytest>=2.8.18
+Faker==19.2.0
+pymilvus==2.4.0rc19
+scikit-learn~=1.5.0
+pytest-xdist==2.5.0
+tenacity==8.1.0
+
+----------------------------------------
+
+TITLE: C++ Code Style Verification
+DESCRIPTION: Make commands for verifying C++ code formatting, license headers, and cpplint standards from the milvus root directory.
+
+LANGUAGE: shell
+CODE:
+make cppcheck
+make verifier
+
+----------------------------------------
+
+TITLE: Building Milvus Index Library with CMake
+DESCRIPTION: This snippet configures the build process for the Milvus index library. It uses a custom command to recursively add source files from the current directory and creates an object library named 'milvus_index'.
+
+LANGUAGE: CMake
+CODE:
+add_source_at_current_directory_recursively()
+add_library(milvus_index OBJECT ${SOURCE_FILES})
+
+----------------------------------------
+
+TITLE: Mounting NAS for Milvus Benchmark Data Access
+DESCRIPTION: Mounts a network-attached storage (NAS) to access raw data for testing, using CIFS protocol.
+
+LANGUAGE: bash
+CODE:
+$ sudo mount -t cifs -o username=test,vers=1.0 //172.16.70.249/test /test
+
+----------------------------------------
+
+TITLE: Adding New Parameters to Milvus Go Client Test Framework
+DESCRIPTION: Demonstrates how to add new parameters to the Milvus Go Client test framework by defining a new option type, adding a constructor, and implementing parameter methods.
+
+LANGUAGE: go
+CODE:
+// In helper/data_helper.go
+type YourNewOption struct {
+    newParam1 string
+    newParam2 int
+}
+
+func TNewYourOption() *YourNewOption {
+    return &YourNewOption{
+        newParam1: "default",
+        newParam2: 0,
+    }
+}
+
+func (opt *YourNewOption) TWithNewParam1(value string) *YourNewOption {
+    opt.newParam1 = value
+    return opt
+}
+
+func (opt *YourNewOption) TWithNewParam2(value int) *YourNewOption {
+    opt.newParam2 = value
+    return opt
+}
+
+----------------------------------------
+
+TITLE: Defining Proxy Structure in Go
+DESCRIPTION: Defines the Proxy structure with various fields for managing proxy state, connections, and message streams.
+
+LANGUAGE: go
+CODE:
+type Proxy struct {
+	ctx    context.Context
+	cancel func()
+	wg     sync.WaitGroup
+
+	initParams *internalpb.InitParams
+	ip         string
+	port       int
+
+	stateCode commonpb.StateCode
+
+	rootCoordClient  RootCoordClient
+	indexCoordClient IndexCoordClient
+	dataCoordClient  DataCoordClient
+	queryCoordClient QueryCoordClient
+
+	sched *TaskScheduler
+	tick  *timeTick
+
+	idAllocator  *allocator.IDAllocator
+	tsoAllocator *allocator.TimestampAllocator
+	segAssigner  *SegIDAssigner
+
+	manipulationMsgStream msgstream.MsgStream
+	queryMsgStream        msgstream.MsgStream
+	msFactory             msgstream.Factory
+
+	// Add callback functions at different stages
+	startCallbacks []func()
+	closeCallbacks []func()
+}
+
+----------------------------------------
+
+TITLE: Configuring Custom Parameters for Milvus Go Client Tests
+DESCRIPTION: Shows how to use custom parameters for collection creation, data insertion, index creation, and search operations in Milvus Go Client tests.
+
+LANGUAGE: go
+CODE:
+fieldsOption := hp.TNewFieldsOption().
+    TWithEnableAnalyzer(true).
+    TWithAnalyzerParams(map[string]any{
+        "tokenizer": "standard",
+    })
+
+schemaOption := hp.TNewSchemaOption().
+    TWithEnableDynamicField(true).
+    TWithDescription("Custom schema").
+    TWithAutoID(false)
+
+insertOption := hp.TNewDataOption().
+    TWithNb(1000).           // Number of records
+    TWithDim(128).           // Vector dimension
+    TWithStart(100).         // Starting ID
+    TWithMaxLen(256).        // Maximum length
+    TWithTextLang("en")      // Text language
+
+indexParams := hp.TNewIndexParams(schema).
+    TWithFieldIndex(map[string]index.Index{
+        common.DefaultVectorFieldName: index.NewIVFSQIndex(
+            &index.IVFSQConfig{
+                MetricType: entity.L2,
+                NList:     128,
+            },
+        ),
+    })
+
+searchOpt := client.NewSearchOption(schema.CollectionName, 100, vectors).
+    WithOffset(0).
+    WithLimit(100).
+    WithConsistencyLevel(entity.ClStrong).
+    WithFilter("int64 >= 100").
+    WithOutputFields([]string{"*"}).
+    WithSearchParams(map[string]any{
+        "nprobe": 16,
+        "ef":     64,
+    })
+
+----------------------------------------
+
+TITLE: Defining Meta Table Structure in Go
+DESCRIPTION: Defines the metaTable structure used for managing metadata in the Root Coordinator, including collections, partitions, and indexes.
+
+LANGUAGE: go
+CODE:
+type metaTable struct {
+	txn             kv.TxnKV
+	snapshot        kv.SnapShotKV
+	collID2Meta     map[typeutil.UniqueID]pb.CollectionInfo
+	collName2ID     map[string]typeutil.UniqueID
+	collAlias2ID    map[string]typeutil.UniqueID
+	partID2SegID    map[typeutil.UniqueID]map[typeutil.UniqueID]bool
+	segID2IndexMeta map[typeutil.UniqueID]map[typeutil.UniqueID]pb.SegmentIndexInfo
+	indexID2Meta    map[typeutil.UniqueID]pb.IndexInfo
+
+	proxyLock  sync.RWMutex
+	ddLock     sync.RWMutex
+}
+
+----------------------------------------
+
+TITLE: Collection Replica Structure in Go
+DESCRIPTION: Defines the in-memory data structures for managing collection replicas across query nodes, including support for partitions and segments.
+
+LANGUAGE: go
+CODE:
+type collectionReplica struct {
+	tSafes map[UniqueID]tSafer // map[collectionID]tSafer
+
+	mu          sync.RWMutex // guards all
+	collections map[UniqueID]*Collection
+	partitions  map[UniqueID]*Partition
+	segments    map[UniqueID]*Segment
+
+	excludedSegments map[UniqueID][]*datapb.SegmentInfo // map[collectionID]segmentIDs
+}
+
+----------------------------------------
+
+TITLE: Building Local Proto Repository
+DESCRIPTION: Shell commands for building and installing the local milvus-proto repository
+
+LANGUAGE: shell
+CODE:
+# make all
+...
+Installing only the local directory...
+-- Install configuration: ""
+make[1]: Leaving directory '/home/silverxia/workspace/milvus-proto/cmake-build'
+~/workspace/milvus-proto
+using protoc-gen-go: /home/silverxia/go/bin/protoc-gen-go
+~/workspace/milvus-proto/proto ~/workspace/milvus-proto
+libprotoc 3.21.4
+~/workspace/milvus-proto
+
+----------------------------------------
+
+TITLE: Configuring Go Module Replacement
+DESCRIPTION: Commands to configure Go module to use local milvus-proto instead of remote repository
+
+LANGUAGE: shell
+CODE:
+# go mod edit -replace github.com/milvus-io/milvus-proto/go-api/v2=/home/silverxia/workspace/milvus-proto/go-api 
+# cd pkg
+// set pkg module as well
+# go mod edit -replace github.com/milvus-io/milvus-proto/go-api/v2=/home/silverxia/workspace/milvus-proto/go-api
+# cd ..
+
+----------------------------------------
+
+TITLE: Configuring Milvus Benchmark Insert Performance Test
+DESCRIPTION: YAML configuration for an insert performance test, specifying collection details, insertion parameters, and indexing options.
+
+LANGUAGE: yaml
+CODE:
+insert_performance:
+  collections:
+     -
+       milvus:
+         db_config.primary_path: /test/milvus/db_data_2/cluster/sift_1m_128_l2
+         wal_enable: true
+       collection_name: sift_1m_128_l2
+       ni_per: 50000
+       build_index: false
+       index_type: ivf_sq8
+       index_param:
+         nlist: 1024
+
+----------------------------------------
+
+TITLE: Protobuf Message Definitions for Channel Watching
+DESCRIPTION: Defines protobuf message structures for VchannelInfo and WatchDmChannelsRequest, used to track segment positions and channel information during recovery.
+
+LANGUAGE: proto
+CODE:
+message VchannelInfo {
+  int64 collectionID = 1;
+  string channelName = 2;
+  msgpb.MsgPosition seek_position = 3;
+  repeated SegmentInfo unflushedSegments = 4;
+  repeated int64 flushedSegments = 5;
+}
+
+message WatchDmChannelsRequest {
+  common.MsgBase base = 1;
+  repeated VchannelInfo vchannels = 2;
+}
+
+----------------------------------------
+
+TITLE: Installing Milvus Benchmark Dependencies
+DESCRIPTION: Installs the required Python packages for milvus_benchmark using pip.
+
+LANGUAGE: bash
+CODE:
+$ pip install -r requirements.txt
+
+----------------------------------------
+
+TITLE: Defining IndexMeta Message in Protocol Buffers
+DESCRIPTION: Defines the IndexMeta message structure in Protocol Buffers. It contains various fields to store metadata about an index, including its state, file paths, and version information.
+
+LANGUAGE: protobuf
+CODE:
+message IndexMeta {
+  int64 indexBuildID = 1;
+  common.IndexState state = 2;
+  string fail_reason = 3;
+  BuildIndexRequest req = 4;
+  repeated string index_file_paths = 5;
+  bool mark_deleted = 6;
+  int64 nodeID = 7;
+  int64 version = 8;
+  bool recycled = 9;
+}
+
+----------------------------------------
+
+TITLE: Checking Docker Installation
+DESCRIPTION: Command to verify Docker daemon status and ensure proper installation.
+
+LANGUAGE: shell
+CODE:
+$ docker info
+
+----------------------------------------
+
+TITLE: DataCoord Flush Protocol Definition
+DESCRIPTION: Protocol buffer definitions for Flush operations between Proxy and DataCoord components.
+
+LANGUAGE: proto
+CODE:
+service DataCoord {
+  ...
+  rpc Flush(FlushRequest) returns (FlushResponse) {}
+  ...
+}
+
+message FlushRequest {
+  common.MsgBase base = 1;
+  int64 dbID = 2;
+  int64 collectionID = 4;
+}
+
+message FlushResponse {
+  common.Status status = 1;
+  int64 dbID = 2;
+  int64 collectionID = 3;
+  repeated int64 segmentIDs = 4;
+}
+
+----------------------------------------
+
+TITLE: Installing git-hooks Tool with Go
+DESCRIPTION: This snippet demonstrates how to install the git-hooks tool using Go. It sets the GO111MODULE environment variable and uses 'go get' to fetch the git-hooks package.
+
+LANGUAGE: shell
+CODE:
+export GO111MODULE="on"
+go get -u github.com/git-hooks/git-hooks
+
+----------------------------------------
+
+TITLE: DataNode Flush Segments Protocol
+DESCRIPTION: Protocol buffer definitions for triggering segment flush operations on DataNode.
+
+LANGUAGE: proto
+CODE:
+service DataNode {
+  ...
+  rpc FlushSegments(FlushSegmentsRequest) returns(common.Status) {}
+  ...
+}
+
+message FlushSegmentsRequest {
+  common.MsgBase base = 1;
+  int64 dbID = 2;
+  int64 collectionID = 3;
+  repeated int64 segmentIDs = 4;
+}
+
+----------------------------------------
+
+TITLE: Milvus Server TLS Configuration
+DESCRIPTION: YAML configuration for enabling TLS in Milvus server with certificate paths and authentication mode
+
+LANGUAGE: yaml
+CODE:
+tls:
+  serverPemPath: configs/cert/server.pem
+  serverKeyPath: configs/cert/server.key
+  caPemPath: configs/cert/ca.pem
+
+common:
+  security:
+    # tlsMode 0 indicates no authentication
+    # tlsMode 1 indicates one-way authentication
+    # tlsMode 2 indicates two-way authentication
+    tlsMode: 2
+
+----------------------------------------
+
+TITLE: Go Code Style Checking
+DESCRIPTION: Make command for checking Go code formatting from the milvus root directory.
+
+LANGUAGE: shell
+CODE:
+make static-check
+
+----------------------------------------
+
+TITLE: Enabling Milvus Clustering Compaction Configuration
+DESCRIPTION: YAML configuration to enable clustering compaction in Milvus. This sets the basic parameters for enabling and auto-enabling the feature.
+
+LANGUAGE: yaml
+CODE:
+dataCoord.compaction.clustering.enable=true
+dataCoord.compaction.clustering.autoEnable=true
+
+----------------------------------------
+
+TITLE: Milvus Clustering Compaction Configuration Options
+DESCRIPTION: Detailed YAML configuration for Milvus clustering compaction, including settings for data coordinator, query node, data node, and common options. This configuration allows fine-tuning of the clustering compaction process.
+
+LANGUAGE: yaml
+CODE:
+dataCoord:
+  compaction:
+    clustering:
+      enable: true # Enable clustering compaction
+      autoEnable: true # Enable auto background clustering compaction
+      triggerInterval: 600 # clustering compaction trigger interval in seconds
+      minInterval: 3600 # The minimum interval between clustering compaction executions of one collection, to avoid redundant compaction
+      maxInterval: 259200 # If a collection haven't been clustering compacted for longer than maxInterval, force compact
+      newDataSizeThreshold: 512m # If new data size is large than newDataSizeThreshold, execute clustering compaction
+      timeout: 7200
+     
+queryNode:
+  enableSegmentPrune: true # use partition stats to prune data in search/query on shard delegator
+
+datanode:
+  clusteringCompaction:
+    memoryBufferRatio: 0.1 # The ratio of memory buffer of clustering compaction. Data larger than threshold will be flushed to storage.
+    workPoolSize: 8  # worker pool size for one clustering compaction task
+common:
+  usePartitionKeyAsClusteringKey: true # if true, do clustering compaction and segment prune on partition key field
+
+----------------------------------------
+
+TITLE: Python Implementation Example with Default Values
+DESCRIPTION: Demonstrates collection creation and data insertion using default values in Milvus, showing how empty fields are populated with default values.
+
+LANGUAGE: python
+CODE:
+    # create collection
+    nb = 3000
+    fields = [
+        FieldSchema(name="int64", dtype=DataType.INT64, is_primary=True),
+         # restrict at most one value to be passed in as the default value
+        FieldSchema(name="float", dtype=DataType.FLOAT, default_value=1.0)
+    ]
+    schema = CollectionSchema(
+        fields=fields, description="collection")
+
+    collection = Collection(name="hello_milvus", schema=default_schema)
+
+    #  insert data
+    collection.insert(
+        [
+            [i for i in range(nb)],
+            # will use the default_value
+            [],
+        ]
+    )
+
+----------------------------------------
+
+TITLE: Installing OpenSSL
+DESCRIPTION: Commands to check OpenSSL version and install it on Ubuntu if not present
+
+LANGUAGE: shell
+CODE:
+openssl version
+sudo apt install openssl
+
+----------------------------------------
+
+TITLE: Adding Default Value to FieldSchema Protocol Buffer Definition
+DESCRIPTION: Extends the FieldSchema message to include a default_value field that supports scalar values.
+
+LANGUAGE: proto
+CODE:
+message FieldSchema {
+  ...
+  ScalarField default_value = 11; // default_value only support scalars for now
+}
+
+----------------------------------------
+
+TITLE: Python Client TLS Connection
+DESCRIPTION: Example code for connecting to Milvus server using Python SDK with TLS authentication
+
+LANGUAGE: python
+CODE:
+from pymilvus import connections
+
+_HOST = '127.0.0.1'
+_PORT = '19530'
+
+print(f"\nCreate connection...")
+connections.connect(host=_HOST, port=_PORT, secure=True, client_pem_path="cert/client.pem",
+                        client_key_path="cert/client.key",
+                        ca_pem_path="cert/ca.pem", server_name="localhost")
+print(f"\nList connections:")
+print(connections.list_connections())
+
+----------------------------------------
+
+TITLE: Defining RootCoord Service for Timestamp Allocation in Protocol Buffers
+DESCRIPTION: This proto definition outlines the RootCoord service for allocating timestamps, including request and response message structures. It specifies the AllocTimestamp RPC method and associated message types.
+
+LANGUAGE: proto
+CODE:
+service RootCoord {
+    ...
+    rpc AllocTimestamp(AllocTimestampRequest) returns (AllocTimestampResponse) {}
+    ...
+}
+
+message AllocTimestampRequest {
+  common.MsgBase base = 1;
+  uint32 count = 3;
+}
+
+message AllocTimestampResponse {
+    common.Status status = 1;
+    uint64 timestamp = 2;
+    uint32 count = 3;
+}
+
+----------------------------------------
+
+TITLE: Downloading Milvus Installation Scripts
+DESCRIPTION: Downloads the required requirements.txt and save_image.py files from the Milvus GitHub repository for offline installation.
+
+LANGUAGE: shell
+CODE:
+$ wget https://raw.githubusercontent.com/milvus-io/milvus/master/deployments/offline/requirements.txt
+$ wget https://raw.githubusercontent.com/milvus-io/milvus/master/deployments/offline/save_image.py
+
+----------------------------------------
+
+TITLE: Demonstrating Milvus Query Expression Examples in Python
+DESCRIPTION: Provides examples of valid Milvus query expressions using the defined grammar. These examples showcase various operations including logical comparisons, arithmetic operations, and array inclusion checks.
+
+LANGUAGE: python
+CODE:
+A > 3 && A < 4 && (C > 5 || D < 6)
+1 < A <= 2.0 + 3 - 4 * 5 / 6 % 7 ** 8
+A == B
+FloatCol in [1.0, 2, 3.0]
+Int64Col in [1, 2, 3] or C != 6
+
+----------------------------------------
+
+TITLE: Exporting Milvus Logs with Additional Components
+DESCRIPTION: This command exports logs for Milvus and additional components (etcd, MinIO, and Pulsar) with custom namespace and storage directory.
+
+LANGUAGE: shell
+CODE:
+./export-milvus-log.sh -i my-release -n milvus -d ./logs -e -m -p
+
+----------------------------------------
+
+TITLE: C++ Code Formatting Script Usage
+DESCRIPTION: Commands for formatting C++ code and adding license headers under the milvus/internal/core directory using clang-format-12.
+
+LANGUAGE: bash
+CODE:
+./run_clang_format.sh .
+
+----------------------------------------
+
+TITLE: Installing Milvus Go SDK using go get
+DESCRIPTION: Use the go get command to install the latest version of the Milvus Go SDK and its dependencies.
+
+LANGUAGE: shell
+CODE:
+go get -u github.com/milvus-io/milvus/client/v2
+
+----------------------------------------
+
+TITLE: SegmentSealedImpl Internal Functions
+DESCRIPTION: Describes the internal function implementations including row count updates and timestamp masking for Time Travel support.
+
+LANGUAGE: markdown
+CODE:
+1. Most functions are the implementation of the corresponding functions of the segment interface, which will not be repeated here.
+2. `update_row_count`: Used to update the row_count field.
+3. `mask_with_timestamps`: Use Timestamp column to update search bitmask, used to support Time Travel function.
+
+----------------------------------------
+
+TITLE: Running Milvus Builder with Amazon Linux 2023
+DESCRIPTION: These commands set the OS environment variable and run the Milvus builder script for Amazon Linux 2023.
+
+LANGUAGE: shell
+CODE:
+export OS_NAME=amazonlinux2023
+build/builder.sh make
+
+----------------------------------------
+
+TITLE: Growing Segment Time Travel Implementation
+DESCRIPTION: Defines the process for implementing time travel in growing segments through ascending time order insertion, binary search for timestamp location, and vector search interface utilization.
+
+LANGUAGE: markdown
+CODE:
+1. When inserting, ensure that the inserted data is in ascending time order.
+2. Find the location of timestamp with binary search and record it as vec_count.
+3. Call vector_search interface and rest is handled inside segment, no need to handle bitmask generated by DSL.
+
+----------------------------------------
+
+TITLE: Running E2E Tests
+DESCRIPTION: Commands to navigate to the test scripts directory and execute the E2E tests in a Kubernetes environment.
+
+LANGUAGE: shell
+CODE:
+$ cd tests/scripts
+$ ./e2e-k8s.sh
+
+----------------------------------------
+
+TITLE: Global Parameters YAML Configuration
+DESCRIPTION: Example YAML configuration structure for Milvus etcd settings that gets parsed into key-value pairs.
+
+LANGUAGE: yaml
+CODE:
+etcd:
+  address: localhost
+  port: 2379
+  rootpath: milvus/etcd
+
+----------------------------------------
+
+TITLE: Accessing E2E Test Help
+DESCRIPTION: Command to display help information for the E2E test script.
+
+LANGUAGE: shell
+CODE:
+$ ./e2e-k8s.sh --help
+
+----------------------------------------
+
+TITLE: Specifying Python Package Dependencies for Milvus
+DESCRIPTION: This snippet defines the exact versions of Python packages required for the Milvus project. It includes Docker version 5.0.0 and nested-lookup version 0.2.22.
+
+LANGUAGE: Python
+CODE:
+docker==5.0.0
+nested-lookup==0.2.22
+
+----------------------------------------
+
+TITLE: Setting PYTHONPATH for Local Milvus Benchmark Testing
+DESCRIPTION: Sets the PYTHONPATH environment variable to the milvus_benchmark project directory for local testing.
+
+LANGUAGE: bash
+CODE:
+$ export PYTHONPATH=/your/project/path/milvus_benchmark
+
+----------------------------------------
+
+TITLE: Downloading Milvus Docker Compose Files
+DESCRIPTION: Downloads either standalone or cluster docker-compose.yml configuration file from the Milvus repository.
+
+LANGUAGE: shell
+CODE:
+$ wget https://raw.githubusercontent.com/milvus-io/milvus/master/deployments/docker/standalone/docker-compose.yml -O docker-compose.yml
+
+LANGUAGE: shell
+CODE:
+$ wget https://raw.githubusercontent.com/milvus-io/milvus/master/deployments/docker/cluster/docker-compose.yml -O docker-compose.yml
+
+----------------------------------------
+
+TITLE: Configuring Milvus Benchmark Client for Insert Testing
+DESCRIPTION: Kubernetes ConfigMap for specifying client-side configuration for insert performance testing in Milvus benchmark.
+
+LANGUAGE: yaml
+CODE:
+kind: ConfigMap
+apiVersion: v1
+metadata:
+  name: client-insert-batch-1000
+  namespace: qa
+  uid: 8604c277-f00f-47c7-8fcb-9b3bc97efa74
+  resourceVersion: '42988547'
+  creationTimestamp: '2021-07-09T08:33:02Z'
+  managedFields:
+    - manager: dashboard
+      operation: Update
+      apiVersion: v1
+      fieldsType: FieldsV1
+      fieldsV1:
+        'f:data':
+          .: {}
+          'f:config.yaml': {}
+data:
+  config.yaml: |
+    insert_performance:
+      collections:
+        - 
+          milvus:
+            wal_enable: true
+          collection_name: sift_1m_128_l2
+          ni_per: 1000
+          build_index: false
+          index_type: ivf_sq8
+          index_param:
+            nlist: 1024
+
+----------------------------------------
+
+TITLE: Exporting Milvus Logs for the Last 24 Hours
+DESCRIPTION: This command exports Milvus logs for only the latest 24 hours.
+
+LANGUAGE: shell
+CODE:
+./export-milvus-log.sh -i my-release -s 24h
+
+----------------------------------------
+
+TITLE: Implementing Test Suite with MiniCluster
+DESCRIPTION: Example of implementing a new test suite using testify/suite with MiniCluster integration. Shows setup and teardown patterns.
+
+LANGUAGE: go
+CODE:
+import (
+    // ...
+    "github.com/milvus-io/milvus/tests/integration"
+)
+
+type NewSuite struct {
+    integration.MiniClusterSuite
+}
+
+
+// Setups and teardowns, optional if no custom logic needed
+// example to suite setup & teardown, same logic applies to test setup&teardown
+
+func (s *NewSuite) SetupSuite() {
+    s.MiniClusterSuite.SetupSuite()
+    // customized setup
+}
+
+func (s *NewSuite) TearDownSuite() {
+    s.MiniClusterSuite.TearDownSuite()
+    // customized teardown
+}
+
+----------------------------------------
+
+TITLE: Exporting Milvus and Kafka Logs
+DESCRIPTION: This command exports logs for Milvus and Kafka components with custom namespace and storage directory.
+
+LANGUAGE: shell
+CODE:
+./export-milvus-log.sh -i my-release -n milvus -d ./logs -k
+
+----------------------------------------
+
+TITLE: Configuring PyTest Default Parameters
+DESCRIPTION: Example configuration in pytest.ini showing how to set default test parameters including host and report location
+
+LANGUAGE: python
+CODE:
+addopts = --host *.*.*.* --html=/tmp/ci_logs/report.html
+
+----------------------------------------
+
+TITLE: Defining RootCoord SegmentFlushCompleted gRPC Service
+DESCRIPTION: Proto definition for the SegmentFlushCompleted gRPC service in RootCoord, used to handle notifications of flushed segments.
+
+LANGUAGE: proto
+CODE:
+service RootCoord {
+  ...
+
+  rpc SegmentFlushCompleted(data.SegmentFlushCompletedMsg) returns (common.Status) {}
+
+  ...
+}
+
+message SegmentFlushCompletedMsg {
+  common.MsgBase base = 1;
+  SegmentInfo segment = 2;
+}
+
+message SegmentInfo {
+  int64 ID = 1;
+  int64 collectionID = 2;
+  int64 partitionID = 3;
+  string insert_channel = 4;
+  int64 num_of_rows = 5;
+  common.SegmentState state = 6;
+  int64 max_row_num = 7;
+  uint64 last_expire_time = 8;
+  msgpb.MsgPosition start_position = 9;
+  msgpb.MsgPosition dml_position = 10;
+  repeated FieldBinlog binlogs = 11;
+}
+
+----------------------------------------
+
+TITLE: Running Single Test Task with Bash Script
+DESCRIPTION: Executes a single test task using the test.sh script. It requires specifying the deployment mode, task type, and root password as parameters.
+
+LANGUAGE: bash
+CODE:
+$ bash test.sh -m ${Mode} -t ${Task} -p ${Password}
+# Mode, the mode of milvus deploy. standalone or cluster"
+# Task, the task type of test. reinstall or upgrade
+# Password, the password of root"
+
+----------------------------------------
+
+TITLE: Running Milvus Scale Test Command
+DESCRIPTION: Command sequence for executing a single scale test scenario for data node expansion. Requires navigating to the test directory and running pytest with specific test parameters.
+
+LANGUAGE: bash
+CODE:
+cd /milvus/tests/python_client/scale
+
+pytest test_data_node_scale.py::TestDataNodeScale::test_expand_data_node -v -s
+
+----------------------------------------
+
+TITLE: Running Milvus Test Cases with Authentication
+DESCRIPTION: This command installs the required dependencies and runs the test cases for Milvus. It uses pytest to execute L0 marked tests in parallel, with verbose output. The tests are configured to connect to a Milvus instance at the specified endpoint and MinIO host.
+
+LANGUAGE: bash
+CODE:
+pip install -r requirements.txt
+pytest testcases -m L0 -n 6 -v --endpoint http://127.0.0.1:19530 --minio_host 127.0.0.1
+
+----------------------------------------
+
+TITLE: Using WAL in Milvus Streaming Node
+DESCRIPTION: Demonstrates how to use the WAL package in a Milvus streaming node. This snippet shows the process of getting a builder, building an opener, and opening a WAL instance.
+
+LANGUAGE: Go
+CODE:
+import "github.com/milvus-io/milvus/internal/streamingnode/server/wal/registry"
+
+name := "your builder name"
+var yourCh *options.PChannelInfo
+
+opener, err := registry.MustGetBuilder(name).Build()
+if err != nil {
+    panic(err)
+}
+ctx := context.Background()
+logger, err := opener.Open(ctx, wal.OpenOption{
+    Channel: yourCh  
+})
+if err != nil {
+    panic(err)
+}
+
+----------------------------------------
+
+TITLE: Milvus Data Coordinator Architecture Overview
+DESCRIPTION: Markdown documentation outlining the core dependencies and components required for the Data Coordinator service. Lists key dependencies including KV store (etcd), message stream (Pulsar), Root Coordinator, and Data Nodes.
+
+LANGUAGE: markdown
+CODE:
+# Data Coordinator
+
+Data cooridnator(datacoord for short) is the component to organize DataNodes and segments allocations.
+
+## Dependency
+
+- KV store: a kv store has all the meta info datacoord needs to operate. (etcd)
+- Message stream: a message stream to communicate statistics information with data nodes. (Pulsar)
+- Root Coordinator: timestamp, id and meta source.
+- Data Node(s): could be an instance or a cluster, actual worker group handles data modification operations.
+
+----------------------------------------
+
+TITLE: Configuring Third-Party Dependency Logging in CMake
+DESCRIPTION: Sets up logging options for third-party dependency builds based on the KNOWHERE_VERBOSE_THIRDPARTY_BUILD flag.
+
+LANGUAGE: CMake
+CODE:
+if (NOT KNOWHERE_VERBOSE_THIRDPARTY_BUILD)
+    set(EP_LOG_OPTIONS LOG_CONFIGURE 1 LOG_BUILD 1 LOG_INSTALL 1 LOG_DOWNLOAD 1)
+else ()
+    set(EP_LOG_OPTIONS)
+endif ()
+
+----------------------------------------
+
+TITLE: Configuring Include Directories for Milvus Benchmarks
+DESCRIPTION: Sets up include paths for the main source and unit test directories.
+
+LANGUAGE: cmake
+CODE:
+include_directories(${CMAKE_HOME_DIRECTORY}/src)
+include_directories(${CMAKE_HOME_DIRECTORY}/unittest)
+
+----------------------------------------
+
+TITLE: Implementing Rectangle Class with Strong Types
+DESCRIPTION: Shows how to use strong types in a class constructor to make interfaces more expressive and type-safe. The Rectangle class uses Width and Height strong types for its dimensions.
+
+LANGUAGE: cpp
+CODE:
+class Rectangle
+{
+public:
+    Rectangle(Width width, Height height) : width_(width.get()), height_(height.get()) {}
+    double getWidth() const { return width_; }
+    double getHeight() const { return height_; }
+
+private:
+    double width_;
+    double height_;
+};
+
+----------------------------------------
+
+TITLE: Strong Typing with References
+DESCRIPTION: Shows how to create strong types that behave like references to the underlying type.
+
+LANGUAGE: cpp
+CODE:
+using FamilyNameRef = NamedType<std:string&, struct FamilyNameRefTag>;
+
+----------------------------------------
+
+TITLE: Building Milvus from Source
+DESCRIPTION: Commands for building Milvus from source code including cloning repo and installing dependencies
+
+LANGUAGE: bash
+CODE:
+# Clone github repository.
+$ git clone https://github.com/milvus-io/milvus.git
+
+# Install third-party dependencies.
+$ cd milvus/
+$ ./scripts/install_deps.sh
+
+# Compile Milvus.
+$ make

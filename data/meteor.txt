@@ -1,0 +1,2510 @@
+TITLE: Creating MongoDB Collections in Meteor
+DESCRIPTION: Example of creating MongoDB collections for chatrooms and messages using Mongo.Collection.
+
+LANGUAGE: javascript
+CODE:
+// Common code on client and server declares a DDP-managed Mongo collection.
+const Chatrooms = new Mongo.Collection('chatrooms');
+const Messages = new Mongo.Collection('messages');
+
+----------------------------------------
+
+TITLE: Publishing Room Data with Meteor in JavaScript
+DESCRIPTION: Demonstrates how to publish room data from a server, including a basic publication and a more complex one with admin-specific information. It also shows how to publish dependent documents and simulate joins.
+
+LANGUAGE: javascript
+CODE:
+// Server: Publish the `Rooms` collection, minus secret info...
+Meteor.publish('rooms', function () {
+  return Rooms.find({}, {
+    fields: { secretInfo: 0 }
+  });
+});
+
+// ...and publish secret info for rooms where the logged-in user is an admin. If
+// the client subscribes to both publications, the records are merged together
+// into the same documents in the `Rooms` collection. Note that currently object
+// values are not recursively merged, so the fields that differ must be top
+// level fields.
+Meteor.publish('adminSecretInfo', function () {
+  return Rooms.find({ admin: this.userId }, {
+    fields: { secretInfo: 1 }
+  });
+});
+
+// Publish dependent documents and simulate joins.
+Meteor.publish('roomAndMessages', function (roomId) {
+  check(roomId, String);
+
+  return [
+    Rooms.find({ _id: roomId }, {
+      fields: { secretInfo: 0 }
+    }),
+    Messages.find({ roomId })
+  ];
+});
+
+----------------------------------------
+
+TITLE: Defining Meteor Methods in JavaScript
+DESCRIPTION: Example of defining Meteor methods using Meteor.methods(). It shows how to create multiple methods, perform argument checking, throw errors, and return values.
+
+LANGUAGE: javascript
+CODE:
+Meteor.methods({
+  foo(arg1, arg2) {
+    check(arg1, String);
+    check(arg2, [Number]);
+
+    // Do stuff...
+
+    if (/* you want to throw an error */) {
+      throw new Meteor.Error('pants-not-found', "Can't find my pants");
+    }
+
+    return 'some return value';
+  },
+
+  bar() {
+    // Do other stuff...
+    return 'baz';
+  }
+});
+
+----------------------------------------
+
+TITLE: Querying and Modifying MongoDB Collections
+DESCRIPTION: Examples of querying, inserting, and updating documents in Meteor collections.
+
+LANGUAGE: javascript
+CODE:
+// Return an array of my messages.
+const myMessages = Messages.find({ userId: Meteor.userId() }).fetch();
+
+// Create a new message.
+Messages.insert({ text: 'Hello, world!' });
+
+// Mark my first message as important.
+Messages.update(myMessages[0]._id, { $set: { important: true } });
+
+----------------------------------------
+
+TITLE: Initializing Database on Server Startup in Meteor
+DESCRIPTION: Demonstrates how to initialize database data on server startup using Meteor.startup() and Meteor.isServer. The code checks if a collection is empty and inserts initial data if needed.
+
+LANGUAGE: javascript
+CODE:
+// On server startup, if the database is empty, create some initial data.
+if (Meteor.isServer) {
+  Meteor.startup(() => {
+    if (Rooms.find().count() === 0) {
+      Rooms.insert({ name: 'Initial room' });
+    }
+  });
+}
+
+----------------------------------------
+
+TITLE: Implementing a Reactive Weather Data Source in JavaScript
+DESCRIPTION: This snippet demonstrates how to create a simple reactive data source using Tracker.Dependency. It implements a weather system with getter and setter functions that properly track dependencies and trigger invalidations when the weather changes.
+
+LANGUAGE: javascript
+CODE:
+let weather = 'sunny';
+const weatherDep = new Tracker.Dependency();
+
+function getWeather() {
+  weatherDep.depend();
+  return weather;
+}
+
+function setWeather(newWeather) {
+  weather = newWeather;
+
+  // Note: We could add logic here to only call `changed` if the new value is
+  // different from the old value.
+  weatherDep.changed();
+}
+
+----------------------------------------
+
+TITLE: Using Match.Where for Custom Validation
+DESCRIPTION: Examples of using 'Match.Where' to create custom validation conditions. It shows how to use it with built-in functions and how to create custom validation functions.
+
+LANGUAGE: js
+CODE:
+check(buffer, Match.Where(EJSON.isBinary));
+
+const NonEmptyString = Match.Where((x) => {
+  check(x, String);
+  return x.length > 0;
+});
+
+check(arg, NonEmptyString);
+
+----------------------------------------
+
+TITLE: GitHub OAuth Login Example
+DESCRIPTION: Example of implementing GitHub OAuth login with request permissions and error handling.
+
+LANGUAGE: javascript
+CODE:
+Meteor.loginWithGithub({
+  requestPermissions: ['user', 'public_repo']
+}, (error) => {
+  if (error) {
+    Session.set('errorMessage', error.reason || 'Unknown error');
+  }
+});
+
+----------------------------------------
+
+TITLE: Using Match.test for Structure Validation
+DESCRIPTION: Examples of using 'Match.test' to check if a variable has a certain structure. It demonstrates checking for object properties, primitive types, and complex patterns.
+
+LANGUAGE: js
+CODE:
+// Will return true for `{ foo: 1, bar: 'hello' }` or similar.
+Match.test(value, { foo: Match.Integer, bar: String });
+
+// Will return true if `value` is a string.
+Match.test(value, String);
+
+// Will return true if `value` is a string or an array of numbers.
+Match.test(value, Match.OneOf(String, [Number]));
+
+----------------------------------------
+
+TITLE: Implementing Server-Side Rendering with React in Meteor
+DESCRIPTION: Demonstrates how to use the onPageLoad function to implement server-side rendering with React in a Meteor application, including rendering the app component and injecting it into the HTML.
+
+LANGUAGE: javascript
+CODE:
+import React from "react";
+import { renderToString } from "react-dom/server";
+import { onPageLoad } from "meteor/server-render";
+
+import App from "/imports/Server.js";
+
+onPageLoad(sink => {
+  sink.renderIntoElementById("app", renderToString(
+    <App location={sink.request.url} />
+  ));
+});
+
+----------------------------------------
+
+TITLE: Setting Up Allow/Deny Rules for Collections
+DESCRIPTION: Example of setting up allow and deny rules to control client-side writes to a collection.
+
+LANGUAGE: javascript
+CODE:
+const Posts = new Mongo.Collection('posts');
+
+Posts.allow({
+  insert(userId, doc) {
+    // The user must be logged in and the document must be owned by the user.
+    return userId && doc.owner === userId;
+  },
+
+  update(userId, doc, fields, modifier) {
+    // Can only change your own documents.
+    return doc.owner === userId;
+  },
+
+  remove(userId, doc) {
+    // Can only remove your own documents.
+    return doc.owner === userId;
+  },
+
+  fetch: ['owner']
+});
+
+Posts.deny({
+  update(userId, doc, fields, modifier) {
+    // Can't change owners.
+    return _.contains(fields, 'owner');
+  },
+
+  remove(userId, doc) {
+    // Can't remove locked documents.
+    return doc.locked;
+  },
+
+  fetch: ['locked'] // No need to fetch `owner`
+});
+
+----------------------------------------
+
+TITLE: Monitoring a Cursor with Tracker.autorun in JavaScript
+DESCRIPTION: This snippet demonstrates how to use Tracker.autorun to monitor a cursor (reactive data source) and aggregate it into a session variable. It finds the oldest monkey from a collection and sets its name to a session variable.
+
+LANGUAGE: javascript
+CODE:
+Tracker.autorun(() => {
+  const oldest = _.max(Monkeys.find().fetch(), (monkey) => {
+    return monkey.age;
+  });
+
+  if (oldest) {
+    Session.set('oldest', oldest.name);
+  }
+});
+
+----------------------------------------
+
+TITLE: Using Observe to Watch for Collection Changes
+DESCRIPTION: Example of using observe to track changes in a collection in real-time.
+
+LANGUAGE: javascript
+CODE:
+// Keep track of how many administrators are online.
+let count = 0;
+const cursor = Users.find({ admin: true, onlineNow: true });
+
+const handle = cursor.observeChanges({
+  added(id, user) {
+    count += 1;
+    console.log(`${user.name} brings the total to ${count} admins.`);
+  },
+
+  removed() {
+    count -= 1;
+    console.log(`Lost one. We're now down to ${count} admins.`);
+  }
+});
+
+// After five seconds, stop keeping the count.
+setTimeout(() => handle.stop(), 5000);
+
+----------------------------------------
+
+TITLE: Retrieving User Document Fields
+DESCRIPTION: Example of fetching specific user fields to optimize performance by limiting the data returned.
+
+LANGUAGE: javascript
+CODE:
+const userName = Meteor.user({fields: {'profile.name': 1}}).profile.name;
+
+----------------------------------------
+
+TITLE: Client-Side Subscription and Data Usage in Meteor
+DESCRIPTION: Demonstrates how to subscribe to a publication on the client-side, declare a collection to hold the published data, and use the data in a reactive context.
+
+LANGUAGE: javascript
+CODE:
+// Declare a collection to hold the count object.
+const Counts = new Mongo.Collection('counts');
+
+// Subscribe to the count for the current room.
+Tracker.autorun(() => {
+  Meteor.subscribe('countsByRoom', Session.get('roomId'));
+});
+
+// Use the new collection.
+const roomCount = Counts.findOne(Session.get('roomId')).count;
+console.log(`Current room has ${roomCount} messages.`);
+
+----------------------------------------
+
+TITLE: Handling New Connections with Meteor.onConnection
+DESCRIPTION: Server-side callback registration for new client connections. Provides connection object with methods for managing the connection and accessing client information.
+
+LANGUAGE: javascript
+CODE:
+Meteor.onConnection(function(connection) {
+  // connection.id - unique connection identifier
+  // connection.close() - close the connection
+  // connection.onClose(callback) - register close handler
+  // connection.clientAddress - client IP address
+  // connection.httpHeaders - whitelisted HTTP headers
+})
+
+----------------------------------------
+
+TITLE: Using Match.Maybe in Object Pattern
+DESCRIPTION: Example of using 'Match.Maybe' in an object pattern to allow for optional fields. It demonstrates the behavior of 'Match.Maybe' both inside and outside of object contexts.
+
+LANGUAGE: js
+CODE:
+// In an object
+const pattern = { name: Match.Maybe(String) };
+
+check({ name: 'something' }, pattern); // OK
+check({}, pattern); // OK
+check({ name: undefined }, pattern); // Throws an exception
+check({ name: null }, pattern); // Throws an exception
+
+// Outside an object
+check(null, Match.Maybe(String)); // OK
+check(undefined, Match.Maybe(String)); // OK
+
+----------------------------------------
+
+TITLE: Validating New Users in Meteor
+DESCRIPTION: Examples of using Accounts.validateNewUser to validate username requirements when creating new users. It demonstrates how to set specific error messages and perform basic validations.
+
+LANGUAGE: javascript
+CODE:
+// Validate username, sending a specific error message on failure.
+Accounts.validateNewUser((user) => {
+  if (user.username && user.username.length >= 3) {
+    return true;
+  } else {
+    throw new Meteor.Error(403, 'Username must have at least 3 characters');
+  }
+});
+
+// Validate username, without a specific error message.
+Accounts.validateNewUser((user) => {
+  return user.username !== 'root';
+});
+
+----------------------------------------
+
+TITLE: Using Check in Meteor Publish Function
+DESCRIPTION: Example of using 'check' to validate the type of an argument in a Meteor publish function. It ensures that 'roomId' is a string before querying the database.
+
+LANGUAGE: js
+CODE:
+Meteor.publish('chatsInRoom', function (roomId) {
+  // Make sure `roomId` is a string, not an arbitrary Mongo selector object.
+  check(roomId, String);
+  return Chats.find({ room: roomId });
+});
+
+----------------------------------------
+
+TITLE: Handling HTTP Requests with WebApp.connectHandlers in Meteor
+DESCRIPTION: This snippet demonstrates how to use WebApp.connectHandlers to handle a specific URL route in a Meteor application. It sets up a handler for the '/hello' path and returns a response with the current Meteor release.
+
+LANGUAGE: javascript
+CODE:
+WebApp.connectHandlers.use('/hello', (req, res, next) => {
+  res.writeHead(200);
+  res.end(`Hello world from: ${Meteor.release}`);
+});
+
+----------------------------------------
+
+TITLE: Managing Server Connections with Meteor.reconnect and disconnect
+DESCRIPTION: Methods for manually controlling the server connection. reconnect() attempts to reestablish a dropped connection, while disconnect() explicitly closes the connection and stops live updates.
+
+LANGUAGE: javascript
+CODE:
+Meteor.reconnect()
+Meteor.disconnect()
+
+----------------------------------------
+
+TITLE: Using Check in Meteor Method
+DESCRIPTION: Example of using 'check' to validate multiple arguments in a Meteor method. It checks for string types and a complex object structure with optional fields.
+
+LANGUAGE: js
+CODE:
+Meteor.methods({
+  addChat(roomId, message) {
+    check(roomId, String);
+    check(message, {
+      text: String,
+      timestamp: Date,
+      // Optional, but if present must be an array of strings.
+      tags: Match.Maybe([String])
+    });
+
+    // Do something with the message...
+  }
+});
+
+----------------------------------------
+
+TITLE: Creating DDP Connections to Remote Meteor Applications
+DESCRIPTION: Establishes connections to other Meteor applications using DDP protocol. Provides methods for remote subscriptions, method calls, and connection management.
+
+LANGUAGE: javascript
+CODE:
+DDP.connect(url)
+DDP.onReconnect(callback)
+
+----------------------------------------
+
+TITLE: Example User Document Structure
+DESCRIPTION: Demonstrates the structure of a typical user document in the Meteor.users collection, including core fields and service integrations.
+
+LANGUAGE: javascript
+CODE:
+{
+  _id: 'QwkSmTCZiw5KDx3L6',  // Meteor.userId()
+  username: 'cool_kid_13', // Unique name
+  emails: [
+    // Each email address can only belong to one user.
+    { address: 'cool@example.com', verified: true },
+    { address: 'another@different.com', verified: false }
+  ],
+  createdAt: new Date('Wed Aug 21 2013 15:16:52 GMT-0700 (PDT)'),
+  profile: {
+    // The profile is writable by the user by default.
+    name: 'Joe Schmoe'
+  },
+  services: {
+    facebook: {
+      id: '709050', // Facebook ID
+      accessToken: 'AAACCgdX7G2...AbV9AZDZD'
+    },
+    resume: {
+      loginTokens: [
+        { token: '97e8c205-c7e4-47c9-9bea-8e2ccc0694cd',
+          when: 1349761684048 }
+      ]
+    }
+  }
+}
+
+----------------------------------------
+
+TITLE: Using Meteor.status for Connection Management
+DESCRIPTION: Returns an object containing the current connection status between client and server, including connection state, retry count, and failure information. This is a reactive data source that can be used in templates or computations.
+
+LANGUAGE: javascript
+CODE:
+Meteor.status()
+
+----------------------------------------
+
+TITLE: ES2015 Export Syntax Examples
+DESCRIPTION: Demonstrates various ways to export variables, functions and classes using ES2015 syntax.
+
+LANGUAGE: javascript
+CODE:
+export var a = ...;
+export let b = ...;
+export const c = ...;
+export function d() { ... }
+export function* e() { ... }
+export class F { ... }
+
+----------------------------------------
+
+TITLE: Sending Emails in Meteor Using Server Method
+DESCRIPTION: Example of how to send an email from a Meteor client using a server method. Includes both server-side method definition and client-side method call.
+
+LANGUAGE: javascript
+CODE:
+// Server: Define a method that the client can call.
+Meteor.methods({
+  sendEmail(to, from, subject, text) {
+    // Make sure that all arguments are strings.
+    check([to, from, subject, text], [String]);
+
+    // Let other method calls from the same client start running, without
+    // waiting for the email sending to complete.
+    this.unblock();
+
+    Email.send({ to, from, subject, text });
+  }
+});
+
+// Client: Asynchronously send an email.
+Meteor.call(
+  'sendEmail',
+  'Alice <alice@example.com>',
+  'bob@example.com',
+  'Hello from Meteor!',
+  'This is a test of Email.send.'
+);
+
+----------------------------------------
+
+TITLE: Implementing Custom EJSON Type in JavaScript
+DESCRIPTION: Shows how to create a custom 'Distance' type and add it to EJSON using EJSON.addType. Includes implementation of required methods for custom types.
+
+LANGUAGE: js
+CODE:
+class Distance {
+  constructor(value, unit) {
+    this.value = value;
+    this.unit = unit;
+  }
+
+  // Convert our type to JSON.
+  toJSONValue() {
+    return {
+      value: this.value,
+      unit: this.unit
+    };
+  }
+
+  // Unique type name.
+  typeName() {
+    return 'Distance';
+  }
+}
+
+EJSON.addType('Distance', function fromJSONValue(json) {
+  return new Distance(json.value, json.unit);
+});
+
+EJSON.stringify(new Distance(10, 'm'));
+// Returns '{"$type":"Distance","$value":{"value":10,"unit":"m"}}'
+
+----------------------------------------
+
+TITLE: Implementing Custom Email Transport in Meteor
+DESCRIPTION: Example of using Email.customTransport to set up a custom email transport using Mailgun in Meteor. This function overrides the default email sending mechanism.
+
+LANGUAGE: javascript
+CODE:
+import { Email } from 'meteor/email'
+import { Log } from 'meteor/logging'
+import Mailgun from 'mailgun-js'
+
+Email.customTransport = (data) => {
+  // `options.packageSettings` are settings from `Meteor.settings.packages.email`
+  // The rest of the options are from Email.send options
+  const mailgun = Mailgun({ apiKey: data.packageSettings.mailgun.privateKey, domain: 'mg.mygreatapp.com' })
+  
+  // Since the data object that we recieve already includes the correct key names for sending
+  // we can just pass it to the mailgun sending message.
+  mailgun.messages().send(data, (error, body) => {
+    if (error) Log.error(error)
+    if (body) Log.info(body)
+  })
+}
+
+----------------------------------------
+
+TITLE: Basic Package.js Structure in Meteor
+DESCRIPTION: Example of a typical package.js file structure, including package description, dependencies, exports, and test setup.
+
+LANGUAGE: javascript
+CODE:
+// Information about this package:
+Package.describe({
+  // Short two-sentence summary
+  summary: 'What this does',
+  // Version number
+  version: '1.0.0',
+  // Optional, default is package directory name
+  name: 'username:package-name',
+  // Optional GitHub URL to your source repository
+  git: 'https://github.com/something/something.git'
+});
+
+// This defines your actual package:
+Package.onUse((api) => {
+  // If no version is specified for an `api.use` dependency, use the one defined
+  // in Meteor 1.4.3.1.
+  api.versionsFrom('1.4.3.1');
+  // Use the `underscore` package, but only on the server. Version not
+  // specified, so it will be as of Meteor 1.4.3.1.
+  api.use('underscore', 'server');
+  // Use `kadira:flow-router`, version 2.12.1 or newer.
+  api.use('kadira:flow-router@2.12.1');
+  // Give users of this package access to active-route's JavaScript helpers.
+  api.imply('zimme:active-route@2.3.2')
+  // Export the object `Email` to packages or apps that use this package.
+  api.export('Email', 'server');
+  // Specify the source code for the package.
+  api.addFiles('email.js', 'server');
+  // When using `ecmascript` or `modules` packages, you can use this instead of
+  // `api.export` and `api.addFiles`.
+  api.mainModule('email.js', 'server');
+});
+
+// This defines the tests for the package:
+Package.onTest((api) => {
+  // Sets up a dependency on this package.
+  api.use('username:package-name');
+  // Use the Mocha test framework.
+  api.use('practicalmeteor:mocha@2.4.5_2');
+  // Specify the source code for the package tests.
+  api.addFiles('email_tests.js', 'server');
+});
+
+// This lets you use npm packages in your package:
+Npm.depends({
+  simplesmtp: '0.3.10',
+  'stream-buffers': '0.2.5'
+});
+
+----------------------------------------
+
+TITLE: Using Meteor.EnvironmentVariable for Request Logging in JavaScript
+DESCRIPTION: This snippet demonstrates how to create and use a Meteor.EnvironmentVariable to maintain context across asynchronous operations. It shows the creation of a currentRequest variable, a logging function that uses it, and how to set and use the environment variable within a specific context.
+
+LANGUAGE: javascript
+CODE:
+const currentRequest = new Meteor.EnvironmentVariable();
+
+function log(message) {
+  const requestId = currentRequest.get() || 'None';
+  console.log(`[${requestId}]`, message);
+}
+
+
+currentRequest.withValue('12345', () => {
+  log('Handling request'); // Logs: [12345] Handling request
+});
+
+----------------------------------------
+
+TITLE: Reactive Session Usage with Tracker
+DESCRIPTION: Example showing how to use Session reactively with Tracker.autorun for subscription management.
+
+LANGUAGE: javascript
+CODE:
+Tracker.autorun(() => {
+  Meteor.subscribe('chatHistory', { room: Session.get('currentRoomId') });
+});
+
+// Causes the function passed to `Tracker.autorun` to be rerun, so that the
+// 'chatHistory' subscription is moved to the room 'home'.
+Session.set('currentRoomId', 'home');
+
+----------------------------------------
+
+TITLE: Implementing Synchronous Twitter API Check in Meteor Method
+DESCRIPTION: Server-side Meteor method example demonstrating a synchronous HTTP GET request to Twitter's API with error handling and unblock functionality.
+
+LANGUAGE: javascript
+CODE:
+Meteor.methods({
+  checkTwitter(userId) {
+    check(userId, String);
+    this.unblock();
+
+    try {
+      const result = HTTP.call('GET', 'http://api.twitter.com/xyz', {
+        params: { user: userId }
+      });
+
+      return true;
+    } catch (e) {
+      // Got a network error, timeout, or HTTP error in the 400 or 500 range.
+      return false;
+    }
+  }
+});
+
+----------------------------------------
+
+TITLE: Setting Global Content Policies in Meteor Browser Policy
+DESCRIPTION: Functions to set content policies for all types of content at once, allowing for broad security configurations.
+
+LANGUAGE: javascript
+CODE:
+BrowserPolicy.content.allowSameOriginForAll()
+BrowserPolicy.content.allowDataUrlForAll()
+BrowserPolicy.content.allowOriginForAll(origin)
+BrowserPolicy.content.disallowAll()
+
+----------------------------------------
+
+TITLE: Asynchronous HTTP POST Request Example
+DESCRIPTION: Client-side example showing an asynchronous HTTP POST request with JSON data and callback handling.
+
+LANGUAGE: javascript
+CODE:
+HTTP.call('POST', 'http://api.twitter.com/xyz', {
+  data: { some: 'json', stuff: 1 }
+}, (error, result) => {
+  if (!error) {
+    Session.set('twizzled', true);
+  }
+});
+
+----------------------------------------
+
+TITLE: Using Meteor Settings for OAuth Secret Key
+DESCRIPTION: This snippet demonstrates how to use Meteor.settings to store the oauthSecretKey, avoiding hardcoding it in the source code.
+
+LANGUAGE: javascript
+CODE:
+Accounts.config({ oauthSecretKey: Meteor.settings.oauthSecretKey });
+
+----------------------------------------
+
+TITLE: Configuring DDP Rate Limiter in JavaScript
+DESCRIPTION: Example of defining and adding a rate limiting rule to DDPRateLimiter. This rule limits login attempts for non-admin users to 5 requests every 1000 milliseconds.
+
+LANGUAGE: javascript
+CODE:
+// Define a rule that matches login attempts by non-admin users.
+const loginRule = {
+  userId(userId) {
+    const user = Meteor.users.findOne(userId);
+    return user && user.type !== 'admin';
+  },
+
+  type: 'method',
+  name: 'login'
+};
+
+// Add the rule, allowing up to 5 messages every 1000 milliseconds.
+DDPRateLimiter.addRule(loginRule, 5, 1000);
+
+----------------------------------------
+
+TITLE: Generating Random Hexadecimal String in Meteor
+DESCRIPTION: The Random.hexString(n) function generates a random hexadecimal string of the specified length. It returns a string of random hexadecimal digits (0-9, a-f).
+
+LANGUAGE: javascript
+CODE:
+Random.hexString(n)
+
+----------------------------------------
+
+TITLE: Calling Meteor Methods Asynchronously in JavaScript
+DESCRIPTION: Demonstrates how to call a Meteor method asynchronously using Meteor.call(). The callback function receives potential errors and the result.
+
+LANGUAGE: javascript
+CODE:
+// Asynchronous call
+Meteor.call('foo', 1, 2, (error, result) => { ... });
+
+----------------------------------------
+
+TITLE: Checking for HMR availability in JavaScript
+DESCRIPTION: This snippet demonstrates how to check if the HMR API is available before using it. This is important because the API isn't always available, such as in production or unsupported architectures.
+
+LANGUAGE: javascript
+CODE:
+if (module.hot) {
+  module.hot.accept();
+}
+
+----------------------------------------
+
+TITLE: ReactiveDict Integration with Meteor Templates
+DESCRIPTION: Complete example showing ReactiveDict usage in Meteor templates, including template helpers and event handlers.
+
+LANGUAGE: html
+CODE:
+<!-- main.html -->
+<template name="main">
+  <p>We've always been at war with {{theEnemy}}.</p>
+  <button class="change-enemy">Change Enemy</button>
+</template>
+
+LANGUAGE: javascript
+CODE:
+// main.js
+Template.main.onCreated(function () {
+    this.state = new ReactiveDict();
+    this.state.set('enemy', 'Eastasia');
+});
+Template.main.helpers({
+  theEnemy() {
+    const inst = Template.instance();
+    return inst.state.get('enemy');
+  }
+});
+Template.main.events({
+  'click .change-enemy'(event, inst) {
+    inst.state.set('enemy', 'Eurasia')
+  }
+});
+
+----------------------------------------
+
+TITLE: Using Dynamic Import with Promise in JavaScript
+DESCRIPTION: Demonstrates how to use dynamic import with the Promise `.then()` method to load a module and execute a task.
+
+LANGUAGE: javascript
+CODE:
+import("tool").then(tool => tool.task());
+
+----------------------------------------
+
+TITLE: Reactive Templates with Session
+DESCRIPTION: Complete example showing reactive template rendering using Session values.
+
+LANGUAGE: html
+CODE:
+<!-- main.html -->
+<template name="main">
+  <p>We've always been at war with {{theEnemy}}.</p>
+</template>
+
+LANGUAGE: javascript
+CODE:
+// main.js
+Template.main.helpers({
+  theEnemy() {
+    return Session.get('enemy');
+  }
+});
+
+Session.set('enemy', 'Eastasia');
+// Page will say "We've always been at war with Eastasia"
+
+Session.set('enemy', 'Eurasia');
+// Page will change to say "We've always been at war with Eurasia"
+
+----------------------------------------
+
+TITLE: Adding Login Button Widget in HTML
+DESCRIPTION: Demonstrates how to add the basic login buttons widget to a Meteor template. This helper creates a login/logout button for single providers or a dropdown menu for multiple authentication options.
+
+LANGUAGE: html
+CODE:
+{{> loginButtons}}
+
+----------------------------------------
+
+TITLE: Using Dynamic Import with Async/Await in JavaScript
+DESCRIPTION: Shows how to use dynamic import with async/await syntax to load a module and perform a task asynchronously.
+
+LANGUAGE: javascript
+CODE:
+async function performTask() {
+  const tool = await import("tool");
+  tool.task();
+}
+
+----------------------------------------
+
+TITLE: ES2015 Template Literals Example
+DESCRIPTION: Demonstrates the use of template literals, a feature enabled by the `ecmascript` package.
+
+LANGUAGE: javascript
+CODE:
+var name = 'Ben';
+var message = `My name is:
+${name}`;
+
+----------------------------------------
+
+TITLE: Creating a Module Whitelist for Dynamic Imports in JavaScript
+DESCRIPTION: Shows how to create a module whitelist to enable dynamic imports with computed expressions in Meteor.
+
+LANGUAGE: javascript
+CODE:
+if (false) {
+  import("/libs/example.js");
+  import("/libs/another-example.js");
+  import("/libs/yet-another-example.js");
+}
+
+----------------------------------------
+
+TITLE: ES2015 Object Literal Shorthand and Computed Properties
+DESCRIPTION: Shows examples of object literal shorthand syntax and computed property names, features enabled by the `ecmascript` package.
+
+LANGUAGE: javascript
+CODE:
+var counter = 0;
+function getKeyName() {
+  return 'key' + counter++;
+}
+
+var obj = {
+  [getKeyName()]: 'zero',
+  [getKeyName()]: 'one',
+};
+
+obj.key0; // 'zero'
+obj.key1; // 'one'
+
+----------------------------------------
+
+TITLE: Using fetch for HTTP POST requests in Meteor
+DESCRIPTION: Comprehensive example of using fetch to make a POST request in Meteor, including setting headers, handling response, and wrapping the async function for synchronous use with Meteor.wrapAsync.
+
+LANGUAGE: javascript
+CODE:
+import { Meteor } from 'meteor/meteor';
+import { fetch, Headers } from 'meteor/fetch';
+
+async function postData (url, data) {
+    const response = await fetch(url, {
+        method: 'POST', // *GET, POST, PUT, DELETE, etc.
+        mode: 'cors', // no-cors, *cors, same-origin
+        cache: 'no-cache', // *default, no-cache, reload, force-cache, only-if-cached
+        credentials: 'same-origin', // include, *same-origin, omit
+        headers: new Headers({
+            Authorization: 'Bearer my-secret-key',
+            'Content-Type': 'application/json'
+        }),
+        redirect: 'follow', // manual, *follow, error
+        referrerPolicy: 'no-referrer', // no-referrer, *no-referrer-when-downgrade, origin, origin-when-cross-origin, same-origin, strict-origin, strict-origin-when-cross-origin, unsafe-url
+        body: JSON.stringify(data) // body data type must match "Content-Type" header
+    });
+    return response.json();
+}
+
+const postDataCall = Meteor.wrapAsync(postData);
+const results = postDataCall('https://www.example.org/statsSubmission', { totalUsers: 55 }));
+
+----------------------------------------
+
+TITLE: Configuring Content Origins in Meteor Browser Policy
+DESCRIPTION: Generic functions for allowing specific types of content to be loaded from given origins, supporting wildcards and protocols.
+
+LANGUAGE: javascript
+CODE:
+BrowserPolicy.content.allow<ContentType>Origin(origin)
+BrowserPolicy.content.allow<ContentType>DataUrl()
+BrowserPolicy.content.allow<ContentType>SameOrigin()
+BrowserPolicy.content.disallow<ContentType>()
+
+----------------------------------------
+
+TITLE: Customizing Meta Tags Based on Request Data in Meteor
+DESCRIPTION: Shows how to extract data from the request in Meteor's server-side rendering to customize meta tags, specifically for product pages with social preview information.
+
+LANGUAGE: javascript
+CODE:
+import React from "react";
+import { onPageLoad } from "meteor/server-render";
+import { renderToNodeStream } from "react-dom/server";
+import { ServerStyleSheet } from "styled-components"
+import App from "/imports/Server";
+
+const getBaseUrlFromHeaders = headers => {
+  const protocol = headers['x-forwarded-proto'];
+  const { host } = headers;
+  // we need to have '//' to findOneByHost work as expected
+  return `${protocol ? `${protocol}:` : ''}//${host}`;
+};
+
+const getContext = sink => {
+  // more details about this implementation here
+  // https://github.com/meteor/meteor/issues/9765
+  const { headers, url, browser } = sink.request;
+  // no useful data will be found for galaxybot requests
+  if (browser && browser.name === 'galaxybot') {
+    return null;
+  }
+  
+  // when we are running inside cordova we don't want to resolve meta tags
+  if (url && url.pathname && url.pathname.includes('cordova/')) {
+    return null;
+  }
+  
+  const baseUrl = getBaseUrlFromHeaders(headers);
+  const fullUrl = `${baseUrl}${url.pathname || ''}`;
+  
+  return { baseUrl, fullUrl };
+}
+
+onPageLoad(sink => {
+  const { baseUrl, fullUrl } = getContext(sink);
+  
+  // product URL contains /product on it
+  const urlParseArray = fullUrl.split('/');
+  
+  const productPosition = urlParseArray.indexOf('product');
+  const productId = productPosition !== -1 && urlParseArray[productPosition + 1].replace('?', '');
+  const product = productId && ProductsCollection.findOne(productId);
+  
+  const productTitle = product && `Buy now ${product.name}, ${product.price}`;
+  if (productTitle) {
+    sink.appendToHead(`<title>${productTitle}</title>\n`);
+    sink.appendToHead(`<meta property="og:title" content="${productTitle}">\n`);
+    if (product.imageUrl) {
+      sink.appendToHead(`<meta property="og:image" content="${product.imageUrl}">\n`);
+    }
+  }
+});
+
+----------------------------------------
+
+TITLE: Selecting Random Element from Array in Meteor
+DESCRIPTION: The Random.choice(array) function selects a random element from the given array and returns it.
+
+LANGUAGE: javascript
+CODE:
+Random.choice(array)
+
+----------------------------------------
+
+TITLE: Streaming HTML with React and Styled-Components in Meteor
+DESCRIPTION: Demonstrates how to use React's renderToNodeStream with styled-components for streaming HTML in a Meteor server-side rendering setup, improving time to first byte.
+
+LANGUAGE: javascript
+CODE:
+import React from "react";
+import { onPageLoad } from "meteor/server-render";
+import { renderToNodeStream } from "react-dom/server";
+import { ServerStyleSheet } from "styled-components"
+import App from "/imports/Server";
+
+onPageLoad(sink => {
+  const sheet = new ServerStyleSheet();
+  const appJSX = sheet.collectStyles(
+    <App location={sink.request.url} />
+  );
+  const htmlStream = sheet.interleaveWithNodeStream(
+    renderToNodeStream(appJSX)
+  );
+  sink.renderIntoElementById("app", htmlStream);
+});
+
+----------------------------------------
+
+TITLE: Serving Static HTML with WebApp.connectHandlers in Meteor
+DESCRIPTION: This snippet demonstrates how to serve a static HTML file using WebApp.connectHandlers in Meteor. It reads an HTML file from the private assets, sets appropriate headers, and serves it for the root URL.
+
+LANGUAGE: javascript
+CODE:
+/* global WebApp Assets */
+import crypto from 'crypto'
+import connectRoute from 'connect-route'
+
+WebApp.connectHandlers.use(connectRoute(function (router) {
+    router.get('/', function (req, res, next) {
+        const buf = Assets.getText('index.html')
+
+        if (buf.length > 0) {
+            const eTag = crypto.createHash('md5').update(buf).digest('hex')
+
+            if (req.headers['if-none-match'] === eTag) {
+                res.writeHead(304, 'Not Modified')
+                return res.end()
+            }
+
+            res.writeHead(200, {
+                ETag: eTag,
+                'Content-Type': 'text/html'
+            })
+
+            return res.end(buf);
+        }
+
+        return res.end('<html><body>Index page not found!</body></html>')
+    })
+}))
+
+----------------------------------------
+
+TITLE: Customizing User Creation in Meteor
+DESCRIPTION: Example of using Accounts.onCreateUser to customize the user document during creation. It demonstrates adding a custom field (dexterity) and handling the profile field.
+
+LANGUAGE: javascript
+CODE:
+// Support for playing D&D: Roll 3d6 for dexterity.
+Accounts.onCreateUser((options, user) => {
+  const customizedUser = Object.assign({
+    dexterity: _.random(1, 6) + _.random(1, 6) + _.random(1, 6),
+  }, user);
+
+  // We still want the default hook's 'profile' behavior.
+  if (options.profile) {
+    customizedUser.profile = options.profile;
+  }
+
+  return customizedUser;
+});
+
+----------------------------------------
+
+TITLE: Logging Complex Objects with Meteor Log in JavaScript
+DESCRIPTION: Illustrates how to log complex objects with special handling for 'message' and 'app' properties. Certain keys are reserved and not allowed in the root of the object.
+
+LANGUAGE: javascript
+CODE:
+Log.info({message: 'warning', app: 'DESKTOP', error: { property1: 'foo', property2: 'bar', property3: { foo: 'bar' }} })
+
+----------------------------------------
+
+TITLE: Handling External Login in Meteor
+DESCRIPTION: Example of using Accounts.setAdditionalFindUserOnExternalLogin to allow existing users to sign in with Google without creating a new account. It demonstrates how to look up a user by email when using external authentication.
+
+LANGUAGE: javascript
+CODE:
+// If a user has already been created, and used their Google email, this will 
+// allow them to sign in with the Meteor.loginWithGoogle method later, without
+// creating a new user.
+Accounts.setAdditionalFindUserOnExternalLogin(({serviceName, serviceData}) => {
+  if (serviceName === "google") {
+     // Note: Consider security implications. If someone other than the owner
+     // gains access to the account on the third-party service they could use
+     // the e-mail set there to access the account on your app.
+     // Most often this is not an issue, but as a developer you should be aware
+     // of how bad actors could play.
+    return Accounts.findUserByEmail(serviceData.email)
+  }
+})
+
+----------------------------------------
+
+TITLE: Using Meteor.setInterval in JavaScript
+DESCRIPTION: Meteor.setInterval is used to schedule a function to run repeatedly at a specified interval. It returns a handle that can be used with Meteor.clearInterval.
+
+LANGUAGE: JavaScript
+CODE:
+Meteor.setInterval(function, delay, ...args)
+
+----------------------------------------
+
+TITLE: Configuring OAuth Service
+DESCRIPTION: Example of configuring a third-party OAuth service (Weibo) for authentication using the service-configuration package.
+
+LANGUAGE: javascript
+CODE:
+ServiceConfiguration.configurations.upsert(
+  { service: 'weibo' },
+  {
+    $set: {
+      loginStyle: "popup",
+      clientId: "1292962797", // See table below for correct property name!
+      secret: "75a730b58f5691de5522789070c319bc"
+    }
+  }
+);
+
+----------------------------------------
+
+TITLE: Disposing Tracker computation in HMR
+DESCRIPTION: This example shows how to properly dispose of a Tracker computation when a module is about to be replaced. This prevents multiple computations from running when the module is reloaded.
+
+LANGUAGE: javascript
+CODE:
+import { setLocale } from '/imports/utils/locale';
+
+const computation = Tracker.autorun(() => {
+  const user = Meteor.user();
+  
+  if (user && user.locale) {
+    setLocale(user.locale);
+  }
+});
+
+if (module.hot) {
+  module.hot.dispose(() => {
+    computation.stop();
+  });
+}
+
+----------------------------------------
+
+TITLE: Publishing Additional User Fields
+DESCRIPTION: Example of publishing extra user fields from the server to the client for the current user.
+
+LANGUAGE: javascript
+CODE:
+// Server
+Meteor.publish('userData', function () {
+  if (this.userId) {
+    return Meteor.users.find({ _id: this.userId }, {
+      fields: { other: 1, things: 1 }
+    });
+  } else {
+    this.ready();
+  }
+});
+
+// Client
+Meteor.subscribe('userData');
+
+----------------------------------------
+
+TITLE: Configuring Inline Styles in Meteor Browser Policy
+DESCRIPTION: Functions to allow or disallow inline CSS, including inline style tags and style attributes.
+
+LANGUAGE: javascript
+CODE:
+BrowserPolicy.content.allowInlineStyles()
+BrowserPolicy.content.disallowInlineStyles()
+
+----------------------------------------
+
+TITLE: Accounts UI Configuration
+DESCRIPTION: Example of configuring the accounts UI package with custom permissions and login fields.
+
+LANGUAGE: javascript
+CODE:
+Accounts.ui.config({
+  requestPermissions: {
+    facebook: ['user_likes'],
+    github: ['user', 'repo']
+  },
+  requestOfflineToken: {
+    google: true
+  },
+  passwordSignupFields: 'USERNAME_AND_OPTIONAL_EMAIL'
+});
+
+----------------------------------------
+
+TITLE: Referencing Online-Only Resources in HTML
+DESCRIPTION: This HTML snippet shows how to reference an online-only resource (a large image) that has been excluded from AppCache.
+
+LANGUAGE: html
+CODE:
+<img src="/online/bigimage.jpg">
+
+----------------------------------------
+
+TITLE: Retrieving Text Content from Asset in Meteor
+DESCRIPTION: This snippet demonstrates how to use the Assets.getText() method to retrieve the content of a text file located in the 'private' subdirectory of a Meteor application. It specifically shows how to access a file named 'data.txt' inside a nested directory.
+
+LANGUAGE: javascript
+CODE:
+const data = Assets.getText('nested/data.txt');
+
+----------------------------------------
+
+TITLE: Creating URL Instance in Meteor
+DESCRIPTION: JavaScript code demonstrating how to import and create a new URL instance using the 'url' package in Meteor.
+
+LANGUAGE: javascript
+CODE:
+import { URL } from 'meteor/url';
+
+const url = new URL('https://www.meteor.com');
+
+----------------------------------------
+
+TITLE: Installing Check Package in Meteor
+DESCRIPTION: Command to add the 'check' package to a Meteor application using the terminal.
+
+LANGUAGE: bash
+CODE:
+meteor add check
+
+----------------------------------------
+
+TITLE: Using Markdown in Meteor HTML Templates
+DESCRIPTION: This example demonstrates how to use markdown syntax within Meteor HTML templates. The markdown content is wrapped in special tags that allow it to be processed.
+
+LANGUAGE: html
+CODE:
+<!-- myTemplate.html -->
+{{#markdown}}I am using __markdown__.{{/markdown}}
+
+----------------------------------------
+
+TITLE: Creating Indexes on MongoDB Collections
+DESCRIPTION: Example of creating an index on a MongoDB collection in Meteor.
+
+LANGUAGE: javascript
+CODE:
+Players.createIndex({ userId: 1 }, { name: 'user reference on players' });
+
+----------------------------------------
+
+TITLE: Creating a Static HTML Landing Page for Meteor
+DESCRIPTION: This snippet shows the structure of a static HTML file that can be used as a landing page in a Meteor application. It includes basic HTML structure with placeholders for content and styles.
+
+LANGUAGE: html
+CODE:
+<head>
+    <title>Fast Landing Page</title>
+    <meta charset="utf-8" />
+    <meta http-equiv="x-ua-compatible" content="ie=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0 user-scalable=no" />   
+    <link rel="stylesheet" href="path to your style sheet etc">
+</head>
+
+    <body>
+        <!-- your content -->
+    </body>
+
+    <script>
+
+    // any functions you need to support your landing page
+ 
+    </script>
+
+</html>
+
+----------------------------------------
+
+TITLE: Serializing Date and Binary in EJSON
+DESCRIPTION: Demonstrates how EJSON serializes objects containing Date and Binary data types, which are not natively supported by JSON.
+
+LANGUAGE: json
+CODE:
+{
+  "d": { "$date": 1358205756553 },
+  "b": { "$binary": "c3VyZS4=" }
+}
+
+----------------------------------------
+
+TITLE: Importing LESS Files in Meteor
+DESCRIPTION: To import a LESS file without Meteor processing it independently, use the .import.less extension. This allows for better control over the compilation process.
+
+LANGUAGE: LESS
+CODE:
+@import "file.import.less";
+
+----------------------------------------
+
+TITLE: Implementing toJSONValue for Mongo.ObjectID in JavaScript
+DESCRIPTION: Demonstrates how to implement the toJSONValue method for a Mongo.ObjectID custom type in EJSON.
+
+LANGUAGE: js
+CODE:
+function () {
+  return this.toHexString();
+}
+
+----------------------------------------
+
+TITLE: ES2015 Block Scoping Example
+DESCRIPTION: Demonstrates the use of `let` for block-scoped variables, a feature enabled by the `ecmascript` package.
+
+LANGUAGE: javascript
+CODE:
+function example(condition) {
+  let x = 0;
+  if (condition) {
+    let x = 1;
+    console.log(x);
+  } else {
+    console.log(x);
+    x = 2;
+  }
+  return x;
+}
+
+example(true); // logs 1, returns 0
+example(false); // logs 0, returns 2
+
+----------------------------------------
+
+TITLE: Installing Meteor Email Package
+DESCRIPTION: Command to add the email package to a Meteor project using the terminal.
+
+LANGUAGE: bash
+CODE:
+meteor add email
+
+----------------------------------------
+
+TITLE: Configuring AppCache for Specific Browsers in Meteor
+DESCRIPTION: This snippet demonstrates how to disable AppCache for specific browsers using the Meteor.AppCache.config method. It shows how to turn off AppCache for Chrome and Firefox.
+
+LANGUAGE: javascript
+CODE:
+Meteor.AppCache.config({
+  chrome: false,
+  firefox: false
+});
+
+----------------------------------------
+
+TITLE: Configuring Email Settings in Meteor
+DESCRIPTION: JSON configuration for setting up email sending options using a supported service in Meteor app settings.
+
+LANGUAGE: json
+CODE:
+{
+  "packages": {
+    "email": {
+      "service": "Mailgun",
+      "user": "postmaster@meteor.com",
+      "password": "superDuperPassword"
+    }
+  }
+}
+
+----------------------------------------
+
+TITLE: Allowing All Framing in Meteor Browser Policy
+DESCRIPTION: Removes the X-Frame-Options header, allowing the app to be framed by any webpage. Use with caution as it may increase vulnerability to clickjacking.
+
+LANGUAGE: javascript
+CODE:
+BrowserPolicy.framing.allowAll()
+
+----------------------------------------
+
+TITLE: Configuring Mobile App Settings with mobile-config.js
+DESCRIPTION: Comprehensive example of mobile configuration including app metadata, icons, launch screens, preferences, and plugin settings for Meteor mobile applications.
+
+LANGUAGE: javascript
+CODE:
+// This section sets up some basic app metadata, the entire section is optional.
+App.info({
+  id: 'com.example.matt.uber',
+  name: 'über',
+  description: 'Get über power in one button click',
+  author: 'Matt Development Group',
+  email: 'contact@example.com',
+  website: 'http://example.com'
+});
+
+// Set up resources such as icons and launch screens.
+App.icons({
+  'iphone_2x': 'icons/icon-60@2x.png',
+  'iphone_3x': 'icons/icon-60@3x.png',
+  // More screen sizes and platforms...
+});
+
+App.launchScreens({
+  'iphone_2x': 'splash/Default@2x~iphone.png',
+  'iphone5': 'splash/Default~iphone5.png',
+  // More screen sizes and platforms...
+});
+
+// Set PhoneGap/Cordova preferences.
+App.setPreference('BackgroundColor', '0xff0000ff');
+App.setPreference('HideKeyboardFormAccessoryBar', true);
+App.setPreference('Orientation', 'default');
+App.setPreference('Orientation', 'all', 'ios');
+
+// Pass preferences for a particular PhoneGap/Cordova plugin.
+App.configurePlugin('com.phonegap.plugins.facebookconnect', {
+  APP_ID: '1234567890',
+  API_KEY: 'supersecretapikey'
+});
+
+// Add custom tags for a particular PhoneGap/Cordova plugin
+App.appendToConfig(`
+  <universal-links>
+    <host name="localhost:3000" />
+  </universal-links>
+`);
+
+----------------------------------------
+
+TITLE: Disallowing Framing in Meteor Browser Policy
+DESCRIPTION: Prevents the app from rendering inside any frame or iframe, enhancing protection against clickjacking attacks.
+
+LANGUAGE: javascript
+CODE:
+BrowserPolicy.framing.disallow()
+
+----------------------------------------
+
+TITLE: Cordova Access Rules Configuration Example
+DESCRIPTION: Examples showing how to configure Cordova whitelist rules using both XML and JavaScript approaches for controlling access to external domains.
+
+LANGUAGE: xml
+CODE:
+<access origin="https://www.google-analytics.com" />
+<allow-navigation href="https://example.com" />
+
+LANGUAGE: javascript
+CODE:
+App.accessRule('https://www.google-analytics.com');
+App.accessRule('https://example.com', { type: 'navigation' });
+
+----------------------------------------
+
+TITLE: Creating URLSearchParams Instance in Meteor
+DESCRIPTION: JavaScript code demonstrating how to import and create a new URLSearchParams instance using the 'url' package in Meteor.
+
+LANGUAGE: javascript
+CODE:
+import { URLSearchParams } from 'meteor/url';
+
+const searchParams = new URLSearchParams({ query: 'WHATWG', location: 'MDN' })
+
+----------------------------------------
+
+TITLE: Adding Password Support to Meteor Application
+DESCRIPTION: Command to add password support to a Meteor application using the accounts-password package.
+
+LANGUAGE: bash
+CODE:
+meteor add accounts-password
+
+----------------------------------------
+
+TITLE: Installing HTTP Package with Meteor CLI
+DESCRIPTION: Command to add the HTTP package to a Meteor project using the terminal.
+
+LANGUAGE: bash
+CODE:
+meteor add http
+
+----------------------------------------
+
+TITLE: Customizing Email Templates in Meteor Accounts
+DESCRIPTION: Example of customizing email templates for account-related emails in Meteor, including site name, from address, and specific templates for enrollment, password reset, and email verification.
+
+LANGUAGE: javascript
+CODE:
+Accounts.emailTemplates.siteName = 'AwesomeSite';
+Accounts.emailTemplates.from = 'AwesomeSite Admin <accounts@example.com>';
+
+Accounts.emailTemplates.enrollAccount.subject = (user) => {
+  return `Welcome to Awesome Town, ${user.profile.name}`;
+};
+
+Accounts.emailTemplates.enrollAccount.text = (user, url) => {
+  return 'You have been selected to participate in building a better future!'
+    + ' To activate your account, simply click the link below:\n\n'
+    + url;
+};
+
+Accounts.emailTemplates.resetPassword.from = () => {
+  // Overrides the value set in `Accounts.emailTemplates.from` when resetting
+  // passwords.
+  return 'AwesomeSite Password Reset <no-reply@example.com>';
+};
+Accounts.emailTemplates.verifyEmail = {
+   subject() {
+      return "Activate your account now!";
+   },
+   text(user, url) {
+      return `Hey ${user}! Verify your e-mail by following this link: ${url}`;
+   }
+};
+
+----------------------------------------
+
+TITLE: Installing Session Package in Meteor
+DESCRIPTION: Command to add the Session package to a Meteor application.
+
+LANGUAGE: bash
+CODE:
+meteor add session
+
+----------------------------------------
+
+TITLE: Setting Publication Strategy in Meteor
+DESCRIPTION: Shows how to import publication strategies from DDPServer and set a specific strategy for a publication using setPublicationStrategy.
+
+LANGUAGE: javascript
+CODE:
+import { DDPServer } from "meteor/ddp-server";
+Meteor.server.setPublicationStrategy('foo', DDPServer.publicationStrategies.NO_MERGE);
+
+----------------------------------------
+
+TITLE: Installing fetch package in Meteor
+DESCRIPTION: Command to add the fetch package to an existing Meteor application using the meteor command-line tool.
+
+LANGUAGE: bash
+CODE:
+meteor add ecmascript
+
+----------------------------------------
+
+TITLE: Installing ReactiveDict Package in Meteor
+DESCRIPTION: Command to add the reactive-dict package to a Meteor project using the terminal.
+
+LANGUAGE: bash
+CODE:
+meteor add reactive-dict
+
+----------------------------------------
+
+TITLE: Installing URL Package in Meteor Application
+DESCRIPTION: Command to add the 'url' package to an existing Meteor application using the Meteor CLI.
+
+LANGUAGE: bash
+CODE:
+meteor add url
+
+----------------------------------------
+
+TITLE: Setting Multiple Values in ReactiveDict
+DESCRIPTION: Shows how to set multiple key-value pairs in a ReactiveDict using an object.
+
+LANGUAGE: javascript
+CODE:
+const state = new ReactiveDict();
+state.set({
+  a: 'foo',
+  b: 'bar'
+});
+
+----------------------------------------
+
+TITLE: Adding URL Package to Meteor Package Dependencies
+DESCRIPTION: JavaScript code snippet showing how to add the 'url' package as a dependency in a Meteor package's 'package.js' file.
+
+LANGUAGE: javascript
+CODE:
+Package.onUse((api) => {
+  api.use('url');
+});
+
+----------------------------------------
+
+TITLE: ReactiveDict Equality Comparison
+DESCRIPTION: Demonstrates two methods for comparing ReactiveDict values, highlighting the more efficient equals method.
+
+LANGUAGE: javascript
+CODE:
+const state = new ReactiveDict()
+// ... 
+state.get('key') === value
+state.equals('key', value)
+
+----------------------------------------
+
+TITLE: Rendered HTML Output from Markdown in Meteor
+DESCRIPTION: This snippet shows the resulting HTML output after the markdown content has been processed. It demonstrates how markdown syntax is converted to HTML elements.
+
+LANGUAGE: html
+CODE:
+<p>I am using <strong>markdown</strong>.</p>
+
+----------------------------------------
+
+TITLE: Installing ReactiveVar Package in Meteor
+DESCRIPTION: Command to add the reactive-var package to a Meteor project using the Meteor CLI.
+
+LANGUAGE: bash
+CODE:
+meteor add reactive-var
+
+----------------------------------------
+
+TITLE: Enabling Bundle Visualizer in Meteor Production Mode
+DESCRIPTION: Command to enable the bundle-visualizer package using the --extra-packages flag in production mode. This allows analysis of minified bundles while preventing permanent installation.
+
+LANGUAGE: sh
+CODE:
+$ cd app/
+$ meteor --extra-packages bundle-visualizer --production
+
+----------------------------------------
+
+TITLE: Setting Multiple Session Values
+DESCRIPTION: Example demonstrating how to set multiple session values using an object.
+
+LANGUAGE: javascript
+CODE:
+Session.set({
+  a: 'foo',
+  b: 'bar'
+});
+
+----------------------------------------
+
+TITLE: Adding ECMAScript Package to Meteor App
+DESCRIPTION: Command to add the `ecmascript` package to an existing Meteor application.
+
+LANGUAGE: bash
+CODE:
+meteor add ecmascript
+
+----------------------------------------
+
+TITLE: Session.equals Usage Example
+DESCRIPTION: Example demonstrating efficient template updates using Session.equals for comparison.
+
+LANGUAGE: html
+CODE:
+<template name="postsView">
+  {{! Show a dynamically updating list of items. Let the user click on an item
+      to select it. The selected item is given a CSS class, so it can be
+      rendered differently. }}
+
+  {{#each posts}}
+    {{> postItem}}
+  {{/each}}
+</template>
+
+<template name="postItem">
+  <div class="{{postClass}}">{{title}}</div>
+</template>
+
+LANGUAGE: javascript
+CODE:
+Template.postsView.helpers({
+  posts() {
+    return Posts.find();
+  }
+});
+
+Template.postItem.helpers({
+  postClass() {
+    return Session.equals('selectedPost', this._id)
+      ? 'selected'
+      : '';
+  }
+});
+
+Template.postItem.events({
+  'click'() {
+    Session.set('selectedPost', this._id);
+  }
+});
+
+----------------------------------------
+
+TITLE: Meteor Log Output Example in Shell
+DESCRIPTION: Shows an example of how the log output appears in the console, demonstrating the format and inclusion of additional metadata.
+
+LANGUAGE: shell
+CODE:
+E20200519-17:57:41.655(9) [DESKTOP] (main.js:36) warning {"error":{"property1":"foo","property2":"bar","property3":{"foo":"bar"}}}
+
+----------------------------------------
+
+TITLE: Using Meteor.clearTimeout in JavaScript
+DESCRIPTION: Meteor.clearTimeout is used to cancel a timeout previously established by calling Meteor.setTimeout.
+
+LANGUAGE: JavaScript
+CODE:
+Meteor.clearTimeout(id)
+
+----------------------------------------
+
+TITLE: Checking Meteor Installation Directory in Windows Command Prompt
+DESCRIPTION: Command to display the required Meteor installation directory path using the LocalAppData environment variable.
+
+LANGUAGE: batch
+CODE:
+echo %LocalAppData%\.meteor
+
+----------------------------------------
+
+TITLE: Conditional Alert with Tracker.autorun in JavaScript
+DESCRIPTION: This example shows how to use Tracker.autorun to wait for a session variable to have a certain value, perform an action once, and then stop the computation. It checks if 'shouldAlert' is true, alerts, and stops the computation.
+
+LANGUAGE: javascript
+CODE:
+Tracker.autorun((computation) => {
+  if (!Session.equals('shouldAlert', true)) {
+    return;
+  }
+
+  computation.stop();
+  alert('Oh no!');
+});
+
+----------------------------------------
+
+TITLE: Running Meteor from Command Line
+DESCRIPTION: Simple command to verify Meteor installation by running it from the command prompt.
+
+LANGUAGE: batch
+CODE:
+meteor
+
+----------------------------------------
+
+TITLE: Setting User Filter for Facts Package
+DESCRIPTION: Example of setting a user filter for the Facts package to control who can see server metrics.
+
+LANGUAGE: javascript
+CODE:
+Facts.setUserIdFilter(function (userId) {
+  var user = Meteor.users.findOne(userId);
+  return user && user.admin;
+});
+
+----------------------------------------
+
+TITLE: Setting Node Options in Meteor Run
+DESCRIPTION: Examples of passing additional Node.js options to Meteor server process using environment variables on different platforms.
+
+LANGUAGE: shell
+CODE:
+$env:SERVER_NODE_OPTIONS = '--inspect' | meteor run
+
+LANGUAGE: shell
+CODE:
+SERVER_NODE_OPTIONS=--inspect-brk meteor run
+
+----------------------------------------
+
+TITLE: Disabling OplogObserveDriver for a Specific Query
+DESCRIPTION: Example of disabling OplogObserveDriver for a specific publish function by using the _disableOplog option.
+
+LANGUAGE: javascript
+CODE:
+Meteor.publish("comments", function (postId) {
+  return Comments.find({post: postId}, {_disableOplog: true, fields: {secret: 0}});
+});
+
+----------------------------------------
+
+TITLE: MongoDB Connection Settings for Free Tier
+DESCRIPTION: Required MongoDB connection settings for free tier applications to handle certificate validation.
+
+LANGUAGE: javascript
+CODE:
+packages: {
+  mongo: {
+    options: { 
+        tlsAllowInvalidCertificates: true,
+    },
+  },
+}
+
+----------------------------------------
+
+TITLE: Creating Oplogger User in MongoDB 2.6
+DESCRIPTION: Command to create a user with read access to the local database in MongoDB 2.6, necessary for oplog tailing.
+
+LANGUAGE: mongodb
+CODE:
+db.createUser({user: "oplogger", pwd: "PasswordForOplogger", roles: [{role: "read", db: "local"}]})
+
+----------------------------------------
+
+TITLE: Installing Meteor via NPM
+DESCRIPTION: Standard installation command for Meteor using NPM package manager. Requires Node.js 8 or newer and installs Meteor globally on the system.
+
+LANGUAGE: bash
+CODE:
+npm install -g meteor
+
+----------------------------------------
+
+TITLE: Package Usage Statistics Example Response in JSON
+DESCRIPTION: Example JSON response format from the package usage statistics endpoint showing direct and total package adds for specific versions.
+
+LANGUAGE: json
+CODE:
+{ "name": "tracker", "version": "1.0.1", "directAdds": 250, "totalAdds": 1000 }
+{ "name": "iron:router", "version": "1.0.0", "directAdds": 200, "totalAdds": 800 }
+
+----------------------------------------
+
+TITLE: Installing Meteor with sudo permissions
+DESCRIPTION: Installation command for systems requiring elevated permissions, using the --unsafe-perm flag. This method should only be used when necessary and with caution.
+
+LANGUAGE: bash
+CODE:
+sudo npm install -g meteor --unsafe-perm
+
+----------------------------------------
+
+TITLE: Deploying Meteor with Certificate Bypass
+DESCRIPTION: Demonstrates how to deploy a Meteor application while bypassing certificate verification. This is a temporary workaround for older Meteor versions affected by the Let's Encrypt certificate expiration.
+
+LANGUAGE: bash
+CODE:
+NODE_TLS_REJECT_UNAUTHORIZED=0 meteor deploy
+
+----------------------------------------
+
+TITLE: Installing Meteor on Apple M1 via Rosetta
+DESCRIPTION: Installation command specifically for Apple M1 computers using Rosetta for x86_64 architecture compatibility.
+
+LANGUAGE: bash
+CODE:
+arch -x86_64 npm install -g meteor
+
+----------------------------------------
+
+TITLE: Generating Let's Encrypt Certificate with Alternative Chain
+DESCRIPTION: Demonstrates how to manually generate a Let's Encrypt certificate using certbot with an alternative preferred chain. This can be useful for maintaining compatibility with older clients.
+
+LANGUAGE: bash
+CODE:
+sudo certbot certonly --manual --preferred-chain "ISRG Root X1" --preferred-challenges dns
+
+----------------------------------------
+
+TITLE: Adding Right-Aligned Login Button Widget in HTML
+DESCRIPTION: Shows how to add a right-aligned login buttons widget that prevents the dropdown from expanding off the screen edge.
+
+LANGUAGE: html
+CODE:
+{{> loginButtons align="right"}}
+
+----------------------------------------
+
+TITLE: Legacy Meteor Installation for Linux and OS X
+DESCRIPTION: Deprecated installation method using a bash script, suitable for Linux and OS X systems. This method doesn't require Node.js but is no longer maintained.
+
+LANGUAGE: bash
+CODE:
+curl https://install.meteor.com/ | sh
+
+----------------------------------------
+
+TITLE: Configuring AppCache with Advanced Enablement Logic in Meteor
+DESCRIPTION: This snippet shows how to use the enableCallback option in Meteor.AppCache.config for more advanced logic to enable or disable the cache. It demonstrates checking a database setting and validating a client certificate.
+
+LANGUAGE: javascript
+CODE:
+Meteor.AppCache.config({
+  // This option is available starting from appcache@1.2.4
+  enableCallback: () => {
+    if (!getSettingsFromDb("public.appcache_enabled")) {
+      return false;
+    }
+
+    const validation = validateClientCert({
+      clientCertPayload: req.headers["x-client-cert"],
+      url: req.url.href,
+    });
+
+    return validation.passed;
+  },
+});
+
+----------------------------------------
+
+TITLE: Configuring Local Meteor Source for Development
+DESCRIPTION: Series of Git commands to replace the default Meteor submodule with a local Meteor repository for development purposes. This allows testing documentation changes with a local Meteor codebase.
+
+LANGUAGE: bash
+CODE:
+# Remove the submodule entry from .git/config
+git submodule deinit -f code
+
+# Remove the submodule directory from the superproject's
+# .git/modules directory
+rm -rf .git/modules/code
+
+# Remove the entry in .gitmodules and remove the submodule directory
+# located at path/to/submodule
+git rm -f code
+
+# ADD your local meteor submodule
+git submodule add /path/to/local/meteor code
+
+----------------------------------------
+
+TITLE: Restricting Frame Origin in Meteor Browser Policy
+DESCRIPTION: Limits the app to render only inside frames loaded by a specific origin, providing control over which sites can frame the app.
+
+LANGUAGE: javascript
+CODE:
+BrowserPolicy.framing.restrictToOrigin(origin)
+
+----------------------------------------
+
+TITLE: Updating Git Submodules for Meteor Docs
+DESCRIPTION: Command to initialize and update the required Git submodules for the Meteor documentation repository. This ensures both the theme and Meteor repository submodules are properly synced.
+
+LANGUAGE: bash
+CODE:
+git submodule update --init
+
+----------------------------------------
+
+TITLE: Configuring Inline Scripts in Meteor Browser Policy
+DESCRIPTION: Functions to allow or disallow inline JavaScript execution, including inline <script> tags, javascript: URLs, and inline event handlers.
+
+LANGUAGE: javascript
+CODE:
+BrowserPolicy.content.allowInlineScripts()
+BrowserPolicy.content.disallowInlineScripts()
+
+----------------------------------------
+
+TITLE: Including Changelog Content in Markdown
+DESCRIPTION: This snippet demonstrates the use of a custom templating syntax to include the contents of a changelog file within a Markdown document. It references a file named 'History.md' located in the 'code' directory.
+
+LANGUAGE: markdown
+CODE:
+{%- changelog 'code/History.md' %}
+
+----------------------------------------
+
+TITLE: Configuring Eval Usage in Meteor Browser Policy
+DESCRIPTION: Functions to allow or disallow the use of eval() and related functions for creating JavaScript from strings.
+
+LANGUAGE: javascript
+CODE:
+BrowserPolicy.content.allowEval()
+BrowserPolicy.content.disallowEval()
+
+----------------------------------------
+
+TITLE: Using Meteor.clearInterval in JavaScript
+DESCRIPTION: Meteor.clearInterval is used to cancel a repeating action which was previously established by a call to Meteor.setInterval.
+
+LANGUAGE: JavaScript
+CODE:
+Meteor.clearInterval(id)
+
+----------------------------------------
+
+TITLE: Accessing Shared Variables in CoffeeScript
+DESCRIPTION: Demonstrates the use of the experimental 'share' object to share variables between CoffeeScript files within the same package.
+
+LANGUAGE: CoffeeScript
+CODE:
+share.foo
+
+----------------------------------------
+
+TITLE: Using Meteor.setTimeout in JavaScript
+DESCRIPTION: Meteor.setTimeout is used to schedule a function to run after a specified delay. It returns a handle that can be used with Meteor.clearTimeout.
+
+LANGUAGE: JavaScript
+CODE:
+Meteor.setTimeout(function, delay, ...args)
+
+----------------------------------------
+
+TITLE: Incorrect Dynamic Import with Computed Expression in JavaScript
+DESCRIPTION: Demonstrates an incorrect attempt to use dynamic import with a computed expression, which will result in an error.
+
+LANGUAGE: javascript
+CODE:
+let path = 'example';
+const module = await import(`/libs/${path}.js`);
+
+----------------------------------------
+
+TITLE: Adding ECMAScript Package to Meteor Package
+DESCRIPTION: Code snippet showing how to add the `ecmascript` package as a dependency in a Meteor package's `package.js` file.
+
+LANGUAGE: javascript
+CODE:
+Package.onUse((api) => {
+  api.use('ecmascript');
+});
+
+----------------------------------------
+
+TITLE: ES2015 Class Syntax Example
+DESCRIPTION: Illustrates the use of ES2015 class syntax, including inheritance, enabled by the `ecmascript` package.
+
+LANGUAGE: javascript
+CODE:
+class Base {
+  constructor(a, b) {
+    this.value = a * b;
+  }
+}
+
+class Derived extends Base {
+  constructor(a, b) {
+    super(a + 1, b + 1);
+  }
+}
+
+var d = new Derived(2, 3);
+d.value; // 12
+
+----------------------------------------
+
+TITLE: ES2015 Default Parameters and Rest Syntax
+DESCRIPTION: Demonstrates the use of default parameter values and rest parameters in functions, features enabled by the `ecmascript` package.
+
+LANGUAGE: javascript
+CODE:
+function add(a = 0, ...rest) {
+  rest.forEach(n => a += n);
+  return a;
+}
+
+add(); // 0
+add(1, 2, 3); // 6
+
+----------------------------------------
+
+TITLE: ES2015 Destructuring Assignment
+DESCRIPTION: Shows examples of destructuring assignment for objects and arrays, a feature enabled by the `ecmascript` package.
+
+LANGUAGE: javascript
+CODE:
+[a, b] = [b, a];
+
+let { username: name } = user;
+// is equivalent to
+let name = user.username;
+
+function run({ command, args, callback }) { ... }
+
+run({
+  command: 'git',
+  args: ['status', '.'],
+  callback(error, status) { ... },
+  unused: 'whatever'
+});
+
+----------------------------------------
+
+TITLE: Adding fetch package to a Meteor package
+DESCRIPTION: JavaScript code snippet showing how to include the fetch package as a dependency in a Meteor package definition file (package.js).
+
+LANGUAGE: javascript
+CODE:
+Package.onUse((api) => {
+  api.use('fetch');
+});
+
+----------------------------------------
+
+TITLE: Importing fetch API components in Meteor
+DESCRIPTION: JavaScript code showing how to import the fetch, Headers, Request, and Response classes from the fetch package in Meteor.
+
+LANGUAGE: javascript
+CODE:
+import { fetch, Headers, Request, Response } from 'meteor/fetch';
+
+----------------------------------------
+
+TITLE: Installing Meteor Logging Package
+DESCRIPTION: Command to add the logging package to a Meteor project using the Meteor package manager.
+
+LANGUAGE: shell
+CODE:
+meteor add logging
+
+----------------------------------------
+
+TITLE: Importing Meteor Logging Utility in JavaScript
+DESCRIPTION: Shows how to import the Log utility from the Meteor logging package in a JavaScript file.
+
+LANGUAGE: javascript
+CODE:
+import { Log } from 'meteor/logging'
+
+----------------------------------------
+
+TITLE: Using Meteor Logging Functions in JavaScript
+DESCRIPTION: Demonstrates various ways to call logging functions, including info, error, warn, and debug levels.
+
+LANGUAGE: javascript
+CODE:
+Log('starting up') // or Log.info('starting up')
+Log.error('error message')
+Log.warn('warning')
+Log.debug('this will show only in development')
+
+----------------------------------------
+
+TITLE: Importing Markdown Package in Meteor JavaScript
+DESCRIPTION: This snippet shows how to import the markdown package in a Meteor template. The package is lazy loaded and not included in the initial bundle, so it needs to be explicitly imported.
+
+LANGUAGE: javascript
+CODE:
+// myTemplate.js
+import 'meteor/markdown';
+
+----------------------------------------
+
+TITLE: Package.json Meteor Configuration
+DESCRIPTION: Shows how to configure main and test modules in package.json for Meteor applications.
+
+LANGUAGE: json
+CODE:
+{
+  "meteor": {
+    "mainModule": {
+      "client": "client/main.js",
+      "server": "server/main.js"
+    },
+    "testModule": {
+      "client": "client/tests.js",
+      "server": "server/tests.js"
+    }
+  }
+}
+
+----------------------------------------
+
+TITLE: CoffeeScript Module Import Example
+DESCRIPTION: Demonstrates module imports using CoffeeScript syntax.
+
+LANGUAGE: coffeescript
+CODE:
+import { Meteor } from 'meteor/meteor'
+import SimpleSchema from 'simpl-schema'
+import { Lists } from './lists.coffee'
+
+----------------------------------------
+
+TITLE: Configuring OAuth Secret Key in Meteor Accounts
+DESCRIPTION: This snippet shows how to configure the oauthSecretKey option in Meteor's Accounts system. It should be called at load time, not inside a Meteor.startup block.
+
+LANGUAGE: javascript
+CODE:
+Accounts.config({ oauthSecretKey: 'onsqJ+1e4iGFlV0nhZYobg==' });
+
+----------------------------------------
+
+TITLE: Migrating Unencrypted Twitter Tokens in Meteor
+DESCRIPTION: This snippet shows how to encrypt existing unencrypted Twitter access tokens in the user database. It finds users with unencrypted tokens and updates them with encrypted versions.
+
+LANGUAGE: javascript
+CODE:
+const cursor = Meteor.users.find({
+  $and: [
+    { 'services.twitter.accessToken': { $exists: true } },
+    { 'services.twitter.accessToken.algorithm': { $exists: false } }
+  ]
+});
+
+cursor.forEach((userDoc) => {
+  const set = {};
+
+  ['accessToken', 'accessTokenSecret', 'refreshToken'].forEach((field) => {
+    const plaintext = userDoc.services.twitter[field];
+
+    if (!_.isString(plaintext)) {
+      return;
+    }
+
+    set[`services.twitter.${field}`] = OAuthEncryption.seal(
+      plaintext,
+      userDoc._id
+    );
+  });
+
+  Meteor.users.update(userDoc._id, { $set: set });
+});
+
+----------------------------------------
+
+TITLE: Loading OAuth Encryption Key Directly in Meteor
+DESCRIPTION: This snippet shows how to load the OAuth encryption key directly using OAuthEncryption.loadKey when using oauth packages without Meteor accounts.
+
+LANGUAGE: javascript
+CODE:
+OAuthEncryption.loadKey('onsqJ+1e4iGFlV0nhZYobg==');
+
+----------------------------------------
+
+TITLE: Decrypting OAuth Service Data in Meteor
+DESCRIPTION: This snippet demonstrates how to decrypt sensitive service data fields when using oauth-encryption. It uses OAuth.openSecrets to decrypt the data retrieved from Twitter.retrieveCredential.
+
+LANGUAGE: javascript
+CODE:
+const credentials = Twitter.retrieveCredential(token);
+const serviceData = OAuth.openSecrets(credentials.serviceData);
+
+----------------------------------------
+
+TITLE: Generating Random ID in Meteor
+DESCRIPTION: The Random.id() function generates a random identifier string. It takes an optional length parameter and returns a string of random digits (0-9).
+
+LANGUAGE: javascript
+CODE:
+Random.id([n])
+
+----------------------------------------
+
+TITLE: Generating Random Fraction in Meteor
+DESCRIPTION: The Random.fraction() function generates a random floating point number between 0 and 1, inclusive of 0 but not 1.
+
+LANGUAGE: javascript
+CODE:
+Random.fraction()
+
+----------------------------------------
+
+TITLE: Updated Runtime Configuration Hook in Meteor WebApp
+DESCRIPTION: This snippet demonstrates the usage of WebApp.addUpdatedNotifyHook to receive notifications when the runtime configuration is updated. It checks for changes in the autoupdate configuration and performs actions accordingly.
+
+LANGUAGE: javascript
+CODE:
+const autoupdateCache;
+WebApp.addUpdatedNotifyHook(({arch, manifest, runtimeConfig}) => {
+  if(!_.isEqual(autoupdateCache, runtimeConfig.autoupdate)) {
+    autoupdateCache = runtimeConfig.autoupdate;
+    // do something...
+  }
+})
+
+----------------------------------------
+
+TITLE: MongoDB Server Error Example in Windows Command Prompt
+DESCRIPTION: Example of MongoDB server startup failure in Meteor, showing error code 3221225781 which indicates missing Visual C++ Redistributable dependencies.
+
+LANGUAGE: shell script
+CODE:
+C:\Users\user\app> meteor
+=> Started proxy.
+Unexpected mongo exit code 3221225781. Restarting.
+Unexpected mongo exit code 3221225781. Restarting.
+Unexpected mongo exit code 3221225781. Restarting.
+Can't start Mongo server.
+
+----------------------------------------
+
+TITLE: Configuring Galaxy Environment for Certificate Bypass
+DESCRIPTION: Shows how to add an environment variable to the Galaxy settings file to bypass certificate verification for server requests. This should only be used as a temporary solution due to security risks.
+
+LANGUAGE: json
+CODE:
+{
+  "galaxy.meteor.com": {
+    "env": {
+      "NODE_TLS_REJECT_UNAUTHORIZED": "0"
+    }
+  }
+}
+
+----------------------------------------
+
+TITLE: Accessing Meteor Build Machines for Different Platforms
+DESCRIPTION: Commands to access pre-configured build machines for various operating systems and architectures using the Meteor admin CLI. These commands help ensure consistent package builds across platforms.
+
+LANGUAGE: sh
+CODE:
+# OS X
+meteor admin get-machine os.osx.x86_64
+
+# Linux on 64-bit Intel
+meteor admin get-machine os.linux.x86_64
+
+# Linux on 32-bit Intel
+meteor admin get-machine os.linux.x86_32
+
+# Windows on 32-bit Intel
+meteor admin get-machine os.windows.x86_32
+
+----------------------------------------
+
+TITLE: Setting inotify Watch Limit on Linux
+DESCRIPTION: Command to increase the system-wide inotify watch limit by adding configuration to sysctl and applying it. This fixes the common issue of reaching the watch limit on Linux systems.
+
+LANGUAGE: bash
+CODE:
+echo fs.inotify.max_user_watches=524288 | sudo tee -a /etc/sysctl.conf && sudo sysctl -p
+
+----------------------------------------
+
+TITLE: Linux File Watcher Warning Message
+DESCRIPTION: Example warning message displayed when Meteor detects that the system has reached its inotify watch limit.
+
+LANGUAGE: text
+CODE:
+=> It looks like a simple tweak to your system's configuration will make many\n   tools (including this Meteor command) more efficient. To learn more, see\n   https://github.com/meteor/meteor/wiki/File-Change-Watcher-Efficiency
+
+----------------------------------------
+
+TITLE: Creating Oplogger User in MongoDB 2.4
+DESCRIPTION: Command to create a user with read access to the local database in MongoDB 2.4, necessary for oplog tailing.
+
+LANGUAGE: mongodb
+CODE:
+db.addUser({user: "oplogger", pwd: "PasswordForOplogger", roles: [], otherDBRoles: {local: ["read"]}})
+
+----------------------------------------
+
+TITLE: Setting MONGO_OPLOG_URL Environment Variable
+DESCRIPTION: Example of setting the MONGO_OPLOG_URL environment variable to enable oplog tailing in a production Meteor app.
+
+LANGUAGE: bash
+CODE:
+MONGO_OPLOG_URL=mongodb://oplogger:PasswordForOplogger@mongo-server-1.example.com,mongo-server-2.example.com,mongo-server-3.example.com/local?authSource=admin&replicaSet=replicaSetName
+
+----------------------------------------
+
+TITLE: Creating a Simple Reactive Value in JavaScript
+DESCRIPTION: Demonstrates how to create a basic reactive value using Tracker.Dependency for a favorite food variable.
+
+LANGUAGE: javascript
+CODE:
+var favoriteFood = "apples";
+var favoriteFoodDep = new Tracker.Dependency;
+
+var getFavoriteFood = function () {
+  favoriteFoodDep.depend();
+  return favoriteFood;
+};
+
+var setFavoriteFood = function (newValue) {
+  favoriteFood = newValue;
+  favoriteFoodDep.changed();
+};
+
+getFavoriteFood();
+// "apples"
+
+----------------------------------------
+
+TITLE: Creating a Reactive User Interface with Tracker and jQuery
+DESCRIPTION: Demonstrates how to create a simple reactive user interface using Tracker and jQuery to update the DOM based on reactive values.
+
+LANGUAGE: javascript
+CODE:
+$('body').html("The weather here is <span class='forecast'></span>!");
+Tracker.autorun(function () {
+  $('.forecast').text(forecasts.get('san-francisco'));
+});
+// Page now says "The weather here is cloudy!"
+
+forecasts.set("san-francisco", "foggy");
+// Page updates to say "The weather here is foggy!"
+
+----------------------------------------
+
+TITLE: Implementing a Custom Tracker.Dependency in JavaScript
+DESCRIPTION: Shows how to implement a custom Tracker.Dependency object to create reactive values from scratch.
+
+LANGUAGE: javascript
+CODE:
+Dependency = function () {
+  this._nextId = 0;
+  this._dependents = {};
+};
+
+Dependency.prototype.depend = function () {
+  var self = this;
+  if (Tracker.currentComputation) {
+    var id = self._nextId++;
+    self._dependents[id] = Tracker.currentComputation;
+    Tracker.currentComputation.onInvalidate(function () {
+      delete self._dependents[id];
+    });
+  }
+};
+
+Dependency.prototype.changed = function () {
+  for (var id in this._dependents) {
+    this._dependents[id].invalidate();
+  }
+};
+
+----------------------------------------
+
+TITLE: Creating a Reactive Time Difference Function in JavaScript
+DESCRIPTION: Demonstrates how to create a reactive function that returns a time difference string and updates automatically.
+
+LANGUAGE: javascript
+CODE:
+var minutesAgo = function (timeInPast) {
+var now = new Date;
+var millisecondsAgo = now.getTime() - timeInPast.getTime();
+var minutesAgo = Math.floor(millisecondsAgo / 1000 / 60);
+
+  if (Tracker.active) {
+    var computation = Tracker.currentComputation;
+
+    var timer = setTimeout(function () {
+      computation.invalidate();
+    }, 60 * 1000 /* one minute */);
+    computation.onInvalidate(function () {
+      clearTimeout(timer);
+    });
+  }
+
+  if (minutesAgo < 1) {
+    return "just now";
+  } else {
+    return minutesAgo + " minutes ago";
+  }
+};
+
+----------------------------------------
+
+TITLE: Implementing a 'Wait and See' Subscription System with Tracker
+DESCRIPTION: Shows how to implement a subscription system that uses Tracker to efficiently manage subscriptions based on changing interests.
+
+LANGUAGE: javascript
+CODE:
+var subscriptions = {}; // keys are names of magazines
+var subscribeToMagazine = function (magazineName) {
+  if (! _.has(subscriptions, magazineName)) {
+    console.log("Putting a check in the mail to subscribe to", magazineName);
+    subscriptions[magazineName] = {
+      references: 1,
+      stop: function () {
+        this.references--;
+        Tracker.afterFlush(function () {
+          if (this.references === 0) {
+            console.log("Canceling our subscription to", magazineName);
+            delete subscriptions[magazineName];
+          }
+        });
+      }
+    };
+  }) else {
+    subscriptions[magazineName].references++;
+  }
+
+  if (Tracker.active) {
+    Tracker.onInvalidate(function (c) {
+      if (_.has(subscriptions, magazineName)) {
+        subscriptions[magazineName].stop();
+      }
+    });
+  }
+
+  return subscriptions[magazineName];
+};

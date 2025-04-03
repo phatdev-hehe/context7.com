@@ -1,0 +1,3337 @@
+TITLE: Minimal Motia Step Example
+DESCRIPTION: A basic Motia step implementation in JavaScript. This step listens for an 'add-numbers' event, adds two numbers, and emits a 'numbers-added' event with the result.
+
+LANGUAGE: javascript
+CODE:
+exports.config = {
+  type: 'event', // "event", "api", or "cron"
+  name: 'AddNumbers',
+  subscribes: ['add-numbers'],
+  emits: ['numbers-added'],
+  flows: ['numbers'],
+}
+
+exports.handler = async (input, { emit }) => {
+  const sum = (input.a || 0) + (input.b || 0)
+  await emit({
+    topic: 'numbers-added',
+    data: { result: sum },
+  })
+}
+
+----------------------------------------
+
+TITLE: Creating Email Auto-Reply Agent with OpenAI Integration in TypeScript
+DESCRIPTION: Implementation of an email auto-reply agent that analyzes sentiment using OpenAI GPT-4. The step subscribes to email events, performs sentiment analysis, and emits new events. Includes configuration for event handling and input validation using Zod.
+
+LANGUAGE: TypeScript
+CODE:
+import { OpenAI } from 'openai';
+import { z } from 'zod';
+import type { EventConfig, StepHandler } from 'motia';
+
+const openai = new OpenAI({
+    apiKey: process.env.OPENAI_API_KEY,
+});
+
+export const config: EventConfig = {
+  type: 'event',
+  name: 'Auto-Reply to Support Emails',
+  subscribes: ['email.received'],
+  emits: ['email.send'],
+  flows: ['email-support'],
+  input: z.object({ subject: z.string(), body: z.string(), from: z.string() }),
+};
+
+export const handler: StepHandler<typeof config> = async (inputData, context) => {
+  const { subject, body, from } = inputData;
+  const { emit, logger } = context;
+
+  const sentimentResponse = await openai.chat.completions.create({
+    model: "gpt-4o",
+    messages: [{ role: "user", content: `Analyze the sentiment of the following text: ${body}` }],
+  });
+
+  const sentiment = sentimentResponse.choices[0].message.content;
+
+  logger.info('[EmailAutoReply] Sentiment analysis', { sentiment });
+
+  emit({
+    type: 'email.send',
+    data: { from, subject, body, sentiment },
+  });
+};
+
+----------------------------------------
+
+TITLE: Testing Motia Step with Jest in TypeScript
+DESCRIPTION: This snippet demonstrates how to write a test for a Motia step using Jest and the createTestContext function from @motiadev/testing. It shows how to mock the emit function and assert the expected behavior of the step.
+
+LANGUAGE: typescript
+CODE:
+// my-step.step.test.ts
+import { createTestContext } from '@motiadev/testing'
+import { handler } from './my-step.step'
+
+describe('MyStep', () => {
+  it('should emit an event with the correct data', async () => {
+    const { emit, done } = createTestContext()
+
+    await handler({ name: 'John' }, { emit })
+
+    expect(emit).toHaveBeenCalledWith({
+      type: 'my-event',
+      data: { greeting: 'Hello, John!' },
+    })
+
+    done()
+  })
+})
+
+----------------------------------------
+
+TITLE: Defining a Minimal Step in TypeScript for Motia
+DESCRIPTION: This snippet demonstrates how to define a minimal step in TypeScript for Motia. It includes the config object with type, name, subscribed topics, and emitted topics. The handler function shows how to use the emit function from the context object.
+
+LANGUAGE: typescript
+CODE:
+import { EventConfig, StepHandler } from 'motia'
+
+export const config: EventConfig = {
+  type: 'event',
+  name: 'Minimal Step',
+  subscribes: ['start'],
+  emits: ['done'],
+}
+
+export const handler: StepHandler<typeof config> = async (input, { emit, traceId, state, logger }) => {
+  await emit({ topic: 'done', data: {} })
+}
+
+----------------------------------------
+
+TITLE: Configuring and Implementing Event Step in TypeScript
+DESCRIPTION: This snippet demonstrates how to configure and implement an Event Step in TypeScript using Motia. It includes input schema definition using Zod, step configuration, and an async handler function that processes input and emits an event.
+
+LANGUAGE: typescript
+CODE:
+import { EventConfig, StepHandler } from 'motia'
+import { z } from 'zod'
+
+const inputSchema = z.object({
+  message: z.string()
+})
+
+type Input = typeof inputSchema
+
+export const config: EventConfig<Input> = {
+  type: 'event',
+  name: 'stepA',
+  description: 'Hello from Step A',
+  subscribes: ['pms.start'],
+  emits: ['pms.stepA.done'],
+  input: inputSchema,
+  flows: ['parallel-merge'],
+}
+
+export const handler: StepHandler<typeof config> = async (input, { emit, logger }) => {
+  logger.info('Processing message:', input.message)
+
+  await emit({
+    topic: 'pms.stepA.done',
+    data: {
+      result: `Processed: ${input.message}`
+    }
+  })
+}
+
+----------------------------------------
+
+TITLE: REST API Endpoint Example
+DESCRIPTION: Example of an API endpoint for receiving customer feedback in Motia
+
+LANGUAGE: http
+CODE:
+POST /feedback
+
+----------------------------------------
+
+TITLE: Creating Motia Project with npx
+DESCRIPTION: Command to create a new Motia project using npx. This downloads and runs the Motia CLI project creation tool, setting up a basic project structure and installing dependencies.
+
+LANGUAGE: bash
+CODE:
+npx motia create -n <your-project-name>
+
+----------------------------------------
+
+TITLE: Creating HTTP Server with Motia Core
+DESCRIPTION: Demonstrates how to create and manage an HTTP server for handling API requests using the createServer function from @motiadev/core.
+
+LANGUAGE: typescript
+CODE:
+import { createServer } from '@motiadev/core'
+
+const server = await createServer(lockedData, eventManager, stateAdapter, config)
+
+----------------------------------------
+
+TITLE: Implementing Logging in Motia (TypeScript)
+DESCRIPTION: Demonstrates various logging levels and error handling in a Motia step handler using TypeScript. Includes examples of info, error, debug, and warn log levels with contextual information.
+
+LANGUAGE: typescript
+CODE:
+export const handler: StepHandler<typeof config> = async (input, { logger }) => {
+  // Basic logging
+  logger.info('Starting process')
+
+  // Logging with context
+  logger.info('Operation completed', {
+    operationId: input.id,
+    duration: 1500
+  })
+
+  // Error handling
+  try {
+    await riskyOperation()
+  } catch (error) {
+    logger.error('Operation failed', {
+      error: error.message,
+      stack: error.stack
+    })
+  }
+
+  // Debug logging
+  logger.debug('Operation details', {
+    rawInput: input,
+    timestamp: Date.now()
+  })
+
+  // Warning logging
+  if (input.amount > 1000) {
+    logger.warn('Large operation detected', {
+      amount: input.amount,
+      threshold: 1000
+    })
+  }
+}
+
+----------------------------------------
+
+TITLE: Creating a New Motia Project with CLI
+DESCRIPTION: Use the 'create' command to initialize a new Motia project. Specify the project name and optionally choose a template.
+
+LANGUAGE: bash
+CODE:
+npx motia create [options]
+
+----------------------------------------
+
+TITLE: Creating Custom Middleware for API Steps in TypeScript
+DESCRIPTION: This snippet showcases the creation of custom middleware functions for API steps in Motia. It includes examples of request modification, response modification, error handling, and rate limiting middleware.
+
+LANGUAGE: typescript
+CODE:
+import { ApiMiddleware } from 'motia'
+
+// Request modification middleware
+const requestModifierMiddleware: ApiMiddleware = async (req, ctx, next) => {
+  // Modify the request before passing it to the next middleware
+  req.headers['x-modified-by'] = 'middleware'
+  req.body.timestamp = Date.now()
+  
+  // Call the next middleware in the chain
+  return next()
+}
+
+// Response modification middleware
+const responseModifierMiddleware: ApiMiddleware = async (req, ctx, next) => {
+  // Call the next middleware in the chain
+  const response = await next()
+  
+  // Modify the response before returning it
+  response.headers = {
+    ...response.headers,
+    'x-powered-by': 'Motia',
+  }
+  
+  return response
+}
+
+// Error handling middleware
+const errorHandlingMiddleware: ApiMiddleware = async (req, ctx, next) => {
+  try {
+    // Call the next middleware in the chain
+    return await next()
+  } catch (error) {
+    ctx.logger.error('Error in handler', { error })
+    return {
+      status: 500,
+      body: { error: 'Internal server error' }
+    }
+  }
+}
+
+// Rate limiter middleware with state
+const rateLimiterMiddleware: ApiMiddleware = (() => {
+  // Closure to maintain state between requests
+  const requests: Record<string, number[]> = {}
+  const limit = 100
+  const windowMs = 60000 // 1 minute
+  
+  return async (req, ctx, next) => {
+    const ip = req.headers['x-forwarded-for'] || 'unknown-ip'
+    const ipStr = Array.isArray(ip) ? ip[0] : ip
+    
+    const now = Date.now()
+    if (!requests[ipStr]) {
+      requests[ipStr] = []
+    }
+    
+    // Remove old requests outside the time window
+    requests[ipStr] = requests[ipStr].filter(time => now - time < windowMs)
+    
+    if (requests[ipStr].length >= limit) {
+      return {
+        status: 429,
+        body: { error: 'Too many requests, please try again later' }
+      }
+    }
+    
+    // Add current request
+    requests[ipStr].push(now)
+    
+    return next()
+  }
+})()
+
+----------------------------------------
+
+TITLE: Installing @motiadev/core Package
+DESCRIPTION: Instructions for installing the @motiadev/core package using npm, yarn, or pnpm package managers.
+
+LANGUAGE: bash
+CODE:
+npm install @motiadev/core
+# or
+yarn add @motiadev/core
+# or
+pnpm add @motiadev/core
+
+----------------------------------------
+
+TITLE: Configuring Step with Flow in JavaScript
+DESCRIPTION: Demonstrates how to configure a Motia step with flow association for adding numbers. The step subscribes to 'add-numbers' event and emits 'numbers-added' event as part of the calculator flow.
+
+LANGUAGE: javascript
+CODE:
+exports.config = {
+  type: 'event',
+  name: 'AddNumbers',
+  subscribes: ['add-numbers'],
+  emits: ['numbers-added'],
+  flows: ['calculator-flow'] // <-- Flow association
+}
+
+----------------------------------------
+
+TITLE: Adding Dev Script to package.json
+DESCRIPTION: JSON snippet to add a 'dev' script to package.json. This script allows running the Motia development server.
+
+LANGUAGE: json
+CODE:
+{
+  "scripts": {
+    "dev": "motia dev"
+  }
+}
+
+----------------------------------------
+
+TITLE: Using State in Steps (JavaScript)
+DESCRIPTION: Shows how to use state management methods within a step handler in JavaScript, including storing, retrieving, deleting, and clearing state data.
+
+LANGUAGE: javascript
+CODE:
+import { StepHandler } from 'motia'
+
+export const handler = async (input, { state, traceId }) => { // Get traceId from context
+  // Store state (using traceId as scope)
+  await state.set(traceId, 'booking', {
+    customer: input.customer,
+    venue: input.venue,
+  });
+
+  // Retrieve state (using traceId as scope)
+  const booking = await state.get(traceId, 'booking');
+
+  // Delete specific state (using traceId as scope)
+  await state.delete(traceId, 'booking');
+
+  // Clear all state for this flow (using traceId as scope)
+  await state.clear(traceId);
+}
+
+----------------------------------------
+
+TITLE: Testing Complete Flow in Motia
+DESCRIPTION: Comprehensive example showing how to test a complete order flow using the Motia tester, including event watching and assertions.
+
+LANGUAGE: typescript
+CODE:
+import { createTester } from '@motiadev/test';
+import { expect, test } from 'vitest';
+
+test('complete order flow works correctly', async () => {
+  const tester = createTester();
+  
+  // Watch for order completion events
+  const orderCompletedWatcher = tester.watchEvents('order.completed');
+  
+  // Trigger the order creation
+  const response = await tester.request()
+    .post('/api/orders')
+    .send({
+      items: [{ id: 'item1', quantity: 2 }],
+      customer: { id: 'cust1', email: 'test@example.com' }
+    });
+  
+  // Verify the API response
+  expect(response.status).toBe(200);
+  expect(response.body).toHaveProperty('orderId');
+  
+  // Wait for all events to be processed
+  await tester.waitForEvents();
+  
+  // Verify the order completed event was emitted
+  const completedEvents = orderCompletedWatcher.getCapturedEvents();
+  expect(completedEvents).toHaveLength(1);
+  expect(completedEvents[0].data).toMatchObject({
+    orderId: expect.any(String),
+    status: 'completed'
+  });
+  
+  // Clean up
+  await tester.close();
+});
+
+----------------------------------------
+
+TITLE: Creating Step Handlers in Motia Core
+DESCRIPTION: Demonstrates how to create handlers for different types of steps (API, Event, Cron) using the createStepHandlers function from @motiadev/core.
+
+LANGUAGE: typescript
+CODE:
+import { createStepHandlers } from '@motiadev/core'
+
+const stepHandlers = createStepHandlers(lockedData, eventManager, state, config)
+
+----------------------------------------
+
+TITLE: Testing Motia Flow with Jest in TypeScript
+DESCRIPTION: This snippet shows how to write a test for a Motia flow using Jest and the createTestFlow function from @motiadev/testing. It demonstrates how to create a test flow with multiple steps and assert the expected output of the flow execution.
+
+LANGUAGE: typescript
+CODE:
+// my-flow.test.ts
+import { createTestFlow } from '@motiadev/testing'
+import { handler as stepAHandler } from './step-a.step'
+import { handler as stepBHandler } from './step-b.step'
+
+describe('MyFlow', () => {
+  it('should execute steps in the correct order', async () => {
+    const flow = createTestFlow('my-flow')
+      .step('step-a', stepAHandler)
+      .step('step-b', stepBHandler)
+
+    const result = await flow.execute({ name: 'Alice' })
+
+    expect(result).toEqual({
+      greeting: 'Hello, Alice!',
+      message: 'Welcome to Motia!',
+    })
+  })
+})
+
+----------------------------------------
+
+TITLE: Configuring and Handling Cron Steps in TypeScript
+DESCRIPTION: Demonstrates how to set up a Cron Step configuration and handler in TypeScript. The step is configured to run every hour and emit a 'cron-ticked' event.
+
+LANGUAGE: typescript
+CODE:
+import { CronConfig } from 'motia'
+
+export const config: CronConfig = {
+  type: 'cron' as const,
+  name: 'PeriodicJob',
+  description: 'Runs every minute and emits a timestamp',
+  cron: '0 * * * *', // run every hour at minute 0
+  emits: ['cron-ticked'],
+  flows: ['cron-example'],
+}
+
+export const handler: StepHandler<typeof config> = async ({ emit }) => {
+  await emit({
+    topic: 'cron-ticked',
+    data: { message: 'Cron job executed' },
+  })
+}
+
+----------------------------------------
+
+TITLE: Using State in Steps (TypeScript)
+DESCRIPTION: Demonstrates how to use state management methods within a step handler in TypeScript, including storing, retrieving, deleting, and clearing state data.
+
+LANGUAGE: typescript
+CODE:
+import { StepHandler } from 'motia'
+
+interface BookingData {
+  customer: { name: string; email: string };
+  venue: { id: string; name: string };
+}
+
+export const handler: StepHandler<typeof config> = async (input, { state, traceId }) => { // Get traceId from context
+  // Store state (using traceId as scope)
+  await state.set<BookingData>(traceId, 'booking', {
+    customer: input.customer,
+    venue: input.venue,
+  });
+
+  // Retrieve state (using traceId as scope)
+  const booking = await state.get<BookingData>(traceId, 'booking');
+
+  // Delete specific state (using traceId as scope)
+  await state.delete(traceId, 'booking');
+
+  // Clear all state for this flow (using traceId as scope)
+  await state.clear(traceId);
+}
+
+----------------------------------------
+
+TITLE: Implementing Middleware for API Steps in TypeScript
+DESCRIPTION: This example demonstrates the implementation of logging and authentication middleware for API steps in Motia. It includes the configuration of an API step with middleware and a handler function.
+
+LANGUAGE: typescript
+CODE:
+import { ApiMiddleware } from 'motia'
+
+// Logging middleware
+const loggingMiddleware: ApiMiddleware = async (req, ctx, next) => {
+  ctx.logger.info('Request received', { path: req.pathParams })
+  const start = Date.now()
+  
+  // Call the next middleware and get its response
+  const response = await next()
+  
+  const duration = Date.now() - start
+  ctx.logger.info('Request completed', { duration, status: response.status })
+  
+  return response
+}
+
+// Authentication middleware
+const authMiddleware: ApiMiddleware = async (req, ctx, next) => {
+  const authHeader = req.headers.authorization
+  
+  if (!authHeader) {
+    // Return early without calling next()
+    return {
+      status: 401,
+      body: { error: 'Unauthorized' }
+    }
+  }
+  
+  // Continue to the next middleware
+  return next()
+}
+
+export const config = {
+  type: 'api',
+  name: 'protected-endpoint',
+  path: '/api/protected',
+  method: 'POST',
+  emits: ['USER_ACTION'],
+  middleware: [
+    loggingMiddleware,
+    authMiddleware
+  ]
+}
+
+export const handler = async (req, ctx) => {
+  // This handler will only be called if all middleware pass
+  return {
+    status: 200,
+    body: { message: 'Protected data accessed successfully' }
+  }
+}
+
+----------------------------------------
+
+TITLE: Defining API Middleware Function Signature in TypeScript
+DESCRIPTION: This snippet defines the type signature for API middleware functions in Motia. It specifies the parameters and return type for middleware functions, which can be used for tasks like authentication, logging, and request modification.
+
+LANGUAGE: typescript
+CODE:
+type ApiMiddleware = (
+  req: ApiRequest, 
+  ctx: FlowContext, 
+  next: () => Promise<ApiResponse>
+) => Promise<ApiResponse>
+
+----------------------------------------
+
+TITLE: Receiving User Input and Emitting Event in TypeScript (Motia)
+DESCRIPTION: This snippet defines an API route that receives user text input and emits an event for sentiment analysis. It uses Motia for API configuration and event handling.
+
+LANGUAGE: typescript
+CODE:
+import { ApiRouteConfig, StepHandler } from 'motia'
+import { z } from 'zod'
+
+export const config: ApiRouteConfig = {
+  type: 'api',
+  name: 'Analyze Sentiment (API)',
+  path: '/api/analyze-sentiment',
+  method: 'POST',
+  emits: ['openai.analyzeSentimentRequest'],
+  bodySchema: z.object({
+    text: z.string().min(1, 'text is required'),
+  }),
+  flows: ['sentiment-demo'],
+}
+
+export const handler: StepHandler<typeof config> = async (req, { emit, logger }) => {
+  const { text } = req.body
+
+  logger.info('[AnalyzeSentimentAPI] Received text', { text })
+
+  // Emit an event to call OpenAI
+  await emit({
+    topic: 'openai.analyzeSentimentRequest',
+    data: { text },
+  })
+
+  // Return right away
+  return {
+    status: 200,
+    body: { status: 'Accepted', message: 'Your text is being analyzed' },
+  }
+}
+
+----------------------------------------
+
+TITLE: Configuring and Handling Cron Steps in Python
+DESCRIPTION: Illustrates the setup of a Cron Step configuration and handler in Python. The step is configured to run every hour and emit a 'cron-ticked' event.
+
+LANGUAGE: python
+CODE:
+config = {
+    "type": "cron",
+    "name": "PeriodicJob",
+    "description": "Runs every minute and emits a timestamp",
+    "cron": "0 * * * *",
+    "emits": ["cron-ticked"],
+    "flows": ["cron-example"]
+}
+
+async def handler(context):
+    await context.emit({
+        "topic": "cron-ticked",
+        "data": { "message": "Cron job executed" },
+    })
+
+----------------------------------------
+
+TITLE: Managing Events with Motia Core
+DESCRIPTION: Shows how to create an event manager, subscribe to events, and emit events using the createEventManager function from @motiadev/core.
+
+LANGUAGE: typescript
+CODE:
+import { createEventManager } from '@motiadev/core'
+
+const eventManager = createEventManager()
+
+// Subscribe to events
+eventManager.subscribe({
+  event: 'user.created',
+  handlerName: 'sendWelcomeEmail',
+  filePath: '/path/to/handler.ts',
+  handler: (event) => {
+    // Handle the event
+  }
+})
+
+// Emit events
+eventManager.emit({
+  topic: 'user.created',
+  data: { userId: '123' },
+  traceId: 'trace-123',
+  logger: logger
+})
+
+----------------------------------------
+
+TITLE: Implementing Logging in Motia (Python)
+DESCRIPTION: Demonstrates various logging levels and error handling in a Motia step handler using Python. Includes examples of info, error, debug, and warn log levels with contextual information.
+
+LANGUAGE: python
+CODE:
+async def handler(input, ctx):
+    # Basic logging
+    ctx.logger.info('Starting process')
+
+    # Logging with context
+    ctx.logger.info('Operation completed', {
+        'operation_id': input.id,
+        'duration': 1500
+    })
+
+    # Error handling
+    try:
+        await risky_operation()
+    except Exception as error:
+        ctx.logger.error('Operation failed', {
+            'error': str(error),
+            'stack': traceback.format_exc()
+        })
+
+    # Debug logging
+    ctx.logger.debug('Operation details', {
+        'raw_input': input.__dict__,
+        'timestamp': time.time()
+    })
+
+    # Warning logging
+    if input.amount > 1000:
+        ctx.logger.warn('Large operation detected', {
+            'amount': input.amount,
+            'threshold': 1000
+        })
+
+----------------------------------------
+
+TITLE: Configuring API Step in TypeScript
+DESCRIPTION: This example demonstrates how to configure an API step in Motia using TypeScript. It includes the configuration object and handler function for a test state API trigger.
+
+LANGUAGE: typescript
+CODE:
+import { ApiRouteConfig, StepHandler } from 'motia'
+import { z } from 'zod'
+
+export const config: ApiRouteConfig = {
+  type: 'api',
+  name: 'Test state api trigger',
+  description: 'test state',
+  path: '/test-state',
+  method: 'POST',
+  emits: ['test-state'],
+  bodySchema: z.object({}),
+  flows: ['test-state'],
+}
+
+export const handler: StepHandler<typeof config> = async (req, { logger, emit }) => {
+  logger.info('[Test State] Received request', req)
+
+  await emit({
+    topic: 'test-state',
+    data: req.body
+  })
+
+  return {
+    status: 200,
+    body: { message: 'Success' },
+  }
+}
+
+----------------------------------------
+
+TITLE: Deploying Motia Workflow to Production Environment
+DESCRIPTION: Example command for deploying to production environment with a specific version number and API key.
+
+LANGUAGE: bash
+CODE:
+motia deploy --environment production --version 1.2.3 --api-key your-api-key-here
+
+----------------------------------------
+
+TITLE: Implementing Structured Logging in Motia
+DESCRIPTION: Best practice example of structured logging in Motia, demonstrating how to log payment processing information in a searchable and parseable format.
+
+LANGUAGE: typescript
+CODE:
+// Good - Structured and searchable
+logger.info('Payment processed', {
+  paymentId: '123',
+  amount: 100,
+  status: 'success'
+})
+
+// Avoid - Harder to parse and search
+logger.info(`Payment ${paymentId} processed: amount=${amount}`)
+
+----------------------------------------
+
+TITLE: Configuring Basic NOOP Step
+DESCRIPTION: Basic configuration for a NOOP step showing required fields including type, name, description, and event handling.
+
+LANGUAGE: typescript
+CODE:
+import { NoopConfig } from 'motia'
+
+export const config: NoopConfig = {
+  type: 'noop',
+  name: 'My NOOP Step',
+  description: 'Description of what this step simulates',
+  virtualEmits: ['event.one', 'event.two'],
+  virtualSubscribes: [], // Required even if empty
+  flows: ['my-flow'],
+}
+
+----------------------------------------
+
+TITLE: Creating Motia Project with Global CLI
+DESCRIPTION: Command to create a new Motia project using the globally installed Motia CLI. This sets up a new project with the specified name.
+
+LANGUAGE: bash
+CODE:
+motia create -n <your-project-name>
+
+----------------------------------------
+
+TITLE: Starting Research API Endpoint
+DESCRIPTION: API endpoint documentation for initiating a research process, including request format and response structure.
+
+LANGUAGE: http
+CODE:
+POST /research
+Content-Type: application/json
+
+{
+  "query": "The research topic or question",
+  "breadth": 4,  // Number of search queries to generate (1-10)
+  "depth": 2     // Depth of research iterations (1-5)
+}
+
+LANGUAGE: json
+CODE:
+{
+  "message": "Research process started",
+  "requestId": "unique-trace-id"
+}
+
+----------------------------------------
+
+TITLE: Managing Application State with Motia Core
+DESCRIPTION: Shows how to create a state adapter and use it for managing application state with different adapters, such as Redis.
+
+LANGUAGE: typescript
+CODE:
+import { createStateAdapter } from '@motiadev/core'
+
+const stateAdapter = createStateAdapter({
+  adapter: 'redis',
+  host: 'localhost',
+  port: 6379
+})
+
+// Use state in your handlers
+await state.set(traceId, 'key', value)
+const value = await state.get(traceId, 'key')
+
+----------------------------------------
+
+TITLE: Checking Research Status API Endpoint
+DESCRIPTION: API endpoint documentation for checking the status of a research process, including request format and response structure.
+
+LANGUAGE: http
+CODE:
+GET /research/status?requestId=unique-trace-id
+
+LANGUAGE: json
+CODE:
+{
+  "message": "Research status retrieved successfully",
+  "requestId": "unique-trace-id",
+  "originalQuery": "The research topic or question",
+  "status": "in-progress",
+  "progress": {
+    "currentDepth": 1,
+    "totalDepth": 2,
+    "percentComplete": 50
+  },
+  "reportAvailable": false
+}
+
+----------------------------------------
+
+TITLE: Custom State Adapter Implementation
+DESCRIPTION: Demonstrates how to implement a custom state adapter by extending the StateAdapter class in TypeScript.
+
+LANGUAGE: typescript
+CODE:
+import { StateAdapter } from 'motia'
+
+class CustomStateAdapter extends StateAdapter {
+  async get<T>(traceId: string, key: string): Promise<T | null> { 
+    // Implementation
+    return null
+  }
+
+  async set<T>(traceId: string, key: string, value: T): Promise<void> { 
+    // Implementation
+  }
+
+  async delete(traceId: string, key: string): Promise<void> { 
+    // Implementation
+  }
+
+  async clear(traceId: string): Promise<void> { 
+    // Implementation
+  }
+
+  async cleanup(): Promise<void> {
+    // Implementation
+  }
+}
+
+----------------------------------------
+
+TITLE: Retrieving Research Report API Endpoint
+DESCRIPTION: API endpoint documentation for retrieving the final research report, including request format and detailed response structure.
+
+LANGUAGE: http
+CODE:
+GET /research/report?requestId=unique-trace-id
+
+LANGUAGE: json
+CODE:
+{
+  "message": "Research report retrieved successfully",
+  "report": {
+    "title": "Research Report Title",
+    "overview": "Executive summary...",
+    "sections": [
+      {
+        "title": "Section Title",
+        "content": "Section content..."
+      }
+    ],
+    "keyTakeaways": [
+      "Key takeaway 1",
+      "Key takeaway 2"
+    ],
+    "sources": [
+      {
+        "title": "Source Title",
+        "url": "Source URL"
+      }
+    ],
+    "originalQuery": "The research topic or question",
+    "metadata": {
+      "depthUsed": 2,
+      "completedAt": "2025-03-18T16:45:30Z"
+    }
+  },
+  "requestId": "unique-trace-id"
+}
+
+----------------------------------------
+
+TITLE: Manual Motia Project Setup
+DESCRIPTION: A series of commands for manually setting up a Motia project. This includes creating a project directory, initializing package.json, and installing core packages.
+
+LANGUAGE: bash
+CODE:
+mkdir <your-project-name> && cd <your-project-name>
+
+LANGUAGE: bash
+CODE:
+npm init -y
+
+LANGUAGE: bash
+CODE:
+npm install motia zod
+
+LANGUAGE: bash
+CODE:
+npm install ts-node typescript -D
+
+LANGUAGE: bash
+CODE:
+mkdir steps
+
+----------------------------------------
+
+TITLE: Implementing Asynchronous Request Handler in Python
+DESCRIPTION: This snippet defines an asynchronous handler function for processing API requests. It takes 'req' and 'context' parameters, logs the incoming request, and returns a success response. The function is a placeholder where custom logic can be added to handle specific API operations.
+
+LANGUAGE: python
+CODE:
+async def handler(req, context):
+    context.logger.info("Processing {{STEP_NAME}}", req)
+
+    # Add your handler logic here
+    
+    return {
+        "status": 200,
+        "body": {"message": "Success"}
+    }
+
+----------------------------------------
+
+TITLE: Installing Motia CLI Globally
+DESCRIPTION: Commands to install the Motia CLI globally using different package managers. This allows you to use the 'motia' command directly from the terminal.
+
+LANGUAGE: bash
+CODE:
+npm install -g motia
+
+LANGUAGE: bash
+CODE:
+yarn global add motia
+
+LANGUAGE: bash
+CODE:
+bun add -g motia
+
+----------------------------------------
+
+TITLE: Initializing Event Handler Configuration and Schema in Motia
+DESCRIPTION: Defines the event configuration including input schema validation using Zod, event type, name, subscriptions, and emissions. Sets up the basic structure for handling events in a Motia application.
+
+LANGUAGE: typescript
+CODE:
+import { EventConfig, StepHandler } from '@motiadev/core'
+import { z } from 'zod'
+
+type Input = typeof inputSchema
+
+const inputSchema = z.object({
+  // Add your schema here
+})
+
+export const config: EventConfig = {
+  type: 'event',
+  name: '{{STEP_NAME}}',
+  description: '{{DESCRIPTION}}',
+  subscribes: {{SUBSCRIPTIONS}},
+  emits: {{EMITS}},
+  input: inputSchema,
+  flows: {{FLOWS}}
+}
+
+----------------------------------------
+
+TITLE: Creating and Using a Motia Tester
+DESCRIPTION: Demonstrates how to create a tester instance and use it to test API endpoints with assertions.
+
+LANGUAGE: typescript
+CODE:
+import { createTester } from '@motiadev/test';
+
+// Create a tester instance
+const tester = createTester();
+
+// Use the tester to test your workflows
+const response = await tester.request()
+  .post('/api/endpoint')
+  .send({ data: 'test' });
+
+// Assert on the response
+expect(response.status).toBe(200);
+
+----------------------------------------
+
+TITLE: Event Handler Configuration Object
+DESCRIPTION: Defines the event handler configuration including event type, name, subscriptions, emissions, and flows. Uses template placeholders for customization.
+
+LANGUAGE: python
+CODE:
+config = {
+    "type": "event",
+    "name": "{{STEP_NAME}}",
+    "description": "{{DESCRIPTION}}",
+    "subscribes": {{SUBSCRIPTIONS}}, 
+    "emits": {{EMITS}},
+    "flows": {{FLOWS}},
+    "input": None,  # No schema validation in Python
+}
+
+----------------------------------------
+
+TITLE: Configuring and Implementing Event Step in JavaScript
+DESCRIPTION: This snippet shows how to configure and implement an Event Step in JavaScript using Motia. It includes input schema definition with Zod, step configuration, and an async handler function for processing input and emitting events.
+
+LANGUAGE: javascript
+CODE:
+const z = require('zod');
+
+const inputSchema = z.object({
+  message: z.string()
+});
+
+const config = {
+  type: 'event',
+  name: 'stepA',
+  description: 'Hello from Step A',
+  subscribes: ['pms.start'],
+  emits: ['pms.stepA.done'],
+  input: inputSchema,
+  flows: ['parallel-merge'],
+};
+
+const handler = async (input, { emit, logger }) => {
+  logger.info('Processing message:', input.message)
+
+  await emit({
+    topic: 'pms.stepA.done',
+    data: {
+      result: `Processed: ${input.message}`
+    }
+  })
+};
+
+module.exports = { config, handler };
+
+----------------------------------------
+
+TITLE: Configuring Cron Job in Python for Motia
+DESCRIPTION: This snippet defines a configuration dictionary for a cron job in the Motia project. It includes placeholders for the step name, description, cron expression, emits, and flows properties.
+
+LANGUAGE: python
+CODE:
+config = {
+    "type": "cron",
+    "name": "{{STEP_NAME}}",
+    "description": "{{DESCRIPTION}}",
+    "cron": "{{CRON_EXPRESSION}}",
+    "emits": {{EMITS}},
+    "flows": {{FLOWS}}
+}
+
+----------------------------------------
+
+TITLE: Configuring Cron Job in Python for Motia
+DESCRIPTION: This snippet defines a configuration dictionary for a cron job in the Motia project. It includes placeholders for the step name, description, cron expression, emits, and flows properties.
+
+LANGUAGE: python
+CODE:
+config = {
+    "type": "cron",
+    "name": "{{STEP_NAME}}",
+    "description": "{{DESCRIPTION}}",
+    "cron": "{{CRON_EXPRESSION}}",
+    "emits": {{EMITS}},
+    "flows": {{FLOWS}}
+}
+
+----------------------------------------
+
+TITLE: Configuring and Implementing Event Step in Python
+DESCRIPTION: This snippet illustrates the configuration and implementation of an Event Step in Python using Motia. It includes step configuration and an async handler function for processing input and emitting events, without input schema validation.
+
+LANGUAGE: python
+CODE:
+config = {
+    "type": "event",
+    "name": "Call OpenAI",
+    "subscribes": ["call-openai"], 
+    "emits": ["openai-response"],
+    "input": None,  # No schema validation in Python version
+    "flows": ["openai"]
+}
+
+async def handler(input, context):
+    context.logger.info('Processing input:', input)
+
+    await context.emit({
+        "topic": "openai-response",
+        "data": {
+            "result": f"Processed: {input.get('message', '')}"
+        }
+    })
+
+----------------------------------------
+
+TITLE: Configuring API Endpoint Properties in Ruby
+DESCRIPTION: Defines the configuration structure for an API endpoint including type, name, description, path, method, emits, and flows properties. Uses template variables that get replaced during implementation.
+
+LANGUAGE: ruby
+CODE:
+def config
+  {
+    type: 'api',
+    name: '{{STEP_NAME}}',
+    description: '{{DESCRIPTION}}',
+    path: '{{PATH}}',
+    method: '{{METHOD}}',
+    emits: {{EMITS}},
+    flows: {{FLOWS}}
+  }
+end
+
+----------------------------------------
+
+TITLE: Configuring API Step in Ruby
+DESCRIPTION: This example demonstrates how to configure an API step in Motia using Ruby. It includes the configuration method and handler function for a test state API trigger.
+
+LANGUAGE: ruby
+CODE:
+def config
+  {
+    type: 'api',
+    name: 'Test state api trigger',
+    description: 'test state',
+    path: '/test-state',
+    method: 'POST',
+    emits: ['test-state'],
+    flows: ['test-state']
+  }
+end
+
+def handler(req, ctx)
+  ctx.emit({
+    "topic" => "test-state",
+    "data" => req.body
+  })
+
+  {
+    "status" => 200,
+    "body" => { "message" => "Success" }
+  }
+end
+
+----------------------------------------
+
+TITLE: Event Handler Schema and Configuration Setup
+DESCRIPTION: Defines a Zod schema for input validation and exports configuration object with event metadata, subscriptions, and emissions settings.
+
+LANGUAGE: javascript
+CODE:
+const { z } = require('zod')
+
+const inputSchema = z.object({
+  // Add your schema here
+})
+
+export const config = {
+  type: 'event',
+  name: '{{STEP_NAME}}',
+  description: '{{DESCRIPTION}}',
+  subscribes: {{SUBSCRIPTIONS}},
+  emits: {{EMITS}},
+  input: inputSchema,
+  flows: {{FLOWS}}
+}
+
+----------------------------------------
+
+TITLE: Implementing Logging in Motia (JavaScript)
+DESCRIPTION: Demonstrates various logging levels and error handling in a Motia step handler using JavaScript. Includes examples of info, error, debug, and warn log levels with contextual information.
+
+LANGUAGE: javascript
+CODE:
+export const handler = async (input, { logger }) => {
+  // Basic logging
+  logger.info('Starting process')
+
+  // Logging with context
+  logger.info('Operation completed', {
+    operationId: input.id,
+    duration: 1500
+  })
+
+  // Error handling
+  try {
+    await riskyOperation()
+  } catch (error) {
+    logger.error('Operation failed', {
+      error: error.message,
+      stack: error.stack
+    })
+  }
+
+  // Debug logging
+  logger.debug('Operation details', {
+    rawInput: input,
+    timestamp: Date.now()
+  })
+
+  // Warning logging
+  if (input.amount > 1000) {
+    logger.warn('Large operation detected', {
+      amount: input.amount,
+      threshold: 1000
+    })
+  }
+}
+
+----------------------------------------
+
+TITLE: Implementing Custom API Node Component in React
+DESCRIPTION: This code defines a React functional component named 'Node' that extends the ApiNode component from the Motia workbench. It adds a custom 'Play' button with an alert functionality and displays the node's description. The component uses Tailwind CSS classes for styling.
+
+LANGUAGE: JavaScript
+CODE:
+import React from 'react'
+import { ApiNode, Button, ApiNodeProps } from '@motiadev/workbench'
+
+export const Node: React.FC<ApiNodeProps> = ({ data }) => {
+  const doSomething = () => {
+    window.alert('Replace this with your custom logic')
+  }
+
+
+  return (
+    <ApiNode data={{ ...data, description: undefined }}>
+      <div className="flex flex-row gap-4">
+        <div className="flex flex-col items-center text-sm">{data.description}</div>
+        <div className="flex flex-col items-end text-sm">
+          <Button onClick={doSomething}>Play</Button>
+        </div>
+      </div>
+    </ApiNode>
+  )
+}
+
+----------------------------------------
+
+TITLE: Implementing Logging in Motia (Ruby)
+DESCRIPTION: Demonstrates various logging levels and error handling in a Motia step handler using Ruby. Includes examples of info, error, debug, and warn log levels with contextual information.
+
+LANGUAGE: ruby
+CODE:
+def handler(input, ctx)
+  # Basic logging
+  ctx.logger.info('Starting process')
+
+  # Logging with context
+  ctx.logger.info('Operation completed', {
+    operation_id: input.id,
+    duration: 1500
+  })
+
+  # Error handling
+  begin
+    risky_operation()
+  rescue StandardError => error
+    ctx.logger.error('Operation failed', {
+      error: error.message,
+      stack: error.backtrace.join("\n")
+    })
+  end
+
+  # Debug logging
+  ctx.logger.debug('Operation details', {
+    raw_input: input.to_h,
+    timestamp: Time.now.to_i
+  })
+
+  # Warning logging
+  if input.amount > 1000
+    ctx.logger.warn('Large operation detected', {
+      amount: input.amount,
+      threshold: 1000
+    })
+  end
+end
+
+----------------------------------------
+
+TITLE: Initializing Noop Configuration in TypeScript
+DESCRIPTION: Exports a NoopConfig object that defines the configuration for a Noop step. Includes placeholder values for step name, description, virtual events, and flows that will be replaced during runtime.
+
+LANGUAGE: typescript
+CODE:
+import { NoopConfig } from '@motiadev/core'
+
+export const config: NoopConfig = {
+  type: 'noop',
+  name: '{{STEP_NAME}}',
+  description: '{{DESCRIPTION}}',
+  virtualEmits: {{VIRTUAL_EMITS}},
+  virtualSubscribes: {{VIRTUAL_SUBSCRIBES}},
+  flows: {{FLOWS}}
+}
+
+----------------------------------------
+
+TITLE: Implementing Detailed Error Logging in Motia
+DESCRIPTION: Best practice for adding detailed context to error logs in Motia, including error message, code, input, and stack trace for comprehensive debugging.
+
+LANGUAGE: typescript
+CODE:
+logger.error('Operation failed', {
+  error: error.message,
+  code: error.code,
+  input: JSON.stringify(input),
+  stack: error.stack
+})
+
+----------------------------------------
+
+TITLE: Defining Motia Step Configuration
+DESCRIPTION: Exports a configuration object that defines a step in the Motia workflow system. The template uses placeholder values for step name, description, virtual event handlers, and flow definitions that can be replaced during step creation.
+
+LANGUAGE: javascript
+CODE:
+export const config = {
+  type: 'noop',
+  name: '{{STEP_NAME}}',
+  description: '{{DESCRIPTION}}',
+  virtualEmits: {{VIRTUAL_EMITS}},
+  virtualSubscribes: {{VIRTUAL_SUBSCRIBES}},
+  flows: {{FLOWS}}
+}
+
+----------------------------------------
+
+TITLE: Implementing Debug Logging in Motia
+DESCRIPTION: Example of using debug logs for detailed troubleshooting in Motia, including raw input, timestamp, and current state information.
+
+LANGUAGE: typescript
+CODE:
+logger.debug('Operation details', {
+  rawInput: input,
+  timestamp: Date.now(),
+  state: currentState
+})
+
+----------------------------------------
+
+TITLE: Implementing Motia Cron Job Handler
+DESCRIPTION: Async handler function that executes the cron job logic, with access to logging and event emission capabilities via the FlowContext parameter. Includes commented example for event emission.
+
+LANGUAGE: typescript
+CODE:
+export const handler = async ({ logger, emit }: FlowContext) => {
+  logger.info('Running {{STEP_NAME}} cron job')
+
+  // Add your cron logic here
+  
+  // Example emit
+  // await emit({
+  //   topic: 'event-type',
+  //   data: {}
+  // })
+}
+
+----------------------------------------
+
+TITLE: Implementing Performance Monitoring in Motia
+DESCRIPTION: Example of how to implement basic performance monitoring in a Motia step handler, including operation duration and memory usage logging.
+
+LANGUAGE: typescript
+CODE:
+export const handler: StepHandler<typeof config> = async (input, { logger }) => {
+  const startTime = performance.now()
+  
+  // Process operation
+  const result = await processOperation(input)
+
+  logger.info('Operation completed', {
+    duration: performance.now() - startTime,
+    memoryUsage: process.memoryUsage().heapUsed
+  })
+}
+
+----------------------------------------
+
+TITLE: Configuring API Route with Motia and Zod in TypeScript
+DESCRIPTION: This snippet defines the configuration for an API route using the Motia framework. It includes route metadata, path, method, and a Zod schema for request body validation.
+
+LANGUAGE: TypeScript
+CODE:
+import { ApiRouteConfig, StepHandler } from '@motiadev/core'
+import { z } from 'zod'
+
+export const config: ApiRouteConfig = {
+  type: 'api',
+  name: '{{STEP_NAME}}',
+  description: '{{DESCRIPTION}}',
+  path: '{{PATH}}',
+  method: '{{METHOD}}',
+  emits: {{EMITS}},
+  flows: {{FLOWS}},
+  bodySchema: z.object({
+    // Add your schema here
+  })
+}
+
+----------------------------------------
+
+TITLE: Logging with Motia Core
+DESCRIPTION: Shows how to use the built-in logging system provided by @motiadev/core for info and error logging.
+
+LANGUAGE: typescript
+CODE:
+import { globalLogger } from '@motiadev/core'
+
+globalLogger.info('Application started')
+globalLogger.error('Something went wrong', { error: err })
+
+----------------------------------------
+
+TITLE: Configuring Event Handler in Ruby
+DESCRIPTION: Defines the configuration structure for an event handler including type, name, descriptions, subscriptions, emissions and flows. Uses template placeholders that should be replaced with actual values.
+
+LANGUAGE: ruby
+CODE:
+def config
+  {
+    type: 'event',
+    name: '{{STEP_NAME}}',
+    description: '{{DESCRIPTION}}',
+    subscribes: {{SUBSCRIPTIONS}},
+    emits: {{EMITS}},
+    flows: {{FLOWS}}
+  }
+end
+
+----------------------------------------
+
+TITLE: Testing Motia Step with CLI
+DESCRIPTION: Commands to test a Motia step by emitting events using the Motia CLI. These examples show how to emit events for both the default template and the add numbers example.
+
+LANGUAGE: bash
+CODE:
+npx motia emit --topic test-state --message '{}'
+
+LANGUAGE: bash
+CODE:
+npx motia emit --topic add-numbers --message '{"a": 5, "b": 3}'
+
+----------------------------------------
+
+TITLE: Basic Event Step Definition in TypeScript
+DESCRIPTION: Demonstrates creating a basic event step handler in TypeScript with configuration and handler
+
+LANGUAGE: typescript
+CODE:
+exports.config = {
+  type: 'event',
+  name: 'AddNumbers',
+  subscribes: ['add-numbers'],
+  emits: ['numbers-added'],
+  flows: ['numbers'],
+}
+
+exports.handler = async (input, { emit }) => {
+  const sum = (input.a || 0) + (input.b || 0)
+  await emit({
+    topic: 'numbers-added', 
+    data: { result: sum },
+  })
+}
+
+----------------------------------------
+
+TITLE: State Cleanup Best Practices (TypeScript)
+DESCRIPTION: Illustrates best practices for cleaning up state data after processing in TypeScript, including error handling.
+
+LANGUAGE: typescript
+CODE:
+export const handler: StepHandler<typeof config> = async (input, { state, traceId }) => {
+  try {
+    await processBooking(input)
+    // Clean up specific keys
+    await state.delete(traceId, 'booking.customer')
+    // Or clean everything
+    await state.clear(traceId)
+  } catch (error) {
+    // Handle errors
+  }
+}
+
+----------------------------------------
+
+TITLE: Cron Step Definition with Scheduling
+DESCRIPTION: Example of creating a scheduled cron step with configuration and handler
+
+LANGUAGE: typescript
+CODE:
+export const config: CronConfig = {
+  type: 'cron',
+  name: 'PeriodicJob',
+  description: 'Runs every minute and emits a timestamp',
+  cron: '0 * * * *',
+  emits: ['cron-ticked'],
+  flows: ['cron-example'],
+}
+
+export const handler: StepHandler<typeof config> = async ({ emit }) => {
+  await emit({
+    topic: 'cron-ticked',
+    data: { message: 'Cron job executed' },
+  })
+}
+
+----------------------------------------
+
+TITLE: Namespacing Best Practices (TypeScript)
+DESCRIPTION: Demonstrates best practices for organizing state data using dot notation for hierarchical structure in TypeScript.
+
+LANGUAGE: typescript
+CODE:
+// Good - Organized hierarchically (using traceId scope)
+await state.set(traceId, 'booking.customer', customerData)
+await state.set(traceId, 'booking.venue', venueData)
+await state.set(traceId, 'payment.status', 'pending')
+
+// Avoid - Flat structure (using traceId scope)
+await state.set(traceId, 'customer', customerData)
+await state.set(traceId, 'venue', venueData)
+await state.set(traceId, 'paymentStatus', 'pending')
+
+----------------------------------------
+
+TITLE: Handling Negative Sentiment in TypeScript (Motia)
+DESCRIPTION: This snippet handles negative sentiment events. It logs the negative sentiment and could be extended to perform actions like escalating to a service or responding gently.
+
+LANGUAGE: typescript
+CODE:
+import { EventConfig, StepHandler } from 'motia'
+import { z } from 'zod'
+
+const negativeSchema = z.object({
+  sentiment: z.string(),
+  analysis: z.string().optional(),
+})
+
+export const config: EventConfig<typeof negativeSchema> = {
+  type: 'event',
+  name: 'Negative Sentiment Responder',
+  subscribes: ['openai.negativeSentiment'],
+  emits: [],
+  input: negativeSchema,
+  flows: ['sentiment-demo'],
+}
+
+export const handler: StepHandler<typeof config> = async (input, { logger }) => {
+  logger.info('[Negative Responder] The sentiment is negative or unknown.', { analysis: input.analysis })
+  // Could escalate to a service, or respond gently, etc.
+}
+
+----------------------------------------
+
+TITLE: Setting Up Cron Jobs with Motia Core
+DESCRIPTION: Demonstrates how to schedule and manage cron jobs using the setupCronHandlers function from @motiadev/core.
+
+LANGUAGE: typescript
+CODE:
+import { setupCronHandlers } from '@motiadev/core'
+
+const cronManager = setupCronHandlers(lockedData, eventManager, state, loggerFactory)
+
+----------------------------------------
+
+TITLE: Handling Positive Sentiment in TypeScript (Motia)
+DESCRIPTION: This snippet handles positive sentiment events. It logs the positive sentiment and could be extended to perform actions like notifying a Slack channel.
+
+LANGUAGE: typescript
+CODE:
+import { EventConfig, StepHandler } from 'motia'
+import { z } from 'zod'
+
+const positiveSchema = z.object({
+  sentiment: z.string(),
+  analysis: z.string().optional(),
+})
+
+export const config: EventConfig<typeof positiveSchema> = {
+  type: 'event',
+  name: 'Positive Sentiment Responder',
+  subscribes: ['openai.positiveSentiment'],
+  emits: [],
+  input: positiveSchema,
+  flows: ['sentiment-demo'],
+}
+
+export const handler: StepHandler<typeof config> = async (input, { logger }) => {
+  logger.info('[Positive Responder] The sentiment is positive!', { analysis: input.analysis })
+  // Maybe notify a Slack channel: "All good vibes here!"
+}
+
+----------------------------------------
+
+TITLE: Configuring and Handling Cron Steps in Ruby
+DESCRIPTION: Demonstrates the configuration and handler setup for a Cron Step in Ruby. The step is set to run hourly and emit a 'cron-ticked' event.
+
+LANGUAGE: ruby
+CODE:
+def config
+  {
+    type: 'cron',
+    name: 'PeriodicJob',
+    description: 'Runs every minute and emits a timestamp',
+    cron: '0 * * * *',
+    emits: ['cron-ticked'],
+    flows: ['cron-example'],
+  }
+end
+
+def handler(context)
+  context.emit({
+    topic: 'cron-ticked',
+    data: { message: 'Cron job executed' },
+  })
+end
+
+----------------------------------------
+
+TITLE: Defining a Minimal Step in JavaScript for Motia
+DESCRIPTION: This snippet shows how to define a minimal step in JavaScript for Motia. It exports a config object and a handler function. The handler demonstrates the use of the emit function from the context object.
+
+LANGUAGE: javascript
+CODE:
+exports.config = {
+  type: 'event',
+  name: 'Minimal Step',
+  subscribes: ['start'],
+  emits: ['done'],
+}
+
+exports.handler = async (input, { emit, traceId, state, logger }) => {
+  await emit({ topic: 'done', data: {} })
+}
+
+----------------------------------------
+
+TITLE: Connecting Steps in Flow with JavaScript
+DESCRIPTION: Shows how to connect multiple steps within the same flow by using identical flow names. This example configures a validation step that processes the output from the previous addition step.
+
+LANGUAGE: javascript
+CODE:
+exports.config = {
+  type: 'event',
+  name: 'ValidateNumbers',
+  subscribes: ['numbers-added'],
+  emits: ['numbers-validated'],
+  flows: ['calculator-flow'] // <-- Same flow name connects the steps
+}
+
+----------------------------------------
+
+TITLE: Defining a Minimal Step in Python for Motia
+DESCRIPTION: This snippet illustrates how to define a minimal step in Python for Motia. It includes a config dictionary and an async handler function. The handler shows how to use the emit method from the context object.
+
+LANGUAGE: python
+CODE:
+config = {
+    'type': 'event',
+    'name': 'Minimal Step',
+    'subscribes': ['start'],
+    'emits': ['done'],
+}
+
+async def handler(args, ctx):
+  await ctx.emit({'topic': 'done', 'data': {}})
+
+----------------------------------------
+
+TITLE: Starting Development Server Commands
+DESCRIPTION: Commands for starting the development server using different package managers to access Motia Workbench for flow visualization.
+
+LANGUAGE: bash
+CODE:
+pnpm run dev
+
+LANGUAGE: bash
+CODE:
+yarn run dev
+
+LANGUAGE: bash
+CODE:
+npm run dev
+
+LANGUAGE: bash
+CODE:
+bun run dev
+
+----------------------------------------
+
+TITLE: Configuring API Step in Python
+DESCRIPTION: This example illustrates how to configure an API step in Motia using Python. It includes the configuration dictionary and handler function for a test state API trigger.
+
+LANGUAGE: python
+CODE:
+config = {
+    'type': 'api',
+    'name': 'Test state api trigger',
+    'description': 'test state',
+    'path': '/test-state',
+    'method': 'POST',
+    'emits': ['test-state'],
+    'flows': ['test-state']
+}
+
+async def handler(req, context):
+    context.logger.info('[Test State] Received request', {'body': req.body})
+
+    await context.emit({
+        'topic': 'test-state',
+        'data': req.body
+    })
+
+    return {
+        'status': 200,
+        'body': {'message': 'Success'}
+    }
+
+----------------------------------------
+
+TITLE: Analyzing Sentiment with OpenAI in TypeScript (Motia)
+DESCRIPTION: This snippet calls OpenAI to analyze sentiment, parses the response, and emits events based on the sentiment. It uses the OpenAI API and Motia for event handling and configuration.
+
+LANGUAGE: typescript
+CODE:
+import { EventConfig, StepHandler } from 'motia'
+import { z } from 'zod'
+import { OpenAI } from 'openai'
+
+const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
+
+const inputSchema = z.object({
+  text: z.string(),
+})
+
+export const config: EventConfig<typeof inputSchema> = {
+  type: 'event',
+  name: 'OpenAI Sentiment Analyzer',
+  subscribes: ['openai.analyzeSentimentRequest'],
+  emits: ['openai.positiveSentiment', 'openai.negativeSentiment'],
+  input: inputSchema,
+  flows: ['sentiment-demo'],
+}
+
+export const handler: StepHandler<typeof config> = async (input, { emit, logger }) => {
+  logger.info('[OpenAI Sentiment Analyzer] Prompting OpenAI...', { text: input.text })
+
+  try {
+    const systemPrompt =
+      'You are an assistant that returns only JSON: {"sentiment":"positive|negative","analysis":"..."}'
+    const userPrompt = `Analyze the sentiment of this text: "${input.text}". Return JSON with keys "sentiment" and "analysis".
+
+    const response = await openai.chat.completions.create({
+      model: 'gpt-3.5-turbo',
+      messages: [
+        { role: 'system', content: systemPrompt },
+        { role: 'user', content: userPrompt },
+      ],
+    })
+
+    const content = response.choices[0]?.message?.content || ''
+    logger.info('[OpenAI Sentiment Analyzer] Raw response', { content })
+
+    let parsed: { sentiment?: string; analysis?: string } = {}
+    try {
+      parsed = JSON.parse(content.trim())
+    } catch (err) {
+      logger.error('[OpenAI Sentiment Analyzer] Unable to parse JSON', { error: err })
+      return
+    }
+
+    if (parsed.sentiment?.toLowerCase() === 'positive') {
+      await emit({
+        topic: 'openai.positiveSentiment',
+        data: { ...parsed },
+      })
+    } else {
+      await emit({
+        topic: 'openai.negativeSentiment',
+        data: { ...parsed },
+      })
+    }
+  } catch (err: any) {
+    logger.error('[OpenAI Sentiment Analyzer] Error calling OpenAI', { error: err.message })
+  }
+}
+
+----------------------------------------
+
+TITLE: Configuring API Step in JavaScript
+DESCRIPTION: This example shows how to configure an API step in Motia using JavaScript. It includes the configuration object and handler function for a test state API trigger.
+
+LANGUAGE: javascript
+CODE:
+const { z } = require('zod')
+
+exports.config = {
+  type: 'api',
+  name: 'Test state api trigger',
+  description: 'test state',
+  path: '/test-state',
+  method: 'POST',
+  emits: ['test-state'],
+  bodySchema: z.object({}),
+  flows: ['test-state'],
+}
+
+exports.handler = async (req, { logger, emit }) => {
+  logger.info('[Test State] Received request', req)
+
+  await emit({
+    topic: 'test-state',
+    data: req.body
+  })
+
+  return {
+    status: 200,
+    body: { message: 'Success' },
+  }
+}
+
+----------------------------------------
+
+TITLE: Configuring Cron Job in JavaScript
+DESCRIPTION: Defines a configuration object for a cron job. It includes properties for type, name, description, cron expression, emits, and flows. The values are placeholders to be replaced with actual data.
+
+LANGUAGE: JavaScript
+CODE:
+export const config = {
+  type: 'cron',
+  name: '{{STEP_NAME}}',
+  description: '{{DESCRIPTION}}',
+  cron: '{{CRON_EXPRESSION}}',
+  emits: {{EMITS}},
+  flows: {{FLOWS}}
+}
+
+----------------------------------------
+
+TITLE: Configuring and Handling Cron Steps in JavaScript
+DESCRIPTION: Shows the configuration and handler setup for a Cron Step in JavaScript. The step is set to run hourly and emit a 'cron-ticked' event.
+
+LANGUAGE: javascript
+CODE:
+const config = {
+  type: 'cron',
+  name: 'PeriodicJob',
+  description: 'Runs every minute and emits a timestamp',
+  cron: '0 * * * *', // run every hour at minute 0
+  emits: ['cron-ticked'],
+  flows: ['cron-example'],
+};
+
+const handler = async ({ emit }) => {
+  await emit({
+    topic: 'cron-ticked',
+    data: { message: 'Cron job executed' },
+  })
+}
+
+----------------------------------------
+
+TITLE: Configuring API Endpoint with Zod Schema
+DESCRIPTION: Defines the API endpoint configuration including type, name, path, method, event emissions, flows, and request body validation schema using Zod.
+
+LANGUAGE: javascript
+CODE:
+const { z } = require('zod')
+
+export const config = {
+  type: 'api',
+  name: '{{STEP_NAME}}',
+  description: '{{DESCRIPTION}}',
+  path: '{{PATH}}',
+  method: '{{METHOD}}',
+  emits: {{EMITS}},
+  flows: {{FLOWS}},
+  bodySchema: z.object({
+    // Add your schema here
+  })
+}
+
+----------------------------------------
+
+TITLE: Type Safety in State Management (TypeScript)
+DESCRIPTION: Shows how to define types for state data to ensure consistency and type safety in TypeScript.
+
+LANGUAGE: typescript
+CODE:
+interface CustomerData {
+  name: string;
+  email: string;
+}
+
+interface VenueData {
+  id: string;
+  capacity: number;
+}
+
+type BookingState = {
+  customer: CustomerData;
+  venue: VenueData;
+  status: 'pending' | 'confirmed';
+}
+
+const booking = await state.get<BookingState>(traceId, 'booking')
+
+----------------------------------------
+
+TITLE: API Request Handler Implementation
+DESCRIPTION: Implements the request handler function with logging capabilities and event emission support. Returns a standard response structure with status code and message.
+
+LANGUAGE: javascript
+CODE:
+export const handler = async (req, { logger, emit }) => {
+  logger.info('Processing {{STEP_NAME}}', req)
+
+  // Add your handler logic here
+  
+  return {
+    status: 200,
+    body: { message: 'Success' }
+  }
+}
+
+----------------------------------------
+
+TITLE: Using State in Steps (Ruby)
+DESCRIPTION: Demonstrates how to use state management methods within a step handler in Ruby, including storing, retrieving, deleting, and clearing state data.
+
+LANGUAGE: ruby
+CODE:
+def handler(input, context) # context is the context object
+  trace_id = context.trace_id # Access traceId from context
+
+  # Store state (using traceId as scope)
+  context.state.set(trace_id, 'booking', { 
+    customer: input.customer,
+    venue: input.venue
+  })
+
+  # Retrieve state (using traceId as scope)
+  booking = context.state.get(trace_id, 'booking') 
+
+  # Delete specific state
+  context.state.delete(trace_id, 'booking') 
+
+  # Clear all state (using traceId as scope)
+  context.state.clear(trace_id) 
+end
+
+----------------------------------------
+
+TITLE: Implementing Cron Job Handler in JavaScript
+DESCRIPTION: Defines an async handler function for the cron job. It logs the job execution, provides a placeholder for custom logic, and includes a commented example of how to emit an event. The function receives logger and emit as parameters.
+
+LANGUAGE: JavaScript
+CODE:
+export const handler = async ({ logger, emit }) => {
+  logger.info('Running {{STEP_NAME}} cron job')
+
+  // Add your cron logic here
+  
+  // Example emit
+  // await emit({
+  //   topic: 'event-type',
+  //   data: {}
+  // })
+}
+
+----------------------------------------
+
+TITLE: Using State in Steps (Python)
+DESCRIPTION: Illustrates how to use state management methods within a step handler in Python, including storing, retrieving, deleting, and clearing state data.
+
+LANGUAGE: python
+CODE:
+async def handler(input, ctx): # ctx is the context object
+    trace_id = ctx.trace_id # Access traceId from context
+
+    # Store state (using traceId as scope)
+    await ctx.state.set(trace_id, 'booking', { 
+        'customer': input.customer,
+        'venue': input.venue
+    })
+
+    # Retrieve state (using traceId as scope)
+    booking = await ctx.state.get(trace_id, 'booking') 
+
+    # Delete specific state (using traceId as scope)
+    await ctx.state.delete(trace_id, 'booking') 
+
+    # Clear all state (using traceId as scope)
+    await ctx.state.clear(trace_id) 
+
+----------------------------------------
+
+TITLE: Using Mock Logger in Motia Tests
+DESCRIPTION: Demonstrates creation and usage of a mock logger for testing logging functionality with assertions.
+
+LANGUAGE: typescript
+CODE:
+import { createMockLogger } from '@motiadev/test';
+
+// Create a mock logger
+const logger = createMockLogger();
+
+// Use the logger in your tests
+logger.info('Test message');
+
+// Assert on logged messages
+expect(logger.messages.info).toContain('Test message');
+
+----------------------------------------
+
+TITLE: Implementing API Route Handler with Motia in TypeScript
+DESCRIPTION: This snippet defines the handler function for the API route. It uses the StepHandler type from Motia, which provides access to the request, logger, and emit function. The handler logs the incoming request and returns a success response.
+
+LANGUAGE: TypeScript
+CODE:
+export const handler: StepHandler<typeof config> = async (req, { logger, emit }) => {
+  logger.info('Processing {{STEP_NAME}}', req)
+
+  // Add your handler logic here
+  
+  return {
+    status: 200,
+    body: { message: 'Success' }
+  }
+}
+
+----------------------------------------
+
+TITLE: State Change Event Configuration with Zod Schema
+DESCRIPTION: Defines input schema and event configuration for state change verification using Zod validation. Specifies event type, name, subscriptions, and input requirements.
+
+LANGUAGE: typescript
+CODE:
+const inputSchema = z.object({
+  key: z.string(),
+  expected: z.optional(z.unknown()),
+})
+
+export const config: EventConfig<Input> = {
+  type: 'event',
+  name: 'Check state change',
+  description: 'check state change',
+  subscribes: ['check-state-change'],
+  emits: [],
+  input: inputSchema,
+  flows: ['default'],
+}
+
+----------------------------------------
+
+TITLE: Implementing Custom Node Component with TypeScript and React
+DESCRIPTION: A React functional component that extends BaseNode from Motia Workbench. It includes a button that triggers an alert, serving as a template for custom node implementations. The component uses TypeScript with React props typing and demonstrates basic event handling.
+
+LANGUAGE: typescript
+CODE:
+import React from 'react'
+import { BaseNode, Button, EventNodeProps } from '@motiadev/workbench'
+
+export const Node: React.FC<EventNodeProps> = ({ data }) => {
+  const doSomething = () => {
+    window.alert('Replace this with your custom logic')
+  }
+
+
+  return (
+    <BaseNode title="{{STEP_NAME}}" variant="noop" {...data} disableTargetHandle>
+      <Button onClick={doSomething}>Click me</Button>
+    </BaseNode>
+  )
+}
+
+----------------------------------------
+
+TITLE: Implementing Flow Starter Component in React/TypeScript
+DESCRIPTION: React functional component that creates a start button within a BaseNode container. When clicked, it sends a POST request to '/default' endpoint to initiate a flow. Uses Motia workbench components and TypeScript typing.
+
+LANGUAGE: typescript
+CODE:
+import { BaseNode, Button, NoopNodeProps } from 'motia/workbench'
+import React from 'react'
+
+export default function FlowStarter({ data }: NoopNodeProps) {
+  const start = () => {
+    fetch('/default', { method: 'POST' })
+  }
+
+  return (
+    <BaseNode title="Start" variant="noop" disableTargetHandle>
+      <Button onClick={start}>Start Flow</Button>
+    </BaseNode>
+  )
+}
+
+----------------------------------------
+
+TITLE: React Node Component with Button Trigger
+DESCRIPTION: A React functional component that implements a custom node with a button trigger. It uses the BaseNode component from @motiadev/workbench and includes a simple alert demonstration function.
+
+LANGUAGE: typescript
+CODE:
+import React from 'react'
+import { BaseNode, Button, NoopNodeProps } from '@motiadev/workbench'
+
+export const Node: React.FC<NoopNodeProps> = ({ data }) => {
+  const doSomething = () => {
+    window.alert('Replace this with your custom logic')
+  }
+
+
+  return (
+    <BaseNode title="{{STEP_NAME}}" variant="noop" {...data} disableTargetHandle>
+      <Button onClick={doSomething}>Click me</Button>
+    </BaseNode>
+  )
+}
+
+----------------------------------------
+
+TITLE: Initializing Motia Flow Starter Configuration
+DESCRIPTION: Exports a NoopConfig object that configures a basic flow starter component. The configuration defines a component named 'Flow Starter' that emits to the '/default' path and initializes the 'default' flow without any subscriptions.
+
+LANGUAGE: typescript
+CODE:
+import { NoopConfig } from 'motia'
+
+export const config: NoopConfig = {
+  type: 'noop',
+  name: 'Flow Starter',
+  description: 'Start the default flow',
+  virtualSubscribes: [],
+  virtualEmits: ['/default'],
+  flows: ['default'],
+}
+
+----------------------------------------
+
+TITLE: Configuring Cron Job Settings in Motia
+DESCRIPTION: Defines the configuration object for a Motia cron job, including name, description, cron expression, and event specifications.
+
+LANGUAGE: typescript
+CODE:
+export const config: CronConfig = {
+  type: 'cron',
+  name: '{{STEP_NAME}}',
+  description: '{{DESCRIPTION}}',
+  cron: '{{CRON_EXPRESSION}}',
+  emits: {{EMITS}},
+  flows: {{FLOWS}}
+}
+
+----------------------------------------
+
+TITLE: Starting Motia Development Environment
+DESCRIPTION: CLI command to initiate a development environment for the Motia project, enabling the use of Motia Workbench for workflow visualization.
+
+LANGUAGE: sh
+CODE:
+motia dev
+
+----------------------------------------
+
+TITLE: File Structure Examples for UI Steps
+DESCRIPTION: Shows the recommended file structure for implementing UI steps with TypeScript and JavaScript.
+
+LANGUAGE: plaintext
+CODE:
+steps/
+      └── myStep/
+      ├── myStep.step.ts      # Step definition
+      └── myStep.step.tsx     # Visual override
+
+LANGUAGE: plaintext
+CODE:
+steps/
+      └── myStep/
+      ├── myStep.step.js      # Step definition
+      └── myStep.step.jsx     # Visual override
+
+----------------------------------------
+
+TITLE: Building Motia Project
+DESCRIPTION: CLI command to build a lock file for the current Motia project setup.
+
+LANGUAGE: sh
+CODE:
+motia build
+
+----------------------------------------
+
+TITLE: Custom EventNode Implementation
+DESCRIPTION: Shows how to create a custom step with EventNode component including custom content.
+
+LANGUAGE: typescript
+CODE:
+import React from 'react'
+import { EventNode } from 'motia/workbench'
+import type { EventNodeProps } from 'motia/workbench'
+
+export default function CustomStep({ data }: EventNodeProps) {
+  return (
+    <EventNode
+      data={data}
+      variant="white"
+      shape="rounded"
+      className="py-2 px-4"
+    >
+      <div>Custom content</div>
+    </EventNode>
+  )
+}
+
+LANGUAGE: javascript
+CODE:
+import React from 'react'
+import { EventNode } from 'motia/workbench'
+
+export default function CustomStep({ data }) {
+  return (
+    <EventNode
+      data={data}
+      variant="white"
+      shape="rounded"
+      className="py-2 px-4"
+    >
+      <div>Custom content</div>
+    </EventNode>
+  )
+}
+
+----------------------------------------
+
+TITLE: Testing Motia API Step with cURL
+DESCRIPTION: Example cURL command to test a Motia API endpoint, demonstrating how to trigger a workflow step via HTTP POST request.
+
+LANGUAGE: bash
+CODE:
+curl -X POST http://localhost:3000/default \
+-H "Content-Type: application/json" \
+-d '{}'
+
+----------------------------------------
+
+TITLE: ApiNode Implementation
+DESCRIPTION: Demonstrates how to implement an API-specific step using the ApiNode component.
+
+LANGUAGE: typescript
+CODE:
+import React from 'react'
+import { ApiNode } from 'motia/workbench'
+import type { ApiNodeProps } from 'motia/workbench'
+
+export default function ApiStep({ data }: ApiNodeProps) {
+  return (
+    <ApiNode
+      data={data}
+      className="border-blue-500"
+    >
+      <div>API endpoint: {data.name}</div>
+    </ApiNode>
+  )
+}
+
+LANGUAGE: javascript
+CODE:
+import React from 'react'
+import { ApiNode } from 'motia/workbench'
+
+export default function ApiStep({ data }) {
+  return (
+    <ApiNode
+      data={data}
+      className="border-blue-500"
+    >
+      <div>API endpoint: {data.name}</div>
+    </ApiNode>
+  )
+}
+
+----------------------------------------
+
+TITLE: Creating a New Motia Project with CLI
+DESCRIPTION: Command to create a new Motia project using the Motia CLI, which sets up a basic project structure with example steps.
+
+LANGUAGE: bash
+CODE:
+npx motia create -n my-motia-project
+
+----------------------------------------
+
+TITLE: Creating NOOP Step UI Component
+DESCRIPTION: React component implementation for NOOP step visualization including handle placement and styling.
+
+LANGUAGE: typescript
+CODE:
+import React from 'react'
+import { BaseHandle, Position } from 'motia/workbench'
+
+export default function MyStep() {
+  return (
+    <div className="p-4 bg-gray-800 rounded-lg border border-gray-600 text-white">
+      <div className="text-sm font-medium">My Step UI</div>
+      {/* Your custom UI elements */}
+      <BaseHandle type="source" position={Position.Bottom} />
+    </div>
+  )
+}
+
+----------------------------------------
+
+TITLE: Creating Custom Node Component
+DESCRIPTION: Example of creating a custom node component by extending the BaseNode component with custom styling and content.
+
+LANGUAGE: typescript
+CODE:
+import { BaseNode, Position } from '@motiadev/workbench'
+
+export const CustomNode = ({ data, ...props }) => {
+  return (
+    <BaseNode 
+      {...props} 
+      title="Custom Node" 
+      color="#8B5CF6"
+    >
+      <div className="p-4">
+        {data.customContent}
+      </div>
+    </BaseNode>
+  )
+}
+
+----------------------------------------
+
+TITLE: Running Motia Tests Locally with pnpm
+DESCRIPTION: These commands demonstrate how to run Motia tests locally using pnpm. The first command runs all tests, while the second command runs tests in watch mode, automatically re-running tests when code changes are detected.
+
+LANGUAGE: bash
+CODE:
+pnpm test
+
+LANGUAGE: bash
+CODE:
+pnpm test --watch
+
+----------------------------------------
+
+TITLE: Importing Workbench Components
+DESCRIPTION: TypeScript code showing how to import various node components from the workbench package for workflow visualization.
+
+LANGUAGE: typescript
+CODE:
+import { 
+  EventNode, 
+  ApiNode, 
+  NoopNode, 
+  BaseNode, 
+  BaseHandle 
+} from '@motiadev/workbench'
+
+----------------------------------------
+
+TITLE: Capturing and Testing Events in Motia
+DESCRIPTION: Shows how to set up event capturing and testing with the Motia tester, including event assertions.
+
+LANGUAGE: typescript
+CODE:
+import { createTester } from '@motiadev/test';
+
+const tester = createTester();
+
+// Set up event capturing
+const watcher = tester.watchEvents('event.topic');
+
+// Trigger an action that emits events
+await tester.request()
+  .post('/api/trigger')
+  .send({ action: 'test' });
+
+// Get captured events
+const events = watcher.getCapturedEvents();
+expect(events).toHaveLength(1);
+expect(events[0].data).toEqual({ result: 'success' });
+
+----------------------------------------
+
+TITLE: Starting Motia Development Server
+DESCRIPTION: Command to start the Motia development server which includes the Workbench interface.
+
+LANGUAGE: bash
+CODE:
+npx motia dev
+
+----------------------------------------
+
+TITLE: Mocking Flow Context in Motia
+DESCRIPTION: Example of creating and using a mock flow context for testing step handlers with assertions on emitted events.
+
+LANGUAGE: typescript
+CODE:
+import { createMockFlowContext } from '@motiadev/test';
+
+// Create a mock context for testing a step handler
+const mockContext = createMockFlowContext();
+
+// Call your step handler with the mock context
+await myStepHandler(inputData, mockContext);
+
+// Assert on emitted events
+expect(mockContext.emit).toHaveBeenCalledWith({
+  topic: 'expected.topic',
+  data: expect.any(Object)
+});
+
+----------------------------------------
+
+TITLE: Installing Motia Workbench Package
+DESCRIPTION: Commands to install the @motiadev/workbench package using different package managers (npm, yarn, or pnpm).
+
+LANGUAGE: bash
+CODE:
+npm install @motiadev/workbench
+# or
+yarn add @motiadev/workbench
+# or
+pnpm add @motiadev/workbench
+
+----------------------------------------
+
+TITLE: Importing TypeScript Types from Motia Core
+DESCRIPTION: Demonstrates how to import and use TypeScript types exported by the @motiadev/core package for type-safe development.
+
+LANGUAGE: typescript
+CODE:
+import { 
+  Event, 
+  FlowContext, 
+  ApiRouteConfig, 
+  EventConfig, 
+  CronConfig 
+} from '@motiadev/core'
+
+----------------------------------------
+
+TITLE: Installing Motia Test Package
+DESCRIPTION: Commands for installing the @motiadev/test package using different package managers (npm, yarn, pnpm).
+
+LANGUAGE: bash
+CODE:
+npm install @motiadev/test --save-dev
+# or
+yarn add @motiadev/test --dev
+# or
+pnpm add @motiadev/test --save-dev
+
+----------------------------------------
+
+TITLE: Displaying Live Logs in Motia Workbench
+DESCRIPTION: Example of live logs displayed in Motia Workbench for monitoring flow execution. Shows informational and debug messages for a payment flow.
+
+LANGUAGE: plaintext
+CODE:
+[INFO] [payment-flow] Payment received: $50.00
+[DEBUG] [payment-flow] Processing payment...
+
+----------------------------------------
+
+TITLE: Basic UI Step Implementation
+DESCRIPTION: Demonstrates basic implementation of a custom UI step component using EventNode.
+
+LANGUAGE: typescript
+CODE:
+import React from 'react'
+import { EventNode } from 'motia/workbench'
+import type { EventNodeProps } from 'motia/workbench'
+
+export default function MyStep({ data }: EventNodeProps) {
+  return (
+    <EventNode
+      data={data}
+      variant="white"
+      className="py-2 px-4"
+    />
+  )
+}
+
+LANGUAGE: javascript
+CODE:
+import React from 'react'
+import { EventNode } from 'motia/workbench'
+
+export default function MyStep({ data }) {
+  return (
+    <EventNode
+      data={data}
+      variant="white"
+      className="py-2 px-4"
+    />
+  )
+}
+
+----------------------------------------
+
+TITLE: Displaying Motia Monorepo Directory Structure
+DESCRIPTION: Shows the directory structure of the Motia monorepo, including core packages and playground environment.
+
+LANGUAGE: bash
+CODE:
+.
+├── packages/                   # Core framework and supporting tools
+│   ├── motia/                  # The Motia.js framework
+│   │   ├── src/                # Source code
+│   │   ├── dist/               # Compiled output
+│   │   ├── package.json        # Package metadata
+│   │   └── README.md           # Framework-specific documentation
+│   └── other-packages/         # Placeholder for future packages
+├── playground/                 # Sandbox environment for testing
+│   ├── src/                    # Source code for testing and examples
+│   │   ├── flows/          # Flow implementations
+│   │   ├── traffic/            # Traffic definitions (inbound/outbound)
+│   │   ├── ui/                 # Custom UI components
+│   │   └── index.js            # Playground entry point
+│   ├── .env.example            # Environment variable template
+│   └── README.md               # Playground-specific documentation
+├── pnpm-workspace.yaml         # Monorepo configuration
+├── package.json                # Top-level package metadata
+├── README.md                   # Monorepo overview (this file)
+└── CONTRIBUTING.md             # Guidelines for contributing
+
+----------------------------------------
+
+TITLE: Starting Motia Workbench with Package Managers
+DESCRIPTION: Commands to start Motia Workbench using different package managers. This initiates the Motia Server, Workbench web interface, and development mode with auto-reload functionality.
+
+LANGUAGE: bash
+CODE:
+pnpm run dev
+
+LANGUAGE: bash
+CODE:
+yarn run dev
+
+LANGUAGE: bash
+CODE:
+npm run dev
+
+LANGUAGE: bash
+CODE:
+bun run dev
+
+----------------------------------------
+
+TITLE: Setting Up Motia Monorepo
+DESCRIPTION: Provides step-by-step instructions for cloning the repository, installing dependencies, and setting up the environment for Motia.js development.
+
+LANGUAGE: bash
+CODE:
+git clone <repository_url>
+cd motia-monorepo
+
+LANGUAGE: bash
+CODE:
+pnpm install
+
+LANGUAGE: bash
+CODE:
+npm install -g motia
+
+LANGUAGE: bash
+CODE:
+cp playground/.env.example playground/.env
+
+----------------------------------------
+
+TITLE: Custom UI Node Implementation
+DESCRIPTION: Advanced implementation of a custom UI node with specific styling and handle placement.
+
+LANGUAGE: tsx
+CODE:
+import React from 'react'
+import { BaseHandle, EventNodeProps, Position } from 'motia/workbench'
+
+export default (_: EventNodeProps) => {
+  return (
+    <div className="p-3 px-6 flex flex-col max-w-[300px] bg-blue-500 border-white rounded-full text-white border border-solid text-center text-sm">
+      <div>Custom Processing</div>
+      <BaseHandle type="target" position={Position.Top} />
+      <BaseHandle type="source" position={Position.Bottom} />
+    </div>
+  )
+}
+
+----------------------------------------
+
+TITLE: Running Motia Playground
+DESCRIPTION: Demonstrates how to start the Motia playground environment for testing and refining flows.
+
+LANGUAGE: bash
+CODE:
+pnpm run dev
+
+----------------------------------------
+
+TITLE: Implementing Webhook Testing Step
+DESCRIPTION: Complete example of a webhook testing NOOP step with both configuration and UI implementation.
+
+LANGUAGE: typescript
+CODE:
+// test-webhook.step.ts
+import { NoopConfig } from 'motia'
+
+export const config: NoopConfig = {
+  type: 'noop',
+  name: 'Webhook Simulator',
+  description: 'Simulates incoming webhook events',
+  virtualEmits: ['webhook.received'],
+  virtualSubscribes: [],
+  flows: ['webhook-flow'],
+}
+
+----------------------------------------
+
+TITLE: Contributing to Motia Development
+DESCRIPTION: Outlines the development workflow for contributing to Motia.js, including branching, making changes, running tests, and submitting pull requests.
+
+LANGUAGE: bash
+CODE:
+git checkout -b feature/<your-feature-name>
+
+LANGUAGE: bash
+CODE:
+pnpm run test
+
+LANGUAGE: bash
+CODE:
+git commit -m "Add <your-feature-description>"
+git push origin feature/<your-feature-name>
+
+----------------------------------------
+
+TITLE: Running Trello Automation Application
+DESCRIPTION: Command to start the Trello automation application in development mode using pnpm.
+
+LANGUAGE: bash
+CODE:
+pnpm dev
+
+----------------------------------------
+
+TITLE: Building a Motia Project
+DESCRIPTION: The 'build' command compiles steps, bundles them into zip files, and generates a configuration file.
+
+LANGUAGE: bash
+CODE:
+npx motia build
+
+----------------------------------------
+
+TITLE: Running GitHub Integration Workflow Application
+DESCRIPTION: Command to start the development server for the GitHub integration workflow application using npm.
+
+LANGUAGE: bash
+CODE:
+npm run dev
+
+----------------------------------------
+
+TITLE: Starting Motia Development Server
+DESCRIPTION: The 'dev' command launches the development server. Options include specifying port and enabling verbose or debug logging.
+
+LANGUAGE: bash
+CODE:
+npx motia dev [options]
+
+----------------------------------------
+
+TITLE: Copying Environment Variables Template for GitHub Integration
+DESCRIPTION: Command to create a .env file by copying the example template for configuring environment variables in the GitHub integration workflow.
+
+LANGUAGE: bash
+CODE:
+cp .env.example .env
+
+----------------------------------------
+
+TITLE: Retrieving Generated Motia Project Configuration
+DESCRIPTION: The 'get-config' command fetches the generated configuration for your Motia project. Optionally specify an output path.
+
+LANGUAGE: bash
+CODE:
+npx motia get-config [options]
+
+----------------------------------------
+
+TITLE: Installing Dependencies for GitHub Integration Workflow
+DESCRIPTION: Command to install the necessary dependencies for the GitHub integration workflow project using npm.
+
+LANGUAGE: bash
+CODE:
+npm install
+
+----------------------------------------
+
+TITLE: Emitting Events to Motia Server
+DESCRIPTION: Use the 'emit' command to send events to the Motia server. Requires specifying the topic and message payload.
+
+LANGUAGE: bash
+CODE:
+npx motia emit [options]
+
+----------------------------------------
+
+TITLE: Cloning GitHub Repository for GitHub Integration Workflow
+DESCRIPTION: Commands to clone the example repository containing the GitHub integration workflow code and navigate to the correct directory.
+
+LANGUAGE: bash
+CODE:
+git clone git@github.com:MotiaDev/motia-examples.git
+cd examples/github-integration-workflow
+
+----------------------------------------
+
+TITLE: Generating Motia Resources
+DESCRIPTION: The 'generate step' command creates a new step with interactive prompts. Optionally specify the directory path.
+
+LANGUAGE: bash
+CODE:
+npx motia generate step [options]
+
+----------------------------------------
+
+TITLE: Running the AI Deep Research Agent Application
+DESCRIPTION: Instructions for starting the development server and making a test request to the AI Deep Research Agent.
+
+LANGUAGE: bash
+CODE:
+pnpm dev
+
+LANGUAGE: bash
+CODE:
+curl --request POST \
+--url http://localhost:3000/research \
+--header 'Content-Type: application/json' \
+--data '{
+   "query": "Advancements in renewable energy storage",
+   "depth": 1,
+   "breadth": 1
+}'
+
+----------------------------------------
+
+TITLE: Listing Current File State in Motia
+DESCRIPTION: The 'state list' command displays the current file state in your Motia project.
+
+LANGUAGE: bash
+CODE:
+npx motia state list
+
+----------------------------------------
+
+TITLE: Cloning and Installing AI Deep Research Agent
+DESCRIPTION: Commands to clone the repository and install dependencies for the AI Deep Research Agent project.
+
+LANGUAGE: bash
+CODE:
+git clone https://github.com/MotiaDev/motia-examples
+cd examples/ai-deep-research-agent
+
+pnpm install
+# or
+npm install
+
+----------------------------------------
+
+TITLE: Enabling Debug Logging for Motia Development Server
+DESCRIPTION: Use the '--debug' flag with the 'dev' command to enable detailed debug logging output.
+
+LANGUAGE: bash
+CODE:
+npx motia dev --debug
+
+----------------------------------------
+
+TITLE: Testing Motia Step with cURL
+DESCRIPTION: A cURL command to test a Motia step by sending a POST request to the local development server. This example is for the default template.
+
+LANGUAGE: bash
+CODE:
+curl -X POST http://localhost:3000/default \
+-H "Content-Type: application/json" \
+-d '{}'
+
+----------------------------------------
+
+TITLE: Deploying Motia Workflow Using CLI Basic Command
+DESCRIPTION: Basic CLI command for deploying Motia workflows with required parameters including API key, environment selection, and version specification.
+
+LANGUAGE: bash
+CODE:
+motia deploy --api-key <api-key> --environment <environment> --version <version>
+
+----------------------------------------
+
+TITLE: Deploying Motia Workflow to Development Environment
+DESCRIPTION: Example command for deploying to development environment using only the API key, allowing for automatic version generation.
+
+LANGUAGE: bash
+CODE:
+motia deploy --api-key your-api-key-here
+
+----------------------------------------
+
+TITLE: Rendering Card Component for Motia Examples in JSX
+DESCRIPTION: This code snippet demonstrates the use of a Card component within a Cards container to display an example for sentiment analysis in Motia. It includes a title, description, and link to the full documentation.
+
+LANGUAGE: jsx
+CODE:
+<Cards>
+  <Card
+    title="Sentiment Analysis"
+    href="/docs/examples/sentiment-analysis"
+    description="Sometimes you don't just want a simple \"prompt => response.\" Instead, you want the LLM to decide how to proceed A real-world example of a sentiment analysis flow"
+  />
+</Cards>
+
+----------------------------------------
+
+TITLE: Deploying Motia Steps to Deployment Service
+DESCRIPTION: Use the 'deploy' command to upload built steps to the Motia deployment service. Requires an API key and allows specifying environment and version.
+
+LANGUAGE: bash
+CODE:
+npx motia deploy [options]
+
+----------------------------------------
+
+TITLE: Installing Dependencies with Package Manager
+DESCRIPTION: Commands for cloning the repository and installing project dependencies using either pnpm or npm.
+
+LANGUAGE: bash
+CODE:
+git clone https://github.com/MotiaDev/motia-examples
+cd examples/finance-agent
+
+pnpm install
+# or
+npm install
+
+----------------------------------------
+
+TITLE: Listing Available Motia Project Templates
+DESCRIPTION: The 'templates' command displays all available project templates for Motia.
+
+LANGUAGE: bash
+CODE:
+npx motia templates
+
+----------------------------------------
+
+TITLE: Environment Configuration
+DESCRIPTION: Environment variable setup for API keys required by the application including Alpha Vantage, SerperDev, and OpenAI.
+
+LANGUAGE: env
+CODE:
+ALPHA_VANTAGE_API_KEY=your_alpha_vantage_api_key_here
+SERPER_API_KEY=your_serper_api_key_here
+OPENAI_API_KEY=your_openai_api_key_here
+
+----------------------------------------
+
+TITLE: Setting Up Basic Robots.txt Configuration for motia.dev
+DESCRIPTION: Configures universal crawler access permissions, specifies the host domain as motia.dev, and declares the location of the XML sitemap for search engine crawlers.
+
+LANGUAGE: robotstxt
+CODE:
+# *
+User-agent: *
+Allow: /
+
+# Host
+Host: https://motia.dev
+
+# Sitemaps
+Sitemap: https://motia.dev/sitemap.xml
+
+----------------------------------------
+
+TITLE: Query API Endpoint Example
+DESCRIPTION: HTTP POST request format for the finance query endpoint with example request body and response.
+
+LANGUAGE: http
+CODE:
+POST /finance-query
+Content-Type: application/json
+
+{
+  "query": "Latest information about AAPL and MSFT"
+}
+
+----------------------------------------
+
+TITLE: Results API Endpoint Example
+DESCRIPTION: HTTP GET request format for retrieving analysis results with example response structure.
+
+LANGUAGE: http
+CODE:
+GET /finance-result/:traceId
+
+----------------------------------------
+
+TITLE: Running Development Server
+DESCRIPTION: Command to start the development server and example curl command for testing the API.
+
+LANGUAGE: bash
+CODE:
+pnpm dev
+
+curl -X POST http://localhost:3000/finance-query \
+  -H "Content-Type: application/json" \
+  -d '{"query": "Latest information about AAPL and MSFT"}'
+
+----------------------------------------
+
+TITLE: Configuring Environment Variables for GitHub Integration
+DESCRIPTION: Example of environment variables to be set in the .env file, including GitHub token and OpenAI API key for the integration workflow.
+
+LANGUAGE: env
+CODE:
+GITHUB_TOKEN=your_github_token_here
+OPENAI_API_KEY=your_openai_api_key
+
+----------------------------------------
+
+TITLE: Cloning Trello Automation Repository
+DESCRIPTION: Commands to clone the GitHub repository containing the Trello automation project and navigate to the correct directory.
+
+LANGUAGE: bash
+CODE:
+git clone git@github.com:MotiaDev/motia-examples.git
+cd examples/trello-flow
+
+----------------------------------------
+
+TITLE: Installing Dependencies for Trello Automation
+DESCRIPTION: Command to install the necessary dependencies for the Trello automation project using pnpm package manager.
+
+LANGUAGE: bash
+CODE:
+pnpm install
+
+----------------------------------------
+
+TITLE: Copying Environment Variables Template
+DESCRIPTION: Command to create a new .env file by copying the example template for configuring environment variables.
+
+LANGUAGE: bash
+CODE:
+cp .env.example .env
+
+----------------------------------------
+
+TITLE: Configuring Environment Variables for Trello Automation
+DESCRIPTION: Sample .env file content showing the required environment variables for the Trello automation system, including API keys, tokens, and list IDs.
+
+LANGUAGE: env
+CODE:
+TRELLO_API_KEY=your_trello_api_key
+TRELLO_TOKEN=your_trello_token
+
+OPENAI_API_KEY=your_openai_api_key
+OPENAI_MODEL=your_openai_model
+
+SLACK_WEBHOOK_URL=your_slack_webhook_url
+
+TRELLO_NEW_TASKS_LIST_ID=your_new_tasks_list_id
+TRELLO_IN_PROGRESS_LIST_ID=your_in_progress_list_id
+TRELLO_NEEDS_REVIEW_LIST_ID=your_needs_review_list_id
+TRELLO_COMPLETED_LIST_ID=your_completed_list_id
+
+----------------------------------------
+
+TITLE: Configuring Environment Variables for AI Deep Research Agent
+DESCRIPTION: Instructions for setting up environment variables, including API keys for OpenAI and Firecrawl.
+
+LANGUAGE: bash
+CODE:
+cp .env.example .env
+
+LANGUAGE: env
+CODE:
+# Required
+OPENAI_API_KEY=your-openai-api-key-here
+FIRECRAWL_API_KEY=your-firecrawl-api-key-here
+
+# Optional
+# OPENAI_MODEL=gpt-4o
+# FIRECRAWL_BASE_URL=http://your-firecrawl-instance-url
+
+----------------------------------------
+
+TITLE: Event Topic Pattern
+DESCRIPTION: Examples of event topic naming patterns used in Motia workflows
+
+LANGUAGE: plaintext
+CODE:
+feedback.in
+sentiment.out
+issues.found
+
+----------------------------------------
+
+TITLE: API Step Definition in TypeScript
+DESCRIPTION: Shows how to configure an API step with route configuration and request handling
+
+LANGUAGE: typescript
+CODE:
+import { ApiRouteConfig, StepHandler } from 'motia'
+import { z } from 'zod'
+
+export const config: ApiRouteConfig = {
+  type: 'api',
+  name: 'Test state api trigger',
+  description: 'test state',
+  path: '/test-state',
+  method: 'POST',
+  emits: ['test-state'],
+  bodySchema: z.object({}),
+  flows: ['test-state'],
+}
+
+export const handler: StepHandler<typeof config> = async (req, { logger, emit }) => {
+  logger.info('[Test State] Received request', req)
+
+  await emit({
+    topic: 'test-state',
+    data: req.body
+  })
+
+  return {
+    status: 200,
+    body: { message: 'Success' },
+  }
+}
+
+----------------------------------------
+
+TITLE: Starting Next.js Development Server
+DESCRIPTION: Commands to start the Next.js development server using different package managers (npm, pnpm, or yarn). After running these commands, the application will be available at http://localhost:3000.
+
+LANGUAGE: bash
+CODE:
+npm run dev
+# or
+pnpm dev
+# or
+yarn dev
+
+----------------------------------------
+
+TITLE: Installing Motia for JavaScript/TypeScript
+DESCRIPTION: Commands for installing Motia using npm, yarn, or pnpm package managers.
+
+LANGUAGE: sh
+CODE:
+npm install motia
+# or
+yarn add motia
+# or
+pnpm add motia
+
+----------------------------------------
+
+TITLE: Starting Motia Development Server
+DESCRIPTION: Command to start the Motia development server, which launches the server and Workbench UI for workflow visualization.
+
+LANGUAGE: bash
+CODE:
+pnpm run dev
+
+----------------------------------------
+
+TITLE: Emitting Motia Event with CLI
+DESCRIPTION: Command to emit an event using the Motia CLI, useful for triggering event-based steps in a workflow.
+
+LANGUAGE: bash
+CODE:
+npx motia emit --topic test-state --message '{}'
+
+----------------------------------------
+
+TITLE: Initializing Motia Project
+DESCRIPTION: CLI command to initialize a new Motia project in the current directory.
+
+LANGUAGE: sh
+CODE:
+motia init
+
+----------------------------------------
+
+TITLE: Accessing Motia CLI Help
+DESCRIPTION: Command to access help information for specific Motia CLI commands.
+
+LANGUAGE: sh
+CODE:
+motia <command> --help
+
+----------------------------------------
+
+TITLE: Specifying modulegraph Package Dependency
+DESCRIPTION: Defines a dependency requirement for the modulegraph package with a minimum version of 0.17.1. Uses standard pip requirements.txt format.
+
+LANGUAGE: txt
+CODE:
+modulegraph>=0.17.1
+
+----------------------------------------
+
+TITLE: Configuring and Handling Default API Route in Motia (TypeScript)
+DESCRIPTION: This snippet defines an API route configuration and handler for the Motia framework. It sets up a POST endpoint at '/default', validates input using Zod, emits a 'test-state' event, and returns a 200 status with a message.
+
+LANGUAGE: TypeScript
+CODE:
+import { ApiRouteConfig, StepHandler } from 'motia'
+import { z } from 'zod'
+
+const inputSchema = z.object({})
+
+export const config: ApiRouteConfig = {
+  type: 'api',
+  name: 'default flow api trigger',
+  description: 'default template api trigger',
+  path: '/default',
+  virtualSubscribes: ['/default'],
+  method: 'POST',
+  emits: ['test-state'],
+  bodySchema: inputSchema,
+  flows: ['default'],
+}
+
+export const handler: StepHandler<typeof config> = async (req, { logger, emit }) => {
+  logger.info('processing default flow api step', req)
+
+  await emit({
+    topic: 'test-state',
+    data: {},
+  })
+
+  return {
+    status: 200,
+    body: { message: 'test-state topic emitted' },
+  }
+}
+
+----------------------------------------
+
+TITLE: Configuring and Handling Motia Event for State Change
+DESCRIPTION: This snippet defines an event configuration and handler for the Motia framework. It sets up an event that modifies a test state and emits a check for state changes. The handler function logs a message, sets a value in the state, and emits an event to check the state change.
+
+LANGUAGE: TypeScript
+CODE:
+import { EventConfig, StepHandler } from 'motia'
+import { z } from 'zod'
+
+type Input = typeof inputSchema
+
+const inputSchema = z.object({})
+
+export const config: EventConfig<Input> = {
+  type: 'event',
+  name: 'Set state change',
+  description: 'set a state change for evaluation',
+  subscribes: ['test-state'],
+  emits: ['check-state-change'],
+  input: inputSchema,
+  flows: ['default'],
+}
+
+export const handler: StepHandler<typeof config> = async (input, { traceId, logger, state, emit }) => {
+  logger.info('step one, set a value in state')
+
+  const message = 'welcome to motia!';
+  await state.set<any>(traceId, 'test', message)
+
+  await emit({
+    topic: 'check-state-change',
+    data: {key: 'test', expected: message}
+  })
+}
+
+----------------------------------------
+
+TITLE: State Change Verification Handler Implementation
+DESCRIPTION: Implements the event handler that compares expected state values with actual values. Includes logging for successful and failed verifications, using the state management system.
+
+LANGUAGE: typescript
+CODE:
+export const handler: StepHandler<typeof config> = async (input, { traceId, logger, state }) => {
+  logger.info('received check-state-change event', input)
+
+  const value = await state.get<any>(traceId, input.key)
+
+  if (value !== input.expected) {
+    logger.error(`🔴 the provided  value for the state key ${input.key} does not match`, { value, expected: input.expected })
+  } else {
+    logger.info(`🟢 the provided value matches the state value for key ${input.key} 🏁`)
+  }
+}
+
+----------------------------------------
+
+TITLE: Configuring API Endpoint Settings in Python
+DESCRIPTION: This snippet defines a configuration dictionary for an API endpoint. It includes placeholders for step name, description, path, HTTP method, emits, and flows. These placeholders are likely to be replaced with actual values during deployment or runtime.
+
+LANGUAGE: python
+CODE:
+config = {
+    "type": "api",
+    "name": "{{STEP_NAME}}",
+    "description": "{{DESCRIPTION}}",
+    "path": "{{PATH}}",
+    "method": "{{METHOD}}",
+    "emits": {{EMITS}},
+    "flows": {{FLOWS}}
+}
+
+----------------------------------------
+
+TITLE: Initializing Motia Step Configuration Template in JavaScript
+DESCRIPTION: Defines a configuration object template for Motia steps with placeholder values for name, description, virtual events, and flows. Uses double curly brace notation for template variables that will be replaced during processing.
+
+LANGUAGE: javascript
+CODE:
+config = {
+    "type": "noop",
+    "name": "{{STEP_NAME}}",
+    "description": "{{DESCRIPTION}}",
+    "virtualEmits": {{VIRTUAL_EMITS}},
+    "virtualSubscribes": {{VIRTUAL_SUBSCRIBES}},
+    "flows": {{FLOWS}}
+}
+
+----------------------------------------
+
+TITLE: Implementing Cron Job Handler in Ruby
+DESCRIPTION: Handler function that executes the cron job logic. Includes logging and a commented example of event emission. Designed to be customized with specific business logic.
+
+LANGUAGE: ruby
+CODE:
+def handler(context)
+  context.logger.info('Running {{STEP_NAME}} cron job')
+
+  # Add your cron logic here
+  
+  # Example emit
+  # context.emit({
+  #   topic: 'event-type',
+  #   data: {}
+  # })
+end
+
+----------------------------------------
+
+TITLE: Defining Python Package Dependencies
+DESCRIPTION: Specifies exact versions of required Python packages: anthropic v0.31.2 and vision-agent v0.2.222. These version constraints ensure reproducible environments.
+
+LANGUAGE: plaintext
+CODE:
+anthropic==0.31.2
+vision-agent==0.2.222

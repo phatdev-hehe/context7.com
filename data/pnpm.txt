@@ -1,0 +1,4135 @@
+TITLE: Implementing readPackage Hook in JavaScript
+DESCRIPTION: Example of using the readPackage hook to modify the manifest of a specific package during installation. This hook allows customization of package dependencies.
+
+LANGUAGE: javascript
+CODE:
+const { installPkgs } = require('@pnpm/core')
+
+installPkgs({
+  hooks: {readPackage}
+})
+
+function readPackage (pkg) {
+  if (pkg.name === 'foo') {
+    pkg.dependencies = {
+      bar: '^2.0.0',
+    }
+  }
+  return pkg
+}
+
+----------------------------------------
+
+TITLE: Getting PNPM Configuration in TypeScript
+DESCRIPTION: Example showing how to import and use the getConfig function to retrieve pnpm configuration options. The function returns a promise that resolves to the configuration object.
+
+LANGUAGE: typescript
+CODE:
+import { getConfig } from '@pnpm/config'
+
+getConfig().then(pnpmConfig => console.log(pnpmConfig))
+
+----------------------------------------
+
+TITLE: Creating Package Dependency Graph with @pnpm/workspace.pkgs-graph
+DESCRIPTION: Example demonstrating how to create a dependency graph from an array of package objects. Shows creation of a graph structure for two packages 'foo' and 'bar' where foo depends on bar.
+
+LANGUAGE: javascript
+CODE:
+import createPkgsGraph from 'pkgs-graph'
+
+const {graph} = createPkgsGraph([
+  {
+    dir: '/home/zkochan/src/foo',
+    manifest: {
+      name: 'foo',
+      version: '1.0.0',
+      dependencies: {
+        bar: '^1.0.0',
+      },
+    },
+  },
+  {
+    dir: '/home/zkochan/src/bar',
+    manifest: {
+      name: 'bar',
+      version: '1.1.0',
+    },
+  }
+])
+
+console.log(graph)
+//> {
+//    '/home/zkochan/src/foo': {
+//      dependencies: ['/home/zkochan/src/bar'],
+//      manifest: {
+//        name: 'foo',
+//        version: '1.0.0',
+//        dependencies: {
+//          bar: '^1.0.0',
+//        },
+//      },
+//    },
+//    '/home/zkochan/src/bar': {
+//      dependencies: [],
+//      manifest: {
+//        name: 'bar',
+//        version: '1.1.0',
+//      },
+//    },
+//  }
+
+----------------------------------------
+
+TITLE: Installing Dependencies with pnpm
+DESCRIPTION: Basic command to install project dependencies using pnpm package manager. This replaces the equivalent npm or Yarn install commands.
+
+LANGUAGE: bash
+CODE:
+pnpm install
+
+----------------------------------------
+
+TITLE: Reading and Writing PNPM Modules Configuration
+DESCRIPTION: Example showing how to use the read and write functions to interact with the modules.yaml file. Demonstrates writing a configuration with hoisting settings, layout version, and store directory, then reading it back.
+
+LANGUAGE: typescript
+CODE:
+import {write, read} from '@pnpm/modules-yaml'
+
+await write('node_modules', {
+  hoistedAliases: {},
+  layoutVersion: 1,
+  packageManager: 'pnpm@1.0.0',
+  pendingBuilds: [],
+  shamefullyFlatten: false,
+  skipped: [],
+  storeDir: '/home/user/.pnpm-store',
+})
+
+const modulesYaml = await read(`node_modules`)
+
+----------------------------------------
+
+TITLE: Creating a pnpm-compatible fetcher using TypeScript
+DESCRIPTION: Template for implementing a fetcher function using types from @pnpm/fetcher-base. It demonstrates the structure and required imports for a basic fetcher implementation.
+
+LANGUAGE: typescript
+CODE:
+import { Resolution } from '@pnpm/resolver-base'
+import {
+  FetchOptions,
+  FetchResult,
+} from '@pnpm/fetcher-base'
+
+export async function demoFetcher (
+  resolution: Resolution,
+  targetFolder: string,
+  opts: FetchOptions,
+): Promise<FetchResult> {
+  // ...
+  return {
+    filesIndex,
+    tempLocation,
+  }
+}
+
+----------------------------------------
+
+TITLE: Reading Project Manifest with TypeScript
+DESCRIPTION: Example showing how to import and use the readProjectManifest function to read a project's package.json file. Returns both the manifest contents and the filename.
+
+LANGUAGE: typescript
+CODE:
+import { readProjectManifest } from '@pnpm/read-project-manifest'
+
+const { manifest, fileName } = await readProjectManifest(process.cwd())
+
+----------------------------------------
+
+TITLE: Using pnpm Lifecycle Hooks
+DESCRIPTION: Example demonstrating how to use runLifecycleHook for specific hooks and runPostinstallHooks for all install hooks. Shows configuration of package paths and options for hook execution.
+
+LANGUAGE: typescript
+CODE:
+import runLifecycleHook, {runPostinstallHooks} from '@pnpm/lifecycle'
+
+const targetPkgRoot = path.resolve('node_modules/target-pkg')
+const pkg = require(path.join(targetPkgRoot, 'package.json'))
+
+// Run a specific hook
+await runLifecycleHook('preinstall', pkg, {
+  pkgId: 'target-pkg/1.0.0',
+  pkgRoot: targetPkgRoot,
+  rawConfig: {},
+  rootModulesDir: path.resolve('node_modules'),
+  unsafePerm: true,
+})
+
+// Run all install hooks
+await runPostinstallHooks({
+  pkgId: 'target-pkg/1.0.0',
+  pkgRoot: targetPkgRoot,
+  rawConfig: {},
+  rootModulesDir: path.resolve('node_modules'),
+  unsafePerm: true,
+})
+
+----------------------------------------
+
+TITLE: Using findPackages to Discover Package Directories
+DESCRIPTION: Example demonstrating how to use the findPkgs function to search for packages in a directory. Shows basic usage with promise-based API and handling of results/errors. Returns package information including path, manifest, and manifest writing function.
+
+LANGUAGE: javascript
+CODE:
+const path = require('path')
+const findPkgs = require('@pnpm/fs.find-packages')
+
+findPkgs(path.join(__dirname, 'test', 'fixture'))
+  .then(pkgs => console.log(pkgs))
+  .catch(err => console.error(err))
+  //> [ { path: '/home/zkochan/src/find-packages/test/fixture/pkg',
+  //      manifest: { name: 'foo', version: '1.0.0' },
+  //      writeProjectManifest: [AsyncFunction] } ]
+
+----------------------------------------
+
+TITLE: Using @pnpm/link-bins in TypeScript
+DESCRIPTION: This snippet demonstrates how to import and use the linkBins and linkBinsOfPackages functions from @pnpm/link-bins. It shows linking bins for an entire node_modules directory and for specific packages.
+
+LANGUAGE: typescript
+CODE:
+import linkBins, {linkBinsOfPackages} from '@pnpm/link-bins'
+
+function warn (msg) { console.warn(msg) }
+
+await linkBins('node_modules', 'node_modules/.bin', {warn})
+
+const packages = [{manifest: packageJson, location: pathToPackage}]
+await linkBinsOfPackages(packages, 'node_modules/.bin', {warn})
+
+----------------------------------------
+
+TITLE: Using @pnpm/dependency-path in JavaScript
+DESCRIPTION: Demonstrates various utility functions provided by the @pnpm/dependency-path package for handling package paths in pnpm's symlinked node_modules structure. Includes examples of isAbsolute, resolve, relative, refToAbsolute, refToRelative, and parse functions.
+
+LANGUAGE: javascript
+CODE:
+const dependencyPath = require('@pnpm/dependency-path')
+
+const registry = 'https://registry.npmjs.org/'
+
+console.log(dependencyPath.isAbsolute('/foo/1.0.0'))
+//> false
+
+// it is confusing currently because relative starts with /.
+// It will be changed in the future to vice versa
+console.log(dependencyPath.resolve(registry, '/foo/1.0.0'))
+//> registry.npmjs.org/foo/1.0.0
+
+console.log(dependencyPath.relative(registry, 'registry.npmjs.org/foo/1.0.0'))
+//> /foo/1.0.0
+
+console.log(dependencyPath.refToAbsolute('1.0.1', 'foo', registry))
+//> registry.npmjs.org/foo/1.0.1
+
+console.log(dependencyPath.refToAbsolute('github.com/foo/bar/twe0jger043t0ew', 'foo', registry))
+//> github.com/foo/bar/twe0jger043t0ew
+
+console.log(dependencyPath.refToRelative('1.0.1', 'foo', registry))
+//> /foo/1.0.1
+
+console.log(dependencyPath.parse('/foo/2.0.0'))
+//> { isAbsolute: false, name: 'foo', version: '2.0.0' }
+
+----------------------------------------
+
+TITLE: Using graphSequencer function in TypeScript
+DESCRIPTION: Example usage of the graphSequencer function to analyze a dependency graph. It demonstrates how to create a graph using a Map, provide a list of nodes, and interpret the result which includes safety status, chunks, and cycles.
+
+LANGUAGE: typescript
+CODE:
+expect(graphSequencer(new Map([
+  [0, [1]],
+  [1, [2]],
+  [2, [3]],
+  [3, [0]],
+]), [0, 1, 2, 3])).toStrictEqual(
+  {
+    safe: false,
+    chunks: [[0, 1, 2, 3]],
+    cycles: [[0, 1, 2, 3]],
+  }
+)
+
+----------------------------------------
+
+TITLE: Configuring tsconfig.json for pnpm projects
+DESCRIPTION: JSON configuration to extend @pnpm/tsconfig in a project's tsconfig.json file. This allows projects to inherit pnpm's TypeScript configuration.
+
+LANGUAGE: json
+CODE:
+{
+  "extends": "@pnpm/tsconfig"
+}
+
+----------------------------------------
+
+TITLE: Using whichVersionIsPinned Function
+DESCRIPTION: Example showing how to use the whichVersionIsPinned function to determine which version component is pinned in a semver specification. Returns 'major' for caret ranges like '^1.0.0'.
+
+LANGUAGE: typescript
+CODE:
+import { whichVersionIsPinned } from '@pnpm/which-version-is-pinned'
+
+whichVersionIsPinned('^1.0.0')
+// major
+
+----------------------------------------
+
+TITLE: Defining StoreControllerOptions Interface in TypeScript for pnpm
+DESCRIPTION: This snippet defines the StoreControllerOptions interface, which specifies configuration options for the StoreController. It includes properties for store path, verifying store integrity, and various filesystem-related settings.
+
+LANGUAGE: TypeScript
+CODE:
+export interface StoreControllerOptions {
+  readonly networkConcurrency?: number
+  readonly fetcher?: FetcherType
+  readonly storeDir: string
+  readonly verifyStoreIntegrity?: boolean
+  readonly ignoreFile?: (filename: string) => boolean
+  readonly useServerInStore?: boolean
+  readonly disableRelinkLocalDirDeps?: boolean
+  readonly filesystemOverrides?: FilesystemOverrides
+  readonly rawConfig?: Record<string, string>
+}
+
+----------------------------------------
+
+TITLE: Creating Symlinks with symlinkDependency Function
+DESCRIPTION: Example showing how to use the symlinkDependency function to create a symbolic link from a source directory to a target node_modules directory. Returns an object indicating if an existing symlink was reused.
+
+LANGUAGE: typescript
+CODE:
+import { symlinkDependency } from '@pnpm/symlink-dependency'
+
+await symlinkDependency('/home/src/foo', '/home/src/my-project/node_modules', 'foo')
+//> { reused: false }
+
+----------------------------------------
+
+TITLE: Getting Current Git Branch Name
+DESCRIPTION: Example showing how to use getCurrentBranchName function from @pnpm/git-utils to retrieve the current git branch name asynchronously.
+
+LANGUAGE: javascript
+CODE:
+'use strict'
+const { getCurrentBranchName } = require('@pnpm-utils').default
+
+main()
+async function main() {
+  const branchName = await getCurrentBranch();
+  console.log(branchName)
+}
+
+----------------------------------------
+
+TITLE: Using PnpmError Class in TypeScript
+DESCRIPTION: Demonstrates how to import and use the PnpmError class to create custom PNPM errors with error codes. The error code is automatically prefixed with 'ERR_PNPM_' in the final output.
+
+LANGUAGE: typescript
+CODE:
+import { PnpmError } from '@pnpm/error'
+
+try {
+    throw new PnpmError('THE_ERROR_CODE', 'The error message')
+} catch (err: any) { // eslint-disable-line
+    console.log(err.code)
+    //> ERR_PNPM_THE_ERROR_CODE
+    console.log(err.message)
+    //> The error message
+}
+
+----------------------------------------
+
+TITLE: Using resolveFromLocal function in JavaScript
+DESCRIPTION: Demonstrates how to use the resolveFromLocal function from @pnpm/local-resolver to resolve a local package. It shows the function call and the expected output structure.
+
+LANGUAGE: javascript
+CODE:
+'use strict'
+const resolveFromLocal = require('@pnpm/local-resolver').default
+
+resolveFromLocal({pref: './example-package'}, {prefix: process.cwd()})
+  .then(resolveResult => console.log(resolveResult))
+//> { id: 'link:example-package',
+//    normalizedPref: 'link:example-package',
+//    package:
+//     { name: 'foo',
+//       version: '1.0.0',
+//       readme: '# foo\n',
+//       readmeFilename: 'README.md',
+//       description: '',
+//       _id: 'foo@1.0.0' },
+//    resolution: { directory: 'example-package', type: 'directory' }
+//    resolvedVia: 'local-filesystem' }
+
+----------------------------------------
+
+TITLE: Using packlist function in JavaScript
+DESCRIPTION: Example of how to use the packlist function from @pnpm/fs.packlist to generate a list of files from a package directory.
+
+LANGUAGE: javascript
+CODE:
+const { packlist } = require('@pnpm/fs.packlist')
+
+const files = packlist('/package-dir')
+
+----------------------------------------
+
+TITLE: Using PackageManifest Type Definition
+DESCRIPTION: Example showing how to import and use the PackageManifest type from @pnpm/types to type a package configuration object.
+
+LANGUAGE: typescript
+CODE:
+import { PackageManifest } from '@pnpm/types'
+
+const pkg: PackageManifest = {
+  name: 'foo',
+  version: '1.0.0',
+}
+
+----------------------------------------
+
+TITLE: Using PNPM Logger with TypeScript
+DESCRIPTION: Example showing how to import and use the logger with stream parsing functionality. Demonstrates basic logging and event listening for log messages.
+
+LANGUAGE: typescript
+CODE:
+import logger, {streamParser} from '@pnpm/logger'
+
+logger.debug({ foo: 'bar' })
+
+streamParser.on('data', msg => {
+  // ...
+})
+
+----------------------------------------
+
+TITLE: Implementing TestIpcServer in TypeScript
+DESCRIPTION: Example test implementation using TestIpcServer to verify script execution. Shows how to create a server instance, prepare test scripts, and verify output using Jest-style assertions.
+
+LANGUAGE: typescript
+CODE:
+import { prepare } from '@pnpm/prepare'
+import { createTestIpcServer } from '@pnpm/test-ipc-server'
+
+test('example test', async () => {
+  await using server = await createTestIpcServer()
+  prepare({
+    scripts: {
+      build: server.sendLineScript('this is a built script that should run'),
+    },
+  })
+
+  await execa('node', [pnpmBin, 'run', 'build'])
+
+  expect(server.getLines()).toStrictEqual(['this is a built script that should run'])
+})
+
+----------------------------------------
+
+TITLE: Using assertStore in TypeScript Tests
+DESCRIPTION: Example of how to use the assertStore function from @pnpm/assert-store in a TypeScript test file. It shows how to create a store assertion object and check if a specific package version exists in the store.
+
+LANGUAGE: typescript
+CODE:
+import test = require('tape')
+import { assertStore } from '@pnpm/assert-store'
+
+test('...', async t => {
+  // ...
+  const store = assertStore(t, pathToStore, encodedRegistryName)
+
+  await store.storeHas('is-positive', '3.1.0')
+  // Test fails if pnpm store does not have this package
+})
+
+----------------------------------------
+
+TITLE: Using NPM Resolver to Fetch Package Information
+DESCRIPTION: Example demonstrating how to create and use an npm resolver to fetch package information. Shows configuration of registry URL and handling of resolution results including package metadata, integrity hashes, and resolved URLs.
+
+LANGUAGE: javascript
+CODE:
+'use strict'
+const createResolveFromNpm = require('@pnpm/npm-resolver').default
+
+const resolveFromNpm = createResolveFromNpm({
+  store: '.store',
+  offline: false,
+  rawConfig: {
+    registry: 'https://registry.npmjs.org/',
+  },
+})
+
+resolveFromNpm({alias: 'is-positive', pref: '1.0.0'}, {
+  registry: 'https://registry.npmjs.org/',
+})
+.then(resolveResult => console.log(JSON.stringify(resolveResult, null, 2)))
+
+----------------------------------------
+
+TITLE: Installing pnpm CLI using curl
+DESCRIPTION: Downloads and executes the pnpm installation script using curl on macOS, Linux, or Windows Subsystem for Linux systems.
+
+LANGUAGE: bash
+CODE:
+curl -fsSL https://get.pnpm.io/install.sh | sh -
+
+----------------------------------------
+
+TITLE: Using PackageManifest Type from @pnpm/types in TypeScript
+DESCRIPTION: This example demonstrates how to import and use the PackageManifest type from the @pnpm/types package in a TypeScript file. It shows the creation of a basic package manifest object.
+
+LANGUAGE: typescript
+CODE:
+import { PackageManifest } from '@pnpm/types'
+
+const pkg: PackageManifest = {
+  name: 'foo',
+  version: '1.0.0',
+}
+
+----------------------------------------
+
+TITLE: Defining StoreController Interface in TypeScript for pnpm
+DESCRIPTION: This snippet defines the StoreController interface, which outlines the core functionality for managing packages in the pnpm store. It includes methods for fetching, importing, and removing packages, as well as handling temporary directories and file systems.
+
+LANGUAGE: TypeScript
+CODE:
+export interface StoreController {
+  readonly opts: StoreControllerOptions
+  fetch: FetchFunction
+  fetchFromRegistry: FetchFromRegistryFunction
+  importPackage (opts: ImportPackageOptions): Promise<ImportPackageResponse>
+  requestPackage (opts: RequestPackageOptions): Promise<RequestPackageResponse>
+  get tempdirs (): TemporaryDirectoryOptions
+  removePackage (opts: {
+    pkgId: string
+    filesIndexFile: string
+    prefix: string
+  }): Promise<void>
+  prune (): Promise<string[]>
+  hasPackage (opts: {
+    pkgId: string
+    prefix: string
+  }): Promise<boolean>
+  getFilesystemStatus? (opts: {
+    pkgId: string
+    prefix: string
+  }): Promise<FilesystemStatus>
+  tempFile? (opts: TemporaryFileOptions): Promise<ImportPackageResponse>
+}
+
+----------------------------------------
+
+TITLE: Implementing Custom pnpm Resolver
+DESCRIPTION: Template for implementing a custom dependency resolver using TypeScript types from @pnpm/resolver-base. Shows the basic structure including importing required types and implementing the resolver function that returns a ResolveResult.
+
+LANGUAGE: typescript
+CODE:
+import {
+  ResolveOptions,
+  ResolveResult,
+  WantedDependency,
+} from '@pnpm/resolver-base'
+
+export async function testResolver (
+  wantedDependency: WantedDependency,
+  opts: ResolveOptions,
+): Promise<ResolveResult> {
+  // ...
+  return {
+    id,
+    resolution,
+    package,
+    latest,
+    normalizedPref,
+  }
+}
+
+----------------------------------------
+
+TITLE: Version Support Matrix in Markdown
+DESCRIPTION: A markdown table showing the support status for different pnpm versions, including current supported versions (10.x, 9.x, 8.x) and end-of-life versions (7.x and below). Includes support end dates for version 9.x (April 2026) and 8.x (April 2025).
+
+LANGUAGE: markdown
+CODE:
+| Version | Supported          |
+| ------- | ------------------ |
+| 10.x  | :white_check_mark: |
+| 9.x   | :white_check_mark: till 2026 April 30 |
+| 8.x   | :white_check_mark: till 2025 April 30 |
+| <= 7.x   | :x:                |
+
+----------------------------------------
+
+TITLE: Fetching Packages to Store
+DESCRIPTION: Command to fetch all packages to the store before mounting, using lockfile-only mode to avoid modifying node_modules.
+
+LANGUAGE: bash
+CODE:
+pnpm install --lockfile-only
+
+----------------------------------------
+
+TITLE: Using parseOverrides function in TypeScript
+DESCRIPTION: This snippet demonstrates how to import and use the parseOverrides function from the @pnpm/parse-overrides module. It shows various override scenarios including version constraints, package renaming, and nested dependencies.
+
+LANGUAGE: typescript
+CODE:
+import { parseOverrides } from '@pnpm/parse-overrides'
+
+parseOverrides({
+  'foo': '^1.0.0',
+  'quux': 'npm:@myorg/quux@^1.0.0',
+  'bar@^2.1.0': '3.0.0',
+  'qar@1>zoo': '2',
+})
+// Returns an array of parsed overrides
+
+----------------------------------------
+
+TITLE: Defining Constants for pnpm Package Manager
+DESCRIPTION: This code snippet defines and exports various constants used in the pnpm package manager, including lockfile versions, store layouts, and supported Node.js versions. It also includes changelog entries for different versions of the @pnpm/constants package.
+
+LANGUAGE: markdown
+CODE:
+# @pnpm/constants
+
+## 1001.1.0
+
+### Minor Changes
+
+- 9a44e6c: `pnpm deploy` should inherit the `pnpm` object from the root `package.json` [#8991](https://github.com/pnpm/pnpm/pull/8991).
+
+## 1001.0.0
+
+### Major Changes
+
+- d2e83b0: Metadata directory version bumped to force fresh cache after we shipped a fix to the metadata write function. This change is backward compatible as install doesn't require a metadata cache.
+- a76da0c: Removed lockfile conversion from v6 to v9. If you need to convert lockfile v6 to v9, use pnpm CLI v9.
+
+## 10.0.0
+
+### Major Changes
+
+- 8108680: Changed the format of the side-effects cache key.
+- c4f5231: Store version bumped to v10. The new store layout has a different directory called "index" for storing the package content mappings. Previously these files were stored in the same directory where the package contents are (in "files"). The new store has also a new format for storing the mappings for side-effects cache.
+
+### Minor Changes
+
+- 19d5b51: Add `MANIFEST_BASE_NAMES`
+
+## 9.0.0
+
+### Major Changes
+
+- 83681da: Keep `libc` field in `clearMeta`.
+
+## 8.0.0
+
+### Major Changes
+
+- 43cdd87: Node.js v16 support dropped. Use at least Node.js v18.12.
+- d381a60: Support for lockfile v5 is dropped. Use pnpm v8 to convert lockfile v5 to lockfile v6 [#7470](https://github.com/pnpm/pnpm/pull/7470).
+
+### Minor Changes
+
+- c692f80: Bump lockfile to v6.1
+
+## 7.1.1
+
+### Patch Changes
+
+- 302ebffc5: Change lockfile version back to 6.0 as previous versions of pnpm fail to parse the version correctly.
+
+## 7.1.0
+
+### Minor Changes
+
+- 9c4ae87bd: Bump lockfile v6 version to v6.1.
+
+## 7.0.0
+
+### Major Changes
+
+- eceaa8b8b: Node.js 14 support dropped.
+
+## 6.2.0
+
+### Minor Changes
+
+- 3ebce5db7: Exported a constant for the new lockfile format version: `LOCKFILE_FORMAT_V6`.
+
+## 6.1.0
+
+### Minor Changes
+
+- 1267e4eff: Lockfile version bumped to 5.4
+
+## 6.0.0
+
+### Major Changes
+
+- 542014839: Node.js 12 is not supported.
+
+## 5.0.0
+
+### Major Changes
+
+- 6871d74b2: Bump lockfile version to 5.3.
+- 97b986fbc: Node.js 10 support is dropped. At least Node.js 12.17 is required for the package to work.
+- f2bb5cbeb: Bump layout version to 5.
+
+## 4.1.0
+
+### Minor Changes
+
+- fcdad632f: Bump lockfile version to 5.2
+
+## 4.0.0
+
+### Major Changes
+
+- b5f66c0f2: Reduce the number of directories in the virtual store directory. Don't create a subdirectory for the package version. Append the package version to the package name directory.
+- ca9f50844: Bump lockfile version to 5.2.
+- 4f5801b1c: Changing lockfile version back to 5.1
+
+## 4.0.0-alpha.1
+
+### Major Changes
+
+- ca9f50844: Bump lockfile version to 5.2.
+
+## 4.0.0-alpha.0
+
+### Major Changes
+
+- b5f66c0f2: Reduce the number of directories in the virtual store directory. Don't create a subdirectory for the package version. Append the package version to the package name directory.
+
+----------------------------------------
+
+TITLE: Mounting Modules Directory
+DESCRIPTION: Command to mount the node_modules directory using FUSE after packages are fetched to the store.
+
+LANGUAGE: bash
+CODE:
+mount-modules
+
+----------------------------------------
+
+TITLE: Initializing and Using Default Reporter in TypeScript
+DESCRIPTION: This snippet demonstrates how to import, initialize, and use the default reporter from @pnpm/default-reporter. It shows the setup of the reporter with a context and streamParser, and includes error handling.
+
+LANGUAGE: typescript
+CODE:
+import { streamParser } from '@pnpm/logger'
+import { initDefaultReporter } from '@pnpm/default-reporter'
+
+const stopReporting = initDefaultReporter({
+  context: {
+    argv: [],
+  },
+  streamParser,
+})
+
+try {
+  // calling some pnpm APIs
+} finally {
+  stopReporting()
+}
+
+----------------------------------------
+
+TITLE: Package.json Configuration for Multi-Architecture Support
+DESCRIPTION: Example configuration showing how to specify supported architectures for optional dependency installation in package.json. Demonstrates setting OS, CPU and LIBC preferences.
+
+LANGUAGE: json
+CODE:
+{
+  "pnpm": {
+    "supportedArchitectures": {
+      "os": ["win32", "darwin", "current"],
+      "cpu": ["x64", "arm64"]
+    }
+  }
+}
+
+----------------------------------------
+
+TITLE: Unmounting Modules Directory
+DESCRIPTION: Command to unmount the node_modules directory in case of issues or when access is no longer needed.
+
+LANGUAGE: bash
+CODE:
+unmount <path to node_modules>
+
+----------------------------------------
+
+TITLE: Using Pattern Matcher in TypeScript
+DESCRIPTION: Example demonstrating how to use the createMatcher function to match package names against glob patterns. The matcher returns true when the input string matches the specified pattern.
+
+LANGUAGE: typescript
+CODE:
+import { createMatcher } from '@pnpm/matcher'
+
+const match = createMatcher(['eslint-*'])
+match('eslint-plugin-foo')
+//> true
+
+----------------------------------------
+
+TITLE: Initializing CLI Configuration for pnpm
+DESCRIPTION: Loads and initializes the pnpm CLI configuration, including setting up the store directory and resolving project manifest.
+
+LANGUAGE: typescript
+CODE:
+export async function initConfigAndGetStoreDir(opts: Pick<Config, 'cliOptions' | 'packageManager'>) {
+  const cliOptions = opts.cliOptions ?? {}
+  const fullConfig = await getConfig({
+    ...opts,
+    cliOptions: {
+      ...cliOptions,
+      lockfileDir: cliOptions.lockfileDir ?? process.cwd(),
+      dir: cliOptions.dir ?? process.cwd(),
+    },
+  })
+  return fullConfig.storeDir!
+}
+
+----------------------------------------
+
+TITLE: Implementing pnpm Deploy Command
+DESCRIPTION: Defines the deploy command handler, which copies a project from a workspace and installs its production dependencies. It supports deploying workspace projects and handles various deployment scenarios.
+
+LANGUAGE: JavaScript
+CODE:
+// Code not provided in the snippet
+
+----------------------------------------
+
+TITLE: Using @pnpm/read-package-json in TypeScript
+DESCRIPTION: Example of how to import and use the readPackageJson function from @pnpm/read-package-json to read a package.json file.
+
+LANGUAGE: typescript
+CODE:
+import readPackageJson from '@pnpm/read-package-json'
+
+const pkgJson = await readPackageJson('package.json')
+
+----------------------------------------
+
+TITLE: Registry URL Normalization Update
+DESCRIPTION: Change in version 2.0.9 that modifies how registry URLs are normalized. Only adds trailing slash if the registry URL has no path. For example, 'https://registry.npmjs.org' becomes 'https://registry.npmjs.org/' but 'https://npm.pkg.github.com/owner' remains unchanged.
+
+LANGUAGE: markdown
+CODE:
+### Patch Changes
+- 30bfca967: When normalizing registry URLs, a trailing slash should only be added if the registry URL has no path.
+
+  So `https://registry.npmjs.org` is changed to `https://registry.npmjs.org/` but `https://npm.pkg.github.com/owner` is unchanged.
+
+  Related issue: [#4034](https://github.com/pnpm/pnpm/issues/4034).
+
+----------------------------------------
+
+TITLE: Adding New Configuration Options in pnpm
+DESCRIPTION: New configuration options are added to pnpm, including support for workspace settings in pnpm-workspace.yaml and improvements to patch handling.
+
+LANGUAGE: JavaScript
+CODE:
+- 9bcca9f: `pnpm config get` and `list` also show settings set in `pnpm-workspace.yaml` files [#9316](https://github.com/pnpm/pnpm/pull/9316).
+- 5b35dff: It should be possible to use env variables in `pnpm-workspace.yaml` setting names and value.
+- 9bcca9f: `pnpm config set --location=project` saves the setting to a `pnpm-workspace.yaml` file if no `.npmrc` file is present in the directory [#9316](https://github.com/pnpm/pnpm/pull/9316).
+- 5f7be64: Rename `pnpm.allowNonAppliedPatches` to `pnpm.allowUnusedPatches`. The old name is still supported but it would print a deprecation warning message.
+- 5f7be64: Add `pnpm.ignorePatchFailures` to manage whether pnpm would ignore patch application failures.
+
+----------------------------------------
+
+TITLE: Installing pnpm manifest utils package
+DESCRIPTION: Command to install the @pnpm/manifest-utils package using pnpm package manager
+
+LANGUAGE: bash
+CODE:
+pnpm i @pnpm/manifest-utils
+
+----------------------------------------
+
+TITLE: Resolving pnpm Store Path in TypeScript
+DESCRIPTION: Example demonstrating how to use the resolveStorePath function to determine the pnpm store location. Takes a project path and store name as input and returns the resolved store path.
+
+LANGUAGE: typescript
+CODE:
+import resolveStorePath from '@pnpm/store-path'
+
+await resolveStorePath('F:\\project', 'pnpm-store')
+//> F:\\pnpm-store\\2
+
+----------------------------------------
+
+TITLE: Markdown Changelog Entry v6.0.0
+DESCRIPTION: Major version update changing store index file structure for more efficient side effects caching.
+
+LANGUAGE: markdown
+CODE:
+## 6.0.0
+
+### Major Changes
+
+- 099e6af: Changed the structure of the index files in the store to store side effects cache information more efficiently. In the new version, side effects do not list all the files of the package but just the differences [#8636](https://github.com/pnpm/pnpm/pull/8636).
+
+----------------------------------------
+
+TITLE: Updating Dependency Resolution Behavior in pnpm
+DESCRIPTION: Changes to how pnpm resolves dependencies, including updates to workspace package linking and dependency deduplication.
+
+LANGUAGE: JavaScript
+CODE:
+- 936430a: Setting `workspace-concurrency` to less than or equal to 0 should work [#9297](https://github.com/pnpm/pnpm/issues/9297).
+- 6e4459c: `pnpm install --prod=false` should not crash, when executed in a project with a `pnpm-workspace.yaml` file [#9233](https://github.com/pnpm/pnpm/issues/9233). This fixes regression introduced via [#9211](https://github.com/pnpm/pnpm/pull/9211).
+- c3aa4d8: Don't ignore pnpm.patchedDependencies from `package.json` [#9226](https://github.com/pnpm/pnpm/issues/9226).
+
+----------------------------------------
+
+TITLE: Installing @pnpm/core and @pnpm/logger via pnpm
+DESCRIPTION: Commands to install the @pnpm/core package and its dependency @pnpm/logger using pnpm package manager.
+
+LANGUAGE: shell
+CODE:
+pnpm add @pnpm/core
+
+LANGUAGE: shell
+CODE:
+pnpm add @pnpm/logger@1
+
+----------------------------------------
+
+TITLE: Changelog Entries in Markdown
+DESCRIPTION: Structured changelog entries detailing version changes, including major version bumps for Node.js compatibility changes, new feature additions like fetch method options, timeout settings, and compression support.
+
+LANGUAGE: markdown
+CODE:
+# @pnpm/fetching-types
+
+## 1000.1.0
+
+### Minor Changes
+
+- b0f3c71: The `fetch` function accepts a `method` option now.
+
+## 6.0.0
+
+### Major Changes
+
+- 43cdd87: Node.js v16 support dropped. Use at least Node.js v18.12.
+
+## 5.0.0
+
+### Major Changes
+
+- eceaa8b8b: Node.js 14 support dropped.
+
+## 4.0.0
+
+### Major Changes
+
+- 804de211e: GetCredentials function replaced with GetAuthHeader.
+
+## 3.0.0
+
+### Major Changes
+
+- 542014839: Node.js 12 is not supported.
+
+## 2.2.1
+
+### Patch Changes
+
+- bab172385: The Node.js process should not silently exit on some broken HTTPS requests.
+
+## 2.2.0
+
+### Minor Changes
+
+- eadf0e505: New optional option added: compress.
+
+## 2.1.0
+
+### Minor Changes
+
+- 05baaa6e7: Add new option: timeout.
+
+## 2.0.0
+
+### Major Changes
+
+- 97b986fbc: Node.js 10 support is dropped. At least Node.js 12.17 is required for the package to work.
+
+## 1.0.0
+
+### Major Changes
+
+- 71aeb9a38: Initial version.
+
+----------------------------------------
+
+TITLE: Performance Optimization - Worker Count Reduction
+DESCRIPTION: Reduced maximum number of concurrent workers to 4 for optimal package linking performance from store, as file system operations don't benefit from higher CPU parallelization.
+
+LANGUAGE: markdown
+CODE:
+### Minor Changes
+- 2e05789: The max amount of workers running for linking packages from the store has been reduced to 4 to achieve optimal results [#9286]. The workers are performing many file system operations, so increasing the number of CPUs doesn't help performance after some point.
+
+----------------------------------------
+
+TITLE: Major Version 5.0.0 Changes
+DESCRIPTION: Documents significant changes to index file storage handling in the store, improving package identifier validation and side effects caching efficiency.
+
+LANGUAGE: markdown
+CODE:
+### Major Changes
+- d433cb9: Some registries allow identical content to be published under different package names or versions. Index files now stored using both content hash and package identifier
+- 099e6af: Changed structure of index files to store side effects cache information more efficiently
+
+----------------------------------------
+
+TITLE: Documenting Major Changes in Markdown
+DESCRIPTION: This snippet shows how major breaking changes are documented, including the version number, change type, and details of the breaking change.
+
+LANGUAGE: markdown
+CODE:
+## 5.0.0
+
+### Major Changes
+
+- 43cdd87: Node.js v16 support dropped. Use at least Node.js v18.12.
+
+----------------------------------------
+
+TITLE: Configuring Patched Dependencies with Version Ranges in YAML
+DESCRIPTION: Demonstrates how to patch dependencies using exact versions, version ranges, and package names in pnpm configuration. Version ranges allow applying different patches to different versions of the same package.
+
+LANGUAGE: yaml
+CODE:
+patchedDependencies:
+  foo: patches/foo-1.patch
+  foo@^2.0.0: patches/foo-2.patch
+  foo@2.1.0: patches/foo-3.patch
+
+----------------------------------------
+
+TITLE: Critical Bug Fixes in Version 4.0.1
+DESCRIPTION: Details fixes for file permission handling and temporary file race conditions in the store implementation.
+
+LANGUAGE: markdown
+CODE:
+### Patch Changes
+- db7ff76: Fixed executable permission checking logic
+- a1f4df2: Fixed race condition in temporary file creation by including worker thread ID
+
+----------------------------------------
+
+TITLE: Configuring Non-Overlapping Version Ranges for Patching in YAML
+DESCRIPTION: Illustrates how to properly configure non-overlapping version ranges when applying patches to different versions of a package. This approach ensures that specialized patches are applied to specific version ranges without conflicts.
+
+LANGUAGE: yaml
+CODE:
+# pnpm-workspace.yaml
+patchedDependencies:
+  # the specialized sub range
+  'foo@2.2.0-2.8.0': patches/foo.2.2.0-2.8.0.patch
+  # the more general patch, excluding the sub range above
+  'foo@>=2.0.0 <2.2.0 || >2.8.0': 'patches/foo.gte2.patch
+
+----------------------------------------
+
+TITLE: New sync-injected-deps-after-scripts setting
+DESCRIPTION: New setting for automatically syncing files of injected workspace packages after pnpm run
+
+LANGUAGE: ini
+CODE:
+sync-injected-deps-after-scripts[]=compile
+
+----------------------------------------
+
+TITLE: Non-overlapping Version Range Configuration in YAML
+DESCRIPTION: Shows how to properly configure non-overlapping version ranges when applying patches to different versions of a package. Includes example of specializing a sub-range while maintaining the general patch.
+
+LANGUAGE: yaml
+CODE:
+# pnpm-workspace.yaml
+patchedDependencies:
+  # the specialized sub range
+  'foo@2.2.0-2.8.0': patches/foo.2.2.0-2.8.0.patch
+  # the more general patch, excluding the sub range above
+  'foo@>=2.0.0 <2.2.0 || >2.8.0': 'patches/foo.gte2.patch
+
+----------------------------------------
+
+TITLE: Installing @pnpm/store.cafs package using pnpm
+DESCRIPTION: This command installs the @pnpm/store.cafs package using the pnpm package manager. It adds the package to the project's dependencies.
+
+LANGUAGE: sh
+CODE:
+pnpm add @pnpm/store.cafs
+
+----------------------------------------
+
+TITLE: Git Repository Subdirectory Installation Support
+DESCRIPTION: Adds support for installing packages from specific subdirectories within Git repositories using path parameter.
+
+LANGUAGE: markdown
+CODE:
+### Minor Changes
+- b13d2dc: It is now possible to install only a subdirectory from a Git repository.
+
+For example, `pnpm add github:user/repo#path:packages/foo` will add a dependency from the `packages/foo` subdirectory.
+
+This new parameter may be combined with other supported parameters separated by `&`. For instance, the next command will install the same package from the `dev` branch: `pnpm add github:user/repo#dev&path:packages/bar`.
+
+----------------------------------------
+
+TITLE: Configuring Audit Ignore Settings in package.json
+DESCRIPTION: Shows how to configure the audit settings to ignore specific vulnerabilities by their GHSA code in package.json
+
+LANGUAGE: json
+CODE:
+{
+  "pnpm": {
+    "auditConfig": {
+      "ignoreGhsas": [
+        "GHSA-42xw-2xvc-qx8m",
+        "GHSA-4w2v-q235-vp99",
+        "GHSA-cph5-m8f7-6c5x",
+        "GHSA-vh95-rmgr-6w4m"
+      ]
+    }
+  }
+}
+
+----------------------------------------
+
+TITLE: Installing Package Requester Dependencies with pnpm
+DESCRIPTION: Command to install the required dependencies (@pnpm/logger and @pnpm/package-requester) using pnpm package manager.
+
+LANGUAGE: sh
+CODE:
+pnpm add @pnpm/logger @pnpm/package-requester
+
+----------------------------------------
+
+TITLE: Updating Dependencies in Markdown
+DESCRIPTION: Updates dependencies and their versions in the changelog, including specific commit references.
+
+LANGUAGE: markdown
+CODE:
+## 1000.0.8
+
+### Patch Changes
+
+- Updated dependencies [3d52365]
+  - @pnpm/resolver-base@1000.2.0
+
+----------------------------------------
+
+TITLE: Configuring Non-Overlapping Version Range Patches in YAML
+DESCRIPTION: Example showing how to properly configure non-overlapping version ranges for patching dependencies. Demonstrates how to handle specialized sub-ranges and more general patches.
+
+LANGUAGE: yaml
+CODE:
+# pnpm-workspace.yaml
+patchedDependencies:
+  # the specialized sub range
+  'foo@2.2.0-2.8.0': patches/foo.2.2.0-2.8.0.patch
+  # the more general patch, excluding the sub range above
+  'foo@>=2.0.0 <2.2.0 || >2.8.0': 'patches/foo.gte2.patch
+
+----------------------------------------
+
+TITLE: Installing @pnpm/outdated Package using pnpm
+DESCRIPTION: This command installs the @pnpm/outdated package using the pnpm package manager. It adds the package to the project's dependencies.
+
+LANGUAGE: sh
+CODE:
+pnpm add @pnpm/outdated
+
+----------------------------------------
+
+TITLE: Configuring Configurational Dependencies in package.json
+DESCRIPTION: Demonstrates how to set up configurational dependencies that are installed before other dependency types. These dependencies cannot have their own dependencies or lifecycle scripts and require exact versions with integrity checksums.
+
+LANGUAGE: json
+CODE:
+{
+  "pnpm": {
+    "configDependencies": {
+      "my-configs": "1.0.0+sha512-30iZtAPgz+LTIYoeivqYo853f02jBYSd5uGnGpkFV0M3xOt9aN73erkgYAmZU43x4VfqcnLxW9Kpg3R5LC4YYw=="
+    }
+  }
+}
+
+----------------------------------------
+
+TITLE: Feature Addition - Virtual Store Directory Configuration
+DESCRIPTION: Adding new setting for configuring maximum length of virtual store directory paths
+
+LANGUAGE: markdown
+CODE:
+### Minor Changes
+- 9719a42: New setting called `virtual-store-dir-max-length` added to modify the maximum allowed length of the directories inside `node_modules/.pnpm`. The default length is set to 120 characters. This setting is particularly useful on Windows, where there is a limit to the maximum length of a file path [#7355]
+
+----------------------------------------
+
+TITLE: Package Scripts in package.json
+DESCRIPTION: Version history for @pnpm/package-requester module maintained by pnpm team. Includes major version releases, minor features, patches and dependency updates.
+
+LANGUAGE: markdown
+CODE:
+# @pnpm/package-requester
+
+## 1002.0.2
+
+### Patch Changes
+
+- Updated dependencies [5f7be64]
+- Updated dependencies [5f7be64] ...[truncated]
+
+----------------------------------------
+
+TITLE: Installing @pnpm/headless Package using pnpm
+DESCRIPTION: Command to install the @pnpm/headless package using the pnpm package manager. This package enables fast installation using only pnpm-lock.yaml.
+
+LANGUAGE: bash
+CODE:
+pnpm install @pnpm/headless
+
+----------------------------------------
+
+TITLE: Node Mirror Config Example
+DESCRIPTION: Example configuration for custom Node download mirror
+
+LANGUAGE: text
+CODE:
+node-mirror:release=https://nodejs.org/download/release/
+
+----------------------------------------
+
+TITLE: Configuring patched dependencies with version ranges
+DESCRIPTION: Example showing how to patch dependencies by version ranges in pnpm.yaml configuration. Version ranges can be specified to apply different patches to different versions of a package.
+
+LANGUAGE: yaml
+CODE:
+patchedDependencies:
+  foo: patches/foo-1.patch
+  foo@^2.0.0: patches/foo-2.patch
+  foo@2.1.0: patches/foo-3.patch
+
+----------------------------------------
+
+TITLE: Writing pnpm Lockfile in JavaScript
+DESCRIPTION: Function to write a pnpm lockfile to disk. Handles formatting and versioning of the lockfile content.
+
+LANGUAGE: JavaScript
+CODE:
+async function writeLockfiles(lockfile, opts) {
+  const { fileName, throwOnConvertionProblems } = opts
+  const dir = opts.dir ?? opts.lockfileDir
+  const normalizedLockfile = normalizeLockfile(lockfile)
+  const yaml = stringifyLockfile(normalizedLockfile)
+  await writeFileAtomically(path.join(dir, fileName), yaml)
+}
+
+----------------------------------------
+
+TITLE: Windows x64 Architecture Configuration
+DESCRIPTION: Minimal configuration example for specifying Windows x64 as the target architecture for optional dependencies.
+
+LANGUAGE: json
+CODE:
+{
+  "pnpm": {
+    "supportedArchitectures": {
+      "os": ["win32"],
+      "cpu": ["x64"]
+    }
+  }
+}
+
+----------------------------------------
+
+TITLE: Rename Patch Configuration Setting
+DESCRIPTION: Changes the pnpm.allowNonAppliedPatches setting to pnpm.allowUnusedPatches with backward compatibility and deprecation warning.
+
+LANGUAGE: javascript
+CODE:
+pnpm.allowNonAppliedPatches // old name (deprecated)
+pnpm.allowUnusedPatches // new name
+
+----------------------------------------
+
+TITLE: Configuring Version-Specific and Range-Based Patching in YAML
+DESCRIPTION: Demonstrates how to configure patched dependencies using exact versions, version ranges, and name-only patterns in pnpm. This snippet shows the hierarchy of patch application and how to specify different patches for different versions of a package.
+
+LANGUAGE: yaml
+CODE:
+patchedDependencies:
+  foo: patches/foo-1.patch
+  foo@^2.0.0: patches/foo-2.patch
+  foo@2.1.0: patches/foo-3.patch
+
+----------------------------------------
+
+TITLE: Configuring Patched Dependencies in YAML
+DESCRIPTION: Example showing how to specify patched dependencies with version ranges in pnpm configuration. Exact versions override version ranges, which override name-only patches.
+
+LANGUAGE: yaml
+CODE:
+patchedDependencies:
+  foo: patches/foo-1.patch
+  foo@^2.0.0: patches/foo-2.patch
+  foo@2.1.0: patches/foo-3.patch
+
+----------------------------------------
+
+TITLE: Major Update to pnpm NPM Resolver
+DESCRIPTION: Implements a major change to the @pnpm/npm-resolver package, adding support for returning 'workspace' in the resolvedVia field of results.
+
+LANGUAGE: markdown
+CODE:
+## 1001.0.0
+
+### Major Changes
+
+- 3d52365: The `@pnpm/npm-resolver` package can now return `workspace` in the `resolvedVia` field of its results. This will be the case if the resolved package was requested through the `workspace:` protocol or if the wanted dependency's name and specifier match a package in the workspace. Previously, the `resolvedVia` field was always set to `local-filesystem` for workspace packages.
+
+### Patch Changes
+
+- Updated dependencies [3d52365]
+  - @pnpm/resolver-base@1000.2.0
+  - @pnpm/crypto.hash@1000.1.1
+
+----------------------------------------
+
+TITLE: Add Patch Failure Configuration
+DESCRIPTION: Adds pnpm.ignorePatchFailures setting to control how patch application failures are handled for different patch types.
+
+LANGUAGE: javascript
+CODE:
+{
+  ignorePatchFailures: undefined, // throw on exact version failures, ignore name-only
+  ignorePatchFailures: false, // throw on all failures
+  ignorePatchFailures: true // warn on all failures
+}
+
+----------------------------------------
+
+TITLE: Configuring Version-Specific Dependency Patches in YAML
+DESCRIPTION: Example configuration showing how to patch different versions of a dependency using exact versions and version ranges. The example demonstrates patch hierarchy where exact versions override version ranges.
+
+LANGUAGE: yaml
+CODE:
+patchedDependencies:
+  foo: patches/foo-1.patch
+  foo@^2.0.0: patches/foo-2.patch
+  foo@2.1.0: patches/foo-3.patch
+
+----------------------------------------
+
+TITLE: Audit Config - Configuring GHSA Ignores
+DESCRIPTION: Added new setting in package.json to allow ignoring vulnerabilities by their GHSA code via pnpm.auditConfig.ignoreGhsas
+
+LANGUAGE: JSON
+CODE:
+{
+  "pnpm": {
+    "auditConfig": {
+      "ignoreGhsas": [
+        "GHSA-42xw-2xvc-qx8m",
+        "GHSA-4w2v-q235-vp99",
+        "GHSA-cph5-m8f7-6c5x",
+        "GHSA-vh95-rmgr-6w4m"
+      ]
+    }
+  }
+}
+
+----------------------------------------
+
+TITLE: Support Version-Agnostic Package Patching
+DESCRIPTION: Allows applying patches to all versions of a package using just the package name, with failure handling based on exact vs name-only patches.
+
+LANGUAGE: javascript
+CODE:
+{
+  patchedDependencies: {
+    "pkg": "patch-file", // apply to all versions
+    "pkg@1.0.0": "patch-file" // apply to exact version only
+  }
+}
+
+----------------------------------------
+
+TITLE: Changelog Entry Documenting Major Changes in Markdown
+DESCRIPTION: Documents major version changes, dependency updates, and bug fixes for the @pnpm/error package, including dropped Node.js version support and new error handling features.
+
+LANGUAGE: markdown
+CODE:
+# @pnpm/error
+
+## 1000.0.2
+
+### Patch Changes
+
+- Updated dependencies [9a44e6c]
+  - @pnpm/constants@1001.1.0
+
+## 1000.0.1
+
+### Patch Changes
+
+- Updated dependencies [d2e83b0]
+- Updated dependencies [a76da0c]
+  - @pnpm/constants@1001.0.0
+
+----------------------------------------
+
+TITLE: Markdown Changelog Entry v5.0.0
+DESCRIPTION: Version update dropping Node.js v16 support and adding ignoredOptionalDependencies field.
+
+LANGUAGE: markdown
+CODE:
+## 5.0.0
+
+### Major Changes
+
+- 43cdd87: Node.js v16 support dropped. Use at least Node.js v18.12.
+
+### Minor Changes
+
+- 730929e: Add a field named `ignoredOptionalDependencies`. This is an array of strings. If an optional dependency has its name included in this array, it will be skipped.
+
+----------------------------------------
+
+TITLE: Pack Command Implementation
+DESCRIPTION: Functionality for creating package tarballs with custom output paths and compression settings
+
+LANGUAGE: JavaScript
+CODE:
+3a3cc49: Add support for specifying a custom output path in the pack command using a new `--out` flag [#8900]
+
+----------------------------------------
+
+TITLE: Version History - Markdown Changelog
+DESCRIPTION: Changelog content tracking version changes and dependency updates over time. Notable changes include removal of lockfile v5 support, dropped Node.js version support changes, and API modifications.
+
+LANGUAGE: markdown
+CODE:
+# @pnpm/lockfile-utils
+
+## 1001.0.7
+
+### Patch Changes
+
+- Updated dependencies [5f7be64]
+- Updated dependencies [5f7be64]
+  - @pnpm/types@1000.3.0
+  - @pnpm/lockfile.types@1001.0.5
+  - @pnpm/dependency-path@1000.0.6
+  - @pnpm/resolver-base@1000.2.1
+  - @pnpm/pick-fetcher@1000.0.0
+...
+
+----------------------------------------
+
+TITLE: Installing @pnpm/server and @pnpm/logger using pnpm
+DESCRIPTION: This command installs the @pnpm/server and @pnpm/logger packages using the pnpm package manager. These packages are required for setting up and running a pnpm installer server.
+
+LANGUAGE: sh
+CODE:
+pnpm add @pnpm/logger @pnpm/server
+
+----------------------------------------
+
+TITLE: Documenting Feature Addition in Markdown
+DESCRIPTION: Documents the addition of a new feature for installing subdirectories from Git repositories in the changelog.
+
+LANGUAGE: markdown
+CODE:
+## 9.0.0
+
+### Minor Changes
+
+- b13d2dc: It is now possible to install only a subdirectory from a Git repository.
+
+  For example, `pnpm add github:user/repo#path:packages/foo` will add a dependency from the `packages/foo` subdirectory.
+
+  This new parameter may be combined with other supported parameters separated by `&`. For instance, the next command will install the same package from the `dev` branch: `pnpm add github:user/repo#dev&path:packages/bar`.
+
+  Related issue: [#4765](https://github.com/pnpm/pnpm/issues/4765).
+  Related PR: [#7487](https://github.com/pnpm/pnpm/pull/7487).
+
+----------------------------------------
+
+TITLE: Version 4.0.0 Major Changes
+DESCRIPTION: Documents breaking changes and new features in version 4.0.0 including dropping Node.js v16 support and adding ignoredOptionalDependencies functionality.
+
+LANGUAGE: markdown
+CODE:
+### Major Changes
+- 43cdd87: Node.js v16 support dropped. Use at least Node.js v18.12.
+
+### Minor Changes
+- 730929e: Add a field named `ignoredOptionalDependencies`. This is an array of strings. If an optional dependency has its name included in this array, it will be skipped.
+
+----------------------------------------
+
+TITLE: Installing @pnpm/link-bins using pnpm
+DESCRIPTION: This command installs the @pnpm/link-bins package using the pnpm package manager.
+
+LANGUAGE: sh
+CODE:
+pnpm add @pnpm/link-bins
+
+----------------------------------------
+
+TITLE: Installing @pnpm/link-bins using pnpm
+DESCRIPTION: This command installs the @pnpm/link-bins package using the pnpm package manager.
+
+LANGUAGE: sh
+CODE:
+pnpm add @pnpm/link-bins
+
+----------------------------------------
+
+TITLE: Changelog Entry for Version 2.0.0
+DESCRIPTION: Documents breaking change that drops support for Node.js v16, requiring Node.js v18.12 or higher.
+
+LANGUAGE: markdown
+CODE:
+## 2.0.0
+
+### Major Changes
+
+- 43cdd87: Node.js v16 support dropped. Use at least Node.js v18.12.
+
+----------------------------------------
+
+TITLE: Reading Workspace Configuration Updates
+DESCRIPTION: Configuration changes including making packages field optional, extending WorkspaceManifest with PnpmSettings, and adding support for pnpm catalogs parsing and validation.
+
+LANGUAGE: yaml
+CODE:
+packages:
+  # Field became optional in version 1000.1.0
+  # Supports pnpm catalogs configuration parsing
+  # Extended with PnpmSettings
+
+----------------------------------------
+
+TITLE: Major Version Change - Store Structure Update
+DESCRIPTION: Changed the structure of store index files to more efficiently store side effects cache information. Side effects now only list file differences rather than all package files.
+
+LANGUAGE: markdown
+CODE:
+### Major Changes
+- 099e6af: Changed the structure of the index files in the store to store side effects cache information more efficiently. In the new version, side effects do not list all the files of the package but just the differences [#8636]
+
+----------------------------------------
+
+TITLE: Updating supportedArchitectures configuration
+DESCRIPTION: New configuration options for specifying supported architectures when installing dependencies
+
+LANGUAGE: json
+CODE:
+{
+  "pnpm": {
+    "supportedArchitectures": {
+      "os": ["win32", "darwin", "current"],
+      "cpu": ["x64", "arm64"]
+    }
+  }
+}
+
+----------------------------------------
+
+TITLE: Changelog Entry v1.0.0
+DESCRIPTION: Documents the initial release of the package and corresponding dependency updates.
+
+LANGUAGE: markdown
+CODE:
+## 1.0.0
+
+### Major Changes
+
+- 6850bb135: Initial release.
+
+### Patch Changes
+
+- Updated dependencies [6850bb135]
+  - @pnpm/dedupe.types@1.0.0
+
+----------------------------------------
+
+TITLE: Markdown Changelog
+DESCRIPTION: Changelog entries documenting version updates and changes to the @pnpm/fs.packlist module, including Node.js version requirements, bug fixes, and dependency updates.
+
+LANGUAGE: markdown
+CODE:
+# @pnpm/fs.packlist
+
+## 2.0.0
+
+### Major Changes
+
+- 43cdd87: Node.js v16 support dropped. Use at least Node.js v18.12.
+
+## 1.0.3
+
+### Patch Changes
+
+- 9fb45d0fc: `pnpm publish` should pack "main" file or "bin" files defined in "publishConfig" [#4195](https://github.com/pnpm/pnpm/issues/4195).
+
+## 1.0.2
+
+### Patch Changes
+
+- 74432d605: Downgraded `npm-packlist` because the newer version significantly slows down the installation of local directory dependencies, making it unbearably slow.
+
+  `npm-packlist` was upgraded in [this PR](https://github.com/pnpm/pnpm/pull/7250) to fix [#6997](https://github.com/pnpm/pnpm/issues/6997). We added our own file deduplication to fix the issue of duplicate file entries.
+
+## 1.0.1
+
+### Patch Changes
+
+- c7f1359b6: After upgrading one of our dependencies, we started to sometimes have an error on publish. We have forked `@npmcli/arborist` to patch it with a fix [#7269](https://github.com/pnpm/pnpm/pull/7269).
+
+## 1.0.0
+
+### Major Changes
+
+- 500363647: Initial release.
+
+----------------------------------------
+
+TITLE: Reading pnpm Lockfile in JavaScript
+DESCRIPTION: Function to read a pnpm lockfile from disk. Supports multiple lockfile versions and handles conversion between formats.
+
+LANGUAGE: JavaScript
+CODE:
+async function readWantedLockfile(opts) {
+  const { wantedVersions, ignoreIncompatible, fileName, cwd } = opts
+  const lockfileDir = opts.lockfileDir ?? cwd
+  const lockfilePath = path.join(lockfileDir, fileName)
+  const lockfileExists = await exists(lockfilePath)
+  if (!lockfileExists) return null
+  const content = await readFile(lockfilePath, 'utf8')
+  // ... (additional logic)
+}
+
+----------------------------------------
+
+TITLE: Changelog Entry v1000.0.1
+DESCRIPTION: Documents a patch update replacing strip-ansi with Node.js built-in util.stripVTControlCharacters function, referencing PR #9009.
+
+LANGUAGE: markdown
+CODE:
+## 1000.0.1
+
+### Patch Changes
+
+- acdf26d: Replace `strip-ansi` with the built-in `util.stripVTControlCharacters` [#9009](https://github.com/pnpm/pnpm/pull/9009).
+
+----------------------------------------
+
+TITLE: Installing @pnpm/plugin-commands-store using pnpm
+DESCRIPTION: This command installs the @pnpm/plugin-commands-store package using pnpm. It adds the plugin to your project, enabling store management commands.
+
+LANGUAGE: sh
+CODE:
+pnpm add @pnpm/plugin-commands-store
+
+----------------------------------------
+
+TITLE: Updating Patch Version in Markdown
+DESCRIPTION: Updates the patch version of @pnpm/git-resolver and its dependencies in the changelog.
+
+LANGUAGE: markdown
+CODE:
+## 1000.0.9
+
+### Patch Changes
+
+- @pnpm/fetch@1000.1.6
+- @pnpm/resolver-base@1000.2.1
+
+----------------------------------------
+
+TITLE: Changelog Entry Format
+DESCRIPTION: Standard format for changelog entries showing dependency updates and version changes in a structured YAML format.
+
+LANGUAGE: yaml
+CODE:
+### Patch Changes
+
+- Updated dependencies [d500d9f]
+  - @pnpm/types@12.2.0
+
+----------------------------------------
+
+TITLE: Major Change in v1001.0.0
+DESCRIPTION: Updated URL recording in lockfile to use final resolved URL after redirects
+
+LANGUAGE: markdown
+CODE:
+Dependencies specified via a URL are now recorded in the lockfile using their final resolved URL. Thus, if the original URL redirects, the final redirect target will be saved in the lockfile [#8833]
+
+----------------------------------------
+
+TITLE: Version Number Formatting in YAML
+DESCRIPTION: Examples of version number formatting in changelog YAML entries, showing both major and minor version changes with nested patch updates.
+
+LANGUAGE: yaml
+CODE:
+## 1000.3.0
+
+### Minor Changes
+
+- 64f6b4f: Add type `StrictModules`.
+
+### Patch Changes
+
+- Updated dependencies [5f7be64]
+- Updated dependencies [5f7be64]
+  - @pnpm/types@1000.3.0
+
+----------------------------------------
+
+TITLE: Documenting Bugfix in Markdown
+DESCRIPTION: Documents a bugfix related to proxy settings for Git-hosted dependencies in the changelog.
+
+LANGUAGE: markdown
+CODE:
+## 1000.0.5
+
+### Patch Changes
+
+- d6a4ff1: Proxy settings should be respected, when resolving Git-hosted dependencies [#6530](https://github.com/pnpm/pnpm/issues/6530).
+
+----------------------------------------
+
+TITLE: Version Change Documentation
+DESCRIPTION: Markdown formatted changelog entries tracking version updates, dependency changes, and new features for the @pnpm/resolver-base package
+
+LANGUAGE: markdown
+CODE:
+# @pnpm/resolver-base
+
+## 1000.2.1
+
+### Patch Changes
+
+- Updated dependencies [5f7be64]
+- Updated dependencies [5f7be64]
+  - @pnpm/types@1000.3.0
+
+## 1000.2.0
+
+### Minor Changes
+
+- 3d52365: The `@pnpm/npm-resolver` package can now return `workspace` in the `resolvedVia` field of its results. This will be the case if the resolved package was requested through the `workspace:` protocol or if the wanted dependency's name and specifier match a package in the workspace. Previously, the `resolvedVia` field was always set to `local-filesystem` for workspace packages.
+
+----------------------------------------
+
+TITLE: Resolving Tarball URL with @pnpm/tarball-resolver in JavaScript
+DESCRIPTION: Example usage of the @pnpm/tarball-resolver package to resolve a tarball URL. It demonstrates how to use the resolveFromTarball function and shows the expected output.
+
+LANGUAGE: js
+CODE:
+'use strict'
+const resolveFromTarball = require('@pnpm/tarball-resolver').default
+
+resolveFromTarball({pref: 'http://registry.npmjs.org/is-array/-/is-array-1.0.1.tgz'})
+  .then(resolveResult => console.log(JSON.stringify(resolveResult, null, 2)))
+  //> {
+  //    "id": "registry.npmjs.org/is-array/-/is-array-1.0.1",
+  //    "normalizedPref": "http://registry.npmjs.org/is-array/-/is-array-1.0.1.tgz",
+  //    "resolution": {
+  //      "tarball": "http://registry.npmjs.org/is-array/-/is-array-1.0.1.tgz"
+  //    },
+  //    "resolvedVia": "url"
+  //  }
+
+----------------------------------------
+
+TITLE: Markdown Changelog Entry - Version 1000.0.18
+DESCRIPTION: Documents patch changes and dependency updates for version 1000.0.18, including updates to @pnpm/config, @pnpm/cache.api, and @pnpm/cli-utils.
+
+LANGUAGE: markdown
+CODE:
+## 1000.0.18
+
+### Patch Changes
+
+- Updated dependencies [9bcca9f]
+- Updated dependencies [5b35dff]
+- Updated dependencies [9bcca9f]
+- Updated dependencies [5f7be64]
+- Updated dependencies [5f7be64]
+  - @pnpm/config@1002.6.0
+  - @pnpm/cache.api@1000.0.17
+  - @pnpm/cli-utils@1000.0.18
+
+----------------------------------------
+
+TITLE: Minor Feature Addition - Basic Auth Support
+DESCRIPTION: Documentation of added support for basic authorization header functionality referenced in issue #7371
+
+LANGUAGE: markdown
+CODE:
+### Minor Changes\n- Add support for basic authorization header [#7371](https://github.com/pnpm/pnpm/issues/7371).
+
+----------------------------------------
+
+TITLE: Installing @pnpm/modules-cleaner with pnpm
+DESCRIPTION: Command to install the @pnpm/modules-cleaner package using pnpm package manager.
+
+LANGUAGE: bash
+CODE:
+pnpm install @pnpm/modules-cleaner
+
+----------------------------------------
+
+TITLE: Changelog Entry 1000.0.18
+DESCRIPTION: Patch update to store connection manager
+
+LANGUAGE: markdown
+CODE:
+## 1000.0.18
+
+### Patch Changes
+
+- @pnpm/store-connection-manager@1000.0.16
+
+----------------------------------------
+
+TITLE: Installing @pnpm/remove-bins Package
+DESCRIPTION: Command to install the @pnpm/remove-bins package using pnpm package manager.
+
+LANGUAGE: bash
+CODE:
+pnpm install @pnpm/remove-bins
+
+----------------------------------------
+
+TITLE: Updating dependencies in package.json
+DESCRIPTION: Example of updating dependencies in the package.json file
+
+LANGUAGE: json
+CODE:
+{
+  "pnpm": {
+    "patchedDependencies": {
+      "eslint@1.0.0": "./patches/eslint@1.0.0.patch"
+    }
+  }
+}
+
+----------------------------------------
+
+TITLE: Specifying Breaking Changes
+DESCRIPTION: This snippet demonstrates how breaking changes are documented in the changelog, including the Node.js version support changes and API modifications.
+
+LANGUAGE: markdown
+CODE:
+### Major Changes
+
+- 43cdd87: Node.js v16 support dropped. Use at least Node.js v18.12.
+
+### Minor Changes
+
+- 730929e: Add a field named `ignoredOptionalDependencies`. This is an array of strings. If an optional dependency has its name included in this array, it will be skipped.
+
+----------------------------------------
+
+TITLE: Using @pnpm/git-resolver to resolve a git-hosted package
+DESCRIPTION: This example demonstrates how to use the @pnpm/git-resolver package to resolve a git-hosted package. It creates a resolver instance and uses it to resolve a specific GitHub repository and commit.
+
+LANGUAGE: javascript
+CODE:
+'use strict'
+const createResolveFromNpm = require('@pnpm/git-resolver').default
+
+const resolveFromNpm = createResolveFromNpm({})
+
+resolveFromNpm({
+  pref: 'kevva/is-negative#16fd36fe96106175d02d066171c44e2ff83bc055'
+})
+.then(resolveResult => console.log(JSON.stringify(resolveResult, null, 2)))
+//> {
+//    "id": "github.com/kevva/is-negative/16fd36fe96106175d02d066171c44e2ff83bc055",
+//    "normalizedPref": "github:kevva/is-negative#16fd36fe96106175d02d066171c44e2ff83bc055",
+//    "resolution": {
+//      "tarball": "https://codeload.github.com/kevva/is-negative/tar.gz/16fd36fe96106175d02d066171c44e2ff83bc055"
+//    },
+//    "resolvedVia": "git-repository"
+//  }
+
+----------------------------------------
+
+TITLE: Installing @pnpm/render-peer-issues package using pnpm
+DESCRIPTION: This command installs the @pnpm/render-peer-issues package using the pnpm package manager. The package is used to visualize peer dependency issues in pnpm projects.
+
+LANGUAGE: bash
+CODE:
+pnpm add @pnpm/render-peer-issues
+
+----------------------------------------
+
+TITLE: Major Version Change - Removing Dependency Paths
+DESCRIPTION: Removes dependency paths from audit output to prevent out-of-memory errors. This change was made in version 1002.0.0.
+
+LANGUAGE: Markdown
+CODE:
+- 7f9f202: Remove dependency paths from audit output to prevent out-of-memory errors [#9280](https://github.com/pnpm/pnpm/issues/9280).
+
+----------------------------------------
+
+TITLE: Changelog Entry v2.0.0
+DESCRIPTION: Documents a major version update dropping Node.js v16 support and requiring Node.js v18.12+, along with dependency updates.
+
+LANGUAGE: markdown
+CODE:
+## 2.0.0
+
+### Major Changes
+
+- 43cdd87: Node.js v16 support dropped. Use at least Node.js v18.12.
+
+### Patch Changes
+
+- Updated dependencies [43cdd87]
+  - @pnpm/dedupe.types@2.0.0
+
+----------------------------------------
+
+TITLE: Installing @pnpm/patching.apply-patch module using pnpm
+DESCRIPTION: This command installs the @pnpm/patching.apply-patch module using the pnpm package manager. This module is required for applying patches to directories in pnpm projects.
+
+LANGUAGE: sh
+CODE:
+pnpm add @pnpm/patching.apply-patch
+
+----------------------------------------
+
+TITLE: Updating Dependencies in package.json
+DESCRIPTION: Example of updating dependencies in package.json for version 1000.0.19
+
+LANGUAGE: json
+CODE:
+{
+  "dependencies": {
+    "@pnpm/config": "1002.6.0",
+    "@pnpm/cli-utils": "1000.0.18",
+    "@pnpm/lockfile.fs": "1001.1.8",
+    "@pnpm/license-scanner": "1001.0.12"
+  }
+}
+
+----------------------------------------
+
+TITLE: Store Inspection Commands Example Usage
+DESCRIPTION: Example commands for inspecting PNPM store contents including cat-index, cat-file and find-hash functionalities
+
+LANGUAGE: bash
+CODE:
+pnpm cat-index <pkg name>@<pkg version>
+pnpm cat-file sha512-mvavhfVcEREI7d8dfvfvIkuBLnx7+rrkHHnPi8mpEDUlNpY4CUY+CvJ5mrrLl18iQYo1odFwBV7z/cOypG7xxQ==
+pnpm find-hash sha512-mvavhfVcEREI7d8dfvfvIkuBLnx7+rrkHHnPi8mpEDUlNpY4CUY+CvJ5mrrLl18iQYo1odFwBV7z/cOypG7xxQ==
+
+----------------------------------------
+
+TITLE: Installing @pnpm/exec.pkg-requires-build with pnpm
+DESCRIPTION: Command to install the @pnpm/exec.pkg-requires-build package using pnpm package manager. This package is used to check if a package requires building.
+
+LANGUAGE: sh
+CODE:
+pnpm add @pnpm/exec.pkg-requires-build
+
+----------------------------------------
+
+TITLE: Configuring Supported Architectures in package.json
+DESCRIPTION: Example of how to specify supported architectures for optional dependency installation in package.json
+
+LANGUAGE: JSON
+CODE:
+{
+  "pnpm": {
+    "supportedArchitectures": {
+      "os": ["win32", "darwin", "current"],
+      "cpu": ["x64", "arm64"]
+    }
+  }
+}
+
+----------------------------------------
+
+TITLE: Changelog Entry for Version 1.0.0
+DESCRIPTION: Documents the initial release of the package.
+
+LANGUAGE: markdown
+CODE:
+## 1.0.0
+
+### Major Changes
+
+- 693944b66: Initial release
+
+----------------------------------------
+
+TITLE: Installing @pnpm/cli-meta Package with pnpm
+DESCRIPTION: This command installs the @pnpm/cli-meta package using the pnpm package manager. It adds the package to the project's dependencies.
+
+LANGUAGE: sh
+CODE:
+pnpm add @pnpm/cli-meta
+
+----------------------------------------
+
+TITLE: Installing @pnpm/workspace.state package using pnpm
+DESCRIPTION: This command installs the @pnpm/workspace.state package using the pnpm package manager. It adds the package to the project's dependencies.
+
+LANGUAGE: sh
+CODE:
+pnpm add @pnpm/workspace.state
+
+----------------------------------------
+
+TITLE: Version Update Notes in Markdown
+DESCRIPTION: Markdown formatted changelog entries documenting updates to @pnpm/exec.build-commands package and its dependencies, including major feature additions and patch changes.
+
+LANGUAGE: markdown
+CODE:
+# @pnpm/exec.build-commands
+
+## 1001.0.8
+
+### Patch Changes
+
+- Updated dependencies [9bcca9f]
+- Updated dependencies [5b35dff]
+- Updated dependencies [a2903a0]
+- Updated dependencies [9bcca9f]
+- Updated dependencies [5f7be64]
+- Updated dependencies [5a9e34f]
+- Updated dependencies [64f6b4f]
+- Updated dependencies [5f7be64]
+  - @pnpm/config@1002.6.0
+  - @pnpm/plugin-commands-rebuild@1002.0.8
+  - @pnpm/config.config-writer@1000.0.0
+  - @pnpm/modules-yaml@1000.3.0
+
+----------------------------------------
+
+TITLE: Markdown Changelog Content
+DESCRIPTION: Changelog documenting version history from v1.0.2 to v6.0.0, including breaking changes, feature additions and dependency updates.
+
+LANGUAGE: markdown
+CODE:
+# @pnpm/resolve-workspace-range
+
+## 6.0.0
+
+### Major Changes
+
+- 43cdd87: Node.js v16 support dropped. Use at least Node.js v18.12.
+
+## 5.0.1
+
+### Patch Changes
+
+- c0760128d: bump semver to 7.4.0
+
+## 5.0.0
+
+### Major Changes
+
+- eceaa8b8b: Node.js 14 support dropped.
+
+## 4.0.0
+
+### Major Changes
+
+- f884689e0: Require `@pnpm/logger` v5.
+
+## 3.0.0
+
+### Major Changes
+
+- 542014839: Node.js 12 is not supported.
+
+## 2.1.0
+
+### Minor Changes
+
+- 85fb21a83: Add support for workspace:^ and workspace:~ aliases
+
+## 2.0.0
+
+### Major Changes
+
+- 97b986fbc: Node.js 10 support is dropped. At least Node.js 12.17 is required for the package to work.
+
+## 1.0.2
+
+----------------------------------------
+
+TITLE: Installing pnpm CLI Arguments Parser
+DESCRIPTION: Command to install the @pnpm/parse-cli-args package using pnpm package manager.
+
+LANGUAGE: sh
+CODE:
+pnpm add @pnpm/parse-cli-args
+
+----------------------------------------
+
+TITLE: Environment Config Example
+DESCRIPTION: Example configuration for the use-node-version setting in package.json
+
+LANGUAGE: json
+CODE:
+{
+  "pnpm": {
+    "executionEnv": {
+      "nodeVersion": "18.0.0-rc.3"
+    }
+  }
+}
+
+----------------------------------------
+
+TITLE: Markdown Changelog Entry for Version 1001.0.5
+DESCRIPTION: Changelog entry documenting dependency updates to @pnpm/types and @pnpm/lockfile.types packages
+
+LANGUAGE: markdown
+CODE:
+## 1001.0.5
+
+### Patch Changes
+
+- Updated dependencies [5f7be64]
+- Updated dependencies [5f7be64]
+  - @pnpm/types@1000.3.0
+  - @pnpm/lockfile.types@1001.0.5
+
+----------------------------------------
+
+TITLE: Updating Dependencies in package.json for Patching
+DESCRIPTION: Example of how to specify patched dependencies in the package.json file. This allows for patching specific versions of packages.
+
+LANGUAGE: json
+CODE:
+{
+  "pnpm": {
+    "patchedDependencies": {
+      "eslint@1.0.0": "./patches/eslint@1.0.0.patch"
+    }
+  }
+}
+
+----------------------------------------
+
+TITLE: Documenting Version Updates in Markdown
+DESCRIPTION: Changelog entries documenting version updates, patch changes, and dependency updates for the @pnpm/prepare package using conventional commits format.
+
+LANGUAGE: markdown
+CODE:
+# @pnpm/prepare
+
+## 0.0.115
+
+### Patch Changes
+
+- Updated dependencies [5f7be64]
+- Updated dependencies [5f7be64]
+  - @pnpm/types@1000.3.0
+  - @pnpm/assert-project@4.0.8
+
+----------------------------------------
+
+TITLE: Markdown Major Version Release Entry
+DESCRIPTION: Changelog entry for version 1001.0.0 documenting removal of lockfile conversion functionality and dependency updates
+
+LANGUAGE: markdown
+CODE:
+## 1001.0.0
+
+### Major Changes
+
+- a76da0c: Removed lockfile conversion from v6 to v9. If you need to convert lockfile v6 to v9, use pnpm CLI v9.
+
+### Patch Changes
+
+- Updated dependencies [6483b64]
+- Updated dependencies [a76da0c]
+  - @pnpm/lockfile.types@1001.0.0
+  - @pnpm/error@1000.0.1
+
+----------------------------------------
+
+TITLE: Installing @pnpm/resolve-workspace-range Package with pnpm
+DESCRIPTION: Command to install the @pnpm/resolve-workspace-range package using pnpm package manager. This package is used for resolving version ranges within a pnpm workspace.
+
+LANGUAGE: bash
+CODE:
+pnpm add @pnpm/resolve-workspace-range
+
+----------------------------------------
+
+TITLE: Release Entry - Version 4.0.8
+DESCRIPTION: Dependency updates to @pnpm/types, @pnpm/modules-yaml, @pnpm/lockfile.types and @pnpm/assert-store
+
+LANGUAGE: markdown
+CODE:
+### Patch Changes
+
+- Updated dependencies [5f7be64]
+- Updated dependencies [64f6b4f]
+- Updated dependencies [5f7be64]
+  - @pnpm/types@1000.3.0
+  - @pnpm/modules-yaml@1000.3.0
+  - @pnpm/lockfile.types@1001.0.5
+  - @pnpm/assert-store@2.0.8
+
+----------------------------------------
+
+TITLE: Version History Documentation in Markdown
+DESCRIPTION: Changelog entries documenting version updates and dependency changes, including a major version change dropping Node.js v16 support and requiring Node.js v18.12+
+
+LANGUAGE: markdown
+CODE:
+# @pnpm/node.resolver
+
+## 1000.0.12
+
+### Patch Changes
+
+- @pnpm/node.fetcher@1000.0.12
+
+----------------------------------------
+
+TITLE: Changelog for @pnpm/dedupe.types Package
+DESCRIPTION: Markdown changelog detailing major version changes for the @pnpm/dedupe.types package. It includes information about Node.js version support and initial release.
+
+LANGUAGE: markdown
+CODE:
+# @pnpm/dedupe.types
+
+## 2.0.0
+
+### Major Changes
+
+- 43cdd87: Node.js v16 support dropped. Use at least Node.js v18.12.
+
+## 1.0.0
+
+### Major Changes
+
+- 6850bb135: Initial release.
+
+----------------------------------------
+
+TITLE: Version History Documentation in Markdown
+DESCRIPTION: Documents version changes and dependency updates for the @pnpm/create-cafs-store package using markdown format
+
+LANGUAGE: markdown
+CODE:
+# @pnpm/create-cafs-store
+
+## 1000.0.9
+
+### Patch Changes
+
+- @pnpm/exec.pkg-requires-build@1000.0.5
+- @pnpm/fetcher-base@1000.0.7
+- @pnpm/store.cafs@1000.0.8
+- @pnpm/store-controller-types@1001.0.5
+- @pnpm/fs.indexed-pkg-importer@1000.1.3
+
+----------------------------------------
+
+TITLE: Major Update: Drop Node.js 14 Support
+DESCRIPTION: Major version update that removes support for Node.js 14 and adds new features for git-hosted dependencies.
+
+LANGUAGE: markdown
+CODE:
+### Major Changes
+- eceaa8b8b: Node.js 14 support dropped.
+
+### Patch Changes
+- Updated dependencies [eceaa8b8b]
+  - @pnpm/read-package-json@8.0.0
+  - @pnpm/lifecycle@15.0.0
+
+----------------------------------------
+
+TITLE: Installing @pnpm/graceful-fs Package
+DESCRIPTION: Command to install the @pnpm/graceful-fs package using the pnpm package manager.
+
+LANGUAGE: sh
+CODE:
+pnpm add @pnpm/graceful-fs
+
+----------------------------------------
+
+TITLE: Workspace Patch Configuration Example
+DESCRIPTION: Configuration example showing how to specify non-overlapping version ranges for package patches in a workspace
+
+LANGUAGE: yaml
+CODE:
+# pnpm-workspace.yaml
+patchedDependencies:
+  'foo@2.2.0-2.8.0': patches/foo.2.2.0-2.8.0.patch
+  'foo@>=2.0.0 <2.2.0 || >2.8.0': 'patches/foo.gte2.patch
+
+----------------------------------------
+
+TITLE: Installing @pnpm/lockfile.walker package using pnpm
+DESCRIPTION: This command installs the @pnpm/lockfile.walker package using the pnpm package manager. It adds the package to the project's dependencies.
+
+LANGUAGE: bash
+CODE:
+pnpm add @pnpm/lockfile.walker
+
+----------------------------------------
+
+TITLE: Installing @pnpm/workspace.find-packages Module
+DESCRIPTION: Command to install the workspace package finder module using pnpm package manager
+
+LANGUAGE: sh
+CODE:
+pnpm add @pnpm/workspace.find-packages
+
+----------------------------------------
+
+TITLE: Updating Dependencies in package.json
+DESCRIPTION: This snippet shows the format used to specify updated dependencies in the changelog. It includes the version number and the specific dependencies that were updated.
+
+LANGUAGE: markdown
+CODE:
+### Patch Changes
+
+- Updated dependencies [5f7be64]
+- Updated dependencies [5f7be64]
+  - @pnpm/types@1000.3.0
+  - @pnpm/resolver-base@1000.2.1
+
+----------------------------------------
+
+TITLE: Changelog Entry - Version 1000.0.19
+DESCRIPTION: Dependency updates for modules-yaml and config packages
+
+LANGUAGE: markdown
+CODE:
+## 1000.0.19
+
+### Patch Changes
+
+- Updated dependencies [d612dcf]
+- Updated dependencies [936430a]
+- Updated dependencies [d612dcf]
+  - @pnpm/modules-yaml@1000.2.0
+  - @pnpm/config@1002.5.4
+  - @pnpm/outdated@1001.0.13
+  - @pnpm/cli-utils@1000.0.17
+  - @pnpm/default-resolver@1001.0.10
+  - @pnpm/lockfile.fs@1001.1.7
+
+----------------------------------------
+
+TITLE: Installing @pnpm/parse-wanted-dependency Package
+DESCRIPTION: Command to install the @pnpm/parse-wanted-dependency package using pnpm package manager.
+
+LANGUAGE: shell
+CODE:
+pnpm i @pnpm/parse-wanted-dependency
+
+----------------------------------------
+
+TITLE: Installing @pnpm/package-store using pnpm
+DESCRIPTION: This command installs the @pnpm/package-store package using the pnpm package manager. It adds the package to the project's dependencies.
+
+LANGUAGE: bash
+CODE:
+pnpm add @pnpm/package-store
+
+----------------------------------------
+
+TITLE: Patch Change - Fix Catalog Support
+DESCRIPTION: Add support for catalogs in outdated command and fix exception with interactive mode
+
+LANGUAGE: markdown
+CODE:
+### Patch Changes
+- a724295: Fix an exception when running `pnpm update --interactive` if catalogs are used.
+- f6e7ace: The `pnpm outdated` command now supports the `catalog:` protocol.
+
+----------------------------------------
+
+TITLE: Installing @pnpm/patching.config package using pnpm
+DESCRIPTION: This command installs the @pnpm/patching.config package using the pnpm package manager. It adds the package to the project's dependencies.
+
+LANGUAGE: sh
+CODE:
+pnpm add @pnpm/patching.config
+
+----------------------------------------
+
+TITLE: Installing @pnpm/dependency-path with pnpm
+DESCRIPTION: Command to install the @pnpm/dependency-path package using pnpm package manager.
+
+LANGUAGE: sh
+CODE:
+pnpm add @pnpm/dependency-path
+
+----------------------------------------
+
+TITLE: Installing @pnpm/fs.find-packages via pnpm
+DESCRIPTION: Command to install the package using pnpm package manager
+
+LANGUAGE: shell
+CODE:
+pnpm add @pnpm/fs.find-packages
+
+----------------------------------------
+
+TITLE: Installing @pnpm/modules-yaml Package
+DESCRIPTION: Command to install the @pnpm/modules-yaml package using PNPM package manager.
+
+LANGUAGE: shell
+CODE:
+pnpm add @pnpm/modules-yaml
+
+----------------------------------------
+
+TITLE: Installing @pnpm/deps.graph-sequencer with pnpm
+DESCRIPTION: Command to install the @pnpm/deps.graph-sequencer package using pnpm package manager.
+
+LANGUAGE: bash
+CODE:
+pnpm add @pnpm/deps.graph-sequencer
+
+----------------------------------------
+
+TITLE: Installing @pnpm/read-package-json using pnpm
+DESCRIPTION: Command to install the @pnpm/read-package-json package using pnpm package manager.
+
+LANGUAGE: sh
+CODE:
+pnpm add @pnpm/read-package-json
+
+----------------------------------------
+
+TITLE: Installing @pnpm/list Package with pnpm
+DESCRIPTION: This command installs the @pnpm/list package using the pnpm package manager. It adds the package to the project's dependencies.
+
+LANGUAGE: shell
+CODE:
+pnpm add @pnpm/list
+
+----------------------------------------
+
+TITLE: Installing @pnpm/client Package with pnpm
+DESCRIPTION: This command installs the @pnpm/client package using the pnpm package manager. It adds the package to the project's dependencies.
+
+LANGUAGE: sh
+CODE:
+pnpm add @pnpm/client
+
+----------------------------------------
+
+TITLE: Installing @pnpm/read-project-manifest Package
+DESCRIPTION: Command to install the @pnpm/read-project-manifest package using pnpm package manager.
+
+LANGUAGE: shell
+CODE:
+pnpm add @pnpm/read-project-manifest
+
+----------------------------------------
+
+TITLE: Installing PNPM Types Package
+DESCRIPTION: Command to install the @pnpm/types package using PNPM package manager.
+
+LANGUAGE: shell
+CODE:
+pnpm add @pnpm/types
+
+----------------------------------------
+
+TITLE: Installing PNPM Constants Package
+DESCRIPTION: Command to install the @pnpm/constants package using PNPM package manager
+
+LANGUAGE: sh
+CODE:
+pnpm add @pnpm/constants
+
+----------------------------------------
+
+TITLE: Installing @pnpm/tools.path Package
+DESCRIPTION: Command to install the @pnpm/tools.path package using pnpm package manager
+
+LANGUAGE: shell
+CODE:
+pnpm add @pnpm/tools.path
+
+----------------------------------------
+
+TITLE: Installing pnpm Workspace Manifest Writer Package
+DESCRIPTION: Command to install the @pnpm/workspace.manifest-writer package using pnpm package manager.
+
+LANGUAGE: bash
+CODE:
+pnpm add @pnpm/workspace.manifest-writer
+
+----------------------------------------
+
+TITLE: Installing @pnpm/local-resolver with pnpm
+DESCRIPTION: Command to install the @pnpm/local-resolver package using pnpm package manager.
+
+LANGUAGE: bash
+CODE:
+pnpm add @pnpm/local-resolver
+
+----------------------------------------
+
+TITLE: Installing @pnpm/find-workspace-dir Package
+DESCRIPTION: Command to install the @pnpm/find-workspace-dir package using pnpm package manager.
+
+LANGUAGE: sh
+CODE:
+pnpm add @pnpm/find-workspace-dir
+
+----------------------------------------
+
+TITLE: Installing @pnpm/reviewing.dependencies-hierarchy with pnpm
+DESCRIPTION: Command to install the @pnpm/reviewing.dependencies-hierarchy package using pnpm package manager.
+
+LANGUAGE: bash
+CODE:
+pnpm add @pnpm/reviewing.dependencies-hierarchy
+
+----------------------------------------
+
+TITLE: Installing PNPM License Commands Plugin
+DESCRIPTION: Command to install the @pnpm/plugin-commands-licenses package using pnpm package manager
+
+LANGUAGE: sh
+CODE:
+pnpm add @pnpm/plugin-commands-licenses
+
+----------------------------------------
+
+TITLE: Installing pnpm Dedicated Lockfile Package
+DESCRIPTION: Command to install the @pnpm/make-dedicated-lockfile package using pnpm package manager. Note that this package is deprecated in favor of using 'pnpm deploy'.
+
+LANGUAGE: shell
+CODE:
+pnpm add @pnpm/make-dedicated-lockfile
+
+----------------------------------------
+
+TITLE: Installing PNPM Logger Package
+DESCRIPTION: Command to install the @pnpm/logger package using pnpm package manager.
+
+LANGUAGE: sh
+CODE:
+pnpm add @pnpm/logger
+
+----------------------------------------
+
+TITLE: Installing CAFS Store Controller Package with pnpm
+DESCRIPTION: Command to install the @pnpm/create-cafs-store package using pnpm package manager.
+
+LANGUAGE: bash
+CODE:
+pnpm add @pnpm/create-cafs-store
+
+----------------------------------------
+
+TITLE: Installing PNPM Plugin Commands Init
+DESCRIPTION: Command to install the @pnpm/plugin-commands-init package using PNPM package manager
+
+LANGUAGE: sh
+CODE:
+pnpm add @pnpm/plugin-commands-init
+
+----------------------------------------
+
+TITLE: Documenting Minor Changes in Markdown
+DESCRIPTION: This snippet demonstrates how minor changes are documented, including the version number, change type, and a description of the new feature or enhancement.
+
+LANGUAGE: markdown
+CODE:
+## 5.1.0
+
+### Minor Changes
+
+- 3beb895: Bundled `pnpm setup` now creates `pnpx` script [#8230](https://github.com/pnpm/pnpm/issues/8230).
+
+----------------------------------------
+
+TITLE: Installing @pnpm/workspace.spec-parser using pnpm
+DESCRIPTION: This command installs the @pnpm/workspace.spec-parser package using the pnpm package manager. It adds the package to the project's dependencies.
+
+LANGUAGE: sh
+CODE:
+pnpm add @pnpm/workspace.spec-parser
+
+----------------------------------------
+
+TITLE: Installing pnpm Context Package
+DESCRIPTION: Command to install the @pnpm/get-context package using pnpm package manager.
+
+LANGUAGE: sh
+CODE:
+pnpm add @pnpm/get-context
+
+----------------------------------------
+
+TITLE: Installing PNPM Lockfile Merger Package
+DESCRIPTION: Command to install the @pnpm/lockfile.merger package using PNPM package manager
+
+LANGUAGE: bash
+CODE:
+pnpm add @pnpm/lockfile.merger
+
+----------------------------------------
+
+TITLE: Bug Fix - Directory Option
+DESCRIPTION: Patch fixing the --dir option in pnpm init command
+
+LANGUAGE: markdown
+CODE:
+### Patch Changes
+- 8ad6ee6: `pnpm init` should respect --dir option
+
+----------------------------------------
+
+TITLE: Installing @pnpm/lockfile.verification using pnpm
+DESCRIPTION: This command installs the @pnpm/lockfile.verification package using the pnpm package manager. It adds the package to the project's dependencies.
+
+LANGUAGE: sh
+CODE:
+pnpm add @pnpm/lockfile.verification
+
+----------------------------------------
+
+TITLE: Installing @pnpm/plugin-commands-setup with pnpm
+DESCRIPTION: This command installs the @pnpm/plugin-commands-setup package using pnpm. It adds the package to the project's dependencies.
+
+LANGUAGE: sh
+CODE:
+pnpm add @pnpm/plugin-commands-setup
+
+----------------------------------------
+
+TITLE: Git Checks Implementation
+DESCRIPTION: Implementation of Git repository checks before publishing, verifying clean working directory and branch name
+
+LANGUAGE: JavaScript
+CODE:
+cfe345b6d: Show a friendly error message when it is impossible to get the current Git branch name during publish [#4488]
+
+----------------------------------------
+
+TITLE: Installing @pnpm/lockfile.filtering Package with pnpm
+DESCRIPTION: This command installs the @pnpm/lockfile.filtering package using the pnpm package manager. It adds the package to the project's dependencies.
+
+LANGUAGE: bash
+CODE:
+pnpm add @pnpm/lockfile.filtering
+
+----------------------------------------
+
+TITLE: Installing @pnpm/env.path Package using pnpm
+DESCRIPTION: This command installs the @pnpm/env.path package using the pnpm package manager. It adds the package to the project's dependencies.
+
+LANGUAGE: sh
+CODE:
+pnpm add @pnpm/env.path
+
+----------------------------------------
+
+TITLE: Changelog Entry - Version 1000.0.20
+DESCRIPTION: Dependency updates including config, types, modules-yaml and other core packages
+
+LANGUAGE: markdown
+CODE:
+## 1000.0.20
+
+### Patch Changes
+
+- Updated dependencies [9bcca9f]
+- Updated dependencies [5b35dff]
+- Updated dependencies [9bcca9f] 
+- Updated dependencies [5f7be64]
+- Updated dependencies [64f6b4f]
+- Updated dependencies [5f7be64]
+  - @pnpm/config@1002.6.0
+  - @pnpm/types@1000.3.0
+  - @pnpm/modules-yaml@1000.3.0
+  - @pnpm/cli-utils@1000.0.18
+  - @pnpm/lockfile.fs@1001.1.8
+  - @pnpm/outdated@1001.0.14
+  - @pnpm/default-resolver@1001.0.11
+
+----------------------------------------
+
+TITLE: Installing @pnpm/write-project-manifest using pnpm
+DESCRIPTION: This command installs the @pnpm/write-project-manifest package using the pnpm package manager.
+
+LANGUAGE: sh
+CODE:
+pnpm add @pnpm/write-project-manifest
+
+----------------------------------------
+
+TITLE: Installing @pnpm/hoist Package
+DESCRIPTION: Command to install the @pnpm/hoist package using pnpm package manager.
+
+LANGUAGE: bash
+CODE:
+pnpm add @pnpm/hoist
+
+----------------------------------------
+
+TITLE: Installing @pnpm/calc-dep-state using pnpm
+DESCRIPTION: This command installs the @pnpm/calc-dep-state package using the pnpm package manager. It adds the package to the project's dependencies.
+
+LANGUAGE: sh
+CODE:
+pnpm add @pnpm/calc-dep-state
+
+----------------------------------------
+
+TITLE: Registry SSL Configuration Example
+DESCRIPTION: Example configuration for registry-scoped SSL settings including cert, key and CA files
+
+LANGUAGE: text
+CODE:
+//registry.mycomp.com/:certfile=server-cert.pem
+//registry.mycomp.com/:keyfile=server-key.pem
+//registry.mycomp.com/:cafile=client-cert.pem
+
+----------------------------------------
+
+TITLE: Installing @pnpm/cache.commands Module using pnpm
+DESCRIPTION: This command installs the @pnpm/cache.commands module using the pnpm package manager. It adds the module to the project's dependencies.
+
+LANGUAGE: sh
+CODE:
+pnpm add @pnpm/cache.commands
+
+----------------------------------------
+
+TITLE: Installing PNPM Test Fixtures Package
+DESCRIPTION: Command to install @pnpm/test-fixtures as a development dependency using pnpm package manager.
+
+LANGUAGE: bash
+CODE:
+pnpm add -D @pnpm/test-fixtures
+
+----------------------------------------
+
+TITLE: Using Rolling Alias for Workspace Versions in pnpm
+DESCRIPTION: Example of using the new 'rolling' value for the save-workspace-protocol option in pnpm. This allows saving workspace versions using a rolling alias instead of pinning the current version number.
+
+LANGUAGE: bash
+CODE:
+pnpm --save-workspace-protocol=rolling add foo
+
+----------------------------------------
+
+TITLE: Installing @pnpm/command module using pnpm
+DESCRIPTION: This command installs the @pnpm/command module using the pnpm package manager. It adds the module to the project's dependencies.
+
+LANGUAGE: sh
+CODE:
+pnpm add @pnpm/command
+
+----------------------------------------
+
+TITLE: Installing @pnpm/types Package with pnpm
+DESCRIPTION: This snippet shows how to install the @pnpm/types package using the pnpm package manager.
+
+LANGUAGE: sh
+CODE:
+pnpm add @pnpm/types
+
+----------------------------------------
+
+TITLE: Installing @pnpm/types Package with pnpm
+DESCRIPTION: This snippet shows how to install the @pnpm/types package using the pnpm package manager.
+
+LANGUAGE: sh
+CODE:
+pnpm add @pnpm/types
+
+----------------------------------------
+
+TITLE: Version History Entry
+DESCRIPTION: Changelog entries showing version updates and corresponding dependency changes for @pnpm/pkg-manager.direct-dep-linker package
+
+LANGUAGE: markdown
+CODE:
+# @pnpm/pkg-manager.direct-dep-linker
+
+## 1000.0.6
+
+### Patch Changes
+
+- @pnpm/symlink-dependency@1000.0.6
+- @pnpm/core-loggers@1000.1.5
+
+----------------------------------------
+
+TITLE: Installing @pnpm/store-path Package
+DESCRIPTION: Command to install the @pnpm/store-path package using various package managers including pnpm, yarn, or npm.
+
+LANGUAGE: shell
+CODE:
+<pnpm|yarn|npm> add @pnpm/store-path
+
+----------------------------------------
+
+TITLE: Installing PNPM CLI Utils Package
+DESCRIPTION: Command to install the @pnpm/cli-utils package using pnpm package manager.
+
+LANGUAGE: sh
+CODE:
+pnpm add @pnpm/cli-utils
+
+----------------------------------------
+
+TITLE: Installing @pnpm/workspace.read-manifest Package with pnpm
+DESCRIPTION: This command installs the @pnpm/workspace.read-manifest package using pnpm. It allows users to add the package to their project for reading workspace manifest files.
+
+LANGUAGE: bash
+CODE:
+pnpm add @pnpm/workspace.read-manifest
+
+----------------------------------------
+
+TITLE: Markdown Changelog Entry Example
+DESCRIPTION: Example of a changelog entry showing patch changes and dependency updates
+
+LANGUAGE: markdown
+CODE:
+## 1000.0.8
+
+### Patch Changes
+
+- Updated dependencies [5f7be64]
+- Updated dependencies [5f7be64]
+  - @pnpm/types@1000.3.0
+  - @pnpm/write-project-manifest@1000.0.5
+
+----------------------------------------
+
+TITLE: Installing @pnpm/fs.hard-link-dir Package with pnpm
+DESCRIPTION: This command installs the @pnpm/fs.hard-link-dir package using the pnpm package manager. The package provides functionality for hard linking or copying files between directories.
+
+LANGUAGE: sh
+CODE:
+pnpm add @pnpm/fs.hard-link-dir
+
+----------------------------------------
+
+TITLE: Installing @pnpm/store-connection-manager using pnpm
+DESCRIPTION: This command installs the @pnpm/store-connection-manager package using the pnpm package manager. It adds the package to the project's dependencies.
+
+LANGUAGE: sh
+CODE:
+pnpm add @pnpm/store-connection-manager
+
+----------------------------------------
+
+TITLE: Major Change - Lock File Conversion Removal
+DESCRIPTION: Remove lockfile conversion from v6 to v9. For converting lockfile v6 to v9, use pnpm CLI v9.
+
+LANGUAGE: markdown
+CODE:
+### Major Changes
+- a76da0c: Removed lockfile conversion from v6 to v9. If you need to convert lockfile v6 to v9, use pnpm CLI v9.
+
+----------------------------------------
+
+TITLE: Installing PNPM Dedupe Check Package
+DESCRIPTION: Command to install the @pnpm/dedupe.check package using PNPM package manager.
+
+LANGUAGE: bash
+CODE:
+pnpm add @pnpm/dedupe.check
+
+----------------------------------------
+
+TITLE: Installing pnpm Core Loggers Package
+DESCRIPTION: Command to install the @pnpm/core-loggers package using pnpm package manager.
+
+LANGUAGE: bash
+CODE:
+pnpm i @pnpm/core-loggers
+
+----------------------------------------
+
+TITLE: Configure YAML Workspace Settings
+DESCRIPTION: Example of patching configuration in pnpm-workspace.yaml file, showing verify dependency and optimization settings
+
+LANGUAGE: yaml
+CODE:
+verifyDepsBeforeRun: install
+optimisticRepeatInstall: true
+publicHoistPattern:
+  - "*types*"
+  - "!@types/react"
+
+----------------------------------------
+
+TITLE: Installing @pnpm/workspace.pkgs-graph Package
+DESCRIPTION: Command to install the package using pnpm package manager
+
+LANGUAGE: shell
+CODE:
+pnpm add @pnpm/workspace.pkgs-graph
+
+----------------------------------------
+
+TITLE: pnpm/list Package Dependency Changes
+DESCRIPTION: Lists dependency updates and version bumps for @pnpm/list package
+
+LANGUAGE: markdown
+CODE:
+# @pnpm/list
+
+## 1000.0.13
+
+### Patch Changes
+
+- Updated dependencies [5f7be64]
+- Updated dependencies [5f7be64]
+  - @pnpm/types@1000.3.0
+  - @pnpm/read-package-json@1000.0.6
+  - @pnpm/read-project-manifest@1000.0.8
+  - @pnpm/reviewing.dependencies-hierarchy@1001.0.10
+
+----------------------------------------
+
+TITLE: pnpm/list Package Dependency Changes
+DESCRIPTION: Lists dependency updates and version bumps for @pnpm/list package
+
+LANGUAGE: markdown
+CODE:
+# @pnpm/list
+
+## 1000.0.13
+
+### Patch Changes
+
+- Updated dependencies [5f7be64]
+- Updated dependencies [5f7be64]
+  - @pnpm/types@1000.3.0
+  - @pnpm/read-package-json@1000.0.6
+  - @pnpm/read-project-manifest@1000.0.8
+  - @pnpm/reviewing.dependencies-hierarchy@1001.0.10
+
+----------------------------------------
+
+TITLE: Installing @pnpm/default-reporter with pnpm
+DESCRIPTION: This command installs the @pnpm/default-reporter package using pnpm package manager.
+
+LANGUAGE: bash
+CODE:
+pnpm add @pnpm/default-reporter
+
+----------------------------------------
+
+TITLE: Replace String Manipulation Function
+DESCRIPTION: Replace strip-ansi with the built-in util.stripVTControlCharacters for string manipulation
+
+LANGUAGE: Markdown
+CODE:
+- acdf26d: Replace `strip-ansi` with the built-in `util.stripVTControlCharacters` [#9009](https://github.com/pnpm/pnpm/pull/9009).
+
+----------------------------------------
+
+TITLE: Installing @pnpm/license-scanner using pnpm
+DESCRIPTION: This command installs the @pnpm/license-scanner package using the pnpm package manager. It adds the package to the project's dependencies.
+
+LANGUAGE: sh
+CODE:
+pnpm add @pnpm/license-scanner
+
+----------------------------------------
+
+TITLE: Installing @pnpm/tarball-resolver with pnpm
+DESCRIPTION: Command to install the @pnpm/tarball-resolver package using pnpm package manager.
+
+LANGUAGE: sh
+CODE:
+pnpm add @pnpm/tarball-resolver
+
+----------------------------------------
+
+TITLE: Markdown Changelog Documentation
+DESCRIPTION: Documents the version history of @pnpm/run-npm package, including major version changes, dependency updates, and feature additions across multiple releases.
+
+LANGUAGE: markdown
+CODE:
+# @pnpm/run-npm
+
+## 7.0.0
+
+### Major Changes
+
+- 43cdd87: Node.js v16 support dropped. Use at least Node.js v18.12.
+
+### Patch Changes
+
+- e70a829: The npm CLI executed from pnpm should not use Corepack [#7747](https://github.com/pnpm/pnpm/pull/7747).
+
+## 6.1.0
+
+### Minor Changes
+
+- 5a5e42551: Allow to set custom env.
+- 5a5e42551: Allow using token helpers in `pnpm publish` [#7316](https://github.com/pnpm/pnpm/issues/7316).
+
+## 6.0.0
+
+### Major Changes
+
+- eceaa8b8b: Node.js 14 support dropped.
+
+## 5.0.0
+
+### Major Changes
+
+- f884689e0: Require `@pnpm/logger` v5.
+
+## 4.0.1
+
+### Patch Changes
+
+- 9177ddbc9: If running npm errors, throw an error.
+
+## 4.0.0
+
+### Major Changes
+
+- 542014839: Node.js 12 is not supported.
+
+## 3.1.0
+
+### Minor Changes
+
+- 724c5abd8: support "publishConfig.directory" field
+
+## 3.0.0
+
+### Major Changes
+
+- 97b986fbc: Node.js 10 support is dropped. At least Node.js 12.17 is required for the package to work.
+
+## 2.0.3
+
+### Patch Changes
+
+- a2ef8084f: Use the same versions of dependencies across the pnpm monorepo.
+
+## 2.0.2
+
+### Patch Changes
+
+- c56438567: Update cross-spawn to ^7.0.3
+
+## 2.0.2
+
+----------------------------------------
+
+TITLE: Installing @pnpm/fs.packlist using pnpm
+DESCRIPTION: Command to install the @pnpm/fs.packlist package using the pnpm package manager.
+
+LANGUAGE: sh
+CODE:
+pnpm add @pnpm/fs.packlist
+
+----------------------------------------
+
+TITLE: Example Overrides Configuration in package.json
+DESCRIPTION: Shows how to configure dependency overrides in package.json to remove dependencies using the overrides feature.
+
+LANGUAGE: json
+CODE:
+{
+  "pnpm": {
+    "overrides": {
+      "lodash": "-"
+    }
+  }
+}
+
+----------------------------------------
+
+TITLE: Installing PNPM Fetch Package
+DESCRIPTION: Command to install the @pnpm/fetch package using the PNPM package manager.
+
+LANGUAGE: sh
+CODE:
+pnpm add @pnpm/fetch
+
+----------------------------------------
+
+TITLE: Installing @pnpm/lockfile.fs Package
+DESCRIPTION: Command to install the @pnpm/lockfile.fs package using pnpm package manager.
+
+LANGUAGE: bash
+CODE:
+pnpm add @pnpm/lockfile.fs
+
+----------------------------------------
+
+TITLE: Installing @pnpm/node.fetcher using pnpm
+DESCRIPTION: This command installs the @pnpm/node.fetcher package using the pnpm package manager. It adds the package to the project's dependencies.
+
+LANGUAGE: sh
+CODE:
+pnpm add @pnpm/node.fetcher
+
+----------------------------------------
+
+TITLE: Configuring Automatic Syncing of Injected Dependencies in pnpm
+DESCRIPTION: Example .npmrc configuration to specify which scripts build workspace packages and trigger syncing of injected dependencies after running scripts.
+
+LANGUAGE: ini
+CODE:
+sync-injected-deps-after-scripts[]=compile
+
+----------------------------------------
+
+TITLE: Installing @pnpm/default-resolver using pnpm
+DESCRIPTION: This command installs the @pnpm/default-resolver package using the pnpm package manager. It adds the package to the project's dependencies.
+
+LANGUAGE: sh
+CODE:
+pnpm add @pnpm/default-resolver
+
+----------------------------------------
+
+TITLE: Installing @pnpm/text.comments-parser Package with pnpm
+DESCRIPTION: This command installs the @pnpm/text.comments-parser package using pnpm. It allows developers to add the comment parsing functionality to their pnpm projects.
+
+LANGUAGE: bash
+CODE:
+pnpm i @pnpm/text.comments-parser
+
+----------------------------------------
+
+TITLE: Implementing New Lockfile Format in pnpm
+DESCRIPTION: Introduction of a new lockfile format (v6) and related configuration options.
+
+LANGUAGE: JavaScript
+CODE:
+- d965748: `pnpm-workspace.yaml` can now hold all the settings that `.npmrc` accepts. The settings should use camelCase [#9211](https://github.com/pnpm/pnpm/pull/9211).
+
+  `pnpm-workspace.yaml` example:
+
+  ```yaml
+  verifyDepsBeforeRun: install
+  optimisticRepeatInstall: true
+  publicHoistPattern:
+    - "*types*"
+    - "!@types/react"
+  ```
+
+----------------------------------------
+
+TITLE: Installing @pnpm/plugin-commands-server using pnpm
+DESCRIPTION: This command installs the @pnpm/plugin-commands-server package using the pnpm package manager. It adds the plugin to the project's dependencies.
+
+LANGUAGE: sh
+CODE:
+pnpm add @pnpm/plugin-commands-server
+
+----------------------------------------
+
+TITLE: Installing @pnpm/config.deps-installer using pnpm
+DESCRIPTION: This command installs the @pnpm/config.deps-installer package using pnpm. It adds the package to the project's dependencies.
+
+LANGUAGE: sh
+CODE:
+pnpm add @pnpm/config.deps-installer
+
+----------------------------------------
+
+TITLE: Directory Rename Change
+DESCRIPTION: Rename dir to rootDir in the Project object
+
+LANGUAGE: markdown
+CODE:
+### Major Changes
+- dd00eeb: Renamed dir to rootDir in the Project object.
+
+----------------------------------------
+
+TITLE: Installing @pnpm/env.system-node-version Package with pnpm
+DESCRIPTION: This command installs the @pnpm/env.system-node-version package using pnpm. It adds the package to the project's dependencies.
+
+LANGUAGE: sh
+CODE:
+pnpm add @pnpm/env.system-node-version
+
+----------------------------------------
+
+TITLE: Installing @pnpm/assert-project Package
+DESCRIPTION: Command to install the @pnpm/assert-project package as a dev dependency using PNPM package manager.
+
+LANGUAGE: bash
+CODE:
+pnpm install -D @pnpm/assert-project
+
+----------------------------------------
+
+TITLE: Bug Fix in v9.0.8
+DESCRIPTION: Fixed ERR_PNPM_TARBALL_EXTRACT error for GitHub dependencies with slashes in branch names
+
+LANGUAGE: markdown
+CODE:
+Fix `ERR_PNPM_TARBALL_EXTRACT` error while installing a dependency from GitHub having a slash in branch name [#7697]
+
+----------------------------------------
+
+TITLE: Installing pnpm Environment Plugin via Package Manager
+DESCRIPTION: Command to install the @pnpm/plugin-commands-env package using pnpm package manager.
+
+LANGUAGE: sh
+CODE:
+pnpm add @pnpm/plugin-commands-env
+
+----------------------------------------
+
+TITLE: Installing @pnpm/create-cafs-store Package
+DESCRIPTION: Command to install the @pnpm/create-cafs-store package using pnpm package manager.
+
+LANGUAGE: bash
+CODE:
+pnpm add @pnpm/create-cafs-store
+
+----------------------------------------
+
+TITLE: Configuring sync-injected-deps-after-scripts in .npmrc
+DESCRIPTION: Example configuration in .npmrc file to specify which scripts build the workspace package, indicating when syncing is needed for automatically syncing files of injected workspace packages after pnpm run.
+
+LANGUAGE: ini
+CODE:
+sync-injected-deps-after-scripts[]=compile
+
+----------------------------------------
+
+TITLE: Installing @pnpm/matcher Package with pnpm
+DESCRIPTION: Command to install the @pnpm/matcher package using the pnpm package manager.
+
+LANGUAGE: bash
+CODE:
+pnpm add @pnpm/matcher
+
+----------------------------------------
+
+TITLE: Installing @pnpm/filter-workspace-packages with pnpm
+DESCRIPTION: This command installs the @pnpm/filter-workspace-packages module using pnpm package manager. It adds the package to the project's dependencies.
+
+LANGUAGE: sh
+CODE:
+pnpm add @pnpm/filter-workspace-packages
+
+----------------------------------------
+
+TITLE: Defining Patch Target Content
+DESCRIPTION: Defines a basic text file with three lines that serves as a patch target. This type of file is typically used as a base for applying patches or demonstrating patch operations.
+
+LANGUAGE: plaintext
+CODE:
+first line of patch-target
+second line of patch-target
+final line of patch-target
+
+----------------------------------------
+
+TITLE: Installing @pnpm/git-utils Package
+DESCRIPTION: Command to install the @pnpm/git-utils package using pnpm package manager.
+
+LANGUAGE: shell
+CODE:
+pnpm add @pnpm/git-utils
+
+----------------------------------------
+
+TITLE: Installing @pnpm/lockfile.utils with pnpm
+DESCRIPTION: Command to install the @pnpm/lockfile.utils package using the pnpm package manager.
+
+LANGUAGE: bash
+CODE:
+pnpm add @pnpm/lockfile.utils
+
+----------------------------------------
+
+TITLE: Installing @pnpm/build-modules Package with pnpm
+DESCRIPTION: This command installs the @pnpm/build-modules package using the pnpm package manager. It adds the package to the project's dependencies.
+
+LANGUAGE: sh
+CODE:
+pnpm add @pnpm/build-modules
+
+----------------------------------------
+
+TITLE: Installing PNPM Doctor Plugin
+DESCRIPTION: Command to install the @pnpm/plugin-commands-doctor package using PNPM package manager
+
+LANGUAGE: sh
+CODE:
+pnpm add @pnpm/plugin-commands-doctor
+
+----------------------------------------
+
+TITLE: Installing @pnpm/plugin-commands-installation using pnpm
+DESCRIPTION: This command installs the @pnpm/plugin-commands-installation package using pnpm. It adds the plugin to the project's dependencies.
+
+LANGUAGE: sh
+CODE:
+pnpm add @pnpm/plugin-commands-installation
+
+----------------------------------------
+
+TITLE: Installing PNPM Audit Commands Plugin
+DESCRIPTION: Command to install the @pnpm/plugin-commands-audit package using pnpm package manager.
+
+LANGUAGE: sh
+CODE:
+pnpm add @pnpm/plugin-commands-audit
+
+----------------------------------------
+
+TITLE: Installing @pnpm/plugin-commands-publishing with pnpm
+DESCRIPTION: This command installs the @pnpm/plugin-commands-publishing package using pnpm. This plugin adds pack and publish commands to pnpm.
+
+LANGUAGE: sh
+CODE:
+pnpm add @pnpm/plugin-commands-publishing
+
+----------------------------------------
+
+TITLE: Installing @pnpm/crypto.polyfill using pnpm
+DESCRIPTION: This command installs the @pnpm/crypto.polyfill package using the pnpm package manager. It adds the package to the project's dependencies.
+
+LANGUAGE: sh
+CODE:
+pnpm add @pnpm/crypto.polyfill
+
+----------------------------------------
+
+TITLE: Installing @pnpm/pnpmfile package using pnpm
+DESCRIPTION: This command installs the @pnpm/pnpmfile package using the pnpm package manager. It adds the package to the project's dependencies.
+
+LANGUAGE: sh
+CODE:
+pnpm add @pnpm/pnpmfile
+
+----------------------------------------
+
+TITLE: Installing PNPM Deploy Commands Plugin
+DESCRIPTION: Command to install the @pnpm/plugin-commands-deploy package using pnpm package manager.
+
+LANGUAGE: sh
+CODE:
+pnpm add @pnpm/plugin-commands-deploy
+
+----------------------------------------
+
+TITLE: Installing @pnpm/workspace.injected-deps-syncer with pnpm
+DESCRIPTION: This command installs the @pnpm/workspace.injected-deps-syncer package using pnpm. It's a prerequisite for using the package in your project.
+
+LANGUAGE: sh
+CODE:
+pnpm add @pnpm/workspace.injected-deps-syncer
+
+----------------------------------------
+
+TITLE: Installing PNPM Patching Types Package
+DESCRIPTION: Command to install the @pnpm/patching.types package using PNPM package manager
+
+LANGUAGE: sh
+CODE:
+pnpm add @pnpm/patching.types
+
+----------------------------------------
+
+TITLE: Installing RHEL Package Build Dependencies
+DESCRIPTION: Installs the required tools rpmdevtools and rpmlint for building RHEL packages using dnf package manager
+
+LANGUAGE: bash
+CODE:
+sudo dnf install -y rpmdevtools rpmlint
+
+----------------------------------------
+
+TITLE: Configuring Linux x64 Binary Package for pnpm in JSON
+DESCRIPTION: This JSON configuration specifies the details for the Linux x64 binary package of pnpm. It includes the file name, checksum, and relative path for the pnpm executable.
+
+LANGUAGE: json
+CODE:
+{
+  "name": "@pnpm/linux-x64",
+  "version": "8.6.5",
+  "os": [
+    "linux"
+  ],
+  "cpu": [
+    "x64"
+  ],
+  "files": [
+    "pnpm"
+  ],
+  "description": "The pnpm executable for Linux x64",
+  "repository": "https://github.com/pnpm/pnpm",
+  "license": "MIT",
+  "publishConfig": {
+    "provenance": true
+  },
+  "pnpm": {
+    "patchedDependencies": {
+      "@pnpm/make-dedicated-lockfile@6.0.0": "patches/@pnpm__make-dedicated-lockfile@6.0.0.patch"
+    }
+  },
+  "main": "pnpm",
+  "bin": {
+    "pnpm": "pnpm"
+  },
+  "preferUnplugged": true,
+  "engines": {
+    "node": ">=16.14"
+  }
+}
+
+----------------------------------------
+
+TITLE: Installing pnpm Resolver Base Package
+DESCRIPTION: Command to install the @pnpm/resolver-base package using pnpm package manager.
+
+LANGUAGE: sh
+CODE:
+pnpm add @pnpm/resolver-base
+
+----------------------------------------
+
+TITLE: Installing Debian Package Build Dependencies
+DESCRIPTION: Installs the dpkg package required for building Debian packages using dnf package manager
+
+LANGUAGE: bash
+CODE:
+sudo dnf install -y dpkg
+
+----------------------------------------
+
+TITLE: Installing pnpm CLI using wget
+DESCRIPTION: Alternative installation method using wget for systems without curl installed.
+
+LANGUAGE: bash
+CODE:
+wget -qO- https://get.pnpm.io/install.sh | sh -
+
+----------------------------------------
+
+TITLE: Installing @pnpm/package-bins via pnpm
+DESCRIPTION: Command to install the @pnpm/package-bins package using the pnpm package manager.
+
+LANGUAGE: shell
+CODE:
+pnpm add @pnpm/package-bins
+
+----------------------------------------
+
+TITLE: Installing PNPM Config Commands Plugin
+DESCRIPTION: Command to install the @pnpm/plugin-commands-config package using PNPM package manager.
+
+LANGUAGE: sh
+CODE:
+pnpm add @pnpm/plugin-commands-config
+
+----------------------------------------
+
+TITLE: Installing PNPM Mount Modules Package
+DESCRIPTION: Command to globally install the @pnpm/mount-modules package using PNPM package manager.
+
+LANGUAGE: bash
+CODE:
+pnpm add @pnpm/mount-modules --global
+
+----------------------------------------
+
+TITLE: Installing @pnpm/which-version-is-pinned Package
+DESCRIPTION: Command to install the package using pnpm package manager
+
+LANGUAGE: bash
+CODE:
+pnpm add @pnpm/which-version-is-pinned
+
+----------------------------------------
+
+TITLE: Installing @pnpm/lockfile.settings-checker using pnpm
+DESCRIPTION: This command installs the @pnpm/lockfile.settings-checker package using the pnpm package manager. It adds the package to the project's dependencies.
+
+LANGUAGE: sh
+CODE:
+pnpm add @pnpm/lockfile.settings-checker
+
+----------------------------------------
+
+TITLE: Installing pnpm Build Commands Package
+DESCRIPTION: Command to install the @pnpm/exec.build-commands package using pnpm package manager
+
+LANGUAGE: sh
+CODE:
+pnpm add @pnpm/exec.build-commands
+
+----------------------------------------
+
+TITLE: Updating Test Response Mocks
+DESCRIPTION: Command to update the mocked registry responses used in testing to ensure stable test results.
+
+LANGUAGE: sh
+CODE:
+pnpm run update-responses
+
+----------------------------------------
+
+TITLE: Installing pnpm Dedupe Types Package
+DESCRIPTION: Command to install the @pnpm/dedupe.types package using the pnpm package manager.
+
+LANGUAGE: bash
+CODE:
+pnpm add @pnpm/dedupe.types
+
+----------------------------------------
+
+TITLE: Installing @pnpm/lockfile-to-pnp globally using pnpm
+DESCRIPTION: This command installs the @pnpm/lockfile-to-pnp package globally using the pnpm package manager. Global installation allows the tool to be used from any directory in the command line.
+
+LANGUAGE: bash
+CODE:
+pnpm add -g @pnpm/lockfile-to-pnp
+
+----------------------------------------
+
+TITLE: Installing Directory Fetcher Package with pnpm
+DESCRIPTION: Command to install the @pnpm/directory-fetcher package using the pnpm package manager.
+
+LANGUAGE: bash
+CODE:
+pnpm add @pnpm/directory-fetcher
+
+----------------------------------------
+
+TITLE: Installing pnpm Plugin Commands Listing
+DESCRIPTION: Installation command for adding the pnpm plugin commands listing package via pnpm.
+
+LANGUAGE: sh
+CODE:
+pnpm add @pnpm/plugin-commands-listing
+
+----------------------------------------
+
+TITLE: Installing PNPM Error Package
+DESCRIPTION: Command to install the @pnpm/error package using PNPM package manager.
+
+LANGUAGE: sh
+CODE:
+pnpm add @pnpm/error
+
+----------------------------------------
+
+TITLE: Installing @pnpm/run-npm Package Using pnpm
+DESCRIPTION: This command installs the @pnpm/run-npm package using the pnpm package manager. It adds the package to the project's dependencies.
+
+LANGUAGE: sh
+CODE:
+pnpm add @pnpm/run-npm
+
+----------------------------------------
+
+TITLE: Installing PNPM Lockfile Pruner Package
+DESCRIPTION: Command to install the @pnpm/lockfile.pruner package using PNPM package manager.
+
+LANGUAGE: bash
+CODE:
+pnpm add @pnpm/lockfile.pruner
+
+----------------------------------------
+
+TITLE: Installing @pnpm/prepare-package using pnpm
+DESCRIPTION: This command installs the @pnpm/prepare-package module using the pnpm package manager. It adds the package to the project's dependencies.
+
+LANGUAGE: sh
+CODE:
+pnpm add @pnpm/prepare-package
+
+----------------------------------------
+
+TITLE: Installing @pnpm/exportable-manifest using pnpm
+DESCRIPTION: This command installs the @pnpm/exportable-manifest package using the pnpm package manager. It adds the package to the project's dependencies.
+
+LANGUAGE: sh
+CODE:
+pnpm add @pnpm/exportable-manifest
+
+----------------------------------------
+
+TITLE: Installing @pnpm/resolve-dependencies package using pnpm
+DESCRIPTION: This command installs the @pnpm/resolve-dependencies package using the pnpm package manager. It's a prerequisite for using the dependency resolution functionality.
+
+LANGUAGE: bash
+CODE:
+pnpm install @pnpm/resolve-dependencies
+
+----------------------------------------
+
+TITLE: Installing pnpm Empty Directory Checker Package
+DESCRIPTION: Command to install the @pnpm/fs.is-empty-dir-or-nothing package using pnpm package manager
+
+LANGUAGE: shell
+CODE:
+pnpm add @pnpm/fs.is-empty-dir-or-nothing
+
+----------------------------------------
+
+TITLE: Installing PNPM Workspace Package Filter Module
+DESCRIPTION: Command to install the @pnpm/workspace.filter-packages-from-dir package using PNPM package manager.
+
+LANGUAGE: sh
+CODE:
+pnpm add @pnpm/workspace.filter-packages-from-dir
+
+----------------------------------------
+
+TITLE: Installing @pnpm/symlink-dependency Package
+DESCRIPTION: Command to install the @pnpm/symlink-dependency package using pnpm package manager.
+
+LANGUAGE: bash
+CODE:
+pnpm install @pnpm/symlink-dependency
+
+----------------------------------------
+
+TITLE: Installing PNPM Worker Package
+DESCRIPTION: Command to install the @pnpm/worker package using PNPM package manager
+
+LANGUAGE: shell
+CODE:
+pnpm add @pnpm/worker
+
+----------------------------------------
+
+TITLE: Installing pnpm Store Inspection Plugin
+DESCRIPTION: Command to install the @pnpm/plugin-commands-store-inspecting package using pnpm package manager.
+
+LANGUAGE: sh
+CODE:
+pnpm add @pnpm/plugin-commands-store-inspecting
+
+----------------------------------------
+
+TITLE: Installing PNPM Config Package
+DESCRIPTION: Command to install the @pnpm/config package using pnpm package manager.
+
+LANGUAGE: sh
+CODE:
+pnpm add @pnpm/config
+
+----------------------------------------
+
+TITLE: Installing @pnpm/crypto.object-hasher package using pnpm
+DESCRIPTION: This command installs the @pnpm/crypto.object-hasher package using the pnpm package manager. The package is used to generate hashes from objects within the pnpm ecosystem.
+
+LANGUAGE: sh
+CODE:
+pnpm add @pnpm/crypto.object-hasher
+
+----------------------------------------
+
+TITLE: Installing @pnpm/config.config-writer using pnpm
+DESCRIPTION: This command installs the @pnpm/config.config-writer package using the pnpm package manager. It adds the module to the project's dependencies.
+
+LANGUAGE: sh
+CODE:
+pnpm add @pnpm/config.config-writer
+
+----------------------------------------
+
+TITLE: Installing pnpm Outdated Commands Plugin
+DESCRIPTION: Command to install the @pnpm/plugin-commands-outdated package using pnpm package manager
+
+LANGUAGE: sh
+CODE:
+pnpm add @pnpm/plugin-commands-outdated
+
+----------------------------------------
+
+TITLE: Installing @pnpm/tsconfig with pnpm
+DESCRIPTION: Command to install @pnpm/tsconfig and typescript as development dependencies using pnpm package manager.
+
+LANGUAGE: plaintext
+CODE:
+pnpm add -D @pnpm/tsconfig typescript
+
+----------------------------------------
+
+TITLE: Installing @pnpm/parse-overrides using pnpm
+DESCRIPTION: This command installs the @pnpm/parse-overrides package using the pnpm package manager.
+
+LANGUAGE: bash
+CODE:
+pnpm add @pnpm/parse-overrides
+
+----------------------------------------
+
+TITLE: Installing @pnpm/tarball-fetcher using pnpm
+DESCRIPTION: This command installs the @pnpm/tarball-fetcher package using pnpm. It adds the package to the project's dependencies.
+
+LANGUAGE: shell
+CODE:
+pnpm add @pnpm/tarball-fetcher
+
+----------------------------------------
+
+TITLE: Configuring pnpm MacOS x64 Package in package.json
+DESCRIPTION: Defines the package metadata, dependencies, and build configurations for the pnpm MacOS x64 native binary package. It specifies the package name, version, CPU architecture, and OS compatibility.
+
+LANGUAGE: json
+CODE:
+{
+  "name": "@pnpm/macos-x64",
+  "version": "8.9.2",
+  "os": [
+    "darwin"
+  ],
+  "cpu": [
+    "x64"
+  ],
+  "directories": {
+    "bin": "bin"
+  },
+  "repository": "https://github.com/pnpm/pnpm.git",
+  "license": "MIT",
+  "preferUnplugged": true,
+  "engines": {
+    "node": ">=16.14"
+  },
+  "publishConfig": {
+    "provenance": true
+  }
+}
+
+----------------------------------------
+
+TITLE: Installing PNPM Dedupe Issues Renderer
+DESCRIPTION: Command to install the @pnpm/dedupe.issues-renderer package using pnpm package manager.
+
+LANGUAGE: shell
+CODE:
+pnpm add @pnpm/dedupe.issues-renderer
+
+----------------------------------------
+
+TITLE: Installing PNPM Dependency Type Detection Package
+DESCRIPTION: Command to install the @pnpm/lockfile.detect-dep-types package using PNPM package manager
+
+LANGUAGE: shell
+CODE:
+pnpm add @pnpm/lockfile.detect-dep-types
+
+----------------------------------------
+
+TITLE: Installing @pnpm/assert-store with pnpm
+DESCRIPTION: Command to install the @pnpm/assert-store package as a development dependency using pnpm.
+
+LANGUAGE: shell
+CODE:
+pnpm install -D @pnpm/assert-store
+
+----------------------------------------
+
+TITLE: Version Change - Major Version Update
+DESCRIPTION: Major version update dropping Node.js 14 support and updating dependencies
+
+LANGUAGE: markdown
+CODE:
+### Major Changes
+- eceaa8b8b: Node.js 14 support dropped.
+
+### Patch Changes
+- Updated dependencies [158d8cf22]
+- Updated dependencies [eceaa8b8b]
+- Updated dependencies [417c8ac59]
+  - @pnpm/lockfile-file@8.0.0
+  - @pnpm/normalize-registries@5.0.0
+  - @pnpm/modules-yaml@12.0.0
+  - @pnpm/types@9.0.0
+
+----------------------------------------
+
+TITLE: Version Change - Major Version Update
+DESCRIPTION: Major version update dropping Node.js 14 support and updating dependencies
+
+LANGUAGE: markdown
+CODE:
+### Major Changes
+- eceaa8b8b: Node.js 14 support dropped.
+
+### Patch Changes
+- Updated dependencies [158d8cf22]
+- Updated dependencies [eceaa8b8b]
+- Updated dependencies [417c8ac59]
+  - @pnpm/lockfile-file@8.0.0
+  - @pnpm/normalize-registries@5.0.0
+  - @pnpm/modules-yaml@12.0.0
+  - @pnpm/types@9.0.0
+
+----------------------------------------
+
+TITLE: Installing PNPM Crypto Hash Package
+DESCRIPTION: Command to install the @pnpm/crypto.hash package using PNPM package manager.
+
+LANGUAGE: sh
+CODE:
+pnpm add @pnpm/crypto.hash
+
+----------------------------------------
+
+TITLE: Using @pnpm/assert-project in Tests
+DESCRIPTION: Example showing how to use assertProject utility in tape tests to verify the contents of node_modules directory. The utility provides methods like has() to check for package existence.
+
+LANGUAGE: typescript
+CODE:
+import test = require('tape')
+import { assertProject } from '@pnpm/assert-project'
+
+test('...', async t => {
+  // ...
+  const project = assertProject(t, pathToProject)
+
+  project.has('foo')
+  // Test fails if project has no foo in node_modules
+})
+
+----------------------------------------
+
+TITLE: Installing @pnpm/hooks.read-package-hook using pnpm
+DESCRIPTION: This command installs the @pnpm/hooks.read-package-hook package using pnpm package manager. It adds the package to the project's dependencies.
+
+LANGUAGE: sh
+CODE:
+pnpm add @pnpm/hooks.read-package-hook
+
+----------------------------------------
+
+TITLE: Installing @pnpm/lockfile.preferred-versions Package with pnpm
+DESCRIPTION: This command installs the @pnpm/lockfile.preferred-versions package using the pnpm package manager. It adds the package to the project's dependencies.
+
+LANGUAGE: bash
+CODE:
+pnpm add @pnpm/lockfile.preferred-versions
+
+----------------------------------------
+
+TITLE: Building pnpm Packages
+DESCRIPTION: Command to build the package artifacts using pnpm build system
+
+LANGUAGE: bash
+CODE:
+pnpm build
+
+----------------------------------------
+
+TITLE: Adding Configurational Dependencies in package.json
+DESCRIPTION: Demonstrates how to specify configurational dependencies in a package.json file. These dependencies are installed before other types and have specific constraints.
+
+LANGUAGE: json
+CODE:
+{
+  "pnpm": {
+    "configDependencies": {
+      "my-configs": "1.0.0+sha512-30iZtAPgz+LTIYoeivqYo853f02jBYSd5uGnGpkFV0M3xOt9aN73erkgYAmZU43x4VfqcnLxW9Kpg3R5LC4YYw=="
+    }
+  }
+}
+
+----------------------------------------
+
+TITLE: Installing pnpm Hooks Types Package
+DESCRIPTION: Command to install the @pnpm/hooks.types package using the pnpm package manager.
+
+LANGUAGE: sh
+CODE:
+pnpm add @pnpm/hooks.types
+
+----------------------------------------
+
+TITLE: Configuring ESLint for pnpm
+DESCRIPTION: Basic ESLint configuration file that extends the pnpm ESLint rules.
+
+LANGUAGE: json
+CODE:
+{
+  "extends": "@pnpm/eslint-config"
+}
+
+----------------------------------------
+
+TITLE: Installing pnpm ESLint Configuration
+DESCRIPTION: Command to install the @pnpm/eslint-config package and its tslint dependency using pnpm package manager.
+
+LANGUAGE: shell
+CODE:
+pnpm add -D @pnpm/eslint-config tslint
+
+----------------------------------------
+
+TITLE: Version Change Documentation for pnpm Config Plugin
+DESCRIPTION: Changelog documenting version updates, bug fixes and dependency changes for the @pnpm/plugin-commands-config package.
+
+LANGUAGE: markdown
+CODE:
+# @pnpm/plugin-commands-config
+
+## 1000.1.0
+
+### Minor Changes
+
+- 9bcca9f: `pnpm config get` and `list` also show settings set in `pnpm-workspace.yaml` files [#9316](https://github.com/pnpm/pnpm/pull/9316).
+- 9bcca9f: `pnpm config set --location=project` saves the setting to a `pnpm-workspace.yaml` file if no `.npmrc` file is present in the directory [#9316](https://github.com/pnpm/pnpm/pull/9316).
+- 3a90ec1: `pnpm config delete --location=project` The setting in `pnpm-workspace.yaml` file will be deleted if no `.npmrc` file is present in the directory
+
+----------------------------------------
+
+TITLE: Installing @pnpm/normalize-registries with pnpm
+DESCRIPTION: Command to install the @pnpm/normalize-registries package using pnpm package manager.
+
+LANGUAGE: shell
+CODE:
+pnpm add @pnpm/normalize-registries
+
+----------------------------------------
+
+TITLE: Installing pnpm Lifecycle Package
+DESCRIPTION: Command to install the required @pnpm/logger and @pnpm/lifecycle packages using pnpm package manager.
+
+LANGUAGE: shell
+CODE:
+pnpm add @pnpm/logger @pnpm/lifecycle
+
+----------------------------------------
+
+TITLE: Installing @pnpm/pkg-manager.direct-dep-linker using pnpm
+DESCRIPTION: This command installs the @pnpm/pkg-manager.direct-dep-linker package using the pnpm package manager. This package is responsible for linking direct dependencies to projects in the pnpm ecosystem.
+
+LANGUAGE: bash
+CODE:
+pnpm install @pnpm/pkg-manager.direct-dep-linker
+
+----------------------------------------
+
+TITLE: Installing @pnpm/pick-registry-for-package Module
+DESCRIPTION: Command to install the pick-registry-for-package module using pnpm package manager.
+
+LANGUAGE: bash
+CODE:
+pnpm add @pnpm/pick-registry-for-package
+
+----------------------------------------
+
+TITLE: Markdown Changelog Entry - Version 0.1.0
+DESCRIPTION: Documents initial minor release adding experimental pnpm cache commands for inspecting metadata cache.
+
+LANGUAGE: markdown
+CODE:
+## 0.1.0
+
+### Minor Changes
+
+- 0170b0f: Experimental: added `pnpm cache` commands for inspecting the metadata cache.
+
+### Patch Changes
+
+- Updated dependencies [0170b0f]
+  - @pnpm/cache.api@0.1.0
+
+----------------------------------------
+
+TITLE: Installing @pnpm/package-is-installable Package
+DESCRIPTION: Command to install the package-is-installable utility using pnpm package manager.
+
+LANGUAGE: bash
+CODE:
+pnpm install @pnpm/package-is-installable
+
+----------------------------------------
+
+TITLE: Installing pnpm Dependency Graph Builder Package
+DESCRIPTION: Command to install the @pnpm/deps.graph.builder package using pnpm package manager.
+
+LANGUAGE: shell
+CODE:
+pnpm install @pnpm/deps.graph.builder
+
+----------------------------------------
+
+TITLE: Installing @pnpm/audit Package with pnpm
+DESCRIPTION: This command installs the @pnpm/audit package using the pnpm package manager. It adds the package to the project's dependencies.
+
+LANGUAGE: sh
+CODE:
+pnpm add @pnpm/audit
+
+----------------------------------------
+
+TITLE: Individual Version Updates and Changes
+DESCRIPTION: Markdown formatted changelog entries tracking version updates, dependency changes, and bug fixes
+
+LANGUAGE: markdown
+CODE:
+# @pnpm/exportable-manifest
+
+## 1000.0.9
+
+### Patch Changes
+
+- Updated dependencies [5f7be64]
+- Updated dependencies [5f7be64]
+  - @pnpm/types@1000.3.0
+  - @pnpm/read-project-manifest@1000.0.8
+
+----------------------------------------
+
+TITLE: Installing @pnpm/pick-fetcher using pnpm
+DESCRIPTION: This command installs the @pnpm/pick-fetcher package using the pnpm package manager. It adds the package to the project's dependencies.
+
+LANGUAGE: sh
+CODE:
+pnpm add @pnpm/pick-fetcher
+
+----------------------------------------
+
+TITLE: Installing @pnpm/cache.api package using pnpm
+DESCRIPTION: This command installs the @pnpm/cache.api package using the pnpm package manager. It adds the package to the project's dependencies.
+
+LANGUAGE: sh
+CODE:
+pnpm add @pnpm/cache.api
+
+----------------------------------------
+
+TITLE: Configuring Package Script in JSON
+DESCRIPTION: Example package.json configuration showing a basic test fixture with a build script.
+
+LANGUAGE: json
+CODE:
+{
+  "name": "@pnpm/example-test-fixture",
+  "private": true,
+  "scripts": {
+    "build": "echo 'This script should run'"
+  }
+}
+
+----------------------------------------
+
+TITLE: Version Declaration and Changes Documentation
+DESCRIPTION: Documents version number, change type, and specific code/dependency updates in Markdown format. Includes major version changes like dropping Node.js v16 support and adding registry-scoped SSL configurations.
+
+LANGUAGE: markdown
+CODE:
+## 1000.1.6
+
+### Patch Changes
+
+- Updated dependencies [5f7be64]
+- Updated dependencies [5f7be64]
+  - @pnpm/types@1000.3.0
+  - @pnpm/core-loggers@1000.1.5
+
+----------------------------------------
+
+TITLE: Installing PNPM Testing Temp Store Package
+DESCRIPTION: Command to install the @pnpm/testing.temp-store package using PNPM package manager
+
+LANGUAGE: shell
+CODE:
+pnpm add @pnpm/testing.temp-store
+
+----------------------------------------
+
+TITLE: Major Change Notes - Node.js Version Support
+DESCRIPTION: Documentation of Node.js version requirement changes across releases, including dropping support for Node.js v14 and v16 in favor of v18.12+
+
+LANGUAGE: markdown
+CODE:
+### Major Changes\n- Node.js v16 support dropped. Use at least Node.js v18.12.\n- Node.js 14 support dropped.
+
+----------------------------------------
+
+TITLE: Recent Major Update - Node.js 16 Support Dropped
+DESCRIPTION: Major version update that drops Node.js v16 support and requires Node.js v18.12 or higher
+
+LANGUAGE: markdown
+CODE:
+### Major Changes
+- 43cdd87: Node.js v16 support dropped. Use at least Node.js v18.12.
+
+----------------------------------------
+
+TITLE: Breaking Change in v9.0.0
+DESCRIPTION: Dropped support for Node.js v16, now requires Node.js v18.12 or higher
+
+LANGUAGE: markdown
+CODE:
+Node.js v16 support dropped. Use at least Node.js v18.12.
+
+----------------------------------------
+
+TITLE: Major Version Change Documentation
+DESCRIPTION: Documentation for version 2.0.0 that introduces changes to store index file storage using content hash and package identifier to handle identical content published under different packages or versions.
+
+LANGUAGE: markdown
+CODE:
+### Major Changes
+
+- d433cb9: Some registries allow identical content to be published under different package names or versions. To accommodate this, index files in the store are now stored using both the content hash and package identifier.
+
+  This approach ensures that we can:
+
+  1. Validate that the integrity in the lockfile corresponds to the correct package,
+     which might not be the case after a poorly resolved Git conflict.
+  2. Allow the same content to be referenced by different packages or different versions of the same package.
+
+  Related PR: [#8510](https://github.com/pnpm/pnpm/pull/8510)
+  Related issue: [#8204](https://github.com/pnpm/pnpm/issues/8204)

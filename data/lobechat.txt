@@ -1,0 +1,3706 @@
+TITLE: Implementing LobeChat Plugin API in TypeScript
+DESCRIPTION: This TypeScript code snippet shows the implementation of a LobeChat plugin API endpoint. It handles POST requests, extracts parameters from the request body, and returns clothing recommendations based on gender and mood. The code uses Edge Runtime and includes error handling.
+
+LANGUAGE: typescript
+CODE:
+export default async (req: Request) => {
+  if (req.method !== 'POST') return createErrorResponse(PluginErrorType.MethodNotAllowed);
+
+  const { gender, mood } = (await req.json()) as RequestData;
+
+  const clothes = gender === 'man' ? manClothes : womanClothes;
+
+  const result: ResponseData = {
+    clothes: clothes[mood] || [],
+    mood,
+    today: Date.now(),
+  };
+
+  return new Response(JSON.stringify(result));
+};
+
+----------------------------------------
+
+TITLE: Defining LobeChat Plugin Manifest in JSON
+DESCRIPTION: This JSON snippet demonstrates the structure of a LobeChat plugin manifest. It includes fields for API definitions, gateway, identifier, UI specifications, and version. The manifest is crucial for describing the plugin's functionality and integration points with LobeChat.
+
+LANGUAGE: json
+CODE:
+{
+  "api": [
+    {
+      "url": "http://localhost:3400/api/clothes",
+      "name": "recommendClothes",
+      "description": "Recommend clothes to the user based on their mood",
+      "parameters": {
+        "properties": {
+          "mood": {
+            "description": "The user's current mood, with optional values: happy, sad, anger, fear, surprise, disgust",
+            "enums": ["happy", "sad", "anger", "fear", "surprise", "disgust"],
+            "type": "string"
+          },
+          "gender": {
+            "type": "string",
+            "enum": ["man", "woman"],
+            "description": "The user's gender, which needs to be asked for from the user to obtain this information"
+          }
+        },
+        "required": ["mood", "gender"],
+        "type": "object"
+      }
+    }
+  ],
+  "gateway": "http://localhost:3400/api/gateway",
+  "identifier": "chat-plugin-template",
+  "ui": {
+    "url": "http://localhost:3400",
+    "height": 200
+  },
+  "version": "1"
+}
+
+----------------------------------------
+
+TITLE: Implementing LobeChat Plugin UI in React
+DESCRIPTION: This React component snippet shows how to implement a user interface for a LobeChat plugin. It uses the fetchPluginMessage function from @lobehub/chat-plugin-sdk to retrieve plugin message data from LobeChat and render it in the UI.
+
+LANGUAGE: typescript
+CODE:
+import { fetchPluginMessage } from '@lobehub/chat-plugin-sdk';
+import { memo, useEffect, useState } from 'react';
+
+import { ResponseData } from '@/type';
+
+const Render = memo(() => {
+  const [data, setData] = useState<ResponseData>();
+
+  useEffect(() => {
+    // Retrieve the current plugin message from LobeChat
+    fetchPluginMessage().then((e: ResponseData) => {
+      setData(e);
+    });
+  }, []);
+
+  return <>...</>;
+});
+
+export default Render;
+
+----------------------------------------
+
+TITLE: Fetching Chat Model Data in TypeScript
+DESCRIPTION: This function preprocesses payload data, sends a POST request to the backend's /chat endpoint, and returns the request result. It also handles plugin integration.
+
+LANGUAGE: typescript
+CODE:
+export const fetchChatModel = (
+  { plugins: enabledPlugins, ...params }: Partial<OpenAIStreamPayload>,
+  options?: FetchChatModelOptions,
+) => {
+  const payload = merge(
+    {
+      model: initialLobeAgentConfig.model,
+      stream: true,
+      ...initialLobeAgentConfig.params,
+    },
+    params,
+  );
+
+  const filterFunctions: ChatCompletionFunctions[] = pluginSelectors.enabledSchema(enabledPlugins)(
+    usePluginStore.getState(),
+  );
+
+  const functions = filterFunctions.length === 0 ? undefined : filterFunctions;
+
+  return fetch(OPENAI_URLS.chat, {
+    body: JSON.stringify({ ...payload, functions }),
+    headers: createHeaderWithOpenAI({ 'Content-Type': 'application/json' }),
+    method: 'POST',
+    signal: options?.signal,
+  });
+};
+
+----------------------------------------
+
+TITLE: Implementing SessionStore with Zustand in TypeScript
+DESCRIPTION: This code snippet demonstrates the implementation of SessionStore using Zustand in LobeChat. It combines multiple slices, implements persistence, and uses devtools for debugging.
+
+LANGUAGE: typescript
+CODE:
+import { PersistOptions, devtools, persist, subscribeWithSelector } from 'zustand/middleware';
+import { shallow } from 'zustand/shallow';
+import { devtools } from 'zustand/middleware';
+import { createWithEqualityFn } from 'zustand/traditional';
+
+import { SessionStoreState, initialState } from './initialState';
+import { AgentAction, createAgentSlice } from './slices/agent/action';
+import { SessionAction, createSessionSlice } from './slices/session/action';
+
+//  ===============  Aggregate createStoreFn ============ //
+
+export type SessionStore = SessionAction & AgentAction & SessionStoreState;
+const createStore: StateCreator<SessionStore, [['zustand/devtools', never]]> = (...parameters) => ({
+  ...initialState,
+  ...createAgentSlice(...parameters),
+  ...createSessionSlice(...parameters),
+});
+
+
+
+//  ===============  Implement useStore ============ //
+
+export const useSessionStore = createWithEqualityFn<SessionStore>()(
+  persist(
+    subscribeWithSelector(
+      devtools(createStore, {
+        name: 'LobeChat_Session' + (isDev ? '_DEV' : ''),
+      }),
+    ),
+    persistOptions,
+  ),
+  shallow,
+);
+
+----------------------------------------
+
+TITLE: Handling POST Request for OpenAI Chat Completion in TypeScript
+DESCRIPTION: This code defines a POST method that parses payload data, retrieves authorization information, creates an OpenAI object, and calls the createChatCompletion method to interact with OpenAI's API.
+
+LANGUAGE: typescript
+CODE:
+export const POST = async (req: Request) => {
+  const payload = await req.json();
+
+  const { apiKey, endpoint } = getOpenAIAuthFromRequest(req);
+
+  const openai = createOpenai(apiKey, endpoint);
+
+  return createChatCompletion({ openai, payload });
+};
+
+----------------------------------------
+
+TITLE: Implementing Zustand Store for Chat State Management
+DESCRIPTION: Creates a Zustand store to manage chat message state and actions, including the messages array and addMessage function.
+
+LANGUAGE: typescript
+CODE:
+// src/store/chatStore.ts
+import create from 'zustand';
+
+type ChatState = {
+  messages: ChatMessage[];
+  addMessage: (message: ChatMessage) => void;
+};
+
+export const useChatStore = create<ChatState>((set) => ({
+  messages: [],
+  addMessage: (message) => set((state) => ({ messages: [...state.messages, message] })),
+}));
+
+----------------------------------------
+
+TITLE: Initializing i18next with Language Detection and Dynamic Resource Loading in TypeScript
+DESCRIPTION: This snippet demonstrates the core implementation logic for internationalization in LobeChat. It shows how to create an i18n instance, configure language detection, dynamically load translation resources, and handle language change events to set document direction.
+
+LANGUAGE: typescript
+CODE:
+import i18n from 'i18next';
+import LanguageDetector from 'i18next-browser-languagedetector';
+import resourcesToBackend from 'i18next-resources-to-backend';
+import { isRtlLang } from 'rtl-detect';
+
+// Create i18n instance and configure
+const createI18nInstance = (lang) => {
+  const i18nInstance = i18n
+    .use(LanguageDetector) // Use language detection
+    .use(
+      resourcesToBackend((language, namespace) => {
+        // Dynamically load translation resources for the corresponding language
+        return import(`path/to/locales/${language}/${namespace}.json`);
+      }),
+    );
+
+  // Listen for language change events and dynamically set document direction
+  i18nInstance.on('languageChanged', (language) => {
+    const direction = isRtlLang(language) ? 'rtl' : 'ltr';
+    document.documentElement.dir = direction; // Set HTML document direction
+  });
+
+  // Initialize i18n instance
+  i18nInstance.init({
+    // Relevant configurations
+  });
+
+  return i18nInstance;
+};
+
+----------------------------------------
+
+TITLE: Implementing Server-Sent Events (SSE) Fetching in TypeScript
+DESCRIPTION: This function implements a streaming approach to retrieve data, calling an onMessageHandle callback for each new data chunk to achieve a typewriter-like output effect.
+
+LANGUAGE: typescript
+CODE:
+export const fetchSSE = async (fetchFn: () => Promise<Response>, options: FetchSSEOptions = {}) => {
+  const response = await fetchFn();
+
+  if (!response.ok) {
+    const chatMessageError = await getMessageError(response);
+
+    options.onErrorHandle?.(chatMessageError);
+    return;
+  }
+
+  const returnRes = response.clone();
+
+  const data = response.body;
+
+  if (!data) return;
+
+  const reader = data.getReader();
+  const decoder = new TextDecoder();
+
+  let done = false;
+
+  while (!done) {
+    const { value, done: doneReading } = await reader.read();
+    done = doneReading;
+    const chunkValue = decoder.decode(value);
+
+    options.onMessageHandle?.(chunkValue);
+  }
+
+  return returnRes;
+};
+
+----------------------------------------
+
+TITLE: Defining Basic Model List Syntax in LobeChat
+DESCRIPTION: This snippet demonstrates the basic syntax for customizing the model list in LobeChat. It shows how to add, remove, and rename models using a comma-separated string format.
+
+LANGUAGE: text
+CODE:
+id->deploymentName=displayName<maxToken:vision:reasoning:search:fc:file:imageOutput>,model2,model3
+
+----------------------------------------
+
+TITLE: 定义 LobeChat 插件 Manifest
+DESCRIPTION: 展示了 LobeChat 插件的 manifest.json 文件示例，包含了插件的 API 定义、UI 配置和其他元数据。这个 manifest 文件是插件功能实现的核心描述。
+
+LANGUAGE: json
+CODE:
+{
+  "api": [
+    {
+      "url": "http://localhost:3400/api/clothes",
+      "name": "recommendClothes",
+      "description": "根据用户的心情，给用户推荐他有的衣服",
+      "parameters": {
+        "properties": {
+          "mood": {
+            "description": "用户当前的心情，可选值有：开心（happy）, 难过（sad）,生气 （anger）,害怕（fear）,惊喜（ surprise）,厌恶 （disgust）",
+            "enums": ["happy", "sad", "anger", "fear", "surprise", "disgust"],
+            "type": "string"
+          },
+          "gender": {
+            "type": "string",
+            "enum": ["man", "woman"],
+            "description": "对话用户的性别，需要询问用户后才知道这个信息"
+          }
+        },
+        "required": ["mood", "gender"],
+        "type": "object"
+      }
+    }
+  ],
+  "gateway": "http://localhost:3400/api/gateway",
+  "identifier": "chat-plugin-template",
+  "ui": {
+    "url": "http://localhost:3400",
+    "height": 200
+  },
+  "version": "1"
+}
+
+----------------------------------------
+
+TITLE: Setting Environment Variables for LobeChat Server Database
+DESCRIPTION: Core environment variables required for configuring LobeChat's server-side database deployment. Includes service mode, database connection, driver type, and encryption key settings.
+
+LANGUAGE: env
+CODE:
+NEXT_PUBLIC_SERVICE_MODE=server
+DATABASE_URL=postgres://username:password@host:port/database
+DATABASE_DRIVER=node|neon
+KEY_VAULTS_SECRET=<32-character-random-string>
+
+----------------------------------------
+
+TITLE: 实现 LobeChat 插件 API 接口
+DESCRIPTION: 展示了如何使用 TypeScript 和 Edge Runtime 实现 LobeChat 插件的 API 接口。这个例子实现了 'recommendClothes' 接口，根据用户的性别和心情推荐衣服。
+
+LANGUAGE: typescript
+CODE:
+export default async (req: Request) => {
+  if (req.method !== 'POST') return createErrorResponse(PluginErrorType.MethodNotAllowed);
+
+  const { gender, mood } = (await req.json()) as RequestData;
+
+  const clothes = gender === 'man' ? manClothes : womanClothes;
+
+  const result: ResponseData = {
+    clothes: clothes[mood] || [],
+    mood,
+    today: Date.now(),
+  };
+
+  return new Response(JSON.stringify(result));
+};
+
+----------------------------------------
+
+TITLE: LobeChat Environment Configuration File
+DESCRIPTION: Environment variable configuration for LobeChat deployment including database connection, authentication settings, S3 storage configuration, and other optional settings.
+
+LANGUAGE: shell
+CODE:
+# Website domain
+APP_URL=https://your-prod-domain.com
+
+# DB required environment variables
+KEY_VAULTS_SECRET=jgwsK28dspyVQoIf8/M3IIHl1h6LYYceSYNXeLpy6uk=
+# Postgres database connection string
+# Format: postgres://username:password@host:port/dbname; if your pg instance is a Docker container, use the container name
+DATABASE_URL=postgres://postgres:mysecretpassword@my-postgres:5432/postgres
+
+# NEXT_AUTH related, can use auth0, Azure AD, GitHub, Authentik, zitadel, etc. If you have other access requirements, feel free to submit a PR
+NEXT_AUTH_SECRET=3904039cd41ea1bdf6c93db0db96e250
+NEXT_AUTH_SSO_PROVIDERS=auth0
+NEXTAUTH_URL=https://your-prod-domain.com/api/auth
+AUTH_AUTH0_ID=xxxxxx
+AUTH_AUTH0_SECRET=cSX_xxxxx
+AUTH_AUTH0_ISSUER=https://lobe-chat-demo.us.auth0.com
+
+# S3 related
+S3_ACCESS_KEY_ID=xxxxxxxxxx
+S3_SECRET_ACCESS_KEY=xxxxxxxxxx
+S3_ENDPOINT=https://xxxxxxxxxx.r2.cloudflarestorage.com
+S3_BUCKET=lobechat
+S3_PUBLIC_DOMAIN=https://s3-for-lobechat.your-domain.com
+
+----------------------------------------
+
+TITLE: Docker Compose Configuration for LobeChat
+DESCRIPTION: YAML configuration for deploying LobeChat using Docker Compose. Specifies the image, container name, restart policy, port mapping, and environment variables.
+
+LANGUAGE: yaml
+CODE:
+version: '3.8'
+
+services:
+  lobe-chat:
+    image: lobehub/lobe-chat
+    container_name: lobe-chat
+    restart: always
+    ports:
+      - '3210:3210'
+    environment:
+      OPENAI_API_KEY: sk-xxxx
+      OPENAI_PROXY_URL: https://api-proxy.com/v1
+      ACCESS_CODE: lobe66
+
+----------------------------------------
+
+TITLE: Implementing Plugin Selectors in TypeScript for LobeChat
+DESCRIPTION: This code defines a set of selector functions for retrieving and processing plugin data from the LobeChat store. It includes methods for filtering enabled plugins, getting plugin metadata, and formatting plugin lists for display.
+
+LANGUAGE: typescript
+CODE:
+const pluginList = (s: PluginStoreState) => [...s.pluginList, ...s.customPluginList];
+
+const displayPluginList = (s: PluginStoreState) =>
+  pluginList(s).map((p) => ({
+    author: p.author,
+    avatar: p.meta?.avatar,
+    createAt: p.createAt,
+    desc: pluginHelpers.getPluginDesc(p.meta),
+    homepage: p.homepage,
+    identifier: p.identifier,
+    title: pluginHelpers.getPluginTitle(p.meta),
+  }));
+
+----------------------------------------
+
+TITLE: Complete Server-side Database Environment Variables
+DESCRIPTION: A comprehensive list of all environment variables required for configuring the server-side database version of LobeChat on Vercel.
+
+LANGUAGE: shell
+CODE:
+APP_URL=https://your-project.com
+
+# Specify the service mode as server
+NEXT_PUBLIC_SERVICE_MODE=server
+
+# Postgres database URL
+DATABASE_URL=
+KEY_VAULTS_SECRET=jgwsK28dspyVQoIf8/M3IIHl1h6LYYceSYNXeLpy6uk=
+
+# Clerk related configurations
+NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=pk_live_xxxxxxxxxxx
+CLERK_SECRET_KEY=sk_live_xxxxxxxxxxxxxxxxxxxxxx
+CLERK_WEBHOOK_SECRET=whsec_xxxxxxxxxxxxxxxxxxxxxx
+
+# S3 related configurations
+# S3 keys
+S3_ACCESS_KEY_ID=9998d6757e276cf9f1edbd325b7083a6
+S3_SECRET_ACCESS_KEY=55af75d8eb6b99f189f6a35f855336ea62cd9c4751a5cf4337c53c1d3f497ac2
+
+# Bucket name
+S3_BUCKET=lobechat
+# Bucket request endpoint
+S3_ENDPOINT=https://0b33a03b5c993fd2f453379dc36558e5.r2.cloudflarestorage.com
+# Public access domain for the bucket
+S3_PUBLIC_DOMAIN=https://s3-for-lobechat.your-domain.com
+# Bucket region, such as us-west-1, generally not needed to add, but some service providers may require configuration
+# S3_REGION=us-west-1
+
+----------------------------------------
+
+TITLE: Configuring Azure OpenAI Environment Variables
+DESCRIPTION: Example of setting required environment variables for Azure OpenAI, including API key, endpoint, and API version.
+
+LANGUAGE: bash
+CODE:
+AZURE_API_KEY=c55168be3874490ef0565d9779ecd5a6
+AZURE_ENDPOINT=https://docs-test-001.openai.azure.com
+AZURE_API_VERSION=2023-02-01
+
+----------------------------------------
+
+TITLE: Using Plugin Selectors in React Components for LobeChat
+DESCRIPTION: This code demonstrates how to use the plugin selectors in a React component within LobeChat. It imports the necessary store and selector functions, then uses them to retrieve the formatted plugin list for rendering.
+
+LANGUAGE: typescript
+CODE:
+import { usePluginStore } from '@/store/plugin';
+import { pluginSelectors } from '@/store/plugin/selectors';
+
+const Render = ({ plugins }) => {
+  const list = usePluginStore(pluginSelectors.displayPluginList);
+
+  return <> ... </>;
+};
+
+----------------------------------------
+
+TITLE: Configuring URL Rules in TypeScript for Web Crawler
+DESCRIPTION: Example configuration for URL-specific crawling rules. Demonstrates how to define patterns, URL transformations, implementation methods, and content filtering options for specific website crawling behaviors.
+
+LANGUAGE: typescript
+CODE:
+const url = [
+  // ... other URL matching rules
+  {
+    // URL matching pattern, supports regex
+    urlPattern: 'https://example.com/articles/(.*)',
+
+    // Optional: URL transformation, redirects to an easier-to-crawl version
+    urlTransform: 'https://example.com/print/$1',
+
+    // Optional: specify crawling implementation, supports 'naive', 'jina', 'search1api', and 'browserless'
+    impls: ['naive', 'jina', 'search1api', 'browserless'],
+
+    // Optional: content filtering configuration
+    filterOptions: {
+      // Whether to enable Readability algorithm for filtering distracting elements
+      enableReadability: true,
+      // Whether to convert to plain text
+      pureText: false,
+    },
+  },
+];
+
+----------------------------------------
+
+TITLE: Configuring Environment Variables for LobeChat Github Authentication
+DESCRIPTION: This code snippet shows the required environment variables for setting up Github authentication in LobeChat. It includes variables for Auth.js session encryption, SSO provider selection, Github App credentials, and OAuth callback URL.
+
+LANGUAGE: markdown
+CODE:
+| Environment Variable      | Type     | Description                                                                                                                                                                                           |
+| ------------------------- | -------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `NEXT_AUTH_SECRET`        | Required | Key used to encrypt Auth.js session tokens. You can generate the key using the command: `openssl rand -base64 32`                                                                                     |
+| `NEXT_AUTH_SSO_PROVIDERS` | Required | Select the Single Sign-On provider for LobeChat. Use `github` for Github.                                                                                                                             |
+| `AUTH_GITHUB_ID`          | Required | Client ID in the Github App details page.                                                                                                                                                             |
+| `AUTH_GITHUB_SECRET`      | Required | Client Secret in the Github App details page.                                                                                                                                                         |
+| `NEXTAUTH_URL`            | Required | This URL is used to specify the callback address for Auth.js when performing OAuth authentication. Only set it if the default generated redirect address is incorrect. `https://example.com/api/auth` |
+
+----------------------------------------
+
+TITLE: Defining LobeChat Feature Flags Schema in TypeScript
+DESCRIPTION: This code snippet defines the schema for LobeChat's feature flags. It includes all available feature flags as boolean properties, representing whether each feature is enabled or disabled.
+
+LANGUAGE: typescript
+CODE:
+// featureFlags.ts
+export interface FeatureFlags {
+  webrtc_sync: boolean;
+  language_model_settings: boolean;
+  openai_api_key: boolean;
+  openai_proxy_url: boolean;
+  create_session: boolean;
+  edit_agent: boolean;
+  dalle: boolean;
+  check_updates: boolean;
+  welcome_suggest: boolean;
+  market: boolean;
+  speech_to_text: boolean;
+  knowledge_base: boolean;
+  clerk_sign_up: boolean;
+}
+
+----------------------------------------
+
+TITLE: Implementing SessionGroup Model
+DESCRIPTION: Base model implementation for handling session group database operations
+
+LANGUAGE: typescript
+CODE:
+class _SessionGroupModel extends BaseModel {
+  constructor() {
+    super('sessions', DB_SessionGroupSchema);
+  }
+
+  async create(name: string, sort?: number, id = nanoid()) {
+    return this._add({ name, sort }, id);
+  }
+}
+
+----------------------------------------
+
+TITLE: Building Custom LobeChat Docker Image with GitHub Actions
+DESCRIPTION: GitHub Actions workflow configuration for building a custom Docker image of LobeChat with overridden NEXT_PUBLIC environment variables. The workflow includes steps for repository checkout, container registry login, metadata extraction, and image building with custom build arguments.
+
+LANGUAGE: yaml
+CODE:
+name: Build Custom Image
+
+on:
+  workflow_dispatch: # Manual trigger
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository_owner }}/lobe-chat-database # Name of your image
+
+jobs:
+  build-and-push:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+        with:
+          repository: lobehub/lobe-chat
+
+      - name: Log in to the Container registry
+        uses: docker/login-action@v2
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract metadata (tags, labels) for Docker
+        id: meta
+        uses: docker/metadata-action@v4
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v4
+        with:
+          context: .
+          file: Dockerfile.database # Change dockerfile if needed
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          # List all variables you need to overwrite
+          build-args: |
+            NEXT_PUBLIC_BASE_PATH=${{ secrets.NEXT_PUBLIC_BASE_PATH }}
+            NEXT_PUBLIC_SERVICE_MODE=${{ secrets.NEXT_PUBLIC_SERVICE_MODE }}
+
+----------------------------------------
+
+TITLE: Creating Chat Page Component
+DESCRIPTION: Implements the main chat page component using Ant Design components and the Zustand store for displaying messages.
+
+LANGUAGE: jsx
+CODE:
+// src/features/chat/index.tsx
+import { List, Typography } from 'antd';
+import { useChatStore } from 'src/store/chatStore';
+
+const ChatPage = () => {
+  const messages = useChatStore((state) => state.messages);
+
+  return (
+    <List
+      dataSource={messages}
+      renderItem={(message) => (
+        <List.Item>
+          <Typography.Text>{message.content}</Typography.Text>
+        </List.Item>
+      )}
+    />
+  );
+};
+
+export default ChatPage;
+
+----------------------------------------
+
+TITLE: Defining Chat Message Data Structure
+DESCRIPTION: Defines the TypeScript interface for chat messages, including properties for id, content, timestamp, and sender type.
+
+LANGUAGE: typescript
+CODE:
+// src/types/chat.ts
+
+export type ChatMessage = {
+  id: string;
+  content: string;
+  timestamp: number;
+  sender: 'user' | 'bot';
+};
+
+----------------------------------------
+
+TITLE: Documentation Structure - Markdown TOC
+DESCRIPTION: Table of contents outlining the main sections of the architecture documentation, including application overview, frontend architecture, Edge Runtime API, markets, and development processes.
+
+LANGUAGE: markdown
+CODE:
+- [Application Architecture Overview](#application-architecture-overview)
+- [Frontend Architecture](#frontend-architecture)
+- [Edge Runtime API](#edge-runtime-api)
+- [Agents Market](#agents-market)
+- [Plugin Market](#plugin-market)
+- [Security and Performance Optimization](#security-and-performance-optimization)
+- [Development and Deployment Process](#development-and-deployment-process)
+
+----------------------------------------
+
+TITLE: Deploying LobeChat Docker Container
+DESCRIPTION: Docker run command to deploy LobeChat service with basic configuration including port mapping, API key, and access code
+
+LANGUAGE: fish
+CODE:
+$ docker run -d -p 3210:3210 \
+    -e OPENAI_API_KEY=sk-xxxx \
+    -e ACCESS_CODE=lobe66 \
+    --name lobe-chat \
+    lobehub/lobe-chat
+
+----------------------------------------
+
+TITLE: Defining Chat Message Actions Interface in TypeScript
+DESCRIPTION: Defines the ChatMessageAction interface with various methods for managing chat messages, including sending, deleting, updating, and querying messages.
+
+LANGUAGE: typescript
+CODE:
+export interface ChatMessageAction extends ChatRAGAction {
+  sendMessage: (params: SendMessageParams) => Promise<void>;
+  addAIMessage: () => Promise<void>;
+  regenerateMessage: (id: string) => Promise<void>;
+  clearMessage: () => Promise<void>;
+  deleteMessage: (id: string) => Promise<void>;
+  deleteToolMessage: (id: string) => Promise<void>;
+  delAndRegenerateMessage: (id: string) => Promise<void>;
+  clearAllMessages: () => Promise<void>;
+  updateInputMessage: (message: string) => void;
+  modifyMessageContent: (id: string, content: string) => Promise<void>;
+  useFetchMessages: (sessionId: string, topicId?: string) => SWRResponse<ChatMessage[]>;
+  stopGenerateMessage: () => void;
+  copyMessage: (id: string, content: string) => Promise<void>;
+  refreshMessages: () => Promise<void>;
+  toggleMessageEditing: (id: string, editing: boolean) => void;
+  // ... internal methods
+}
+
+----------------------------------------
+
+TITLE: Main Directory Structure Overview - Bash
+DESCRIPTION: Shows the primary directory structure of the LobeChat application, detailing key folders like app, components, config, and other essential directories for the application's organization.
+
+LANGUAGE: bash
+CODE:
+src
+├── app        # Main logic and state management related code for the application
+├── components # Reusable UI components
+├── config     # Application configuration files, including client-side and server-side environment variables
+├── const      # Used to define constants, such as action types, route names, etc.
+├── features   # Function modules related to business functions, such as agent settings, plugin development pop-ups, etc.
+├── hooks      # Custom utility hooks reused throughout the application
+├── layout     # Application layout components, such as navigation bars, sidebars, etc.
+├── locales    # Internationalization language files
+├── services   # Encapsulated backend service interfaces, such as HTTP requests
+├── store      # Zustand store for state management
+├── types      # TypeScript type definition files
+└── utils      # Common utility functions
+
+----------------------------------------
+
+TITLE: Creating Postgres Database Instance with Docker
+DESCRIPTION: Commands to create a Postgres database instance with PGVector plugin using Docker. Creates a network and runs a Postgres 16 container with vector search capabilities.
+
+LANGUAGE: shell
+CODE:
+docker network create pg
+
+docker run --name my-postgres --network pg -e POSTGRES_PASSWORD=mysecretpassword -p 5432:5432 -d pgvector/pgvector:pg16
+
+----------------------------------------
+
+TITLE: Setting OpenAI API Key in Environment Variables
+DESCRIPTION: Example of setting the OpenAI API key as an environment variable. This is required for using OpenAI services in LobeChat.
+
+LANGUAGE: bash
+CODE:
+OPENAI_API_KEY=sk-xxxxxx...xxxxxx
+
+----------------------------------------
+
+TITLE: Configuring Cloudflare R2 Environment Variables for S3 Storage
+DESCRIPTION: These environment variables are necessary for connecting to the Cloudflare R2 S3 storage bucket. They include the bucket name, endpoint URL, and public domain for accessing stored files.
+
+LANGUAGE: shell
+CODE:
+# Bucket name
+S3_BUCKET=lobechat
+# Request endpoint of the bucket (note that the path in this link includes the bucket name, which must be removed, or use the link provided on the page for applying S3 API token)
+S3_ENDPOINT=https://0b33a03b5c993fd2f453379dc36558e5.r2.cloudflarestorage.com
+# Access domain of the bucket
+S3_PUBLIC_DOMAIN=https://s3-for-lobechat.your-domain.com
+
+----------------------------------------
+
+TITLE: Initializing ElectronIPCServer in TypeScript for LobeHub
+DESCRIPTION: This snippet demonstrates how to create and start an ElectronIPCServer instance in the Electron main process. It defines an event handler for processing IPC requests, such as retrieving the database path.
+
+LANGUAGE: typescript
+CODE:
+import { ElectronIPCEventHandler, ElectronIPCServer } from '@lobechat/electron-server-ipc';
+
+// 定义处理函数
+const eventHandler: ElectronIPCEventHandler = {
+  getDatabasePath: async () => {
+    return '/path/to/database';
+  },
+  // 其他处理函数...
+};
+
+// 创建并启动服务器
+const server = new ElectronIPCServer(eventHandler);
+server.start();
+
+----------------------------------------
+
+TITLE: Markdown Structure for LobeChat Deployment Steps
+DESCRIPTION: Markdown document outlining the deployment process for LobeChat on Sealos, including preparation steps, deployment instructions, and domain configuration options.
+
+LANGUAGE: markdown
+CODE:
+---
+title: Deploy LobeChat on Sealos
+description: >
+  Learn how to deploy LobeChat on Sealos with ease. Follow the provided steps to
+  set up LobeChat and start using it efficiently.
+tags:
+  - Deploy LobeChat
+  - Sealos Deployment
+  - OpenAI API Key
+  - Custom Domain Binding
+---
+
+# Deploy LobeChat with Sealos
+
+If you want to deploy LobeChat on Sealos, you can follow the steps below:
+
+## Sealos Deployment Process
+
+<Steps>
+  ### Prepare your OpenAI API Key
+
+  Go to [OpenAI](https://platform.openai.com/account/api-keys) to get your OpenAI API Key.
+
+  ### Click the button below to deploy
+
+  [![][deploy-button-image]][deploy-link]
+
+  ### After deployment, you can start using it
+
+  ### Bind a custom domain (optional)
+
+  You can use the subdomain provided by Sealos, or choose to bind a custom domain. Currently, the domains provided by Sealos have not been contaminated, and can be directly accessed in most regions.
+</Steps>
+
+[deploy-button-image]: https://raw.githubusercontent.com/labring-actions/templates/main/Deploy-on-Sealos.svg
+[deploy-link]: https://template.usw.sealos.io/deploy?templateName=lobe-chat
+
+----------------------------------------
+
+TITLE: Using ElectronIpcClient in TypeScript for LobeHub Server
+DESCRIPTION: This snippet shows how to use the ElectronIpcClient in a server-side context (e.g., Next.js) to connect to the IPC server and send requests. It demonstrates sending a request to get the database path.
+
+LANGUAGE: typescript
+CODE:
+import { ElectronIPCMethods, ElectronIpcClient } from '@lobechat/electron-server-ipc';
+
+// 创建客户端
+const client = new ElectronIpcClient();
+
+// 发送请求
+const dbPath = await client.sendRequest(ElectronIPCMethods.getDatabasePath);
+
+----------------------------------------
+
+TITLE: Example JSON Settings for LobeChat Configuration
+DESCRIPTION: Provides an example of the settings object in JSON format, showing how to structure the keyVaults configuration for OpenAI.
+
+LANGUAGE: json
+CODE:
+{
+  "keyVaults": {
+    "openai": {
+      "apiKey": "user-key"
+    }
+  }
+}
+
+----------------------------------------
+
+TITLE: Markdown Documentation for TencentCloud Deployment
+DESCRIPTION: Structured markdown documentation explaining the steps to deploy LobeChat on TencentCloud Lighthouse, including API key preparation and deployment instructions.
+
+LANGUAGE: markdown
+CODE:
+# Deploy LobeChat with TencentCloud Lighthouse
+
+If you want to deploy LobeChat on TencentCloud Lighthouse, you can follow the steps below:
+
+## Tencent Cloud Deployment Process
+
+<Steps>
+  ### Prepare your API Key
+
+  Go to [OpenAI API Key](https://platform.openai.com/account/api-keys) to get your OpenAI API Key.
+
+  ### One-click to deploy
+
+  [![][deploy-button-image]][deploy-link]
+
+  ### Once deployed, you can start using it
+</Steps>
+
+[deploy-button-image]: https://cloudcache.tencent-cloud.com/qcloud/ui/static/static_source_business/d65fb782-4fb0-4348-ad85-f2943d6bee8f.svg
+[deploy-link]: https://buy.tencentcloud.com/lighthouse?blueprintType=APP_OS&blueprintOfficialId=lhbp-6u0ti132&regionId=9&zone=ap-singapore-3&bundleId=bundle_starter_nmc_lin_med2_01&loginSet=AUTO&rule=true&from=lobechat
+
+----------------------------------------
+
+TITLE: Configuring Environment Variables for LobeChat Netlify Deployment
+DESCRIPTION: Required and optional environment variables for configuring LobeChat deployment on Netlify. Includes OpenAI API key, access codes, and proxy URL settings.
+
+LANGUAGE: markdown
+CODE:
+| Environment Variable | Type     | Description                                                                                                                                                                 | Example                                                               |
+| -------------------- | -------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------- |
+| `OPENAI_API_KEY`     | Required | This is the API key you applied for on the OpenAI account page                                                                                                              | `sk-xxxxxx...xxxxxx`                                                  |
+| `ACCESS_CODE`        | Required | Add a password to access this service. You can set a long password to prevent brute force attacks. When this value is separated by commas, it becomes an array of passwords | `awCT74` or `e3@09!` or `code1,code2,code3`                           |
+| `OPENAI_PROXY_URL`   | Optional | If you manually configure the OpenAI interface proxy, you can use this configuration to override the default OpenAI API request base URL                                    | `https://aihubmix.com/v1`, default value: `https://api.openai.com/v1` |
+
+----------------------------------------
+
+TITLE: Starting LobeChat Database Docker Container
+DESCRIPTION: Docker commands to run the LobeChat database container and check its logs for successful deployment.
+
+LANGUAGE: shell
+CODE:
+docker run -it -d -p 3210:3210 --network pg --env-file lobe-chat.env --name lobe-chat-database lobehub/lobe-chat-database
+
+LANGUAGE: shell
+CODE:
+docker logs -f lobe-chat-database
+
+----------------------------------------
+
+TITLE: Production Docker Compose Configuration
+DESCRIPTION: Example docker-compose.yml file for production deployment with Casdoor authentication.
+
+LANGUAGE: yaml
+CODE:
+name: lobe-chat-database
+services:
+  network-service:
+    image: alpine
+    container_name: lobe-network
+    ports:
+      - '${MINIO_PORT}:${MINIO_PORT}' # MinIO API
+      - '9001:9001' # MinIO Console
+      - '${CASDOOR_PORT}:${CASDOOR_PORT}' # Casdoor
+      - '${LOBE_PORT}:3210' # LobeChat
+    command: tail -f /dev/null
+    networks:
+      - lobe-network
+
+  postgresql:
+    image: pgvector/pgvector:pg16
+    container_name: lobe-postgres
+    ports:
+      - '5432:5432'
+    volumes:
+      - './data:/var/lib/postgresql/data'
+    environment:
+      - 'POSTGRES_DB=${LOBE_DB_NAME}'
+      - 'POSTGRES_PASSWORD=${POSTGRES_PASSWORD}'
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U postgres']
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    restart: always
+    networks:
+      - lobe-network
+
+  minio:
+    image: minio/minio
+    container_name: lobe-minio
+    network_mode: 'service:network-service'
+    volumes:
+      - './s3_data:/etc/minio/data'
+    environment:
+      - 'MINIO_ROOT_USER=${MINIO_ROOT_USER}'
+      - 'MINIO_ROOT_PASSWORD=${MINIO_ROOT_PASSWORD}'
+      # - 'MINIO_API_CORS_ALLOW_ORIGIN=http://localhost:${LOBE_PORT}'
+      - 'MINIO_API_CORS_ALLOW_ORIGIN=https://lobe.example.com'
+    restart: always
+    command: >
+      server /etc/minio/data --address ":${MINIO_PORT}" --console-address ":9001"
+
+  casdoor:
+    image: casbin/casdoor
+    container_name: lobe-casdoor
+    entrypoint: /bin/sh -c './server --createDatabase=true'
+    network_mode: 'service:network-service'
+    depends_on:
+      postgresql:
+        condition: service_healthy
+    environment:
+      RUNNING_IN_DOCKER: 'true'
+      driverName: 'postgres'
+      dataSourceName: 'user=postgres password=${POSTGRES_PASSWORD} host=postgresql port=5432 sslmode=disable dbname=casdoor'
+      # origin: 'http://localhost:${CASDOOR_PORT}'
+      origin: 'https://auth.example.com'
+      runmode: 'dev'
+    volumes:
+      - ./init_data.json:/init_data.json
+
+  lobe:
+    image: lobehub/lobe-chat-database
+    container_name: lobe-chat-database
+    network_mode: 'service:network-service'
+    depends_on:
+      postgresql:
+        condition: service_healthy
+      network-service:
+        condition: service_started
+      minio:
+        condition: service_started
+      casdoor:
+        condition: service_started
+
+    environment:
+      # - 'APP_URL=http://localhost:3210'
+      - 'APP_URL=https://lobe.example.com'
+
+      - 'NEXT_AUTH_SSO_PROVIDERS=casdoor'
+      - 'KEY_VAULTS_SECRET=Kix2wcUONd4CX51E/ZPAd36BqM4wzJgKjPtz2sGztqQ='
+      - 'NEXT_AUTH_SECRET=NX2kaPE923dt6BL2U8e9oSre5RfoT7hg'
+      # - 'AUTH_URL=http://localhost:${LOBE_PORT}/api/auth'
+      - 'AUTH_URL=https://lobe.example.com/api/auth'
+
+      # - 'AUTH_CASDOOR_ISSUER=http://localhost:${CASDOOR_PORT}'
+      - 'AUTH_CASDOOR_ISSUER=https://auth.example.com'
+
+      - 'DATABASE_URL=postgresql://postgres:${POSTGRES_PASSWORD}@postgresql:5432/${LOBE_DB_NAME}'
+      # - 'S3_ENDPOINT=http://localhost:${MINIO_PORT}'
+      - 'S3_ENDPOINT=https://minio.example.com'
+
+      - 'S3_BUCKET=${MINIO_LOBE_BUCKET}'
+      # - 'S3_PUBLIC_DOMAIN=http://localhost:${MINIO_PORT}'
+      - 'S3_PUBLIC_DOMAIN=https://minio.example.com'
+
+      - 'S3_ENABLE_PATH_STYLE=1'
+      - 'LLM_VISION_IMAGE_USE_BASE64=1'
+    env_file:
+      - .env
+    restart: always
+
+volumes:
+  data:
+    driver: local
+  s3_data:
+    driver: local
+
+networks:
+  lobe-network:
+    driver: bridge
+
+----------------------------------------
+
+TITLE: Production Environment Variables Configuration
+DESCRIPTION: Example .env file configuration for production deployment using Casdoor authentication.
+
+LANGUAGE: env
+CODE:
+# Proxy, if you need it
+# HTTP_PROXY=http://localhost:7890
+# HTTPS_PROXY=http://localhost:7890
+
+# Other environment variables, as needed. You can refer to the environment variables configuration for the client version, making sure not to have ACCESS_CODE.
+# OPENAI_API_KEY=sk-xxxx
+# OPENAI_PROXY_URL=https://api.openai.com/v1
+# OPENAI_MODEL_LIST=...
+
+# ===========================
+# ====== Preset config ======
+# ===========================
+# if no special requirements, no need to change
+LOBE_PORT=3210
+CASDOOR_PORT=8000
+MINIO_PORT=9000
+
+# Postgres related, which are the necessary environment variables for DB
+LOBE_DB_NAME=lobechat
+POSTGRES_PASSWORD=uWNZugjBqixf8dxC
+
+# Casdoor secret
+AUTH_CASDOOR_ID=943e627d79d5dd8a22a1
+AUTH_CASDOOR_SECRET=6ec24ac304e92e160ef0d0656ecd86de8cb563f1
+
+# MinIO S3 configuration
+MINIO_ROOT_USER=Joe
+MINIO_ROOT_PASSWORD=Crj1570768
+
+# Configure the bucket information of MinIO
+MINIO_LOBE_BUCKET=lobe
+S3_ACCESS_KEY_ID=dB6Uq9CYZPdWSZouPyEd
+S3_SECRET_ACCESS_KEY=aPBW8CVULkh8bw1GatlT0GjLihcXHLNwRml4pieS
+
+----------------------------------------
+
+TITLE: Local Docker Deployment Command
+DESCRIPTION: Complete Docker run command for deploying LobeChat database locally on Mac/Windows with all required environment variables.
+
+LANGUAGE: shell
+CODE:
+docker run -it -d --name lobe-chat-database -p 3210:3210 \
+  -e DATABASE_URL=postgres://postgres:mysecretpassword@host.docker.internal:5432/postgres \
+  -e KEY_VAULTS_SECRET=jgwsK28dspyVQoIf8/M3IIHl1h6LYYceSYNXeLpy6uk= \
+  -e NEXT_AUTH_SECRET=3904039cd41ea1bdf6c93db0db96e250 \
+  -e NEXT_AUTH_SSO_PROVIDERS=auth0 \
+  -e AUTH_AUTH0_ID=xxxxxx \
+  -e AUTH_AUTH0_SECRET=cSX_xxxxx \
+  -e AUTH_AUTH0_ISSUER=https://lobe-chat-demo.us.auth0.com \
+  -e APP_URL=http://localhost:3210 \
+  -e NEXTAUTH_URL=http://localhost:3210/api/auth \
+  -e S3_ACCESS_KEY_ID=xxxxxxxxxx \
+  -e S3_SECRET_ACCESS_KEY=xxxxxxxxxx \
+  -e S3_ENDPOINT=https://xxxxxxxxxx.r2.cloudflarestorage.com \
+  -e S3_BUCKET=lobechat \
+  -e S3_PUBLIC_DOMAIN=https://s3-for-lobechat.your-domain.com \
+  lobehub/lobe-chat-database
+
+----------------------------------------
+
+TITLE: Complete Environment Configuration
+DESCRIPTION: Full list of required environment variables for LobeChat deployment including build settings, database configuration, authentication, and API keys
+
+LANGUAGE: shell
+CODE:
+# Environment variables required for building
+NIXPACKS_PKGS="pnpm bun"
+NIXPACKS_INSTALL_CMD="pnpm install"
+NIXPACKS_BUILD_CMD="pnpm run build"
+NIXPACKS_START_CMD="pnpm start"
+
+APP_URL=
+
+# Set the service mode to server
+NEXT_PUBLIC_SERVICE_MODE=server
+
+# Configuration related to Postgres database
+DATABASE_DRIVER=node
+DATABASE_URL=
+
+# You can use openssl rand -base64 32 to generate a random 32-character string as a key.
+KEY_VAULTS_SECRET=
+
+# Clerk related configuration
+NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=
+CLERK_SECRET_KEY=
+CLERK_WEBHOOK_SECRET=
+
+# S3 related configuration
+S3_ACCESS_KEY_ID=
+S3_SECRET_ACCESS_KEY=
+S3_ENDPOINT=
+S3_BUCKET=
+S3_PUBLIC_DOMAIN=
+S3_ENABLE_PATH_STYLE=
+
+# OpenAI related configuration
+OPENAI_API_KEY=
+OPENAI_MODEL_LIST=
+OPENAI_PROXY_URL=
+
+----------------------------------------
+
+TITLE: Configuring Langfuse Environment Variables
+DESCRIPTION: Environment variables required to enable and configure Langfuse integration with LobeChat. These variables include the enable flag, secret key, public key, and host URL.
+
+LANGUAGE: shell
+CODE:
+ENABLE_LANGFUSE = '1'
+LANGFUSE_SECRET_KEY = 'sk-lf...'
+LANGFUSE_PUBLIC_KEY = 'pk-lf...'
+LANGFUSE_HOST = 'https://cloud.langfuse.com'
+
+----------------------------------------
+
+TITLE: Configuring Node Postgres Environment Variables
+DESCRIPTION: Set up the necessary environment variables for connecting to a Node Postgres database, specifying the database driver, and setting the server mode for LobeChat.
+
+LANGUAGE: shell
+CODE:
+# Node Postgres DB Url
+DATABASE_URL=
+
+# Specify Postgres database driver as node
+DATABASE_DRIVER=node
+
+# Specify service mode as server, otherwise it will not enter the server-side database
+NEXT_PUBLIC_SERVICE_MODE=server
+
+----------------------------------------
+
+TITLE: Setting Clerk Environment Variables in Shell
+DESCRIPTION: Defines the necessary environment variables for Clerk authentication, including public and private keys, and disabling NextAuth.
+
+LANGUAGE: shell
+CODE:
+NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=pk_live_xxxxxxxxxxx
+CLERK_SECRET_KEY=sk_live_xxxxxxxxxxxxxxxxxxxxxx
+NEXT_PUBLIC_ENABLE_NEXT_AUTH=0
+
+----------------------------------------
+
+TITLE: Adding Key Vault Secret Environment Variable
+DESCRIPTION: Add the KEY_VAULTS_SECRET environment variable, which is used to encrypt sensitive information such as API keys stored by users.
+
+LANGUAGE: shell
+CODE:
+KEY_VAULTS_SECRET=jgwsK28dspyVQoIf8/M3IIHl1h6LYYceSYNXeLpy6uk=
+
+----------------------------------------
+
+TITLE: Configuring S3 CORS Settings
+DESCRIPTION: Example JSON configuration for setting up Cross-Origin Resource Sharing (CORS) rules for the S3 bucket to allow requests from your domain.
+
+LANGUAGE: json
+CODE:
+[
+  {
+    "AllowedOrigins": ["https://your-project.vercel.app"],
+    "AllowedMethods": ["GET", "PUT", "HEAD", "POST", "DELETE"],
+    "AllowedHeaders": ["*"]
+  }
+]
+
+----------------------------------------
+
+TITLE: Generating Auth.js Session Token Key
+DESCRIPTION: Bash command to generate a secure key for encrypting Auth.js session tokens using OpenSSL.
+
+LANGUAGE: bash
+CODE:
+openssl rand -base64 32
+
+----------------------------------------
+
+TITLE: Configuring Authelia OIDC Provider for LobeChat
+DESCRIPTION: YAML configuration for setting up an Authelia OIDC identity provider for LobeChat. Includes essential settings like secret, redirect URIs, and required scopes for authentication.
+
+LANGUAGE: yaml
+CODE:
+identity_providers:
+  oidc:
+    ...
+    ## The other portions of the mandatory OpenID Connect 1.0 configuration go here.
+    ## See: https://www.authelia.com/c/oidc
+    - id: lobe-chat
+      description: LobeChat
+      secret: '$pbkdf2-sha512$310000$c8p78n7pUMln0jzvd4aK4Q$JNRBzwAo0ek5qKn50cFzzvE9RXV88h1wJn5KGiHrD0YKtZaR/nCb2CJPOsKaPK0hjf.9yHxzQGZziziccp6Yng'  # The digest of 'insecure_secret'.
+      public: false
+      authorization_policy: two_factor
+      redirect_uris:
+        - https://chat.example.com/api/auth/callback/authelia
+      scopes:
+        - openid
+        - profile
+        - email
+      userinfo_signing_algorithm: none
+
+----------------------------------------
+
+TITLE: Configuring Clerk Authentication Environment Variables
+DESCRIPTION: Set up the necessary environment variables for Clerk authentication service, including public and private keys.
+
+LANGUAGE: shell
+CODE:
+NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=pk_live_xxxxxxxxxxx
+CLERK_SECRET_KEY=sk_live_xxxxxxxxxxxxxxxxxxxxxx
+
+----------------------------------------
+
+TITLE: Generating Auth.js Session Token Secret in Bash
+DESCRIPTION: Command to generate a secure random secret for encrypting Auth.js session tokens using OpenSSL.
+
+LANGUAGE: bash
+CODE:
+openssl rand -base64 32
+
+----------------------------------------
+
+TITLE: Automatic Update Script
+DESCRIPTION: Bash script for automating LobeChat Docker container updates with proxy configuration, version checking, and cleanup
+
+LANGUAGE: bash
+CODE:
+#!/bin/bash
+# auto-update-lobe-chat.sh
+
+# Set up proxy (optional)
+export https_proxy=http://127.0.0.1:7890 http_proxy=http://127.0.0.1:7890 all_proxy=socks5://127.0.0.1:7890
+
+# Pull the latest image and store the output in a variable
+output=$(docker pull lobehub/lobe-chat:latest 2>&1)
+
+# Check if the pull command was executed successfully
+if [ $? -ne 0 ]; then
+  exit 1
+fi
+
+# Check if the output contains a specific string
+echo "$output" | grep -q "Image is up to date for lobehub/lobe-chat:latest"
+
+# If the image is already up to date, do nothing
+if [ $? -eq 0 ]; then
+  exit 0
+fi
+
+echo "Detected lobe-chat update"
+
+# Remove the old container
+echo "Removed: $(docker rm -f lobe-chat)"
+
+# Run the new container(Please change the path to the env file)
+echo "Started: $(docker run -d --network=host --env-file /path/to/lobe.env --name=lobe-chat --restart=always lobehub/lobe-chat)"
+
+# Print the update time and version
+echo "Update time: $(date)"
+echo "Version: $(docker inspect lobehub/lobe-chat:latest | grep 'org.opencontainers.image.version' | awk -F'"' '{print $4}')"
+
+# Clean up unused images
+docker images | grep 'lobehub/lobe-chat' | grep -v 'lobehub/lobe-chat-database' | grep -v 'latest' | awk '{print $3}' | xargs -r docker rmi > /dev/null 2>&1
+echo "Removed old images."
+
+----------------------------------------
+
+TITLE: Configuring S3 Storage Environment Variables
+DESCRIPTION: Set up the necessary environment variables for connecting to an S3-compatible storage service, including bucket details and access keys.
+
+LANGUAGE: shell
+CODE:
+# S3 Keys
+S3_ACCESS_KEY_ID=9998d6757e276cf9f1edbd325b7083a6
+S3_SECRET_ACCESS_KEY=55af75d8eb6b99f189f6a35f855336ea62cd9c4751a5cf4337c53c1d3f497ac2
+
+# Bucket name
+S3_BUCKET=lobechat
+# Bucket request endpoint
+S3_ENDPOINT=https://0b33a03b5c993fd2f453379dc36558e5.r2.cloudflarestorage.com
+# Public domain for bucket access
+S3_PUBLIC_DOMAIN=https://s3-dev.your-domain.com
+
+# Bucket region, such as us-west-1, generally not required, but some providers may need to configure
+# S3_REGION=us-west-1
+
+----------------------------------------
+
+TITLE: Automatic Update Script
+DESCRIPTION: Bash script for automating LobeChat Docker container updates with proxy configuration, version checking, and cleanup
+
+LANGUAGE: bash
+CODE:
+#!/bin/bash
+# auto-update-lobe-chat.sh
+
+# Set up proxy (optional)
+export https_proxy=http://127.0.0.1:7890 http_proxy=http://127.0.0.1:7890 all_proxy=socks5://127.0.0.1:7890
+
+# Pull the latest image and store the output in a variable
+output=$(docker pull lobehub/lobe-chat:latest 2>&1)
+
+# Check if the pull command was executed successfully
+if [ $? -ne 0 ]; then
+  exit 1
+fi
+
+# Check if the output contains a specific string
+echo "$output" | grep -q "Image is up to date for lobehub/lobe-chat:latest"
+
+# If the image is already up to date, do nothing
+if [ $? -eq 0 ]; then
+  exit 0
+fi
+
+echo "Detected lobe-chat update"
+
+# Remove the old container
+echo "Removed: $(docker rm -f lobe-chat)"
+
+# Run the new container(Please change the path to the env file)
+echo "Started: $(docker run -d --network=host --env-file /path/to/lobe.env --name=lobe-chat --restart=always lobehub/lobe-chat)"
+
+# Print the update time and version
+echo "Update time: $(date)"
+echo "Version: $(docker inspect lobehub/lobe-chat:latest | grep 'org.opencontainers.image.version' | awk -F'"' '{print $4}')"
+
+# Clean up unused images
+docker images | grep 'lobehub/lobe-chat' | grep -v 'lobehub/lobe-chat-database' | grep -v 'latest' | awk '{print $3}' | xargs -r docker rmi > /dev/null 2>&1
+echo "Removed old images."
+
+----------------------------------------
+
+TITLE: Configuring Environment Variables for Wechat Authentication in LobeChat
+DESCRIPTION: This snippet outlines the required environment variables for setting up Wechat authentication in LobeChat. It includes variables for Auth.js session encryption, SSO provider selection, Wechat credentials, and the authentication callback URL.
+
+LANGUAGE: markdown
+CODE:
+| Environment Variable      | Type     | Description                                                                                                                                                                                           |
+| ------------------------- | -------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `NEXT_AUTH_SECRET`        | Required | Key used to encrypt Auth.js session tokens. You can generate the key using the command: `openssl rand -base64 32`                                                                                     |
+| `NEXT_AUTH_SSO_PROVIDERS` | Required | Select the Single Sign-On provider for LobeChat. Use `github` for Github.                                                                                                                             |
+| `WECHAT_CLIENT_ID`        | Required | Client ID from the Wechat website application details page                                                                                                                                            |
+| `WECHAT_CLIENT_SECRET`    | Required | Client Secret from the Wechat website application details page                                                                                                                                        |
+| `NEXTAUTH_URL`            | Required | This URL is used to specify the callback address for Auth.js when performing OAuth authentication. Only set it if the default generated redirect address is incorrect. `https://example.com/api/auth` |
+
+----------------------------------------
+
+TITLE: Deploying LobeChat with Proxy Configuration
+DESCRIPTION: Docker run command that includes proxy configuration for OpenAI API access
+
+LANGUAGE: fish
+CODE:
+$ docker run -d -p 3210:3210 \
+    -e OPENAI_API_KEY=sk-xxxx \
+    -e OPENAI_PROXY_URL=https://api-proxy.com/v1 \
+    -e ACCESS_CODE=lobe66 \
+    --name lobe-chat \
+    lobehub/lobe-chat
+
+----------------------------------------
+
+TITLE: LobeChat Environment Configuration
+DESCRIPTION: Sample environment configuration file containing API keys, proxy settings, and model configurations
+
+LANGUAGE: env
+CODE:
+OPENAI_API_KEY=sk-xxxx
+OPENAI_PROXY_URL=https://api-proxy.com/v1
+ACCESS_CODE=arthals2333
+OPENAI_MODEL_LIST=-gpt-4,-gpt-4-32k,-gpt-3.5-turbo-16k,gpt-3.5-turbo-1106=gpt-3.5-turbo-16k,gpt-4-0125-preview=gpt-4-turbo,gpt-4-vision-preview=gpt-4-vision
+
+----------------------------------------
+
+TITLE: Running Docker Compose Deployment Command
+DESCRIPTION: Command to start the LobeChat service using Docker Compose in detached mode.
+
+LANGUAGE: bash
+CODE:
+$ docker-compose up -d
+
+----------------------------------------
+
+TITLE: Extended View Configuration
+DESCRIPTION: Advanced view configuration example showing various options including security settings, WITH clauses, and materialized view specific settings.
+
+LANGUAGE: typescript
+CODE:
+const newYorkers = pgView('new_yorkers')
+  .with({
+    checkOption: 'cascaded',
+    securityBarrier: true,
+    securityInvoker: true,
+  })
+  .as((qb) => {
+    const sq = qb
+      .$with('sq')
+      .as(
+        qb.select({ userId: users.id, cityId: cities.id })
+          .from(users)
+          .leftJoin(cities, eq(cities.id, users.homeCity))
+          .where(sql`${users.age1} > 18`),
+      );
+    return qb.with(sq).select().from(sq).where(sql`${users.homeCity} = 1`);
+  });
+
+----------------------------------------
+
+TITLE: Crontab Configuration
+DESCRIPTION: Crontab entry to schedule automatic updates every 5 minutes with log output
+
+LANGUAGE: bash
+CODE:
+*/5 * * * * /path/to/auto-update-lobe-chat.sh >> /path/to/auto-update-lobe-chat.log 2>&1
+
+----------------------------------------
+
+TITLE: Automatic Update Script for LobeChat Docker Container
+DESCRIPTION: Bash script for automatically updating the LobeChat Docker container. It pulls the latest image, checks for updates, removes the old container, starts a new one, and cleans up unused images.
+
+LANGUAGE: bash
+CODE:
+#!/bin/bash
+# auto-update-lobe-chat.sh
+
+# Set proxy (optional)
+export https_proxy=http://127.0.0.1:7890 http_proxy=http://127.0.0.1:7890 all_proxy=socks5://127.0.0.1:7890
+
+# Pull the latest image and store the output in a variable
+output=$(docker pull lobehub/lobe-chat:latest 2>&1)
+
+# Check if the pull command was executed successfully
+if [ $? -ne 0 ]; then
+  exit 1
+fi
+
+# Check if the output contains a specific string
+echo "$output" | grep -q "Image is up to date for lobehub/lobe-chat:latest"
+
+# If the image is already up to date, do nothing
+if [ $? -eq 0 ]; then
+  exit 0
+fi
+
+echo "Detected Lobe-Chat update"
+
+# Remove the old container
+echo "Removed: $(docker rm -f Lobe-Chat)"
+
+# You may need to navigate to the directory where `docker-compose.yml` is located first
+# cd /path/to/docker-compose-folder
+
+# Run the new container
+echo "Started: $(docker-compose up)"
+
+# Print the update time and version
+echo "Update time: $(date)"
+echo "Version: $(docker inspect lobehub/lobe-chat:latest | grep 'org.opencontainers.image.version' | awk -F'"' '{print $4}')"
+
+# Clean up unused images
+docker images | grep 'lobehub/lobe-chat' | grep -v 'lobehub/lobe-chat-database' | grep -v 'latest' | awk '{print $3}' | xargs -r docker rmi > /dev/null 2>&1
+echo "Removed old images."
+
+----------------------------------------
+
+TITLE: Installing Google Gemma Model via Ollama CLI
+DESCRIPTION: Command to pull and install the Google Gemma 7b model locally using Ollama CLI. This step is required before using the model in LobeChat.
+
+LANGUAGE: bash
+CODE:
+ollama pull gemma
+
+----------------------------------------
+
+TITLE: Configuring Crontab for Automatic Updates
+DESCRIPTION: Crontab entry to execute the automatic update script every 5 minutes and log the output.
+
+LANGUAGE: bash
+CODE:
+*/5 * * * * /path/to/auto-update-lobe-chat.sh >> /path/to/auto-update-lobe-chat.log 2>&1
+
+----------------------------------------
+
+TITLE: Docker Container Success Logs
+DESCRIPTION: Example of successful startup logs from the LobeChat database container showing database migration and server startup.
+
+LANGUAGE: log
+CODE:
+[Database] Start to migration...
+✅ database migration pass.
+------------------------------------
+  ▲ Next.js 14.x.x
+  - Local:        http://localhost:3210
+  - Network:      http://0.0.0.0:3210
+
+ ✓ Starting...
+ ✓ Ready in 95ms
+
+----------------------------------------
+
+TITLE: Environment Variables Configuration for Azure OpenAI in LobeChat
+DESCRIPTION: Table defining the required and optional environment variables for Azure OpenAI integration during LobeChat deployment. Includes API keys, endpoints, version specifications, model configurations, and access control settings.
+
+LANGUAGE: markdown
+CODE:
+| Environment Variable | Type     | Description                                                                                                                                                                                                                                                          | Default Value      | Example                                                                                                          |
+| -------------------- | -------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------ | ---------------------------------------------------------------------------------------------------------------- |
+| `AZURE_API_KEY`      | Required | This is the API key you obtained from the Azure OpenAI account page                                                                                                                                                                                                  | -                  | `c55168be3874490ef0565d9779ecd5a6`                                                                               |
+| `AZURE_ENDPOINT`     | Required | Azure API address, can be found in the "Keys and Endpoints" section when checking resources in the Azure portal                                                                                                                                                      | -                  | `https://docs-test-001.openai.azure.com`                                                                         |
+| `AZURE_API_VERSION`  | Required | Azure API version, following the format YYYY-MM-DD                                                                                                                                                                                                                   | 2023-08-01-preview | `-`, see [latest version](https://learn.microsoft.com/en-us/azure/ai-services/openai/reference#chat-completions) |
+| `AZURE_MODEL_LIST`   | Required | Used to control the model list, use `+` to add a model, use `-` to hide a model, use `id->deplymentName=displayName` to customize the display name of a model, separated by commas. Definition syntax rules see [Model List](/docs/self-hosting/advanced/model-list) | -                  | `gpt-35-turbo->my-deploy=GPT 3.5 Turbo` or `gpt-4-turbo->my-gpt4=GPT 4 Turbo<128000:vision:fc>`                  |
+| `ACCESS_CODE`        | Optional | Add a password to access LobeChat. You can set a long password to prevent brute force attacks. When this value is separated by commas, it becomes an array of passwords                                                                                              | -                  | `awCT74` or `e3@09!` or `code1,code2,code3`                                                                      |
+
+----------------------------------------
+
+TITLE: Running vLLM Commands with UV
+DESCRIPTION: Alternative method to run vLLM commands directly using UV without creating a virtual environment.
+
+LANGUAGE: shell
+CODE:
+uv run --with vllm vllm --help
+
+----------------------------------------
+
+TITLE: Starting vLLM Server with Qwen Model
+DESCRIPTION: Command to start a vLLM server running the Qwen2.5-1.5B-Instruct model with OpenAI API compatibility.
+
+LANGUAGE: shell
+CODE:
+vllm serve Qwen/Qwen2.5-1.5B-Instruct
+
+----------------------------------------
+
+TITLE: LobeChat Auto-Update Script
+DESCRIPTION: Bash script for automatically updating LobeChat Docker container with error handling and logging
+
+LANGUAGE: bash
+CODE:
+#!/bin/bash
+# auto-update-lobe-chat.sh
+
+# Set up proxy (optional)
+export https_proxy=http://127.0.0.1:7890 http_proxy=http://127.0.0.1:7890 all_proxy=socks5://127.0.0.1:7890
+
+# Pull the latest image and store the output in a variable
+output=$(docker pull lobehub/lobe-chat:latest 2>&1)
+
+# Check if the pull command was executed successfully
+if [ $? -ne 0 ]; then
+  exit 1
+fi
+
+# Check if the output contains a specific string
+echo "$output" | grep -q "Image is up to date for lobehub/lobe-chat:latest"
+
+# If the image is already up to date, do nothing
+if [ $? -eq 0 ]; then
+  exit 0
+fi
+
+echo "Detected Lobe-Chat update"
+
+# Remove the old container
+echo "Removed: $(docker rm -f Lobe-Chat)"
+
+# Run the new container
+echo "Started: $(docker run -d --network=host --env-file /path/to/lobe.env --name=Lobe-Chat --restart=always lobehub/lobe-chat)"
+
+# Print the update time and version
+echo "Update time: $(date)"
+echo "Version: $(docker inspect lobehub/lobe-chat:latest | grep 'org.opencontainers.image.version' | awk -F'"' '{print $4}')"
+
+# Clean up unused images
+docker images | grep 'lobehub/lobe-chat' | grep -v 'lobehub/lobe-chat-database' | grep -v 'latest' | awk '{print $3}' | xargs -r docker rmi > /dev/null 2>&1
+echo "Removed old images."
+
+----------------------------------------
+
+TITLE: Fetching and Executing Deployment Script
+DESCRIPTION: Command to download and run the LobeChat deployment script with English language option.
+
+LANGUAGE: sh
+CODE:
+bash <(curl -fsSL https://lobe.li/setup.sh) -l en
+
+----------------------------------------
+
+TITLE: Installing Ollama on Linux
+DESCRIPTION: Curl command to download and install Ollama on Linux systems.
+
+LANGUAGE: bash
+CODE:
+curl -fsSL https://ollama.com/install.sh | sh
+
+----------------------------------------
+
+TITLE: Configuring Ollama Systemd Service
+DESCRIPTION: Commands to edit and configure Ollama's systemd service for cross-origin access and host settings on Linux.
+
+LANGUAGE: bash
+CODE:
+sudo systemctl edit ollama.service
+
+LANGUAGE: bash
+CODE:
+[Service]
+Environment="OLLAMA_HOST=0.0.0.0"
+Environment="OLLAMA_ORIGINS=*"
+
+LANGUAGE: bash
+CODE:
+sudo systemctl daemon-reload
+sudo systemctl restart ollama
+
+----------------------------------------
+
+TITLE: Configuring Zeabur Pack for Serverless Deployment in JSON
+DESCRIPTION: This JSON configuration file (zbpack.json) is used to set up LobeChat for serverless deployment on Zeabur. It ignores the Dockerfile and enables serverless mode.
+
+LANGUAGE: json
+CODE:
+{
+  "ignore_dockerfile": true,
+  "serverless": true
+}
+
+----------------------------------------
+
+TITLE: Markdown Documentation for SambaNova Integration
+DESCRIPTION: Documentation detailing the process of integrating SambaNova with LobeChat, including metadata, image references, and structured steps for setup and configuration.
+
+LANGUAGE: markdown
+CODE:
+---
+title: Using SambaNova API Key in LobeChat
+description: Learn how to configure and use SambaNova models in LobeChat, obtain an API key, and start a conversation.
+tags:
+  - LobeChat
+  - SambaNova
+  - API Key
+  - Web UI
+---
+
+# Using SambaNova in LobeChat
+
+<Image alt={'Using SambaNova in LobeChat'} cover src={'https://github.com/user-attachments/assets/1028aa1a-6c19-4191-b28a-2020e5637155'} />
+
+----------------------------------------
+
+TITLE: Pulling Latest Docker Image
+DESCRIPTION: Command to pull the latest Docker image for LobeChat
+
+LANGUAGE: fish
+CODE:
+docker pull lobehub/lobe-chat
+
+----------------------------------------
+
+TITLE: Clerk Authentication Variables
+DESCRIPTION: Environment variables needed for Clerk authentication service setup
+
+LANGUAGE: shell
+CODE:
+NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=pk_live_xxxxxxxxxxx
+CLERK_SECRET_KEY=sk_live_xxxxxxxxxxxxxxxxxxxxxx
+CLERK_WEBHOOK_SECRET=whsec_xxxxxxxxxxxxxxxxxxxxxx
+
+----------------------------------------
+
+TITLE: Defining SessionGroup Database Schema
+DESCRIPTION: Defines the data model schema for session groups using Zod schema validation
+
+LANGUAGE: typescript
+CODE:
+import { z } from 'zod';
+
+export const DB_SessionGroupSchema = z.object({
+  name: z.string(),
+  sort: z.number().optional(),
+});
+
+export type DB_SessionGroup = z.infer<typeof DB_SessionGroupSchema>;
+
+----------------------------------------
+
+TITLE: Creating Frontend Store Actions
+DESCRIPTION: Implementation of session group actions in the frontend store using Zustand
+
+LANGUAGE: typescript
+CODE:
+export const createSessionGroupSlice: StateCreator<
+  SessionStore,
+  [['zustand/devtools', never]],
+  [],
+  SessionGroupAction
+> = (set, get) => ({
+  addSessionGroup: async (name) => {
+    const id = await sessionService.createSessionGroup(name);
+    await get().refreshSessions();
+    return id;
+  },
+});
+
+----------------------------------------
+
+TITLE: Environment Configuration
+DESCRIPTION: Environment variables configuration file for LobeChat Docker deployment
+
+LANGUAGE: env
+CODE:
+OPENAI_API_KEY=sk-xxxx
+OPENAI_PROXY_URL=https://api-proxy.com/v1
+ACCESS_CODE=arthals2333
+OPENAI_MODEL_LIST=-gpt-4,-gpt-4-32k,-gpt-3.5-turbo-16k,gpt-3.5-turbo-1106=gpt-3.5-turbo-16k,gpt-4-0125-preview=gpt-4-turbo,gpt-4-vision-preview=gpt-4-vision
+
+----------------------------------------
+
+TITLE: Implementing Chat Message Actions in TypeScript
+DESCRIPTION: Implements the chat message actions using Zustand store creator. This includes methods for sending messages, processing AI responses, and managing message states.
+
+LANGUAGE: typescript
+CODE:
+export const chatMessage: StateCreator<
+  ChatStore,
+  [['zustand/devtools', never]],
+  [],
+  ChatMessageAction
+> = (set, get, ...rest) => ({
+  ...chatRag(set, get, ...rest),
+
+  sendMessage: async ({ message, files, onlyAddUserMessage, isWelcomeQuestion }) => {
+    // Implementation of sending a message
+    // ...
+  },
+
+  addAIMessage: async () => {
+    // Implementation of adding an AI message
+    // ...
+  },
+
+  internal_coreProcessMessage: async (originalMessages, userMessageId, params) => {
+    // Implementation of core message processing
+    // ...
+  },
+
+  // ... other method implementations
+});
+
+----------------------------------------
+
+TITLE: Deploying PostgreSQL with PGVector using Docker
+DESCRIPTION: This command runs a Docker container with PostgreSQL and the PGVector extension, essential for storing structured data and vector indexes in LobeChat's knowledge base system.
+
+LANGUAGE: bash
+CODE:
+docker run -p 5432:5432 -d --name pg -e POSTGRES_PASSWORD=mysecretpassword pgvector/pgvector:pg16
+
+----------------------------------------
+
+TITLE: Running Docker Container with Environment Variable
+DESCRIPTION: This command shows how to run a Docker container with the NODE_TLS_REJECT_UNAUTHORIZED environment variable set to bypass certificate validation.
+
+LANGUAGE: bash
+CODE:
+docker run -e NODE_TLS_REJECT_UNAUTHORIZED=0 <other parameters> <image name>
+
+----------------------------------------
+
+TITLE: Managing Message Loading States in TypeScript
+DESCRIPTION: Implements methods for managing loading states of messages, including toggling loading indicators and handling abort controllers.
+
+LANGUAGE: typescript
+CODE:
+internal_toggleMessageLoading: (loading, id) => {
+  set(
+    {
+      messageLoadingIds: toggleBooleanList(get().messageLoadingIds, id, loading),
+    },
+    false,
+    'internal_toggleMessageLoading',
+  );
+},
+
+internal_toggleChatLoading: (loading, id, action) => {
+  return get().internal_toggleLoadingArrays('chatLoadingIds', loading, id, action);
+},
+
+internal_toggleLoadingArrays: (key, loading, id, action) => {
+  if (loading) {
+    window.addEventListener('beforeunload', preventLeavingFn);
+    const abortController = new AbortController();
+    set(
+      {
+        abortController,
+        [key]: toggleBooleanList(get()[key] as string[], id!, loading),
+      },
+      false,
+      action,
+    );
+    return abortController;
+  } else {
+    // ... handling unloading
+  }
+},
+
+----------------------------------------
+
+TITLE: Retrieving User Information in Frontend
+DESCRIPTION: Use the useOAuthSession() hook to get user information in frontend pages.
+
+LANGUAGE: typescript
+CODE:
+import { useOAuthSession } from '@/hooks/useOAuthSession';
+
+const { user, isOAuthLoggedIn } = useOAuthSession();
+
+----------------------------------------
+
+TITLE: Enabling S3 Path-Style Access Mode in Shell
+DESCRIPTION: Example of enabling the path-style access mode for S3 by setting the S3_ENABLE_PATH_STYLE environment variable. This is typically needed for self-deployed services like Minio.
+
+LANGUAGE: shell
+CODE:
+S3_ENABLE_PATH_STYLE=1
+
+----------------------------------------
+
+TITLE: Customizing JWT and Session Callbacks
+DESCRIPTION: Implement custom logic in jwt and session callbacks to handle user ID and additional profile information.
+
+LANGUAGE: typescript
+CODE:
+callbacks: {
+  async jwt({ token, profile, account }) {
+    if (profile && account) {
+      token.userId = account.providerAccountId;
+      token.avatar = profile.picture;
+    }
+    return token;
+  },
+  async session({ session, token }) {
+    if (session.user) {
+      session.user.id = token.userId ?? session.user.id;
+      session.user.avatar = token.avatar;
+    }
+    return session;
+  },
+}
+
+----------------------------------------
+
+TITLE: Setting Cloudflare R2 S3 Access Key Environment Variables
+DESCRIPTION: These environment variables contain the access key and secret key required for authenticating and authorizing access to the Cloudflare R2 S3 storage service.
+
+LANGUAGE: shell
+CODE:
+S3_ACCESS_KEY_ID=9998d6757e276cf9f1edbd325b7083a6
+S3_SECRET_ACCESS_KEY=55af75d8eb6b99f189f6a35f855336ea62cd9c4751a5cf4337c53c1d3f497ac2
+
+----------------------------------------
+
+TITLE: Setting Environment Variable in Docker Compose
+DESCRIPTION: This YAML snippet demonstrates how to set the NODE_TLS_REJECT_UNAUTHORIZED environment variable in a docker-compose.yml file for bypassing certificate validation.
+
+LANGUAGE: yaml
+CODE:
+# In the docker-compose.yml
+environment:
+  - NODE_TLS_REJECT_UNAUTHORIZED=0
+
+----------------------------------------
+
+TITLE: Handling Multiple Authentication Providers
+DESCRIPTION: Differentiate between multiple authentication providers in the jwt callback using the account.provider parameter.
+
+LANGUAGE: typescript
+CODE:
+callbacks: {
+  async jwt({ token, profile, account }) {
+    if (profile && account) {
+      if (account.provider === 'authing')
+        token.userId = account.providerAccountId ?? token.sub;
+      else if (acount.provider === 'auth0')
+        token.userId = profile.sub ?? token.sub;
+      else
+        // other providers
+    }
+    return token;
+  },
+}
+
+----------------------------------------
+
+TITLE: Writing Basic Prompt for Generative AI in English
+DESCRIPTION: A simple prompt structure for asking the AI assistant to answer questions. This format provides a clear instruction followed by the specific question to be addressed.
+
+LANGUAGE: prompt
+CODE:
+Answer the following questions:
+What are the most urgent environmental issues facing our planet, and what actions can individuals take to help address these issues?
+
+----------------------------------------
+
+TITLE: Complete S3 Environment Variables Configuration for Cloudflare R2
+DESCRIPTION: This shell script provides a comprehensive set of environment variables needed to configure and connect to a Cloudflare R2 S3 storage service, including access keys, bucket details, and optional region specification.
+
+LANGUAGE: shell
+CODE:
+# S3 Keys
+S3_ACCESS_KEY_ID=9998d6757e276cf9f1edbd325b7083a6
+S3_SECRET_ACCESS_KEY=55af75d8eb6b99f189f6a35f855336ea62cd9c4751a5cf4337c53c1d3f497ac2
+
+# Bucket Name
+S3_BUCKET=lobechat
+# Bucket Request Endpoint
+S3_ENDPOINT=https://0b33a03b5c993fd2f453379dc36558e5.r2.cloudflarestorage.com
+# Public Access Domain for the Bucket
+S3_PUBLIC_DOMAIN=https://s3-dev.your-domain.com
+
+# Bucket Region, such as us-west-1. Generally not required, but some service providers may need it.
+# S3_REGION=us-west-1
+
+----------------------------------------
+
+TITLE: Creating Structured Prompt for Detailed Response in English
+DESCRIPTION: An improved prompt that specifies the desired output format (a paper with introduction, body, and conclusion) and provides clear instructions for a more comprehensive and structured response.
+
+LANGUAGE: prompt
+CODE:
+Write a highly detailed paper, including an introduction, body, and conclusion, to answer the following questions:
+What are the most urgent environmental issues facing our planet,
+and what actions can individuals take to help address these issues?
+
+----------------------------------------
+
+TITLE: Setting Environment Variables for Tencent Cloud COS in Shell
+DESCRIPTION: This snippet demonstrates how to set the required environment variables for connecting to a Tencent Cloud COS bucket. It includes the bucket name, endpoint URL, region, and public domain URL.
+
+LANGUAGE: shell
+CODE:
+S3_BUCKET=lobe-130xxxxxx2
+S3_ENDPOINT=https://cos.ap-chengdu.myqcloud.com
+S3_REGION=ap-chengdu
+S3_PUBLIC_DOMAIN=https://lobe-1251234567.cos.ap-chengdu.myqcloud.com
+
+----------------------------------------
+
+TITLE: Automating LobeChat Docker Updates
+DESCRIPTION: Bash script for automating the update process of LobeChat Docker container, including pulling the latest image, stopping the old container, and starting a new one.
+
+LANGUAGE: bash
+CODE:
+#!/bin/bash
+# auto-update-lobe-chat.sh
+
+# 设置代理（可选）
+# export https_proxy=http://127.0.0.1:7890 http_proxy=http://127.0.0.1:7890 all_proxy=socks5://127.0.0.1:7890
+
+# 拉取最新的镜像并将输出存储在变量中
+output=$(docker pull lobehub/lobe-chat:latest 2>&1)
+
+# 检查拉取命令是否成功执行
+if [ $? -ne 0 ]; then
+  exit 1
+fi
+
+# 检查输出中是否包含特定的字符串
+echo "$output" | grep -q "Image is up to date for lobehub/lobe-chat:latest"
+
+# 如果镜像已经是最新的，则不执行任何操作
+if [ $? -eq 0 ]; then
+  exit 0
+fi
+
+echo "Detected lobe-chat update"
+
+# 删除旧的容器
+echo "Removed: $(docker rm -f lobe-chat)"
+
+# 运行新的容器(请将env配置文件地址改为你的实际地址)
+echo "Started: $(docker run -d --network=host --env-file path/to/lobe.env --name=lobe-chat --restart=always lobehub/lobe-chat)"
+
+# 打印更新的时间和版本
+echo "Update time: $(date)"
+echo "Version: $(docker inspect lobehub/lobe-chat:latest | grep 'org.opencontainers.image.version' | awk -F'"' '{print $4}')"
+
+# 清理不再使用的镜像
+docker images | grep 'lobehub/lobe-chat' | grep -v 'lobehub/lobe-chat-database' | grep -v 'latest' | awk '{print $3}' | xargs -r docker rmi > /dev/null 2>&1
+echo "Removed old images."
+
+----------------------------------------
+
+TITLE: Generating Initial Paragraph with Prompt in English
+DESCRIPTION: A prompt designed to generate an opening paragraph for a philosophical discussion. It provides a specific question and instructs the AI to use careful reasoning in the response.
+
+LANGUAGE: prompt
+CODE:
+Write an opening paragraph to answer the following question:
+Is mathematics an invention or a discovery? Use careful reasoning to explain your answer.
+
+----------------------------------------
+
+TITLE: Cloning Forked Repository in Bash
+DESCRIPTION: This command clones the forked Lobe Chat repository to the contributor's local machine. It requires the contributor to replace 'YourUsername' with their actual GitHub username.
+
+LANGUAGE: bash
+CODE:
+git clone https://github.com/YourUsername/lobe-chat.git
+
+----------------------------------------
+
+TITLE: Configuring Authentik Redirect URL for LobeChat
+DESCRIPTION: The redirect URL pattern that needs to be configured in the Authentik OAuth2/OpenID Provider settings. This URL is used for handling authentication callbacks from Authentik to LobeChat.
+
+LANGUAGE: bash
+CODE:
+https://your-domain/api/auth/callback/authentik
+
+----------------------------------------
+
+TITLE: Creating New Branch in Git
+DESCRIPTION: This Git command creates a new branch for the contributor's work. The branch name should be replaced with a meaningful name related to the contribution.
+
+LANGUAGE: bash
+CODE:
+git checkout -b your-branch-name
+
+----------------------------------------
+
+TITLE: Styling Casdoor Login Form with CSS
+DESCRIPTION: CSS code to enhance the user experience of the Casdoor login form. It styles the login panel, logo, and buttons for both desktop and mobile views.
+
+LANGUAGE: html
+CODE:
+<style>
+  .login-panel {
+    padding: 40px 70px 0 70px;
+    border-radius: 10px;
+    background-color: #ffffff;
+    box-shadow: rgba(17, 12, 46, 0.15) 0px 48px 100px 0px;
+  }
+  .panel-logo {
+    width: 64px;
+  }
+  .login-logo-box {
+    margin-top: 20px;
+  }
+
+  #parent-area
+    > main
+    > div
+    > div.login-content
+    > div.login-panel
+    > div.login-form
+    > div
+    > div
+    > button {
+    box-shadow: none !important;
+    border-radius: 10px !important;
+    transition-property: all;
+    transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+    transition-duration: 150ms;
+    border: 1px solid #eee !important;
+  }
+
+  @media (max-width: 640px) {
+    .login-panel {
+      padding: 40px 0 0 0;
+      box-shadow: none;
+    }
+  }
+
+
+
+</style>
+
+----------------------------------------
+
+TITLE: Markdown Configuration for LobeChat Deployment Guide
+DESCRIPTION: Markdown configuration file defining the deployment documentation structure, including title, description, tags, and deployment steps for LobeChat on Alibaba Cloud.
+
+LANGUAGE: markdown
+CODE:
+---
+title: Deploy LobeChat on Alibaba Cloud
+description: >
+  Learn how to deploy the LobeChat application on Alibaba Cloud, including
+  preparing the large model API Key, clicking the deploy button, and other
+  operations.
+tags:
+  - Alibaba Cloud
+  - LobeChat
+  - Alibaba Cloud Compute Nest
+  - API Key
+---
+
+# Deploy LobeChat with Alibaba Cloud
+
+If you want to deploy LobeChat on Alibaba Cloud, you can follow the steps below:
+
+## Alibaba Cloud Deployment Process
+
+<Steps>
+  ### Prepare your API Key
+
+  Go to [OpenAI API Key](https://platform.openai.com/account/api-keys) to get your OpenAI API Key. Or go to [Tongyi Qianwen API Key](https://bailian.console.aliyun.com/?apiKey=1#/api-key) to get your API Key.
+
+  ### One-click to deploy
+
+  [![][deploy-button-image]][deploy-link]
+
+  ### Once deployed, you can start using it
+</Steps>
+
+[deploy-button-image]: https://service-info-public.oss-cn-hangzhou.aliyuncs.com/computenest-en.svg
+[deploy-link]: https://computenest.console.aliyun.com/service/instance/create/default?type=user&ServiceName=LobeChat%E7%A4%BE%E5%8C%BA%E7%89%88
+
+----------------------------------------
+
+TITLE: Running Linter for Lobe Chat Project
+DESCRIPTION: This command runs the project's linter to ensure the code adheres to the project's coding style. It uses pnpm, indicating that Lobe Chat likely uses pnpm as its package manager.
+
+LANGUAGE: bash
+CODE:
+pnpm lint
+
+----------------------------------------
+
+TITLE: Committing Changes in Git
+DESCRIPTION: These Git commands stage all changes and create a commit with a meaningful message. Contributors are advised to keep commits focused and clear.
+
+LANGUAGE: bash
+CODE:
+git add .
+git commit -m "Your meaningful commit message"
+
+----------------------------------------
+
+TITLE: Generating Auth Secret Key with OpenSSL
+DESCRIPTION: Command to generate a secure key for Auth.js session token encryption
+
+LANGUAGE: bash
+CODE:
+openssl rand -base64 32
+
+----------------------------------------
+
+TITLE: Successful Startup Log
+DESCRIPTION: Example of log output indicating successful startup of the LobeChat service.
+
+LANGUAGE: log
+CODE:
+[Database] Start to migration...
+✅ database migration pass.
+-------------------------------------
+  ▲ Next.js 14.x.x
+  - Local:        http://localhost:3210
+  - Network:      http://0.0.0.0:3210
+
+ ✓ Starting...
+ ✓ Ready in 95ms
+
+----------------------------------------
+
+TITLE: Database Migration Command for Logto
+DESCRIPTION: Command to perform database migration for version upgrades in Logto
+
+LANGUAGE: bash
+CODE:
+npx @logto/cli db alteration deploy $version
+
+----------------------------------------
+
+TITLE: Database Seeding Command for Logto
+DESCRIPTION: Special command for seeding Logto database with encryption for base role
+
+LANGUAGE: bash
+CODE:
+logto db seed --encrypt-base-role
+
+----------------------------------------
+
+TITLE: Downloading Docker Compose Configuration Files
+DESCRIPTION: Commands to download the Docker Compose configuration file and environment variable example file.
+
+LANGUAGE: sh
+CODE:
+curl -O https://raw.githubusercontent.com/lobehub/lobe-chat/HEAD/docker-compose/local/docker-compose.yml
+curl -O https://raw.githubusercontent.com/lobehub/lobe-chat/HEAD/docker-compose/local/.env.en_US.example
+mv .env.en_US.example .env
+
+----------------------------------------
+
+TITLE: Nginx Reverse Proxy Configuration for Casdoor
+DESCRIPTION: Nginx configuration snippet for properly handling Casdoor's OAuth2 requests.
+
+LANGUAGE: nginx
+CODE:
+location /.well-known/openid-configuration {
+proxy_pass http://localhost:8000;  # Forward to localhost:8000
+proxy_set_header Host $host;  # Keep the original host header
+proxy_set_header X-Real-IP $remote_addr;  # Keep the client's real IP
+proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;  # Keep the forwarded IP
+proxy_set_header X-Forwarded-Proto $scheme;  # Keep the request protocol
+}
+
+----------------------------------------
+
+TITLE: Docker One-Click Upgrade Command for Logto
+DESCRIPTION: Combined command for database seeding, migration, and startup in Docker deployment
+
+LANGUAGE: bash
+CODE:
+sh -c "npm run cli db seed -- --swe --encrypt-base-role" && npx @logto/cli db alteration deploy $version && npm start
+
+----------------------------------------
+
+TITLE: Configuring Serverless Postgres Environment Variables
+DESCRIPTION: Set up the necessary environment variables for connecting to a Serverless Postgres database and specifying the server mode for LobeChat.
+
+LANGUAGE: shell
+CODE:
+# Serverless Postgres DB Url
+DATABASE_URL=
+
+# Specify service mode as server, otherwise it will not enter the server-side database
+NEXT_PUBLIC_SERVICE_MODE=server
+
+----------------------------------------
+
+TITLE: Setting Redirect URI for Microsoft Entra ID Authentication
+DESCRIPTION: URL pattern for the authentication callback endpoint that needs to be configured in the Microsoft Entra ID application settings. The URI must match the deployed domain of the LobeChat instance.
+
+LANGUAGE: bash
+CODE:
+https://your-domain/api/auth/callback/microsoft-entra-id
+
+----------------------------------------
+
+TITLE: Pulling Latest LobeChat Docker Image
+DESCRIPTION: Command to pull the latest LobeChat Docker image from the repository.
+
+LANGUAGE: fish
+CODE:
+docker pull lobehub/lobe-chat
+
+----------------------------------------
+
+TITLE: Adding Clerk Webhook Secret to Environment Variables
+DESCRIPTION: Add the Clerk webhook secret to the environment variables for handling user lifecycle events.
+
+LANGUAGE: shell
+CODE:
+CLERK_WEBHOOK_SECRET=whsec_xxxxxxxxxxxxxxxxxxxxxx
+
+----------------------------------------
+
+TITLE: Creating Chat Completion with OpenAI Streaming in TypeScript
+DESCRIPTION: This function preprocesses payload data, calls OpenAI's chat.completions.create method, and uses OpenAIStream from Vercel AI SDK to convert the result into a streaming response.
+
+LANGUAGE: typescript
+CODE:
+import { OpenAIStream, StreamingTextResponse } from 'ai';
+
+export const createChatCompletion = async ({ payload, openai }: CreateChatCompletionOptions) => {
+  const { messages, ...params } = payload;
+
+  const formatMessages = messages.map((m) => ({
+    content: m.content,
+    name: m.name,
+    role: m.role,
+  }));
+
+  const response = await openai.chat.completions.create(
+    {
+      messages: formatMessages,
+      ...params,
+      stream: true,
+    },
+    { headers: { Accept: '*/*' } },
+  );
+  const stream = OpenAIStream(response);
+  return new StreamingTextResponse(stream);
+};
+
+----------------------------------------
+
+TITLE: Configuring Redirect URI for ZITADEL Application in LobeChat
+DESCRIPTION: The redirect URI to be configured in the ZITADEL application settings for LobeChat. This URI is essential for the OAuth authentication flow.
+
+LANGUAGE: plaintext
+CODE:
+http(s)://your-domain/api/auth/callback/zitadel
+
+----------------------------------------
+
+TITLE: Raw SQL View Declaration
+DESCRIPTION: Demonstrates declaring views using raw SQL with explicit schema definition. Includes examples for both regular and materialized views.
+
+LANGUAGE: typescript
+CODE:
+const newYorkers = pgView('new_yorkers', {
+  id: serial('id').primaryKey(),
+  name: text('name').notNull(),
+  cityId: integer('city_id').notNull(),
+}).as(sql`select * from ${users} where ${eq(users.cityId, 1)}`);
+
+const newYorkers = pgMaterializedView('new_yorkers', {
+  id: serial('id').primaryKey(),
+  name: text('name').notNull(),
+  cityId: integer('city_id').notNull(),
+}).as(sql`select * from ${users} where ${eq(users.cityId, 1)}`);
+
+----------------------------------------
+
+TITLE: Generating Auth.js Session Encryption Key in Bash
+DESCRIPTION: Command to generate a secure random key for encrypting Auth.js session tokens. This key is used as the NEXT_AUTH_SECRET environment variable.
+
+LANGUAGE: bash
+CODE:
+openssl rand -base64 32
+
+----------------------------------------
+
+TITLE: Stopping and Removing Docker Container
+DESCRIPTION: Commands to stop and remove the currently running LobeChat Docker container.
+
+LANGUAGE: fish
+CODE:
+docker stop lobe-chat
+docker rm lobe-chat
+
+----------------------------------------
+
+TITLE: Deploying Docker Container
+DESCRIPTION: Command to deploy the LobeChat container with environment variables for API key, proxy URL, and access code
+
+LANGUAGE: fish
+CODE:
+docker run -d -p 3210:3210 \
+  -e OPENAI_API_KEY=sk-xxxx \
+  -e OPENAI_PROXY_URL=https://api-proxy.com/v1 \
+  -e ACCESS_CODE=lobe66 \
+  --name lobe-chat \
+  lobehub/lobe-chat
+
+----------------------------------------
+
+TITLE: Displaying UNABLE_TO_VERIFY_LEAF_SIGNATURE Error in Bash
+DESCRIPTION: This snippet shows the error message that may be encountered when using a proxy with LobeChat, indicating a certificate verification failure.
+
+LANGUAGE: bash
+CODE:
+[TypeError: fetch failed] {
+  cause: [Error: unable to verify the first certificate] {
+    code: 'UNABLE_TO_VERIFY_LEAF_SIGNATURE'
+  }
+}
+
+----------------------------------------
+
+TITLE: Adding Clerk Webhook Secret to Environment Variables in Shell
+DESCRIPTION: Sets the Clerk webhook secret as an environment variable for secure communication between Clerk and the application.
+
+LANGUAGE: shell
+CODE:
+CLERK_WEBHOOK_SECRET=whsec_xxxxxxxxxxxxxxxxxxxxxx
+
+----------------------------------------
+
+TITLE: Displaying UNABLE_TO_VERIFY_LEAF_SIGNATURE Error in JSON
+DESCRIPTION: This JSON snippet illustrates another format of the error message, showing the endpoint and the specific certificate verification error code.
+
+LANGUAGE: json
+CODE:
+{
+  "endpoint": "https://api.openai.com/v1",
+  "error": {
+    "cause": {
+      "code": "UNABLE_TO_VERIFY_LEAF_SIGNATURE"
+    }
+  }
+}
+
+----------------------------------------
+
+TITLE: Enabling Vercel Analytics in LobeChat
+DESCRIPTION: Set the environment variable to enable Vercel Analytics for collecting website visit data in LobeChat. This allows tracking of traffic, sources, and devices used for access.
+
+LANGUAGE: markdown
+CODE:
+ENABLE_VERCEL_ANALYTICS=1
+
+----------------------------------------
+
+TITLE: Creating Directory for LobeChat Deployment
+DESCRIPTION: Commands to create a directory for storing LobeChat configuration and database files.
+
+LANGUAGE: sh
+CODE:
+mkdir lobe-chat-db && cd lobe-chat-db
+
+----------------------------------------
+
+TITLE: Bypassing Certificate Validation in Node.js
+DESCRIPTION: This command demonstrates how to bypass Node.js certificate validation by setting the NODE_TLS_REJECT_UNAUTHORIZED environment variable when starting the application.
+
+LANGUAGE: bash
+CODE:
+NODE_TLS_REJECT_UNAUTHORIZED=0 npm run start
+
+----------------------------------------
+
+TITLE: Setting Environment Variable in Dockerfile
+DESCRIPTION: This Dockerfile snippet shows how to set the NODE_TLS_REJECT_UNAUTHORIZED environment variable within a Docker container to bypass certificate validation.
+
+LANGUAGE: dockerfile
+CODE:
+# In the Dockerfile
+ENV NODE_TLS_REJECT_UNAUTHORIZED=0
+
+----------------------------------------
+
+TITLE: Importing Settings via URL in LobeChat
+DESCRIPTION: Demonstrates the URL format for importing settings parameters from an external URL in LobeChat. It shows how to structure the URL with JSON-formatted settings object.
+
+LANGUAGE: plaintext
+CODE:
+https://lobehub.com/?settings=<settings object in JSON format>
+https://lobehub.com/?settings={"keyVaults":{"openai":{"apiKey":"user-key","baseURL":"https://your-proxy.com/v1"}}}
+
+----------------------------------------
+
+TITLE: Configuring Custom Model List Syntax in LobeChat
+DESCRIPTION: 这段代码展示了 LobeChat 中自定义模型列表的基本语法。用户可以使用 '+' 添加模型，'-' 隐藏模型，并使用 '模型名->部署名=展示名<扩展配置>' 来自定义模型的展示名和扩展能力。各模型配置之间用英文逗号分隔。
+
+LANGUAGE: text
+CODE:
+id->deploymentName=displayName<maxToken:vision:reasoning:search:fc:file:imageOutput>,model2,model3
+
+----------------------------------------
+
+TITLE: Configuring LobeChat Environment Variables
+DESCRIPTION: Examples of setting various environment variables for customizing LobeChat deployment, including access codes, API key selection, base paths, and default agent configurations.
+
+LANGUAGE: bash
+CODE:
+ACCESS_CODE="awCTe)re_r74"
+API_KEY_SELECT_MODE="random"
+NEXT_PUBLIC_BASE_PATH="/test"
+DEFAULT_AGENT_CONFIG='model=gpt-4-1106-preview;params.max_tokens=300;plugins=search-engine,lobe-image-designer'
+FEATURE_FLAGS="-welcome_suggest"
+PROXY_URL="http://127.0.0.1:7890"
+SSRF_ALLOW_PRIVATE_IP_ADDRESS="0"
+SSRF_ALLOW_IP_ADDRESS_LIST="198.18.1.62,224.0.0.3"
+PLUGINS_INDEX_URL="https://chat-plugins.lobehub.com"
+PLUGIN_SETTINGS="search-engine:SERPAPI_API_KEY=xxxxx,plugin-2:key1=value1;key2=value2"
+AGENTS_INDEX_URL="https://chat-agents.lobehub.com"
+
+----------------------------------------
+
+TITLE: Configuring Model Extensions in LobeChat
+DESCRIPTION: 这段代码展示了 LobeChat 中配置模型扩展能力的语法。在尖括号内，第一个值表示模型的最大 token 数，之后的值表示模型的扩展能力，如视觉识别、推理、搜索等。能力之间用冒号分隔。
+
+LANGUAGE: shell
+CODE:
+id->deploymentName=displayName<maxToken:vision:reasoning:search:fc:file:imageOutput>
+
+----------------------------------------
+
+TITLE: Deploying PostgreSQL with PGVector using Docker
+DESCRIPTION: Docker command to deploy PostgreSQL with PGVector extension for vector operations and structured data storage. Exposes port 5432 and sets a secure password.
+
+LANGUAGE: bash
+CODE:
+docker run -p 5432:5432 -d --name pg -e POSTGRES_PASSWORD=mysecretpassword pgvector/pgvector:pg16
+
+----------------------------------------
+
+TITLE: Enabling AWS Bedrock and Setting Credentials
+DESCRIPTION: Example of enabling AWS Bedrock as a model provider and setting the required AWS credentials.
+
+LANGUAGE: bash
+CODE:
+ENABLED_AWS_BEDROCK=1
+AWS_ACCESS_KEY_ID=AKIA5STVRLFSB4S9HWBR
+AWS_SECRET_ACCESS_KEY=Th3vXxLYpuKcv2BARktPSTPxx+jbSiFT6/0w7oEC
+AWS_REGION=us-east-1
+
+----------------------------------------
+
+TITLE: Configuring Custom Embedding Model Environment Variable
+DESCRIPTION: Environment variable configuration for setting the default embedding model in LobeChat. Supports various providers including zhipu, github, openai, bedrock, and ollama.
+
+LANGUAGE: bash
+CODE:
+environment: DEFAULT_FILES_CONFIG=embedding_model=openai/embedding-text-3-small
+
+----------------------------------------
+
+TITLE: Deploying LobeChat with Ollama AI Support using Docker
+DESCRIPTION: This Docker command runs LobeChat with Ollama AI integration, enabling local LLM conversations. It maps port 3210 and sets the Ollama proxy URL to communicate with the host machine.
+
+LANGUAGE: bash
+CODE:
+docker run -d -p 3210:3210 -e OLLAMA_PROXY_URL=http://host.docker.internal:11434/v1 lobehub/lobe-chat
+
+----------------------------------------
+
+TITLE: Configuring Custom Embedding Model for LobeChat
+DESCRIPTION: This environment variable sets the default embedding model for LobeChat's file processing. It allows for customization of the vector representation generation for semantic search.
+
+LANGUAGE: bash
+CODE:
+environment: DEFAULT_FILES_CONFIG=embedding_model=openai/embedding-text-3-small
+
+----------------------------------------
+
+TITLE: Setting Ollama Environment Variables on macOS
+DESCRIPTION: These commands use launchctl to set environment variables for Ollama on macOS. They configure OLLAMA_HOST to allow access from any IP and OLLAMA_ORIGINS to accept requests from any origin. Remember to restart the Ollama application after setting these variables.
+
+LANGUAGE: bash
+CODE:
+launchctl setenv OLLAMA_HOST "0.0.0.0"
+launchctl setenv OLLAMA_ORIGINS "*"
+
+----------------------------------------
+
+TITLE: Markdown Frontmatter Configuration
+DESCRIPTION: YAML frontmatter configuration for the Assistant Market documentation page, defining title, description and relevant tags.
+
+LANGUAGE: yaml
+CODE:
+---
+title: Find best Assistants in LobeChat Assistant Market
+description: >-
+  Explore a vibrant community of carefully designed assistants in LobeChat's
+  Assistant Market. Contribute your wisdom and share your personally developed
+  assistants in this collaborative space.
+tags:
+  - LobeChat
+  - Assistant Market
+  - Community
+  - Collaboration
+  - Assistants
+---
+
+----------------------------------------
+
+TITLE: Editing Ollama Systemd Service on Linux
+DESCRIPTION: This command opens the systemd service file for Ollama on Linux systems. It allows you to add environment variables to configure Ollama's behavior, such as setting the host and allowed origins.
+
+LANGUAGE: bash
+CODE:
+sudo systemctl edit ollama.service
+
+----------------------------------------
+
+TITLE: Rendering Documentation Card Links in Markdown
+DESCRIPTION: Card component structure for linking to additional deployment documentation.
+
+LANGUAGE: markdown
+CODE:
+<Cards>
+  <Card href={'/docs/self-hosting/server-database'} title={'Server-Side Database Deployment Guide'} />
+</Cards>
+
+----------------------------------------
+
+TITLE: Image Component Implementation
+DESCRIPTION: JSX/MDX code for displaying the Assistant Market cover image using a custom Image component with specific props.
+
+LANGUAGE: jsx
+CODE:
+<Image
+  alt={'Assistant Market'}
+  borderless
+  cover
+  src={
+'https://github.com/user-attachments/assets/b3ab6e35-4fbc-468d-af10-e3e0c687350f'
+}
+/>
+
+----------------------------------------
+
+TITLE: Expanding Essay Content with Iterative Prompt in English
+DESCRIPTION: An advanced prompt that builds upon a previously generated paragraph. It provides context from the initial response and asks the AI to continue the essay, demonstrating an iterative approach to content generation.
+
+LANGUAGE: prompt
+CODE:
+I am writing a detailed essay to answer the following prompt:
+Is mathematics an invention or a discovery? Use careful reasoning to explain your answer. Here is my current situation: Philosophers and mathematicians have long debated whether mathematics is an invention or a discovery.
+Some argue that the concepts and principles of mathematics exist independently of human thought, and therefore can be considered discovered rather than invented.
+For example, the concepts of numbers, ratios, and geometric shapes are observed in the natural world and can be abstracted and systematically studied. Write the next paragraph of my essay.
+
+----------------------------------------
+
+TITLE: Embedding Image Component in Markdown
+DESCRIPTION: Markdown code block showing how to embed an image component with custom properties for the LobeChat documentation interface.
+
+LANGUAGE: markdown
+CODE:
+<Image
+  alt={'Text to Image Generation'}
+  borderless
+  cover
+  src={'https://github.com/user-attachments/assets/708274a7-2458-494b-a6ec-b73dfa1fa7c2'}
+/>
+
+----------------------------------------
+
+TITLE: Setting Up 360AI Integration in LobeChat - Markdown Documentation
+DESCRIPTION: Step-by-step documentation for integrating 360AI with LobeChat, including obtaining an API key from the 360AI platform and configuring it in LobeChat's settings interface. The guide includes necessary prerequisite steps and warnings about potential costs.
+
+LANGUAGE: markdown
+CODE:
+# Using the 360AI in LobeChat
+
+<Steps>
+  ### Step 1: Obtain the 360AI API Key
+
+  - Register and log in to the [360AI API Open Platform](https://ai.360.com/platform/keys)
+  - Click on the `API Keys` menu on the left
+  - Create an API key and copy it
+
+  ### Step 2: Configure 360AI in LobeChat
+
+  - Access the `Settings` interface in LobeChat
+  - Under `Language Models`, find the option for `360`
+  - Enter the API key you obtained
+  - Choose a 360AI model for your AI assistant to start chatting
+
+  <Callout type={'warning'}>
+    Please note that you may need to pay the API service provider during use, refer to the relevant
+    pricing policy of the 360AI.
+  </Callout>
+</Steps>
+
+----------------------------------------
+
+TITLE: Installing and Configuring Image Generation Plugins in LobeChat
+DESCRIPTION: Documentation for setting up and using DALL-E and Midjourney plugins in LobeChat for text-to-image generation. Requires OpenAI API key for DALL-E and Midjourney API key for the Midjourney plugin.
+
+LANGUAGE: markdown
+CODE:
+# Guide to Using Text-to-Image Models in LobeChat
+
+LobeChat supports text-to-image generation through a plugin mechanism. Currently, LobeChat comes with the built-in DALL-E plugin, which allows users to generate images using OpenAI's DALL-E model. Additionally, users can also install the official Midjourney plugin to utilize the Midjourney text-to-image feature.
+
+## DALL-E Model
+
+If you have configured the OpenAI API, you can enable the DALL-E plugin directly in the assistant interface and input prompts in the conversation for AI to generate images for you.
+
+## Midjourney Model
+
+LobeChat also offers the Midjourney plugin, which generates images by calling the Midjourney API. Please install the Midjourney plugin in the plugin store beforehand.
+
+When using the Midjourney plugin for the first time, you will need to fill in your Midjourney API key in the plugin settings.
+
+----------------------------------------
+
+TITLE: 创建 LobeChat 插件本地网关
+DESCRIPTION: 展示了如何使用 @lobehub/chat-plugins-gateway 包创建 LobeChat 插件的本地网关。这个网关允许 LobeChat 访问本地运行的插件服务。
+
+LANGUAGE: typescript
+CODE:
+import { createLobeChatPluginGateway } from '@lobehub/chat-plugins-gateway';
+
+export const config = {
+  runtime: 'edge',
+};
+
+export default createLobeChatPluginGateway();
+
+----------------------------------------
+
+TITLE: Setting Ollama Environment Variables on macOS
+DESCRIPTION: Command to set the OLLAMA_ORIGINS environment variable for enabling cross-origin access in Ollama on macOS using launchctl.
+
+LANGUAGE: bash
+CODE:
+launchctl setenv OLLAMA_ORIGINS "*"
+
+----------------------------------------
+
+TITLE: 实现 LobeChat 插件 UI 界面
+DESCRIPTION: 展示了如何使用 React 和 @lobehub/chat-plugin-sdk 实现 LobeChat 插件的 UI 界面。这个例子展示了如何从 LobeChat 获取插件消息数据。
+
+LANGUAGE: tsx
+CODE:
+import { fetchPluginMessage } from '@lobehub/chat-plugin-sdk';
+import { memo, useEffect, useState } from 'react';
+
+import { ResponseData } from '@/type';
+
+const Render = memo(() => {
+  const [data, setData] = useState<ResponseData>();
+
+  useEffect(() => {
+    // 从 LobeChat 获取当前插件的消息
+    fetchPluginMessage().then((e: ResponseData) => {
+      setData(e);
+    });
+  }, []);
+
+  return <>...</>;
+});
+
+export default Render;
+
+----------------------------------------
+
+TITLE: Deploying Ollama with Docker
+DESCRIPTION: Docker commands for pulling and running Ollama container with necessary environment variables and port mappings.
+
+LANGUAGE: bash
+CODE:
+docker pull ollama/ollama
+
+LANGUAGE: bash
+CODE:
+docker run -d --gpus=all -v ollama:/root/.ollama -e OLLAMA_ORIGINS="*" -p 11434:11434 --name ollama ollama/ollama
+
+----------------------------------------
+
+TITLE: 添加 LobeChat 插件 Shield
+DESCRIPTION: 展示了如何在 Markdown 中添加 LobeChat 插件的 Shield 徽章，用于在 GitHub 等平台上展示插件状态。
+
+LANGUAGE: markdown
+CODE:
+[![lobe-chat-plugin](https://img.shields.io/badge/%F0%9F%A4%AF%20%26%20%F0%9F%A7%A9%20LobeHub-Plugin-95f3d9?labelColor=black&style=flat-square)](https://github.com/lobehub/lobe-chat-plugins)
+
+----------------------------------------
+
+TITLE: Creating LobeChat Plugin Gateway in TypeScript
+DESCRIPTION: This TypeScript snippet demonstrates how to create a gateway for LobeChat plugins using the @lobehub/chat-plugins-gateway package. The gateway allows LobeChat to access local plugin services by handling and forwarding requests.
+
+LANGUAGE: typescript
+CODE:
+import { createLobeChatPluginGateway } from '@lobehub/chat-plugins-gateway';
+
+export const config = {
+  runtime: 'edge',
+};
+
+export default createLobeChatPluginGateway();
+
+----------------------------------------
+
+TITLE: Installing Ollama Models
+DESCRIPTION: Command to pull and install specific Ollama models locally using the command line.
+
+LANGUAGE: bash
+CODE:
+ollama pull llama3
+
+----------------------------------------
+
+TITLE: Adding LobeChat Plugin Shield in Markdown
+DESCRIPTION: This Markdown snippet shows how to add a LobeChat Plugin shield to a project's README or documentation. The shield serves as a visual indicator that the project is a LobeChat plugin and links to the LobeChat plugins repository.
+
+LANGUAGE: markdown
+CODE:
+[![lobe-chat-plugin](https://img.shields.io/badge/%F0%9F%A4%AF%20%26%20%F0%9F%A7%A9%20LobeHub-Plugin-95f3d9?labelColor=black&style=flat-square)](https://github.com/lobehub/lobe-chat-plugins)
+
+----------------------------------------
+
+TITLE: Installing vLLM using UV Package Manager
+DESCRIPTION: Commands to create a Python virtual environment and install vLLM using the UV package manager. This setup is recommended for NVIDIA GPU users.
+
+LANGUAGE: shell
+CODE:
+uv venv myenv --python 3.12 --seed
+source myenv/bin/activate
+uv pip install vllm
+
+----------------------------------------
+
+TITLE: Setting S3 Endpoint for Cloudflare R2 in Shell
+DESCRIPTION: Example of setting the S3_ENDPOINT environment variable for Cloudflare R2 storage. This endpoint should not include the bucket name and must remove any suffix path to ensure uploaded files are accessible.
+
+LANGUAGE: shell
+CODE:
+S3_ENDPOINT=https://0b33a03b5c993fd2f453379dc36558e5.r2.cloudflarestorage.com
+
+----------------------------------------
+
+TITLE: Configuring CORS Rules for Cloudflare R2 S3 Bucket
+DESCRIPTION: This JSON configuration sets up Cross-Origin Resource Sharing (CORS) rules for the S3 bucket. It allows specific HTTP methods from the specified origin and permits all headers.
+
+LANGUAGE: json
+CODE:
+[
+  {
+    "AllowedOrigins": ["https://your-project.vercel.app"],
+    "AllowedMethods": ["GET", "PUT", "HEAD", "POST", "DELETE"],
+    "AllowedHeaders": ["*"]
+  }
+]
+
+----------------------------------------
+
+TITLE: Installing vLLM using Conda
+DESCRIPTION: Commands to create a Conda environment and install vLLM using pip within the Conda environment.
+
+LANGUAGE: shell
+CODE:
+conda create -n myenv python=3.12 -y
+conda activate myenv
+pip install vllm
+
+----------------------------------------
+
+TITLE: Logging Error for HTTP Image Fetching in LobeChat
+DESCRIPTION: This log snippet shows an error message that occurs when trying to fetch images over unsecured HTTP connections. It indicates the need to configure the LLM_VISION_IMAGE_USE_BASE64 environment variable.
+
+LANGUAGE: log
+CODE:
+Route: [xai] ProviderBizError: Fetching images over plain http:// is not supported.
+
+----------------------------------------
+
+TITLE: Markdown Structure for xAI Setup Guide
+DESCRIPTION: Structured markdown documentation detailing the process of configuring xAI integration with LobeChat, including frontmatter metadata, steps for API key acquisition, and configuration instructions.
+
+LANGUAGE: markdown
+CODE:
+---
+title: Using xAI in LobeChat
+description: >
+  Learn how to configure and use xAI's API Key in LobeChat to start
+  conversations and interactions.
+tags:
+  - LobeChat
+  - xAI
+  - API Key
+  - Web UI
+---
+
+----------------------------------------
+
+TITLE: Creating Session Slice Actions in TypeScript
+DESCRIPTION: This snippet shows how to create a session slice with custom actions using Zustand's StateCreator. It includes a useFetchSessions action as an example.
+
+LANGUAGE: typescript
+CODE:
+import { StateCreator } from 'zustand';
+
+import { SessionStore } from '@/store/session';
+
+export interface SessionActions {
+  /**
+   * A custom hook that uses SWR to fetch sessions data.
+   */
+  useFetchSessions: () => SWRResponse<any>;
+}
+
+export const createSessionSlice: StateCreator<
+  SessionStore,
+  [['zustand/devtools', never]],
+  [],
+  SessionAction
+> = (set, get) => ({
+  useFetchSessions: () => {
+    // ...logic for initializing sessions
+  },
+  // ...implementation of other actions
+});
+
+----------------------------------------
+
+TITLE: Displaying LobeChat SessionStore Directory Structure
+DESCRIPTION: This bash snippet shows the directory structure of LobeChat's SessionStore, illustrating the organization of slices, actions, selectors, and other components.
+
+LANGUAGE: bash
+CODE:
+src/store/session
+├── helpers.ts                         # Helper functions
+├── hooks                              # Custom React hooks
+│   ├── index.ts                       # Export file for hooks
+│   ├── useEffectAfterHydrated.ts      # Hook for effects after session hydration
+│   ├── useOnFinishHydrationSession.ts # Hook for session hydration completion
+│   ├── useSessionChatInit.ts          # Hook for session chat initialization
+│   └── useSessionHydrated.ts          # Hook for session hydration status
+├── index.ts                           # Aggregated export file for SessionStore
+├── initialState.ts                    # Aggregated initialState for all slices
+├── selectors.ts                       # Selectors exported from various slices
+├── slices                             # Separated functional modules
+│   ├── agent                          # State and operations related to agents
+│   │   ├── action.ts                  # Action definitions related to agents
+│   │   ├── index.ts                   # Entry file for agent slice
+│   │   ├── selectors.test.ts          # Tests for agent-related selectors
+│   │   └── selectors.ts               # Selector definitions related to agents
+│   └── session                        # State and operations related to sessions
+│   ├── action.test.ts                 # Tests for session-related actions
+│   ├── action.ts                      # Action definitions related to sessions
+│   ├── helpers.ts                     # Helper functions related to sessions
+│   ├── initialState.ts                # Initial state for session slice
+│   └── selectors                      # Session-related selectors and their tests
+│   ├── export.ts                      # Aggregated export for session selectors
+│   ├── index.ts                       # Entry file for session selectors
+│   ├── list.test.ts                   # Tests for list selectors
+│   └── list.ts                        # Definitions for list-related selectors
+└── store.ts                           # Creation and usage of SessionStore
+
+----------------------------------------
+
+TITLE: Running LobeChat Docker Container with Ollama Support
+DESCRIPTION: This command runs a Docker container for LobeChat v1.6 with Ollama support, mapping port 3210 and setting the Ollama proxy URL. It enables users to start conversations with local AI models using LobeChat.
+
+LANGUAGE: bash
+CODE:
+docker run -d -p 3210:3210 -e OLLAMA_PROXY_URL=http://host.docker.internal:11434/v1 lobehub/lobe-chat
+
+----------------------------------------
+
+TITLE: Exporting Settings to URL in LobeChat
+DESCRIPTION: Demonstrates how to generate and export settings to a URL in LobeChat using TypeScript. It shows the process of creating a settings object and converting it to a JSON-formatted string for URL parameters.
+
+LANGUAGE: ts
+CODE:
+// Generate settings to export to URL
+const settings = {
+  keyVaults: {
+    openai: {
+      apiKey: 'user-key',
+      baseURL: 'https://your-proxy.com/v1',
+    },
+  },
+};
+// Convert settings to a JSON formatted string
+const url = `/?settings=${JSON.stringify(settings)}`;
+console.log(url);
+// /?settings={"keyVaults":{"openai":{"apiKey":"user-key","baseURL":"https://your-proxy.com/v1"}}}
+
+----------------------------------------
+
+TITLE: Installing Docker on CentOS
+DESCRIPTION: Command to install Docker on CentOS Linux systems using yum package manager
+
+LANGUAGE: fish
+CODE:
+$ yum install docker
+
+----------------------------------------
+
+TITLE: Installing Docker on CentOS
+DESCRIPTION: Command to install Docker on CentOS Linux systems using yum package manager
+
+LANGUAGE: fish
+CODE:
+$ yum install docker
+
+----------------------------------------
+
+TITLE: Installing Dependencies with Yarn
+DESCRIPTION: Commands to navigate to the project directory and install dependencies using Yarn package manager.
+
+LANGUAGE: bash
+CODE:
+cd lobe-chat
+yarn install
+
+----------------------------------------
+
+TITLE: Installing Dependencies for LobeChat in Bash
+DESCRIPTION: These commands navigate to the project directory and install the required dependencies using either Bun or PNPM package managers.
+
+LANGUAGE: bash
+CODE:
+cd lobe-chat
+# If you use Bun
+bun install
+# If you use PNPM
+pnpm install
+
+----------------------------------------
+
+TITLE: Installing Docker on CentOS
+DESCRIPTION: Command to install Docker on CentOS using the yum package manager.
+
+LANGUAGE: fish
+CODE:
+$ yum install docker
+
+----------------------------------------
+
+TITLE: Installing Docker on CentOS
+DESCRIPTION: Command to install Docker on CentOS using the yum package manager.
+
+LANGUAGE: fish
+CODE:
+$ yum install docker
+
+----------------------------------------
+
+TITLE: Pulling Latest LobeChat Docker Image
+DESCRIPTION: Command to pull the most recent Docker image of LobeChat from the official repository.
+
+LANGUAGE: fish
+CODE:
+docker pull lobehub/lobe-chat
+
+----------------------------------------
+
+TITLE: Configuring Zeabur Deployment for LobeChat
+DESCRIPTION: JSON configuration file (zbpack.json) for deploying LobeChat as a serverless function on Zeabur. It ignores the Dockerfile and sets the deployment type to serverless.
+
+LANGUAGE: json
+CODE:
+{
+  "ignore_dockerfile": true,
+  "serverless": true
+}
+
+----------------------------------------
+
+TITLE: Redeploying LobeChat Docker Container
+DESCRIPTION: Command to redeploy the LobeChat container using the newly pulled image. This includes setting environment variables for API key, proxy URL, and access code.
+
+LANGUAGE: fish
+CODE:
+docker run -d -p 3210:3210 \
+  -e OPENAI_API_KEY=sk-xxxx \
+  -e OPENAI_PROXY_URL=https://api-proxy.com/v1 \
+  -e ACCESS_CODE=lobe66 \
+  --name lobe-chat \
+  lobehub/lobe-chat
+
+----------------------------------------
+
+TITLE: Installing Dokploy CLI
+DESCRIPTION: Command to install Dokploy CLI tool using curl
+
+LANGUAGE: shell
+CODE:
+curl -sSL https://dokploy.com/install.sh | sh
+
+----------------------------------------
+
+TITLE: Rendering Platform Selection Component in Markdown
+DESCRIPTION: Component tag for displaying platform selection cards with URL prefix parameter.
+
+LANGUAGE: markdown
+CODE:
+<PlatformCards urlPrefix={'platform'} />
+
+----------------------------------------
+
+TITLE: Installing Docker on Ubuntu
+DESCRIPTION: Command to install Docker on Ubuntu Linux systems using apt package manager
+
+LANGUAGE: fish
+CODE:
+$ apt install docker.io
+
+----------------------------------------
+
+TITLE: Rendering Warning Callout in Markdown
+DESCRIPTION: Callout component displaying important information about client-side database limitations.
+
+LANGUAGE: markdown
+CODE:
+<Callout>
+  In the client-side database mode, data is stored locally on the user's device, without
+  cross-device synchronization, and does not support advanced features such as file uploads and
+  knowledge base.
+</Callout>
+
+----------------------------------------
+
+TITLE: Installing Docker on Ubuntu
+DESCRIPTION: Command to install Docker on Ubuntu using the apt package manager.
+
+LANGUAGE: fish
+CODE:
+$ apt install docker.io
+
+----------------------------------------
+
+TITLE: Example Gitmoji Commit Message Format
+DESCRIPTION: Demonstrates the proper format for creating commit messages using gitmoji conventions. The example shows a documentation update with specific changes listed in bullet points.
+
+LANGUAGE: markdown
+CODE:
+📝 Update README with contribution guidelines
+
+- Added section about code style preferences
+- Included instructions for running tests
+- Corrected typos and improved formatting
+
+----------------------------------------
+
+TITLE: Stopping and Removing Docker Container for LobeChat
+DESCRIPTION: Commands to stop and remove the currently running LobeChat Docker container. This is the first step in updating to the latest version.
+
+LANGUAGE: fish
+CODE:
+docker stop lobe-chat
+docker rm lobe-chat
+
+----------------------------------------
+
+TITLE: Creating Storage Folder for LobeChat
+DESCRIPTION: Command to create a folder for storing LobeChat files.
+
+LANGUAGE: fish
+CODE:
+$ mkdir lobe-chat-db && cd lobe-chat-db
+
+----------------------------------------
+
+TITLE: 停止和删除 Docker 容器
+DESCRIPTION: 这段代码用于停止并删除名为 'lobe-chat' 的 Docker 容器。这是更新 LobeChat Docker 部署的第一步。
+
+LANGUAGE: fish
+CODE:
+docker stop lobe-chat
+docker rm lobe-chat
+
+----------------------------------------
+
+TITLE: Binding Chat Functions to UI
+DESCRIPTION: Demonstrates how to bind Zustand store actions to UI components, including a button to send new messages.
+
+LANGUAGE: jsx
+CODE:
+import { Button } from 'antd';
+
+const ChatPage = () => {
+  const messages = useChatStore((state) => state.messages);
+  const addMessage = useChatStore((state) => state.addMessage);
+
+  const handleSend = () => {
+    addMessage({ id: '1', content: 'Hello, world!', timestamp: Date.now(), sender: 'user' });
+  };
+
+  return (
+    <>
+      <List
+        dataSource={messages}
+        renderItem={(message) => (
+          <List.Item>
+            <Typography.Text>{message.content}</Typography.Text>
+          </List.Item>
+        )}
+      />
+      <Button onClick={handleSend}>Send</Button>
+    </>
+  );
+};
+
+export default ChatPage;
+
+----------------------------------------
+
+TITLE: 部署更新后的 LobeChat Docker 容器
+DESCRIPTION: 这个命令用于使用最新拉取的镜像重新部署 LobeChat 容器。它设置了必要的环境变量，如 OpenAI API 密钥、代理 URL 和访问代码。
+
+LANGUAGE: fish
+CODE:
+docker run -d -p 3210:3210 \
+  -e OPENAI_API_KEY=sk-xxxx \
+  -e OPENAI_PROXY_URL=https://api-proxy.com/v1 \
+  -e ACCESS_CODE=lobe66 \
+  --name lobe-chat \
+  lobehub/lobe-chat
+
+----------------------------------------
+
+TITLE: 拉取最新的 LobeChat Docker 镜像
+DESCRIPTION: 这个命令用于从 Docker Hub 拉取最新版本的 LobeChat 镜像。这确保了你使用的是最新的 LobeChat 版本。
+
+LANGUAGE: fish
+CODE:
+docker pull lobehub/lobe-chat
+
+----------------------------------------
+
+TITLE: Customizing Model List for OpenAI
+DESCRIPTION: Example of using the OPENAI_MODEL_LIST environment variable to customize the available models, add new models, hide models, and rename models.
+
+LANGUAGE: bash
+CODE:
+OPENAI_MODEL_LIST=+qwen-7b-chat,+glm-6b,-gpt-3.5-turbo,gpt-4-0125-preview=gpt-4-turbo
+
+----------------------------------------
+
+TITLE: Running Unit Tests with npm for LobeChat
+DESCRIPTION: Command to execute all unit tests in the LobeChat project using npm. This will run the tests and generate a test report.
+
+LANGUAGE: bash
+CODE:
+npm run test
+
+----------------------------------------
+
+TITLE: Configuring Model Extensions in LobeChat
+DESCRIPTION: This snippet shows the syntax for configuring model extension capabilities in LobeChat. It includes the model ID, deployment name, display name, and various capabilities such as max token, vision, reasoning, search, function call, file handling, and image output.
+
+LANGUAGE: shell
+CODE:
+id->deploymentName=displayName<maxToken:vision:reasoning:search:fc:file:imageOutput>
+
+----------------------------------------
+
+TITLE: Deploying LobeChat with Vercel Button in Markdown
+DESCRIPTION: This code snippet provides a Markdown-formatted button that links to Vercel for one-click deployment of LobeChat. It includes pre-configured environment variables and repository settings.
+
+LANGUAGE: markdown
+CODE:
+[![](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https%3A%2F%2Fgithub.com%2Flobehub%2Flobe-chat\&env=OPENAI_API_KEY,ACCESS_CODE\&envDescription=Find%20your%20OpenAI%20API%20Key%20by%20click%20the%20right%20Learn%20More%20button.%20%7C%20Access%20Code%20can%20protect%20your%20website\&envLink=https%3A%2F%2Fplatform.openai.com%2Faccount%2Fapi-keys\&project-name=lobe-chat\&repository-name=lobe-chat)
+
+----------------------------------------
+
+TITLE: Writing Unit Tests for Number Formatting in TypeScript
+DESCRIPTION: Example of writing unit tests for a number formatting function using vitest in TypeScript. It demonstrates how to structure test suites with 'describe' and individual test cases with 'it', as well as using assertions with 'expect'.
+
+LANGUAGE: typescript
+CODE:
+import { formatNumber } from './formatNumber';
+
+describe('formatNumber', () => {
+  it('should format number with comma separator', () => {
+    const result = formatNumber(1000);
+    expect(result).toBe('1,000');
+  });
+
+  it('should return the same number if it is less than 1000', () => {
+    const result = formatNumber(500);
+    expect(result).toBe('500');
+  });
+});
+
+----------------------------------------
+
+TITLE: Cloning LobeChat Repository
+DESCRIPTION: Command to clone the LobeChat codebase from GitHub repository to local machine.
+
+LANGUAGE: bash
+CODE:
+git clone https://github.com/lobehub/lobe-chat.git
+
+----------------------------------------
+
+TITLE: Installing Dependencies with PNPM
+DESCRIPTION: Alternative commands to navigate to the project directory and install dependencies using PNPM package manager.
+
+LANGUAGE: bash
+CODE:
+cd lobe-chat
+pnpm install
+
+----------------------------------------
+
+TITLE: Starting Development Server
+DESCRIPTION: Command to start the LobeChat development server, which will run on http://localhost:3010.
+
+LANGUAGE: bash
+CODE:
+yarn run dev
+
+----------------------------------------
+
+TITLE: Displaying LobeChat Folder Structure in Bash
+DESCRIPTION: This code snippet shows the folder structure of the LobeChat project, outlining the main directories and their purposes within the src folder.
+
+LANGUAGE: bash
+CODE:
+src
+├── app        # Code related to the main logic and state management of the application
+├── components # Reusable UI components
+├── config     # Application configuration files, including client and server environment variables
+├── const      # Used to define constants, such as action types, route names, etc.
+├── features   # Business-related feature modules, such as Agent settings, plugin development pop-ups, etc.
+├── hooks      # Custom utility Hooks reusable across the application
+├── layout     # Application layout components, such as navigation bars, sidebars, etc.
+├── locales    # Language files for internationalization
+├── services   # Encapsulated backend service interfaces, such as HTTP requests
+├── store      # Zustand store for state management
+├── types      # TypeScript type definition files
+└── utils      # General utility functions
+
+----------------------------------------
+
+TITLE: Cloning LobeChat Repository in Bash
+DESCRIPTION: This command clones the LobeChat code repository to the local machine using Git.
+
+LANGUAGE: bash
+CODE:
+git clone https://github.com/lobehub/lobe-chat.git
+
+----------------------------------------
+
+TITLE: Starting LobeChat Development Server in Bash
+DESCRIPTION: This command starts the local development server for LobeChat using Bun.
+
+LANGUAGE: bash
+CODE:
+# Start the development server with Bun
+bun run dev
+# Visit http://localhost:3010 to view the application
+
+----------------------------------------
+
+TITLE: Welcome Page Route Structure - Bash
+DESCRIPTION: Demonstrates the file structure for the welcome page, showcasing how desktop and mobile implementations are separated using Next.js Route Groups while maintaining shared components.
+
+LANGUAGE: bash
+CODE:
+welcome
+├── (desktop)               # Desktop implementation
+│   ├── features            # Desktop-specific features
+│   ├── index.tsx           # Main entry file for desktop
+│   └── layout.desktop.tsx  # Desktop layout component
+├── (mobile)                # Mobile implementation
+│   ├── features            # Mobile-specific features
+│   ├── index.tsx           # Main entry file for mobile
+│   └── layout.mobile.tsx   # Mobile layout component
+├── features                # This folder contains features code shared by both desktop and mobile, such as the Banner component
+│   └── Banner
+└── page.tsx                # This is the main entry file for the page, used to load desktop or mobile code based on the device type
+
+----------------------------------------
+
+TITLE: Defining Next.js Route for Chat Feature
+DESCRIPTION: Sets up the basic routing structure for the chat feature by creating a page component in the Next.js app directory.
+
+LANGUAGE: tsx
+CODE:
+// src/app/chat/page.tsx
+import ChatPage from './features/chat';
+
+export default ChatPage;
+
+----------------------------------------
+
+TITLE: UI Component Implementation
+DESCRIPTION: Example of binding store actions in a React component for creating session groups
+
+LANGUAGE: tsx
+CODE:
+const CreateGroupModal = () => {
+  const [updateSessionGroup, addCustomGroup] = useSessionStore((s) => [
+    s.updateSessionGroupId,
+    s.addSessionGroup,
+  ]);
+
+  return (
+    <Modal
+      onOk={async () => {
+        const groupId = await addCustomGroup(name);
+        await updateSessionGroup(sessionId, groupId);
+      }}
+    >
+      {/* ... */}
+    </Modal>
+  );
+};
+
+----------------------------------------
+
+TITLE: Importing Okta Provider in Next-Auth Configuration
+DESCRIPTION: Import the Okta provider from next-auth/providers and add it to the NextAuth configuration in the src/app/api/auth/next-auth.ts file.
+
+LANGUAGE: typescript
+CODE:
+import { NextAuth } from 'next-auth';
+import Auth0 from 'next-auth/providers/auth0';
+import Okta from 'next-auth/providers/okta';
+
+// Import server configuration
+const { OKTA_CLIENT_ID, OKTA_CLIENT_SECRET, OKTA_ISSUER } = getServerConfig();
+
+const nextAuth = NextAuth({
+  providers: [
+    // ... Other providers
+
+    Okta({
+      clientId: OKTA_CLIENT_ID,
+      clientSecret: OKTA_CLIENT_SECRET,
+      issuer: OKTA_ISSUER,
+    }),
+  ],
+});
+
+----------------------------------------
+
+TITLE: Updating Server Configuration for Okta
+DESCRIPTION: Add Okta-related environment variables to the getAppConfig function in the src/config/server/app.ts file.
+
+LANGUAGE: typescript
+CODE:
+export const getAppConfig = () => {
+  // ... Other code
+
+  return {
+    // ... Other environment variables
+
+    OKTA_CLIENT_ID: process.env.OKTA_CLIENT_ID || '',
+    OKTA_CLIENT_SECRET: process.env.OKTA_CLIENT_SECRET || '',
+    OKTA_ISSUER: process.env.OKTA_ISSUER || '',
+  };
+};
+
+----------------------------------------
+
+TITLE: Updating Internationalization Configuration in JavaScript
+DESCRIPTION: This snippet shows how to update the .i18nrc.js file to add a new language code (Vietnamese 'vi-VN') to the outputLocales array.
+
+LANGUAGE: javascript
+CODE:
+module.exports = {
+  // ... Other configurations
+
+  outputLocales: [
+    'zh-TW',
+    'en-US',
+    'ru-RU',
+    'ja-JP',
+    // ...Other languages
+
+    'vi-VN', // Add 'vi-VN' to the array
+  ],
+};
+
+----------------------------------------
+
+TITLE: Running Automatic Translation Command in Bash
+DESCRIPTION: This command uses the lobe-i18n tool to automatically translate and generate language files for the newly added language.
+
+LANGUAGE: bash
+CODE:
+npm run i18n
+
+----------------------------------------
+
+TITLE: Installing LobeChat Dependencies
+DESCRIPTION: Commands to clone the LobeChat repository and install its dependencies using pnpm.
+
+LANGUAGE: fish
+CODE:
+$ git clone https://github.com/lobehub/lobe-chat.git
+$ cd lobe-chat
+$ pnpm install
+$ pnpm dev
+
+----------------------------------------
+
+TITLE: Initializing LobeChat Infrastructure
+DESCRIPTION: Command to initialize the LobeChat infrastructure using a setup script.
+
+LANGUAGE: fish
+CODE:
+bash <(curl -fsSL https://lobe.li/setup.sh)
+
+----------------------------------------
+
+TITLE: Starting LobeChat Service with Docker
+DESCRIPTION: Command to start the LobeChat service using Docker Compose.
+
+LANGUAGE: fish
+CODE:
+docker compose up -d
+
+----------------------------------------
+
+TITLE: Basic View Declaration in PostgreSQL
+DESCRIPTION: Demonstrates basic view declaration using pgView with query builder syntax for PostgreSQL database. Shows how to create views for all users and filtered customer views.
+
+LANGUAGE: typescript
+CODE:
+import { pgTable, pgView, serial, text, timestamp } from "drizzle-orm/pg-core";
+
+export const user = pgTable("user", {
+  id: serial("id"),
+  name: text("name"),
+  email: text("email"),
+  password: text("password"),
+  role: text("role").$type<"admin" | "customer">(),
+  createdAt: timestamp("created_at"),
+  updatedAt: timestamp("updated_at"),
+});
+
+export const userView = pgView("user_view").as((qb) => qb.select().from(user));
+export const customersView = pgView("customers_view").as((qb) => qb.select().from(user).where(eq(user.role, "customer")));
+
+----------------------------------------
+
+TITLE: Column Subset View Declaration
+DESCRIPTION: Shows how to create a view with selected columns using the .select() method in query builder. Demonstrates creating a customers view with only id, name, and email fields.
+
+LANGUAGE: typescript
+CODE:
+export const customersView = pgView("customers_view").as((qb) => {
+  return qb
+    .select({
+      id: user.id,
+      name: user.name,
+      email: user.email,
+    })
+    .from(user);
+});
+
+----------------------------------------
+
+TITLE: Displaying Anthropic Claude Models' Tools Calling Capabilities Table in YAML
+DESCRIPTION: A YAML table showing the tools calling capabilities of different Anthropic Claude models, including support for tools calling, streaming, parallel execution, and performance scores for simple and complex instructions.
+
+LANGUAGE: yaml
+CODE:
+| 模型                | 支持 Tools Calling | 流式 （Stream） | 并发（Parallel） | 简单指令得分 | 复杂指令 |
+| ----------------- | ---------------- | ----------- | ------------ | ------ | ---- |
+| Claude 3.5 Sonnet | ✅                | ✅           | ✅            | 🌟🌟🌟 | 🌟🌟 |
+| Claude 3 Opus     | ✅                | ✅           | ❌            | 🌟     | ⛔️   |
+| Claude 3 Sonnet   | ✅                | ✅           | ❌            | 🌟🌟   | ⛔️   |
+| Claude 3 Haiku    | ✅                | ✅           | ❌            | 🌟🌟   | ⛔️   |
+
+----------------------------------------
+
+TITLE: Running LobeChat Docker Container with Ollama Integration
+DESCRIPTION: This command runs LobeChat as a Docker container, configuring it to use a locally running Ollama service on port 11434. It exposes LobeChat on port 3210 and sets the OLLAMA_PROXY_URL environment variable to connect to the Ollama service.
+
+LANGUAGE: bash
+CODE:
+docker run -d -p 3210:3210 -e OLLAMA_PROXY_URL=http://host.docker.internal:11434 lobehub/lobe-chat
+
+----------------------------------------
+
+TITLE: Reloading Systemd and Restarting Ollama on Linux
+DESCRIPTION: These commands reload the systemd configuration and restart the Ollama service on Linux. This is necessary after modifying the Ollama service file to apply the new environment variable settings.
+
+LANGUAGE: bash
+CODE:
+sudo systemctl daemon-reload
+sudo systemctl restart ollama
+
+----------------------------------------
+
+TITLE: S3 Storage Configuration Variables
+DESCRIPTION: Environment variables required for configuring S3 storage service integration
+
+LANGUAGE: shell
+CODE:
+S3_ACCESS_KEY_ID=
+S3_SECRET_ACCESS_KEY=
+S3_ENDPOINT=
+S3_BUCKET=
+S3_PUBLIC_DOMAIN=
+S3_ENABLE_PATH_STYLE=
+
+----------------------------------------
+
+TITLE: PostgreSQL Connection String
+DESCRIPTION: Example PostgreSQL database connection URL format
+
+LANGUAGE: shell
+CODE:
+postgresql://postgres:wAbLxfXSwkxxxxxx@45.577.281.48:5432/postgres
+
+----------------------------------------
+
+TITLE: Starting Docker Containers
+DESCRIPTION: Command to start the Docker containers defined in the docker-compose.yml file.
+
+LANGUAGE: sh
+CODE:
+docker compose up -d
+
+----------------------------------------
+
+TITLE: Checking Docker Logs
+DESCRIPTION: Command to view the logs of the lobe-chat Docker container.
+
+LANGUAGE: sh
+CODE:
+docker logs -f lobe-chat
+
+----------------------------------------
+
+TITLE: MinIO Bucket Policy Configuration
+DESCRIPTION: JSON configuration for MinIO bucket policy to allow Casdoor avatar storage.
+
+LANGUAGE: json
+CODE:
+{
+  "Statement": [
+    {
+      "Effect": "Allow",
+      "Principal": {
+        "AWS": ["*"]
+      },
+      "Action": ["s3:GetBucketLocation"],
+      "Resource": ["arn:aws:s3:::casdoor"]
+    },
+    {
+      "Effect": "Allow",
+      "Principal": {
+        "AWS": ["*"]
+      },
+      "Action": ["s3:ListBucket"],
+      "Resource": ["arn:aws:s3:::casdoor"],
+      "Condition": {
+        "StringEquals": {
+          "s3:prefix": ["files/*"]
+        }
+      }
+    },
+    {
+      "Effect": "Allow",
+      "Principal": {
+        "AWS": ["*"]
+      },
+      "Action": ["s3:PutObject", "s3:DeleteObject", "s3:GetObject"],
+      "Resource": ["arn:aws:s3:::casdoor/**"]
+    }
+  ],
+  "Version": "2012-10-17"
+}
+
+----------------------------------------
+
+TITLE: Migrating to Casdoor Setup Script
+DESCRIPTION: Command to set up LobeChat with Casdoor authentication for production deployment.
+
+LANGUAGE: sh
+CODE:
+bash <(curl -fsSL https://raw.githubusercontent.com/lobehub/lobe-chat/HEAD/docker-compose/local/setup.sh) -f -l zh_CN
+docker compose up -d
+
+----------------------------------------
+
+TITLE: Environment Variables Configuration for Zeabur Deployment
+DESCRIPTION: Lists the required environment variables needed for deploying LobeChat on Zeabur, including OpenAI API key, domain configurations for LobeChat, MinIO, and Logto services.
+
+LANGUAGE: markdown
+CODE:
+- OpenAI API key: Your OpenAI API key to get responses from OpenAI.
+- LobeChat Domain: A free subdomain with `.zeabur.app` suffix.
+- MinIO Public Domain: A free subdomain with `.zeabur.app` suffix for yout MinIO web port.
+- Logto Console Domain: A free subdomain with `.zeabur.app` suffix for your Logto console.
+- Logto API Domain: A free subdomain with `.zeabur.app` suffix for your Logto api.

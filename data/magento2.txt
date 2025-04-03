@@ -1,0 +1,4568 @@
+TITLE: Magento 2 Setup Interface Implementation Guide
+DESCRIPTION: Key interfaces that need to be implemented for handling database schema and data operations during module setup. InstallSchemaInterface and UpgradeSchemaInterface handle database schema modifications, while InstallDataInterface and UpgradeDataInterface manage data operations. UninstallInterface handles module uninstallation cleanup.
+
+LANGUAGE: php
+CODE:
+InstallSchemaInterface // For DB schema installation\nUpgradeSchemaInterface // For DB schema upgrades\nInstallDataInterface // For DB data installation\nUpgradeDataInterface // For DB data upgrades\nUninstallInterface // For module uninstallation
+
+----------------------------------------
+
+TITLE: Overview of Magento 2 Autoloader Components
+DESCRIPTION: Documentation of the main components in Magento 2's autoloader system: AutoloaderInterface for abstract autoloader functionality, AutoloaderRegistry for singleton access, ClassLoaderWrapper for Composer integration, and Populator for PSR standard mappings.
+
+LANGUAGE: markdown
+CODE:
+# Autoload
+
+**Autoload** library contains an abstract wrapper for Composer's generated autoloader.
+
+* AutoloaderInterface provides abstract ability use and modify the autoloader class.
+* AutoloaderRegistry allows the same instance of the autoloader to put accessed across the code base.
+* ClassLoaderWrapper wraps around Composer's generated autoloader in order to insulate it.
+* Populator fills in PSR-0 and PSR-4 standard namespace-directory mappings for the autoloader.
+
+----------------------------------------
+
+TITLE: Installing Magento 2 via Command Line
+DESCRIPTION: Command line installation of Magento 2 with configuration for database, admin user, locale settings, and Elasticsearch. Sets up base URL, database credentials, admin account, and system preferences.
+
+LANGUAGE: php
+CODE:
+php bin/magento setup:install --base-url=http://127.0.0.1:8082 \
+--db-host=localhost --db-name=magento --db-user=magento --db-password=magento \
+--admin-firstname=Magento --admin-lastname=User --admin-email=user@example.com \
+--admin-user=admin --admin-password=admin123 --language=en_US \
+--currency=USD --timezone=America/Chicago --use-rewrites=1 \
+--search-engine=elasticsearch8 --elasticsearch-host=es-host.example.com --elasticsearch-port=9200
+
+----------------------------------------
+
+TITLE: Implementing Proxy Class in PHP for Magento 2 Object Manager
+DESCRIPTION: A proxy class that provides lazy loading and delegation to a subject instance. It handles object instantiation, serialization, debugging, and method delegation while maintaining object state and sharing configuration.
+
+LANGUAGE: php
+CODE:
+namespace Magento\Framework\ObjectManager\Code\Generator;\n\n/**\n * Proxy class for @see \Magento\Framework\ObjectManager\Code\Generator\Sample\n */\nclass Sample_Proxy extends Sample implements \Magento\Framework\ObjectManager\NoninterceptableInterface\n{\n    /**\n     * Object Manager instance\n     *\n     * @var \Magento\Framework\ObjectManagerInterface\n     */\n    protected $_objectManager = null;\n\n    /**\n     * Proxied instance name\n     *\n     * @var string\n     */\n    protected $_instanceName = null;\n\n    /**\n     * Proxied instance\n     *\n     * @var \Magento\Framework\ObjectManager\Code\Generator\Sample\n     */\n    protected $_subject = null;\n\n    /**\n     * Instance shareability flag\n     *\n     * @var bool\n     */\n    protected $_isShared = null;\n\n    /**\n     * Proxy constructor\n     *\n     * @param \Magento\Framework\ObjectManagerInterface $objectManager\n     * @param string $instanceName\n     * @param bool $shared\n     */\n    public function __construct(\Magento\Framework\ObjectManagerInterface $objectManager, $instanceName = '\\Magento\\Framework\\ObjectManager\\Code\\Generator\\Sample', $shared = true)\n    {\n        $this->_objectManager = $objectManager;\n        $this->_instanceName = $instanceName;\n        $this->_isShared = $shared;\n    }\n\n    /**\n     * @return array\n     */\n    public function __sleep()\n    {\n        return ['_subject', '_isShared', '_instanceName'];\n    }\n\n    /**\n     * Retrieve ObjectManager from global scope\n     */\n    public function __wakeup()\n    {\n        $this->_objectManager = \Magento\Framework\App\ObjectManager::getInstance();\n    }\n\n    /**\n     * Clone proxied instance\n     */\n    public function __clone()\n    {\n        if ($this->_subject) {\n            $this->_subject = clone $this->_getSubject();\n        }\n    }\n\n    /**\n     * Debug proxied instance\n     */\n    public function __debugInfo()\n    {\n        return ['i' => $this->_subject];\n    }\n\n    /**\n     * Get proxied instance\n     *\n     * @return \Magento\Framework\ObjectManager\Code\Generator\Sample\n     */\n    protected function _getSubject()\n    {\n        if (!$this->_subject) {\n            $this->_subject = true === $this->_isShared\n                ? $this->_objectManager->get($this->_instanceName)\n                : $this->_objectManager->create($this->_instanceName);\n        }\n        return $this->_subject;\n    }\n\n    /**\n     * {@inheritdoc}\n     */\n    public function setMessages(array $messages)\n    {\n        return $this->_getSubject()->setMessages($messages);\n    }\n\n    /**\n     * {@inheritdoc}\n     */\n    public function getMessages()\n    {\n        return $this->_getSubject()->getMessages();\n    }\n\n    /**\n     * {@inheritdoc}\n     */\n    public function setConfig(array $config)\n    {\n        return $this->_getSubject()->setConfig($config);\n    }\n\n    /**\n     * {@inheritdoc}\n     */\n    public function getConfig() : array\n    {\n        return $this->_getSubject()->getConfig();\n    }\n\n    /**\n     * {@inheritdoc}\n     */\n    public function setAttribute(int|string $attribute)\n    {\n        return $this->_getSubject()->setAttribute($attribute);\n    }\n\n    /**\n     * {@inheritdoc}\n     */\n    public function getAttribute() : int|string\n    {\n        return $this->_getSubject()->getAttribute();\n    }\n}
+
+----------------------------------------
+
+TITLE: Describing Magento 2 Phrase Class and Renderers in Markdown
+DESCRIPTION: This markdown snippet outlines the Magento\Framework\Phrase class and its associated renderers for text translation. It describes four types of renderers: Placeholder, Translate, Inline, and Composite, explaining their specific functionalities and use cases.
+
+LANGUAGE: markdown
+CODE:
+# Phrase
+
+Class *\Magento\Framework\Phrase* calls renderer to make the translation of the text. **Phrase** provides *RendererInterface* and a few renderers to support different kinds of needs of translation of the text. Here are list of renderers in this library:
+
+ * Placeholder render - it replaces placeholders with parameters for substitution. It is the default render if none is set for the Phrase.
+ * Translate render - it is a base renderer that implements text translations.
+ * Inline render - it adds inline translate part to text translation and returns the strings by a template.
+ * Composite render - it can have several renderers, calls each renderer for processing the text. Array of renderer class names pass into composite render constructor as a parameter.
+
+----------------------------------------
+
+TITLE: Registering Magento 2 Module Component
+DESCRIPTION: Shows how to register a Magento 2 module component using ComponentRegistrar. The method requires the component type constant, module name, and current directory path.
+
+LANGUAGE: php
+CODE:
+ComponentRegistrar::register(ComponentRegistrar::MODULE, '<module name>', __DIR__);
+
+----------------------------------------
+
+TITLE: Registering Magento 2 Language Component
+DESCRIPTION: Shows how to register a Magento 2 language package using ComponentRegistrar. The method requires the component type constant, language name, and current directory path.
+
+LANGUAGE: php
+CODE:
+ComponentRegistrar::register(ComponentRegistrar::LANGUAGE, '<language name>', __DIR__);
+
+----------------------------------------
+
+TITLE: Magento Sales Module Overview
+DESCRIPTION: Core functionality overview of the Magento\Sales module listing its primary responsibilities in order management, invoice processing, shipment tracking, and credit memo handling.
+
+LANGUAGE: markdown
+CODE:
+# Overview
+
+## Purpose of module
+
+Magento\Sales module is responsible for order processing and appearance in system,
+Magento\Sales module manages next system entities and flows:
+
+* order management;
+* invoice management;
+* shipment management (including tracks management);
+* credit memos management;
+Magento\Sales module is required for Magento\Checkout module to perform checkout operations.
+
+----------------------------------------
+
+TITLE: Defining Magento2 Crontab Management Interfaces
+DESCRIPTION: Interfaces that define the contract for managing cron tasks in Magento2. CrontabManagerInterface handles crontab operations (get, save, remove tasks) while TasksProviderInterface provides task list injection capability through DI.
+
+LANGUAGE: php
+CODE:
+interface CrontabManagerInterface {
+    public function getTasks(); // get list of Magento cron tasks from crontab
+    public function saveTasks(); // save Magento cron tasks to crontab
+    public function removeTasks(); // remove Magento cron tasks from crontab
+}
+
+interface TasksProviderInterface {
+    public function getTasks(); // provides transportation of task list from DI
+}
+
+----------------------------------------
+
+TITLE: Defining Magento 2 Translation Components Structure
+DESCRIPTION: Structural overview of the main components in Magento's Translate library, including Parser, Provider, Configuration, State, and Resource components with their respective interfaces and implementations.
+
+LANGUAGE: markdown
+CODE:
+# Translate
+
+Magento provides an *Inline Translation* tool that allows inline editing of phrases that are passed through translation mechanism. The phrases are edited by the end-user stored in database dictionaries. **Translate** library provides framework to support inline translation. The following components are provided in this library for inline translation:
+
+ * Parser - Parser parses and saves edited translation, and replaces html body with translation wrapping
+   * *ParserInterface, ParserFactory*
+ * Provider - Provider returns instance of inline translate class
+   * *ProviderInterface* and a *Provider*
+ * Configuration - It can configure inline translation to be active or inactive or to allow client ip or not.
+   * *ConfigInterface*
+ * State - It can disable, enable, suspend and resume inline translation.
+   * *StateInterface* and a *State* class
+ * Resource - It stores and retrieve translation array
+   * *ResourceInterface*
+
+----------------------------------------
+
+TITLE: Listing Magento_Backend Module UI Components
+DESCRIPTION: Identifies the UI component configuration files that can be used to extend the Magento_Backend module. This information is crucial for developers working on customizing the admin interface.
+
+LANGUAGE: markdown
+CODE:
+- `view/adminhtml/ui_component/design_config_form.xml`
+- `view/adminhtml/ui_component/design_config_listing.xml`
+
+----------------------------------------
+
+TITLE: Listing Magento_Backend Module Events
+DESCRIPTION: Enumerates the events dispatched by the Magento_Backend module, including their dispatch locations and parameters. This information is crucial for developers looking to extend or modify the module's functionality.
+
+LANGUAGE: markdown
+CODE:
+- `adminhtml_block_html_before` event in the `\Magento\Backend\Block\Template::_toHtml()` method. Parameters:
+  - `block` is the backend block template (this) (`\Magento\Backend\Block\Template` class).
+- `adminhtml_store_edit_form_prepare_form` event in the `\Magento\Backend\Block\System\Store\Edit\AbstractForm::_prepareForm()` method. Parameters:
+  - `block` is the AbstractForm block (this) (`\Magento\Backend\Block\System\Store\Edit\AbstractForm` class).
+- `backend_block_widget_grid_prepare_grid_before` event in the `\Magento\Backend\Block\Widget\Grid::_prepareGrid()` method. Parameters:
+  - `grid` is the widget grid block (this) (`\Magento\Backend\Block\Widget\Grid` class)
+  - `collection` is the grid collection (`\Magento\Framework\Data\Collection` class).
+- `adminhtml_cache_flush_system` event in the `\Magento\Backend\Console\Command\CacheCleanCommand::performAction()` method.
+- `adminhtml_cache_flush_all` event in the `\Magento\Backend\Console\Command\CacheFlushCommand::performAction()` method.
+- `clean_catalog_images_cache_after` event in the `\Magento\Backend\Controller\Adminhtml\Cache\CleanImages::execute()` method.
+- `clean_media_cache_after` event in the `\Magento\Backend\Controller\Adminhtml\Cache\CleanMedia::execute()` method.
+- `clean_static_files_cache_after` event in the `\Magento\Backend\Controller\Adminhtml\Cache\CleanStaticFiles::execute()` method.
+- `adminhtml_cache_flush_all` event in the `\Magento\Backend\Controller\Adminhtml\Cache\FlushAll::execute()` method.
+- `adminhtml_cache_flush_system` event in the `\Magento\Backend\Controller\Adminhtml\Cache\FlushSystem::execute()` method.
+- `theme_save_after` event in the `\Magento\Backend\Controller\Adminhtml\System\Design\Save::execute()` method.
+- `backend_auth_user_login_success` event in the `\Magento\Backend\Model\Auth::login()` method. Parameters:
+  - `user` is the credential storage object (`null | \Magento\Backend\Model\Auth\Credential\StorageInterface`)
+- `backend_auth_user_login_failed` event in the `\Magento\Backend\Model\Auth::login()` method. Parameters:
+  - `user_name` is username extracted from the credential storage object (`null | \Magento\Backend\Model\Auth\Credential\StorageInterface`)
+  - `exception` any exception generated (`\Magento\Framework\Exception\LocalizedException | \Magento\Framework\Exception\Plugin\AuthenticationException`)
+
+----------------------------------------
+
+TITLE: Magento Console Commands for Indexer Management
+DESCRIPTION: Console commands provided by the module for managing indexers, including viewing status, running reindexing, and configuring indexer modes.
+
+LANGUAGE: bash
+CODE:
+bin/magento indexer:info
+bin/magento indexer:status [indexer]
+bin/magento indexer:reindex [indexer]
+bin/magento indexer:reset [indexer]
+bin/magento indexer:show-mode [indexer]
+bin/magento indexer:set-mode {realtime|schedule} [indexer]
+bin/magento indexer:set-dimensions-mode [indexer]
+bin/magento indexer:show-dimensions-mode [indexer]
+
+----------------------------------------
+
+TITLE: Configuring Gallery Switch Strategy in Magento 2 Theme view.xml
+DESCRIPTION: This XML snippet demonstrates how to set the gallery_switch_strategy for configurable products in Magento 2. It configures the behavior of gallery images when switching between product configurations.
+
+LANGUAGE: xml
+CODE:
+<vars module="Magento_ConfigurableProduct">
+    <var name="gallery_switch_strategy">replace</var>
+</vars>
+
+----------------------------------------
+
+TITLE: Registering Magento 2 Library Component
+DESCRIPTION: Shows how to register a Magento 2 library component using ComponentRegistrar. The method requires the component type constant, library name, and current directory path.
+
+LANGUAGE: php
+CODE:
+ComponentRegistrar::register(ComponentRegistrar::LIBRARY, '<library name>', __DIR__);
+
+----------------------------------------
+
+TITLE: Defining Non-Cacheable Block in Magento 2 Layout XML
+DESCRIPTION: Demonstrates how to set a block as non-cacheable using the 'cacheable' attribute in Magento 2 layout XML files. This prevents the block and its containing page from being cached.
+
+LANGUAGE: xml
+CODE:
+<block class="Block\Class" name="blockname" cacheable="false" />
+
+----------------------------------------
+
+TITLE: Dispatching customer_register_success Event in Magento 2 PHP
+DESCRIPTION: This code snippet shows how the customer_register_success event is dispatched in the CreatePost controller's execute method. It passes the account controller and customer object as parameters.
+
+LANGUAGE: php
+CODE:
+"customer_register_success" event in the \Magento\Customer\Controller\Account\CreatePost::execute method. Parameters:
+    - `account_controller` is a `$this` object (\Magento\Customer\Controller\Account\CreatePost class)
+    - `customer` is a customer object (\Magento\Customer\Model\Data\Customer class)
+
+----------------------------------------
+
+TITLE: Defining Observed Events in Magento_Catalog Module
+DESCRIPTION: This XML snippet defines the events observed by the Magento_Catalog module. It includes events for product and category operations such as save, delete, and load actions.
+
+LANGUAGE: xml
+CODE:
+<config xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="urn:magento:framework:Event/etc/events.xsd">
+    <event name="magento_catalog_api_data_productinterface_save_before">
+        <observer name="before_entity_save" instance="Magento\Framework\EntityManager\Observer\BeforeEntitySave" />
+    </event>
+    <event name="magento_catalog_api_data_productinterface_save_after">
+        <observer name="after_entity_save" instance="Magento\Framework\EntityManager\Observer\AfterEntitySave" />
+    </event>
+    <!-- Additional event definitions omitted for brevity -->
+</config>
+
+----------------------------------------
+
+TITLE: Configuring Custom Console Command in Magento 2 XML
+DESCRIPTION: Demonstrates how to register a new console command by extending CommandListInterface through dependency injection configuration. The example shows adding a 'test_me' command that maps to a custom command class.
+
+LANGUAGE: xml
+CODE:
+<type name="Magento\Framework\Console\CommandListInterface">
+    <arguments>
+        <argument name="commands" xsi:type="array">
+            <item name="test_me" xsi:type="object">Magento\MyModule\Console\TestMeCommand</item>
+        </argument>
+    </arguments>
+</type>
+
+----------------------------------------
+
+TITLE: Listing Magento_Backend Module Layouts
+DESCRIPTION: Enumerates the layouts and layout handles introduced by the Magento_Backend module in the view/adminhtml/layout directory. This information is useful for frontend developers working with the admin interface.
+
+LANGUAGE: markdown
+CODE:
+- `admin_login`
+- `adminhtml_auth_login`
+- `adminhtml_cache_block`
+- `adminhtml_cache_index`
+- `adminhtml_dashboard_customersmost`
+- `adminhtml_dashboard_customersnewest`
+- `adminhtml_dashboard_index`
+- `adminhtml_dashboard_productsviewed`
+- `adminhtml_denied`
+- `adminhtml_noroute`
+- `adminhtml_system_account_index`
+- `adminhtml_system_design_edit`
+- `adminhtml_system_design_grid`
+- `adminhtml_system_design_grid_block`
+- `adminhtml_system_design_index`
+- `adminhtml_system_store_deletestore`
+- `adminhtml_system_store_editstore`
+- `adminhtml_system_store_grid_block`
+- `adminhtml_system_store_index`
+- `default`
+- `editor`
+- `empty`
+- `formkey`
+- `overlay_popup`
+- `popup`
+
+----------------------------------------
+
+TITLE: Referencing Resource Model Class for Entity Persistence in Magento 2
+DESCRIPTION: Recommends using the Resource Model infrastructure by extending the Magento\Framework\Model\ResourceModel\Db\AbstractDb class for entity persistence without EAV attributes.
+
+LANGUAGE: markdown
+CODE:
+Magento\Framework\Model\ResourceModel\Db\AbstractDb
+
+----------------------------------------
+
+TITLE: Introducing Magento 2 Model Library in Markdown
+DESCRIPTION: This markdown snippet provides a concise overview of the Model library in Magento 2. It highlights the library's support for MVC models, model context, and database operations for model persistence.
+
+LANGUAGE: markdown
+CODE:
+# Model
+
+**Model** library provides support for MVC models, model context, and storing and retrieving models to the database.
+
+----------------------------------------
+
+TITLE: Using SerializerInterface in Magento2
+DESCRIPTION: Migration guidance for developers to switch from deprecated serialization library to the new Magento\Framework\Serialize\SerializerInterface. The interface provides standardized serialization methods for data handling in Magento2.
+
+LANGUAGE: php
+CODE:
+Magento\Framework\Serialize\SerializerInterface
+
+----------------------------------------
+
+TITLE: Magento 2 Controller Library Overview
+DESCRIPTION: Documentation outlining the core components of Magento 2's Controller library, including the Response adapter for Zend Response class used for dependency injection, and the Router component that serves as a route factory.
+
+LANGUAGE: markdown
+CODE:
+# Controller
+
+**Controller** library is responsible for HTTP response and creating route.
+
+* **Response** * Adapter for Zend Response class. Needed for DI
+
+* **Router** * Route Factory
+
+----------------------------------------
+
+TITLE: Listing Public APIs for Magento_MediaGalleryApi Module
+DESCRIPTION: This code block lists the public APIs provided by the Magento_MediaGalleryApi module. It includes interfaces for managing media assets, keywords, directories, and performing various operations on media gallery items.
+
+LANGUAGE: markdown
+CODE:
+- `\Magento\MediaGalleryApi\Api\Data\AssetInterface`
+    - media asset entity data
+
+- `\Magento\MediaGalleryApi\Api\Data\AssetKeywordsInterface`
+    - assets keywords aggregation
+
+- `\Magento\MediaGalleryApi\Api\Data\AssetKeywordsInterface`
+    - media asset keyword entity data
+
+- `\Magento\MediaGalleryApi\Api\CreateDirectoriesByPathsInterface`:
+    - create new directories by provided paths
+
+- `\Magento\MediaGalleryApi\Api\DeleteAssetsByPathsInterface`:
+    - delete media assets by paths. Removes all the assets which paths start with provided paths
+
+- `\Magento\MediaGalleryApi\Api\DeleteDirectoriesByPathsInterface`:
+    - delete folders by provided paths
+
+- `\Magento\MediaGalleryApi\Api\GetAssetsByIdsInterface`:
+    - get media gallery assets by id attribute
+
+- `\Magento\MediaGalleryApi\Api\GetAssetsByPathsInterface`:
+    - get media gallery assets by paths in media storage
+
+- `\Magento\MediaGalleryApi\Api\GetAssetsKeywordsInterface`:
+    - get a media gallery asset keywords related to media gallery asset ids provided
+
+- `\Magento\MediaGalleryApi\Api\IsPathExcludedInterface`:
+    - check if the path is excluded from displaying and processing in the media gallery
+
+- `\Magento\MediaGalleryApi\Api\SaveAssetsInterface`:
+    - save media gallery assets to the database
+
+- `\Magento\MediaGalleryApi\Api\SaveAssetsKeywordsInterface`:
+    - save keywords related to assets to the database
+  
+- `\Magento\MediaGalleryApi\Api\SearchAssetsInterface`:
+    - search media gallery assets
+
+----------------------------------------
+
+TITLE: Defining Customer Interface in Magento 2 PHP
+DESCRIPTION: This code snippet outlines the \Magento\Customer\Api\Data\CustomerInterface, which represents customer data in the Magento 2 API.
+
+LANGUAGE: php
+CODE:
+"\Magento\Customer\Api\Data\CustomerInterface":
+    - customer data
+
+----------------------------------------
+
+TITLE: Describing LockManagerInterface Methods in Magento 2
+DESCRIPTION: This snippet outlines the three main methods provided by the LockManagerInterface in Magento 2's Lock library: lock for acquiring a named lock, unlock for releasing a named lock, and isLocked for testing if a named lock exists.
+
+LANGUAGE: markdown
+CODE:
+* *lock* - Acquires a named lock
+* *unlock* - Releases a named lock
+* *isLocked* - Tests if a named lock exists
+
+----------------------------------------
+
+TITLE: Defining AccountManagementInterface in Magento 2 PHP
+DESCRIPTION: This code snippet outlines the \Magento\Customer\Api\AccountManagementInterface, which provides methods for managing customer accounts in Magento 2.
+
+LANGUAGE: php
+CODE:
+"\Magento\Customer\Api\AccountManagementInterface":
+    - create customer account
+    - create customer account using provided hashed password
+    - validate customer data
+    - check if customer can be deleted
+    - activate a customer account using customer EMAIL and key that was sent in a confirmation email
+    - activate a customer account using customer ID and key that was sent in a confirmation email
+    - authenticate a customer by username and password
+    - change customer password by customer EMAIL
+    - change customer password by customer ID
+    - send an email to the customer with a password reset link
+    - reset customer password
+    - check if password reset token is valid
+    - gets the account confirmation status
+    - resend confirmation email
+    - check if given email is associated with a customer account in given website
+    - check store availability for customer given the customer ID
+    - retrieve default billing address for the given customer ID
+    - retrieve default shipping address for the given customer ID
+    - get hashed password
+
+----------------------------------------
+
+TITLE: Configuring Cron Jobs for Magento Integration Module
+DESCRIPTION: XML configuration for cron jobs that handle cleanup of authentication failures and expired tokens. Defines two cron tasks: outdated_authentication_failures_cleanup and expired_tokens_cleanups.
+
+LANGUAGE: xml
+CODE:
+etc/crontab.xml:
+- outdated_authentication_failures_cleanup
+- expired_tokens_cleanups
+
+----------------------------------------
+
+TITLE: Setting Magento2 Application Mode
+DESCRIPTION: Command to switch between development and production modes. Accepts an optional skip-compilation parameter for production mode to skip static file compilation.
+
+LANGUAGE: bash
+CODE:
+bin/magento deploy:mode:set [mode]
+
+----------------------------------------
+
+TITLE: Database Tables Schema - Magento Quote Module
+DESCRIPTION: List of database tables created by the Magento_Quote module for storing cart-related data
+
+LANGUAGE: markdown
+CODE:
+- `quote`
+- `quote_address`
+- `quote_item`
+- `quote_address_item`
+- `quote_item_option`
+- `quote_payment`
+- `quote_shipping_rate`
+- `quote_id_mask`
+
+----------------------------------------
+
+TITLE: Markdown Documentation Header for CatalogGraphQl Module
+DESCRIPTION: Markdown header and description explaining the purpose of the CatalogGraphQl module for Magento 2's GraphQL implementation.
+
+LANGUAGE: markdown
+CODE:
+# CatalogGraphQl
+
+**CatalogGraphQl** provides type and resolver information for the GraphQl module
+to generate catalog and product information endpoints.
+
+----------------------------------------
+
+TITLE: Declaring New Import Entity in XML
+DESCRIPTION: Example of how to declare a new import entity in the etc/import.xml file. This is the first step in creating a custom import entity.
+
+LANGUAGE: xml
+CODE:
+<import xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:noNamespaceSchemaLocation="urn:magento:module:Magento_ImportExport:etc/import.xsd">
+    <!-- Declare new import entity here -->
+</import>
+
+----------------------------------------
+
+TITLE: Declaring New Export Entity in XML
+DESCRIPTION: Example of how to declare a new export entity in the etc/export.xml file. This is the first step in creating a custom export entity.
+
+LANGUAGE: xml
+CODE:
+<export xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:noNamespaceSchemaLocation="urn:magento:module:Magento_ImportExport:etc/export.xsd">
+    <!-- Declare new export entity here -->
+</export>
+
+----------------------------------------
+
+TITLE: Configuring Magento Checkout Events in XML
+DESCRIPTION: XML configuration defining event observers for sales quote updates and customer authentication events. Includes handlers for sales_quote_save_after, customer_login, and customer_logout events.
+
+LANGUAGE: xml
+CODE:
+<!-- etc/events.xml -->
+<event name="sales_quote_save_after">
+    <observer name="checkout_observer" instance="Magento\Checkout\Observer\SalesQuoteSaveAfterObserver" />
+</event>
+
+<!-- etc/frontend/events.xml -->
+<event name="customer_login">
+    <observer name="load_customer_quote" instance="Magento\Checkout\Observer\LoadCustomerQuoteObserver" />
+</event>
+<event name="customer_logout">
+    <observer name="unset_all" instance="Magento\Checkout\Observer\UnsetAllObserver" />
+</event>
+
+----------------------------------------
+
+TITLE: Referencing Magento Payment Abstract Class
+DESCRIPTION: Shows the base abstract class path that should be extended when implementing new payment methods in Magento 2. This class contains core payment processing functionality.
+
+LANGUAGE: php
+CODE:
+Magento\Payment\Model\Method\AbstractMethod
+
+----------------------------------------
+
+TITLE: Defining Magento Checkout Layout Handles
+DESCRIPTION: Frontend layout configuration defining various checkout-related page layouts and rendering templates for cart, sidebar, and checkout process pages.
+
+LANGUAGE: xml
+CODE:
+<!-- view/frontend/layout handles -->
+<handle name="catalog_category_view" />
+<handle name="catalog_product_view" />
+<handle name="checkout_cart_configure" />
+<handle name="checkout_cart_configure_type_simple" />
+<handle name="checkout_cart_index" />
+<handle name="checkout_cart_item_renderers" />
+<handle name="checkout_cart_sidebar_item_price_renderers" />
+<handle name="checkout_cart_sidebar_item_renderers" />
+<handle name="checkout_cart_sidebar_total_renderers" />
+<handle name="checkout_index_index" />
+<handle name="checkout_item_price_renderers" />
+<handle name="checkout_onepage_failure" />
+<handle name="checkout_onepage_review_item_renderers" />
+<handle name="checkout_onepage_success" />
+<handle name="default" />
+
+----------------------------------------
+
+TITLE: Authentication Data Management Interfaces - PHP
+DESCRIPTION: Collection of interfaces for managing authentication data including generation, retrieval, deletion and storage of authentication secrets
+
+LANGUAGE: php
+CODE:
+\Magento\LoginAsCustomerApi\Api\DeleteAuthenticationDataForUserInterface
+\Magento\LoginAsCustomerApi\Api\GenerateAuthenticationSecretInterface
+\Magento\LoginAsCustomerApi\Api\GetAuthenticationDataBySecretInterface
+\Magento\LoginAsCustomerApi\Api\SaveAuthenticationDataInterface
+
+----------------------------------------
+
+TITLE: Events Documentation - Magento Quote Module
+DESCRIPTION: List of events dispatched by the Magento_Quote module with their respective parameters and methods
+
+LANGUAGE: markdown
+CODE:
+- `sales_quote_address_collection_load_after`
+- `items_additional_data`
+- `sales_quote_remove_item`
+- `sales_quote_add_item`
+- `sales_quote_product_add_after`
+- `sales_quote_merge_before`
+- `sales_quote_merge_after`
+- `sales_convert_quote_to_order`
+- `sales_quote_item_qty_set_after`
+- `sales_quote_item_set_product`
+- `sales_quote_payment_import_data_before`
+- `sales_quote_collect_totals_before`
+- `sales_quote_collect_totals_after`
+- `sales_quote_address_collect_totals_before`
+- `sales_quote_address_collect_totals_after`
+- `checkout_submit_before`
+- `checkout_submit_all_after`
+- `sales_model_service_quote_submit_before`
+- `sales_model_service_quote_submit_success`
+- `sales_model_service_quote_submit_failure`
+- `prepare_catalog_product_collection_prices`
+- `sales_quote_item_collection_products_after_load`
+
+----------------------------------------
+
+TITLE: Defining Cron Job for Newsletter Sending in Magento 2
+DESCRIPTION: This snippet shows the configuration for scheduling the newsletter sending cron job in Magento 2. It defines the 'newsletter_send_all' job in the crontab.xml file.
+
+LANGUAGE: xml
+CODE:
+<newsletter_send_all> - schedules newsletter sending
+
+----------------------------------------
+
+TITLE: Session Management Interfaces - PHP
+DESCRIPTION: Interfaces for managing the admin and customer IDs during login as customer sessions
+
+LANGUAGE: php
+CODE:
+\Magento\LoginAsCustomerApi\Api\GetLoggedAsCustomerAdminIdInterface
+\Magento\LoginAsCustomerApi\Api\GetLoggedAsCustomerCustomerIdInterface
+\Magento\LoginAsCustomerApi\Api\SetLoggedAsCustomerAdminIdInterface
+\Magento\LoginAsCustomerApi\Api\SetLoggedAsCustomerCustomerIdInterface
+
+----------------------------------------
+
+TITLE: Describing Magento_Backend Module Structure
+DESCRIPTION: Explains the file structure of the Magento_Backend module, highlighting the presence of the Service/V1 directory which contains logic for listing installed Magento modules.
+
+LANGUAGE: markdown
+CODE:
+Beyond the [usual module file structure](https://developer.adobe.com/commerce/php/architecture/modules/overview/) the module contains a directory `Service/V1`.
+
+`Service/V1` - contains logic to provide a list of modules installed in Magento.
+
+----------------------------------------
+
+TITLE: Removing Magento 2 Sample Data Modules (Composer)
+DESCRIPTION: This bash command removes the sample data modules from the Magento 2 code base when they were deployed from the Composer repository.
+
+LANGUAGE: bash
+CODE:
+# bin/magento sampledata:remove
+
+----------------------------------------
+
+TITLE: Enabling Basic Instant Purchase Implementation in Magento 2 XML Configuration
+DESCRIPTION: This XML snippet demonstrates how to enable the basic implementation of instant purchase support for a payment method with vault support in Magento 2. It adds a single option to the payment method configuration in config.xml.
+
+LANGUAGE: xml
+CODE:
+<instant_purchase>
+    <supported>1</supported>
+</instant_purchase>
+
+----------------------------------------
+
+TITLE: Specifying Sample Data Packages in Composer JSON for Magento 2
+DESCRIPTION: This snippet demonstrates how to add Magento 2 sample data package dependencies to the root composer.json file. It includes examples for catalog, configurable, CMS, and sales sample data modules.
+
+LANGUAGE: json
+CODE:
+{
+    "require": {
+        ...
+        "magento/module-catalog-sample-data": "{version}",
+        "magento/module-configurable-sample-data": "{version}",
+        "magento/module-cms-sample-data": "{version}",
+        "magento/module-sales-sample-data": "{version}"
+        ....
+    }
+}
+
+----------------------------------------
+
+TITLE: Deploying Magento 2 Sample Data Using Composer
+DESCRIPTION: This bash command deploys Magento 2 sample data from the Composer repository using the Magento CLI. It collects dependencies from the 'suggest' sections of composer.json files in modules that suggest installing sample data.
+
+LANGUAGE: bash
+CODE:
+# bin/magento sampledata:deploy
+
+----------------------------------------
+
+TITLE: Customizing Instant Purchase Implementation in Magento 2 XML Configuration
+DESCRIPTION: This XML snippet shows how to provide a custom implementation for instant purchase integration in Magento 2. It defines custom classes for availability checking, token formatting, and additional information provision.
+
+LANGUAGE: xml
+CODE:
+<instant_purchase>
+    <available>Implementation_Of_Magento\InstantPurchase\PaymentMethodIntegration\AvailabilityCheckerInterface</available>
+    <tokenFormat>Implementation_Of_Magento\InstantPurchase\PaymentMethodIntegration\PaymentTokenFormatterInterface</tokenFormat>
+    <additionalInformation>Implementation_Of_Magento\InstantPurchase\PaymentMethodIntegration\PaymentAdditionalInformationProviderInterface</additionalInformation>
+</instant_purchase>
+
+----------------------------------------
+
+TITLE: Listing Layout Handles for CMS Module in Magento 2
+DESCRIPTION: This snippet lists the layout handles that the CMS module interacts with in the adminhtml and frontend areas. It includes handles for block and page management, WYSIWYG functionality, and frontend page rendering.
+
+LANGUAGE: xml
+CODE:
+view/adminhtml/layout directory:
+
+ * cms_block_edit.xml
+ * cms_block_index.xml
+ * cms_block_new.xml
+ * cms_page_edit.xml
+ * cms_page_index.xml
+ * cms_page_new.xml
+ * cms_wysiwyg_images_contents.xml
+ * cms_wysiwyg_images_index.xml
+
+view/frontend/layout directory:
+
+ * cms_index_defaultindex.xml
+ * cms_index_defaultnoroute.xml
+ * cms_index_index.xml
+ * cms_index_nocookies.xml
+ * cms_noroute_index.xml
+ * cms_page_view.xml
+ * default.xml
+ * print.xml
+
+----------------------------------------
+
+TITLE: CSS Library Overview
+DESCRIPTION: Markdown documentation explaining the purpose and functionality of the Magento 2 CSS library, which handles LESS file processing and conversion to CSS.
+
+LANGUAGE: markdown
+CODE:
+# Overview
+
+CSS library contains common infrastructure to work with style sheets.
+It provides an ability to process LESS files in Magento application and convert this dynamic stylesheet language into CSS using correspondent parser.
+
+----------------------------------------
+
+TITLE: Referencing EAV Entity Class for Entity Persistence with EAV Support in Magento 2
+DESCRIPTION: Suggests extending the Magento\Eav\Model\Entity\AbstractEntity class for entity persistence when EAV attributes support is needed.
+
+LANGUAGE: markdown
+CODE:
+Magento\Eav\Model\Entity\AbstractEntity
+
+----------------------------------------
+
+TITLE: BundleGraphQl Module Documentation
+DESCRIPTION: Markdown documentation explaining the purpose of the BundleGraphQl module, which provides GraphQL type definitions and resolvers for bundle products in Magento 2.
+
+LANGUAGE: markdown
+CODE:
+# BundleGraphQl
+
+**BundleGraphQl** provides type and resolver information for the GraphQl module
+to generate bundle product information.
+
+----------------------------------------
+
+TITLE: PHP Interface Implementation for Filter Rendering
+DESCRIPTION: Public API interface for rendering navigation filters in the layered navigation system. This interface is crucial for implementing custom filter rendering functionality.
+
+LANGUAGE: php
+CODE:
+\Magento\LayeredNavigation\Block\Navigation\FilterRendererInterface
+
+----------------------------------------
+
+TITLE: Describing DownloadableGraphQl Module in Magento 2
+DESCRIPTION: This snippet provides a brief description of the DownloadableGraphQl module in Magento 2. It explains that the module supplies type and resolver information for the GraphQl module to generate downloadable product information.
+
+LANGUAGE: Markdown
+CODE:
+# DownloadableGraphQl
+
+**DownloadableGraphQl** provides type and resolver information for the GraphQl module
+to generate downloadable product information.
+
+----------------------------------------
+
+TITLE: Running Static Content Deployment in Magento2
+DESCRIPTION: Command to deploy static content from the Magento root directory using the CLI tool.
+
+LANGUAGE: bash
+CODE:
+bin/magento setup:static-content:deploy
+
+----------------------------------------
+
+TITLE: Defining Layout Handles in Magento 2 Adminhtml
+DESCRIPTION: Lists the layout handles introduced by the Magento_Weee module in the adminhtml area. These handles are used for customizing the admin interface.
+
+LANGUAGE: markdown
+CODE:
+- `view/adminhtml/layout`:
+    - `catalog_product_form`
+    - `sales_creditmemo_item_price`
+    - `sales_invoice_item_price`
+    - `sales_order_create_item_price`
+    - `sales_order_creditmemo_new`
+    - `sales_order_creditmemo_updateqty`
+    - `sales_order_creditmemo_view`
+    - `sales_order_invoice_new`
+    - `sales_order_invoice_updateqty`
+    - `sales_order_invoice_view`
+    - `sales_order_item_price`
+    - `sales_order_view`
+
+----------------------------------------
+
+TITLE: Markdown Documentation for StoreGraphQl Module
+DESCRIPTION: Module header and description explaining the purpose of StoreGraphQl as a type provider for Magento 2's GraphQL implementation.
+
+LANGUAGE: markdown
+CODE:
+# StoreGraphQl
+
+**StoreGraphQl** provides type information for the GraphQl module
+to generate store fields information endpoints.
+
+----------------------------------------
+
+TITLE: Resetting Magento 2 Sample Data
+DESCRIPTION: This bash command resets the Magento 2 sample data, restoring deleted entities. It should be run from the Magento root directory and followed by a Magento upgrade.
+
+LANGUAGE: bash
+CODE:
+# bin/magento sampledata:reset
+
+----------------------------------------
+
+TITLE: Describing CmsUrlRewriteGraphQl Module in Markdown
+DESCRIPTION: This snippet provides a brief description of the CmsUrlRewriteGraphQl module for Magento 2. It explains that the module provides type information for the GraphQL module to generate URL rewrite fields for CMS information endpoints.
+
+LANGUAGE: Markdown
+CODE:
+# CmsUrlRewriteGraphQl
+
+**CmsUrlRewriteGraphQl** provides type information for the GraphQl module
+to generate url rewrite fields for cms information endpoints.
+
+----------------------------------------
+
+TITLE: Directory Structure for Magento_WebapiAsync Module
+DESCRIPTION: Describes the main directory structure of the Magento_WebapiAsync module, specifically mentioning the Code/ directory which contains Remote service reader configuration files.
+
+LANGUAGE: markdown
+CODE:
+`Code/` - the directory that contains Remote service reader configuration files.
+
+----------------------------------------
+
+TITLE: Analyzing HTTP Response Headers for Magento 2
+DESCRIPTION: This snippet demonstrates the HTTP response headers returned by a Magento 2 server. It includes security headers like X-Frame-Options and Strict-Transport-Security, as well as standard headers such as Content-Type and Content-Length.
+
+LANGUAGE: http
+CODE:
+HTTP/1.1 200 OK
+Server: Apache
+X-Frame-Options: SAMEORIGIN
+Strict-Transport-Security: max-age=14400
+Strict-Transport-Security: max-age=14400
+Content-Type: text/html; charset=UTF-8
+Date: Mon, 22 Apr 2013 09:52:36 GMT
+Content-Length: 8
+Connection: keep-alive
+Set-Cookie: ...
+
+VERIFIED
+
+----------------------------------------
+
+TITLE: Markdown Documentation for PayPal GraphQL Module
+DESCRIPTION: Simple markdown documentation describing the PaypalGraphQl module that provides resolver information for PayPal payment methods via GraphQL in Magento 2.
+
+LANGUAGE: markdown
+CODE:
+# PaypalGraphQl
+
+**PaypalGraphQl** provides resolver information for using Paypal payment methods via GraphQl.
+
+----------------------------------------
+
+TITLE: Configuring Web API Security Path in Magento 2
+DESCRIPTION: Specifies the configuration path in the Magento 2 backend to enable or disable Web API security for certain services.
+
+LANGUAGE: markdown
+CODE:
+`Stores -> Configuration -> Services -> Magento Web API -> Web Api Security`
+
+----------------------------------------
+
+TITLE: Specifying Services Configuration File in Magento 2
+DESCRIPTION: Indicates the location of the configuration file that defines which services are affected by the Web API security settings.
+
+LANGUAGE: markdown
+CODE:
+`app/code/Magento/WebapiSecurity/etc/di.xml`
+
+----------------------------------------
+
+TITLE: Documenting DirectoryGraphQl Module
+DESCRIPTION: Module description explaining that DirectoryGraphQl provides type and resolver information for GraphQL directory information endpoints.
+
+LANGUAGE: markdown
+CODE:
+# DirectoryGraphQl\n\n**DirectoryGraphQl** provides type and resolver information for the GraphQl module\nto generate directory information endpoints.
+
+----------------------------------------
+
+TITLE: Login As Customer Configuration Interface - PHP
+DESCRIPTION: Interface providing configuration methods to check if the extension is enabled, manage store view selection, and handle authentication expiration
+
+LANGUAGE: php
+CODE:
+\Magento\LoginAsCustomerApi\Api\ConfigInterface
+
+----------------------------------------
+
+TITLE: Markdown Documentation for CheckoutAgreementsGraphQl Module
+DESCRIPTION: Documentation explaining the purpose of the CheckoutAgreementsGraphQl module which provides GraphQL type definitions for checkout agreements functionality in Magento 2.
+
+LANGUAGE: markdown
+CODE:
+# CheckoutAgreementsGraphQl
+
+**CheckoutAgreementsGraphQl** provides type information for the GraphQl module
+to generate Checkout Agreements fields for Checkout Agreements information endpoints.
+
+----------------------------------------
+
+TITLE: Listing Magento_Wishlist Module Events
+DESCRIPTION: Enumerates the events dispatched by the Magento_Wishlist module, including their names, methods, and parameters.
+
+LANGUAGE: markdown
+CODE:
+- `product_option_renderer_init` event in the `\Magento\Wishlist\Block\Customer\Wishlist\Item\Options::_construct()` method. Parameters:
+    - `block` is a Wishlist block customer items (`\Magento\Wishlist\Block\Customer\Wishlist\Item\Options` class).
+- `rss_wishlist_xml_callback` event in the `\Magento\Wishlist\Model\Rss\Wishlist::getRssData()` method. Parameters:
+    - `$args` is a array of product object (`\Magento\Catalog\Model\Product` class).
+- `wishlist_add_item` event in the `\Magento\Wishlist\Model\Wishlist::addItem()` method. Parameters:
+    - `item` is an item object (`\Magento\Wishlist\Model\Item` class).
+- `wishlist_add_product` event in the `\Magento\Wishlist\Controller\Index\Add::execute()` method. Parameters:
+    - `wishlist` is a Wishlist object (`\Magento\Wishlist\Model\Wishlist` class).
+    - `product` is a product object (`\Magento\Catalog\Api\Data\ProductInterface` class).
+    - `item` is an item object (`\Magento\Wishlist\Model\Item` class).
+- `wishlist_item_collection_products_after_load` event in the `\Magento\Wishlist\Model\ResourceModel\Item\Collection::_assignProducts()` method. Parameters:
+    - `product_collection` is a product collection object (`\Magento\Catalog\Model\ResourceModel\Product\Collection` class).
+- `wishlist_items_renewed` event in the `\Magento\Wishlist\Helper\Data::calculate()` method.
+- `wishlist_product_add_after` event in the `\Magento\Wishlist\Model\Wishlist::addNewItem()` method. Parameters:
+    - `items` is an array of item object (`\Magento\Wishlist\Model\Item` class).
+- `wishlist_share` event in the `\Magento\Wishlist\Controller\Index\Send::execute()` method. Parameters:
+    - `wishlist` is a Wishlist object (`\Magento\Wishlist\Model\Wishlist` class).
+- `wishlist_update_item` event in the `\Magento\Wishlist\Controller\Index\UpdateItemOptions::execute()` method. Parameters:
+    - `wishlist` is a Wishlist object (`\Magento\Wishlist\Model\Wishlist` class).
+    - `product` is a product object (`\Magento\Catalog\Api\Data\ProductInterface` class).
+    - `item` is an item object (`\Magento\Wishlist\Model\Item` class).
+
+----------------------------------------
+
+TITLE: Configuring MySQL Message Queue Cron Jobs in Magento 2
+DESCRIPTION: XML configuration for the mysqlmq_clean_messages cron job that handles cleanup of old messages from the MySQL message queue database tables.
+
+LANGUAGE: xml
+CODE:
+etc/crontab.xml
+
+----------------------------------------
+
+TITLE: Defining CatalogInventoryGraphQl Module
+DESCRIPTION: Module header documentation describing the purpose of the CatalogInventoryGraphQl module in providing GraphQL type information for inventory stock fields.
+
+LANGUAGE: markdown
+CODE:
+# CatalogInventoryGraphQl
+
+**CatalogInventoryGraphQl** provides type information for the GraphQl module
+to generate inventory stock fields for product information endpoints.
+
+----------------------------------------
+
+TITLE: Magento Sales Module Deployment Instructions
+DESCRIPTION: Installation and system requirements documentation for the Magento_Sales module, noting that it has no specific requirements but database sizing should be considered based on order volume.
+
+LANGUAGE: markdown
+CODE:
+# Deployment
+
+## System requirements
+
+The Magento_Sales module does not have any specific system requirements.
+Depending on how many orders are being placed, there might be consideration for the database size
+
+## Install
+
+The Magento_Sales module is installed automatically (using the native Magento install mechanism) without any additional actions.
+
+----------------------------------------
+
+TITLE: Magento UI Component Configuration
+DESCRIPTION: UI component configuration files that handle media gallery listing and category functionality in the admin interface.
+
+LANGUAGE: xml
+CODE:
+media_gallery_category_listing\nmedia_gallery_listing\nstandalone_media_gallery_listing
+
+----------------------------------------
+
+TITLE: Defining ThemeGraphQl Module - Markdown
+DESCRIPTION: Documentation header and description for the ThemeGraphQl module that provides GraphQL type information for theme fields.
+
+LANGUAGE: markdown
+CODE:
+# ThemeGraphQl
+
+**ThemeGraphQl** provides type information for the GraphQl module
+to generate theme fields information endpoints.
+
+----------------------------------------
+
+TITLE: Markdown Documentation for GraphQlNewRelic Module
+DESCRIPTION: Markdown documentation explaining the purpose of the GraphQlNewRelic module and its prerequisites for implementation. The module requires a New Relic account and extension installation.
+
+LANGUAGE: markdown
+CODE:
+# GraphQlNewRelic
+
+The _GraphQlNewRelic_ module enables reporting for performance and reliability data of GraphQL using the New Relic service.
+
+## Prerequisites
+
+To take advantage of this module, you must have a New Relic account and install the New Relic extension on your environment
+
+----------------------------------------
+
+TITLE: Describing ContactGraphQlPwa Module in Markdown
+DESCRIPTION: This snippet provides a brief description of the ContactGraphQlPwa module, explaining its purpose of adding GraphQL support for the Magento 2 contact module.
+
+LANGUAGE: Markdown
+CODE:
+# ContactGraphQlPwa
+
+**ContactGraphQlPwa** provides GraphQL support for `magento/module-contact`.
+
+----------------------------------------
+
+TITLE: Magento Admin Layout Configuration
+DESCRIPTION: Layout configuration file path in the adminhtml layout directory that defines the media gallery catalog category index layout.
+
+LANGUAGE: xml
+CODE:
+media_gallery_catalog_category_index
+
+----------------------------------------
+
+TITLE: Listing Supported Offline Payment Methods in Markdown
+DESCRIPTION: This snippet lists the offline payment methods implemented by the Magento_OfflinePayments module. It includes bank transfer, cash on delivery, check/money order, and purchase order.
+
+LANGUAGE: markdown
+CODE:
+- Bank transfer
+- Cash on delivery
+- Check / Money Order
+- Purchase order
+
+----------------------------------------
+
+TITLE: Interface Definition for Grouped Product Options
+DESCRIPTION: Public API interface that represents product item ID with quantity for grouped products
+
+LANGUAGE: php
+CODE:
+\Magento\GroupedProduct\Api\Data\GroupedOptionsInterface
+
+----------------------------------------
+
+TITLE: CatalogWidget Module Overview
+DESCRIPTION: Markdown documentation describing the CatalogWidget module's purpose and functionality, specifically highlighting the Product List widget feature.
+
+LANGUAGE: markdown
+CODE:
+# CatalogWidget
+
+**CatalogWidget** contains various widgets that extend Catalog module functionality:
+
+- Product List widget provides widget that contains product list created using rule based filter.
+
+----------------------------------------
+
+TITLE: Defining Get Logs List Interface in PHP for Magento 2 Login as Customer
+DESCRIPTION: This code snippet defines the GetLogsListInterface for retrieving the login as customer log list considering search criteria. It is part of the public API for the Magento_LoginAsCustomerLog module.
+
+LANGUAGE: php
+CODE:
+\Magento\LoginAsCustomerLog\Api\GetLogsListInterface
+
+----------------------------------------
+
+TITLE: Defining Cron Group Configuration in XML for Magento ProductAlert
+DESCRIPTION: This XML snippet defines the cron group configuration for the Magento_ProductAlert module. It sets up a cron job named 'catalog_product_alert' to send product alerts to customers.
+
+LANGUAGE: xml
+CODE:
+<catalog_product_alert> - send product alerts to customers
+
+----------------------------------------
+
+TITLE: GraphQL Query Reference for Downloadable Products
+DESCRIPTION: The customerDownloadableProducts query allows retrieving purchased downloadable products for authenticated customers.
+
+LANGUAGE: graphql
+CODE:
+customerDownloadableProducts
+
+----------------------------------------
+
+TITLE: Database Tables Created by Magento_MediaGallery Module
+DESCRIPTION: Lists the database tables created by the Magento_MediaGallery module during installation.
+
+LANGUAGE: markdown
+CODE:
+- `media_gallery_asset`
+- `media_gallery_keyword`
+- `media_gallery_asset_keyword`
+
+----------------------------------------
+
+TITLE: Database Tables Created by Magento_AsynchronousOperations
+DESCRIPTION: Lists the database tables created by the Magento_AsynchronousOperations module during installation.
+
+LANGUAGE: markdown
+CODE:
+- `magento_bulk`
+- `magento_operation`
+- `magento_acknowledged_bulk`
+
+----------------------------------------
+
+TITLE: Standard Performance Monitor Log Output
+DESCRIPTION: Example of the standard (non-verbose) performance monitoring log output showing basic metrics like memory usage, peak memory usage, and wall time elapsed.
+
+LANGUAGE: log
+CODE:
+[2023-10-04T20:48:23.727037+00:00] report.ERROR: "Profile information": {
+        "applicationClass":     "Magento\ApplicationServer\App\Application\Interceptor",
+        "applicationServer":    "1",
+        "threadPreviousRequestCount":   "73",
+        "memoryUsageAfter":     "240 MB",
+        "memoryUsageAfterComparedToPrevious":   "0 B",
+        "memoryUsageDelta":     "118 KB",
+        "peakMemoryUsageAfter": "243 MB",
+        "peakMemoryUsageDelta": "0 B",
+        "wallTimeElapsed":      "0 s"
+}
+
+----------------------------------------
+
+TITLE: Database Table Modifications
+DESCRIPTION: List of database tables and columns that are created or modified by the GiftMessage module for storing gift message data.
+
+LANGUAGE: markdown
+CODE:
+gift_message table creation\nquote - adds column gift_message_id\nquote_address - adds column gift_message_id\nquote_item - adds column gift_message_id\nquote_address_item - adds column gift_message_id\nsales_order - adds column gift_message_id\nsales_order_item - adds columns gift_message_id and gift_message_available
+
+----------------------------------------
+
+TITLE: Defining Log Interface in PHP for Magento 2 Login as Customer
+DESCRIPTION: This code snippet defines the LogInterface for the Login as Customer log data. It is part of the public API for the Magento_LoginAsCustomerLog module.
+
+LANGUAGE: php
+CODE:
+\Magento\LoginAsCustomerLog\Api\Data\LogInterface
+
+----------------------------------------
+
+TITLE: Module Directory Structure Reference
+DESCRIPTION: Shows the main directory structure for MSRP price calculation implementation. The Pricing directory contains the MsrpPriceCalculator class for handling MSRP calculations for Grouped Products.
+
+LANGUAGE: markdown
+CODE:
+`Pricing\` - directory contains implementation of msrp price calculation
+for Grouped Product (`Magento\MsrpGroupedProduct\Pricing\MsrpPriceCalculator` class).
+
+----------------------------------------
+
+TITLE: Layout Configuration Paths
+DESCRIPTION: Frontend and adminhtml layout paths implemented by the GiftMessage module.
+
+LANGUAGE: markdown
+CODE:
+view/adminhtml/layout:\n- sales_order_create_index\n- sales_order_create_load_block_data\n- sales_order_create_load_block_items\n- sales_order_view\n\nview/frontend/layout:\n- checkout_cart_index\n- checkout_cart_item_renderers
+
+----------------------------------------
+
+TITLE: Configuring Elasticsearch 8 Index Settings in YAML
+DESCRIPTION: Configuration settings required in elasticsearch.yml to enable indices.id_field_data which is disabled by default in Elasticsearch 8.x
+
+LANGUAGE: yaml
+CODE:
+indices:
+  id_field_data:
+    enabled: true
+
+----------------------------------------
+
+TITLE: UI Components Location
+DESCRIPTION: Specifies the location and name of the UI component extended by this module in the admin interface.
+
+LANGUAGE: markdown
+CODE:
+- `product_form`
+
+----------------------------------------
+
+TITLE: Configuring Custom MSRP Price Calculators in Magento 2 XML
+DESCRIPTION: This XML snippet demonstrates how to configure custom MSRP price calculators for specific product types using Magento 2's dependency injection configuration. It shows an example for configurable products.
+
+LANGUAGE: xml
+CODE:
+<type name="Magento\Msrp\Pricing\MsrpPriceCalculator">
+    <arguments>
+        <argument name="msrpPriceCalculators" xsi:type="array">
+            <item name="configurable" xsi:type="array">
+                <item name="productType" xsi:type="const">Magento\ConfigurableProduct\Model\Product\Type\Configurable::TYPE_CODE</item>
+                <item name="priceCalculator" xsi:type="object">Magento\MsrpConfigurableProduct\Pricing\MsrpPriceCalculator</item>
+            </item>
+        </argument>
+    </arguments>
+</type>
+
+----------------------------------------
+
+TITLE: Defining Message Queue Consumer in Magento 2
+DESCRIPTION: Specifies the message queue consumer 'media.gallery.renditions.update' for updating renditions. It updates renditions for given paths or all renditions if an empty array is provided.
+
+LANGUAGE: markdown
+CODE:
+- `media.gallery.renditions.update` - update renditions for given paths, if empty array is provided - all renditions are updated
+
+----------------------------------------
+
+TITLE: Listing Magento_Wishlist Module Dependencies
+DESCRIPTION: Specifies the module dependencies for Magento_Wishlist, including required modules and modules that depend on it.
+
+LANGUAGE: markdown
+CODE:
+- Magento_Captcha
+- Magento_Catalog
+- Magento_Customer
+
+Before disabling or uninstalling this module, note the following dependencies:
+
+- Magento_WishlistAnalytics
+
+----------------------------------------
+
+TITLE: Indexer Events Implementation in PHP
+DESCRIPTION: Event dispatch implementations in the Indexer module for cache management. Shows events dispatched during index updates and cache cleaning operations.
+
+LANGUAGE: php
+CODE:
+\Magento\Indexer\Model\Indexer\CacheCleaner::cleanCache
+\Magento\Indexer\Model\Processor\CleanCache::afterUpdateMview
+\Magento\Indexer\Model\Processor\CleanCache::afterReindexAllInvalid
+
+----------------------------------------
+
+TITLE: Describing CatalogCmsGraphQl Module in Markdown
+DESCRIPTION: This snippet provides a brief description of the CatalogCmsGraphQl module, explaining its purpose in the context of Magento 2's GraphQL implementation. It highlights the module's role in providing type and resolver information for attributes dependent on the Catalog and Cms modules.
+
+LANGUAGE: Markdown
+CODE:
+# CatalogCmsGraphQl
+
+**CatalogCmsGraphQl** provides type and resolver information for GraphQL attributes that have dependencies on the Catalog and Cms modules.
+
+----------------------------------------
+
+TITLE: Describing Magento_Wishlist Module Structure
+DESCRIPTION: Explains the directory structure of the Magento_Wishlist module, specifically mentioning the Pricing directory.
+
+LANGUAGE: markdown
+CODE:
+`Pricing/` - the directory that contain solutions for configurable and downloadable product price.
+
+----------------------------------------
+
+TITLE: Defining Magento 2 SalesGraphQL Module Purpose
+DESCRIPTION: Markdown documentation explaining the purpose of the SalesGraphQL module which provides GraphQL support for sales order information in Magento 2.
+
+LANGUAGE: markdown
+CODE:
+# SalesGraphQl
+
+**SalesGraphQl** provides type and resolver information for the GraphQl module
+to generate sales orders information.
+
+----------------------------------------
+
+TITLE: Defining Frontend Layout in Magento 2 for Google AdWords
+DESCRIPTION: This snippet shows the layout file introduced by the Magento_GoogleAdwords module in the frontend layout directory. It specifies the 'checkout_onepage_success' layout, which is likely used for integrating Google AdWords tracking on the checkout success page.
+
+LANGUAGE: markdown
+CODE:
+- `checkout_onepage_success`
+
+----------------------------------------
+
+TITLE: TaxGraphQl Module Description
+DESCRIPTION: Markdown documentation header describing the TaxGraphQl module's purpose in providing GraphQL type information for tax fields in catalog and product endpoints.
+
+LANGUAGE: markdown
+CODE:
+# TaxGraphQl
+
+**TaxGraphQl** provides type information for the GraphQl module
+to generate tax fields for catalog and product information endpoints.
+
+----------------------------------------
+
+TITLE: Listing Database Tables Modified by Magento_OfflineShipping Module
+DESCRIPTION: This snippet outlines the database tables that are created or modified by the Magento_OfflineShipping module during installation. It specifies the new table created and the columns added to existing tables.
+
+LANGUAGE: markdown
+CODE:
+The Magento_OfflineShipping module creates the `shipping_tablerate` table in the database.
+
+This module modifies the following tables in the database:
+
+- `salesrule` - adds column `simple_free_shipping`
+- `sales_order_item` - adds column `free_shipping`
+- `quote_address` - adds column `free_shipping`
+- `quote_item` - adds column `free_shipping`
+- `quote_address_item` - adds column `free_shipping`
+
+----------------------------------------
+
+TITLE: Fetching Currency Conversion Rates in Magento 2
+DESCRIPTION: The FetchRates.php controller retrieves a specified currency conversion rate. It supports all currencies defined in the Magento 2 system.
+
+LANGUAGE: PHP
+CODE:
+CurrencySymbol\Controller\Adminhtml\System\Currency\FetchRates.php
+
+----------------------------------------
+
+TITLE: Creating Custom Currency Symbols in Magento 2
+DESCRIPTION: The Save.php controller is used to create and save custom currency symbols in the Magento 2 system.
+
+LANGUAGE: PHP
+CODE:
+CurrencySymbol\Controller\Adminhtml\System\Currencysymbol\Save.php
+
+----------------------------------------
+
+TITLE: Module Name Declaration in Markdown
+DESCRIPTION: Declares the module name and provides a brief description of its functionality in extending Magento_GraphQl and Magento_Eav modules.
+
+LANGUAGE: markdown
+CODE:
+# Magento_EavGraphQl module\n\nMagento_EavGraphQl module extends Magento_GraphQl and Magento_Eav modules to provide type and resolver information for GraphQL API.
+
+----------------------------------------
+
+TITLE: Resetting Custom Currency Symbols in Magento 2
+DESCRIPTION: The Reset.php controller resets all custom currency symbols to their default values in the Magento 2 system.
+
+LANGUAGE: PHP
+CODE:
+CurrencySymbol\Controller\Adminhtml\System\Currencysymbol\Reset.php
+
+----------------------------------------
+
+TITLE: Markdown Documentation for LoginAsCustomerSales Module
+DESCRIPTION: Markdown documentation explaining the purpose and scope of the LoginAsCustomerSales module and its relationship to the Login As Customer feature.
+
+LANGUAGE: markdown
+CODE:
+# Magento_LoginAsCustomerSales module
+
+This module is responsible for communication between Magento_LoginAsCustomer and order placement.
+
+## Additional information
+
+This module is a part of Login As Customer feature.
+
+[Learn more about Login As Customer feature](https://experienceleague.adobe.com/docs/commerce-admin/customers/customer-accounts/manage/login-as-customer.html).
+
+----------------------------------------
+
+TITLE: Creating Database Tables for Magento_Authorization Module
+DESCRIPTION: The Magento_Authorization module creates two tables in the database using db_schema.xml: authorization_role and authorization_rule.
+
+LANGUAGE: markdown
+CODE:
+- `authorization_role`
+- `authorization_rule`
+
+----------------------------------------
+
+TITLE: Defining SwatchesGraphQl Module Header
+DESCRIPTION: Module header documentation explaining the purpose of SwatchesGraphQl module for providing GraphQL type information for swatch fields.
+
+LANGUAGE: markdown
+CODE:
+# SwatchesGraphQl\n\n**SwatchesGraphQl** provides type information for the GraphQl module\nto generate swatches fields for catalog and product information endpoints.
+
+----------------------------------------
+
+TITLE: Displaying Magento UI Library File Structure
+DESCRIPTION: Shows the directory structure of the Magento UI library, including the css, fonts, images, and jquery folders.
+
+LANGUAGE: css
+CODE:
+/lib/web/
+    ├── css/
+    │    ├── docs/ (Library documentation)
+    │    │    ├── source/
+    │    │    │    ├── _actions-toolbar.less
+    │    │    │    ├── _breadcrumbs.less
+    │    │    │    ├── _buttons.less
+    │    │    │    ├── _dropdowns.less
+    │    │    │    ├── _forms.less
+    │    │    │    ├── _icons.less
+    │    │    │    ├── _layout.less
+    │    │    │    ├── _lib.less
+    │    │    │    ├── _loaders.less
+    │    │    │    ├── _messages.less
+    │    │    │    ├── _pages.less
+    │    │    │    ├── _popups.less
+    │    │    │    ├── _rating.less
+    │    │    │    ├── _resets.less
+    │    │    │    ├── _responsive.less
+    │    │    │    ├── _sections.less
+    │    │    │    ├── _tables.less
+    │    │    │    ├── _tooltips.less
+    │    │    │    ├── _typography.less
+    │    │    │    ├── _utilities.less
+    │    │    │    ├── _variables.less
+    │    │    │    ├── _components.less
+    │    │    │    ├── docs.less
+    │    │    │    └── README.md
+    │    │    ├─── extends.html
+    │    │    ├─── actions-toolbar.html
+    │    │    ├─── breadcrumbs.html
+    │    │    ├─── buttons.html
+    │    │    ├─── components.html
+    │    │    ├─── docs.css
+    │    │    ├─── docs.html
+    │    │    ├─── dropdowns.html
+    │    │    ├─── forms.html
+    │    │    ├─── icons.html
+    │    │    ├─── index.html
+    │    │    ├─── layout.html
+    │    │    ├─── lib.html
+    │    │    ├─── loaders.html
+    │    │    ├─── messages.html
+    │    │    ├─── pages.html
+    │    │    ├─── popups.html
+    │    │    ├─── rating.html
+    │    │    ├─── resets.html
+    │    │    ├─── responsive.html
+    │    │    ├─── sections.html
+    │    │    ├─── tables.html
+    │    │    ├─── tooltips.html
+    │    │    ├─── typography.html
+    │    │    ├─── utilities.html
+    │    │    └─── variables.html
+    │    └── source/
+    │          ├── components/ (Reusable components files)
+    │          │    └── _modals.less
+    │          ├── lib/ (Library source files)
+    │          │    └── variables/ (Decoupled variables)
+    │          │          └── ...
+    │          │    ├── _extends.less
+    │          │    ├── _actions-toolbar.less
+    │          │    ├── _breadcrumbs.less
+    │          │    ├── _buttons.less
+    │          │    ├── _dropdowns.less
+    │          │    ├── _forms.less
+    │          │    ├── _icons.less
+    │          │    ├── _layout.less
+    │          │    ├── _lib.less
+    │          │    ├── _loaders.less
+    │          │    ├── _messages.less
+    │          │    ├── _navigation.less
+    │          │    ├── _pages.less
+    │          │    ├── _popups.less
+    │          │    ├── _rating.less
+    │          │    ├── _resets.less
+    │          │    ├── _responsive.less
+    │          │    ├── _sections.less
+    │          │    ├── _tables.less
+    │          │    ├── _tooltips.less
+    │          │    ├── _typography.less
+    │          │    ├── _utilities.less
+    │          │    └── _variables.less
+    │          ├── _extend.less
+    │          └── _theme.less
+    ├── fonts/
+    │    └── Blank-Theme-Icons/ (Library custom icons font)
+    ├── images/
+    │    └── blank-theme-icons.png (Library icons sprite)
+    └── jquery/ (Library javascript files)
+
+----------------------------------------
+
+TITLE: Using Magento DirectoryList Class Path
+DESCRIPTION: The fully qualified class name for the directory management class that defines available application directories
+
+LANGUAGE: php
+CODE:
+\Magento\Framework\Filesystem\DirectoryList
+
+----------------------------------------
+
+TITLE: Authentication Data Interface Definition - PHP
+DESCRIPTION: Interface that contains customer authentication data structures
+
+LANGUAGE: php
+CODE:
+\Magento\LoginAsCustomerApi\Api\Data\AuthenticationDataInterface
+
+----------------------------------------
+
+TITLE: ReviewGraphQl Description in Markdown
+DESCRIPTION: Module description markdown content explaining the purpose of the ReviewGraphQl module for handling product reviews through GraphQL.
+
+LANGUAGE: markdown
+CODE:
+# ReviewGraphQl
+
+**ReviewGraphQl** provides endpoints for getting and creating the Product reviews by guest and logged in customers.
+
+----------------------------------------
+
+TITLE: Currency Library Header
+DESCRIPTION: Simple markdown header and brief description of the Currency library's purpose.
+
+LANGUAGE: markdown
+CODE:
+# Currency
+
+**Currency** library provides needed data and features to work with currencies.
+
+----------------------------------------
+
+TITLE: Magento Event Dispatching
+DESCRIPTION: Events dispatched by the GiftMessage module with their respective parameters and contexts.
+
+LANGUAGE: markdown
+CODE:
+gift_options_prepare_items event in \Magento\GiftMessage\Block\Message\Inline::getItems\nParameters: items (array type)\n\ngift_options_prepare event in \Magento\GiftMessage\Block\Message\Inline::isMessagesOrderAvailable\nParameters: entity (entity object)
+
+----------------------------------------
+
+TITLE: Module Documentation Header in Markdown
+DESCRIPTION: Documentation header defining the Magento_OpenSearch module and its primary purpose for product searching using OpenSearch 1.x engine.
+
+LANGUAGE: markdown
+CODE:
+# Magento_OpenSearch module
+
+Magento_OpenSearch module allows using OpenSearch 1.x engine for the product searching capabilities.
+
+----------------------------------------
+
+TITLE: Installing Magento_NewsletterGraphQl Module
+DESCRIPTION: Instructions for installing the Magento_NewsletterGraphQl module in Magento 2. It references the official Adobe Commerce documentation for module management.
+
+LANGUAGE: markdown
+CODE:
+For information about a module installation in Magento 2, see [Enable or disable modules](https://experienceleague.adobe.com/docs/commerce-operations/installation-guide/tutorials/manage-modules.html).
+
+----------------------------------------
+
+TITLE: Listing UI Components for CMS Module in Magento 2
+DESCRIPTION: This snippet lists the UI components that the CMS module extends in the adminhtml area. These components are used for managing CMS blocks and pages in the Magento admin panel.
+
+LANGUAGE: xml
+CODE:
+view/adminhtml/ui_component directory:
+
+ * cms_block_form.xml
+ * cms_block_listing.xml
+ * cms_page_form.xml
+ * cms_page_listing.xml
+
+----------------------------------------
+
+TITLE: Module Description in Markdown
+DESCRIPTION: Markdown documentation explaining the primary purpose of the Magento_ConfigurableProductSales module in validating configurable product options.
+
+LANGUAGE: markdown
+CODE:
+# Magento_ConfigurableProductSales module
+
+The Magento_ConfigurableProductSales module checks that the selected options of order item are still presented in
+Catalog. Returns true if the previously ordered item configuration is still available.
+
+----------------------------------------
+
+TITLE: Observing Controller Action Predispatch Event in Magento 2
+DESCRIPTION: This snippet shows the event that the Magento_AdminNotification module observes. It listens for the 'controller_action_predispatch' event in the PredispatchAdminActionControllerObserver file.
+
+LANGUAGE: markdown
+CODE:
+- `controller_action_predispatch` event in `Magento\AdminNotification\Observer\PredispatchAdminActionControllerObserver` file.
+
+----------------------------------------
+
+TITLE: Listing Layouts Introduced by Magento_OfflineShipping Module
+DESCRIPTION: This snippet lists the layouts introduced by the Magento_OfflineShipping module in the view/frontend/layout directory. It provides information about the structure of the module's frontend layout.
+
+LANGUAGE: markdown
+CODE:
+This module introduces the following layouts in the `view/frontend/layout` directory:
+
+- `checkout_cart_index`
+- `checkout_index_index`
+
+----------------------------------------
+
+TITLE: Describing Magento_Amqp Module Functionality in Markdown
+DESCRIPTION: This snippet provides an overview of the Magento_Amqp module, explaining its purpose for AMQP messaging and outlining extensibility options for developers.
+
+LANGUAGE: markdown
+CODE:
+# Magento_Amqp module
+
+Magento_Amqp module provides functionality to publish/consume messages with the Advanced Message Queuing Protocol (AMQP).
+
+## Extensibility
+
+Extension developers can interact with the Magento_Amqp module. For more information about the Magento extension mechanism, see [Magento plug-ins](https://developer.adobe.com/commerce/php/development/components/plugins/).
+
+[The Magento dependency injection mechanism](https://developer.adobe.com/commerce/php/development/components/dependency-injection/) enables you to override the functionality of the Magento_Amqp module.
+
+----------------------------------------
+
+TITLE: Magento Vault Module Test Description
+DESCRIPTION: Simple markdown header and description explaining the purpose of the functional test module for Magento Vault.
+
+LANGUAGE: markdown
+CODE:
+# Vault Functional Tests
+
+The Functional Test Module for **Magento Vault** module.
+
+----------------------------------------
+
+TITLE: Configuring Performance Monitor in env.php
+DESCRIPTION: Configuration settings for enabling performance monitoring in Magento 2's env.php file. Controls basic and verbose logging output through two boolean flags.
+
+LANGUAGE: php
+CODE:
+'application' => [
+    'performance_monitor' => [
+        'logger_output_enable' => 1,
+        'logger_output_verbose' => 0,
+    ]
+]
+
+----------------------------------------
+
+TITLE: Frontend Layout Paths in Magento_Fedex
+DESCRIPTION: Lists the frontend layout files that are introduced by the Magento_Fedex module, located in the view/frontend/layout directory.
+
+LANGUAGE: markdown
+CODE:
+- `checkout_cart_index`
+- `checkout_index_index`
+
+----------------------------------------
+
+TITLE: Defining Order Statuses in Markdown
+DESCRIPTION: Lists the order statuses that are eligible for cancellation in the Magento 2 system: RECEIVED, PENDING, and PROCESSING.
+
+LANGUAGE: markdown
+CODE:
+`RECEIVED`, `PENDING` or `PROCESSING`
+
+----------------------------------------
+
+TITLE: Extending Magento_MediaGalleryMetadataApi Module
+DESCRIPTION: Explanation of how developers can extend the Magento_MediaGalleryMetadataApi module, including references to Magento plugins and dependency injection mechanisms.
+
+LANGUAGE: markdown
+CODE:
+## Extensibility
+
+Extension developers can interact with the Magento_MediaGalleryMetadataApi module. For more information about the Magento extension mechanism, see [Magento plug-ins](https://developer.adobe.com/commerce/php/development/components/plugins/).
+
+[The Magento dependency injection mechanism](https://developer.adobe.com/commerce/php/development/components/dependency-injection/) enables you to override the functionality of the Magento_MediaGalleryMetadataApi module.
+
+----------------------------------------
+
+TITLE: Documenting Magento Directory Test Module in Markdown
+DESCRIPTION: A markdown header and description explaining the purpose of the Magento Directory functional test module.
+
+LANGUAGE: markdown
+CODE:
+# Directory Functional Tests
+
+The Functional Test Module for **Magento Directory** module.
+
+----------------------------------------
+
+TITLE: Enabling AsyncConfig in Magento 2 via Command Line
+DESCRIPTION: This Bash command shows how to enable the AsyncConfig module using the Magento 2 command-line interface. It sets the --config-async option to 1.
+
+LANGUAGE: bash
+CODE:
+bin/magento setup:config:set --config-async 1
+
+----------------------------------------
+
+TITLE: Module Documentation in Markdown
+DESCRIPTION: Module documentation explaining the purpose and extensibility features of the Magento_AdvancedPricingImportExport module, including links to plugin development and dependency injection documentation.
+
+LANGUAGE: markdown
+CODE:
+# Magento_AdvancedPricingImportExport module
+
+The Magento_AdvancedPricingImportExport module handles the import and export of the advanced pricing.
+
+## Extensibility
+
+Extension developers can interact with the Magento_AdvancedPricingImportExport module. For more information about the Magento extension mechanism, see [Magento plug-ins](https://developer.adobe.com/commerce/php/development/components/plugins/).
+
+[The Magento dependency injection mechanism](https://developer.adobe.com/commerce/php/development/components/dependency-injection/) enables you to override the functionality of the Magento_AdvancedPricingImportExport module.
+
+----------------------------------------
+
+TITLE: Defining Variable Functional Tests Documentation in Markdown
+DESCRIPTION: A simple markdown header and description defining the purpose of the Variable Functional Tests module in Magento 2.
+
+LANGUAGE: markdown
+CODE:
+# Variable Functional Tests
+
+The Functional Test Module for **Magento Variable** module.
+
+----------------------------------------
+
+TITLE: Describing Magento_LoginAsCustomerPageCache Module in Markdown
+DESCRIPTION: This snippet provides a brief description of the Magento_LoginAsCustomerPageCache module, its purpose, and its relationship to the Login as Customer feature. It also includes a link for more information about the feature.
+
+LANGUAGE: markdown
+CODE:
+# Magento_LoginAsCustomerPageCache module
+
+This module provides adaptation to PageCache functionality for Login as Customer functionality.
+
+## Additional information
+
+This module is a part of Login As Customer feature.
+
+[Learn more about Login As Customer feature](https://experienceleague.adobe.com/docs/commerce-admin/customers/customer-accounts/manage/login-as-customer.html).
+
+----------------------------------------
+
+TITLE: Enabling AsyncConfig in Magento 2 PHP Configuration
+DESCRIPTION: This PHP code snippet demonstrates how to enable the AsyncConfig module by setting the 'config/async' variable to 1 in the env.php file of a Magento 2 project.
+
+LANGUAGE: php
+CODE:
+<?php
+      'config' => [
+               'async' => 1
+       ]
+
+----------------------------------------
+
+TITLE: Describing CatalogUrlRewriteGraphQl Module in Markdown
+DESCRIPTION: This snippet provides a brief description of the CatalogUrlRewriteGraphQl module for Magento 2. It explains that the module offers type information for the GraphQL module to generate URL rewrite fields for catalog and product information endpoints.
+
+LANGUAGE: Markdown
+CODE:
+# CatalogUrlRewriteGraphQl
+
+**CatalogUrlRewriteGraphQl** provides type information for the GraphQl module
+to generate url rewrite fields for catalog and product information endpoints.
+
+----------------------------------------
+
+TITLE: Markdown Documentation for Magento_SalesAnalytics Module
+DESCRIPTION: Documentation header and description for the Magento_SalesAnalytics module explaining its purpose in configuring data definitions for Advanced Reporting.
+
+LANGUAGE: markdown
+CODE:
+# Magento_SalesAnalytics module
+
+The Magento_SalesAnalytics module configures data definitions for a data collection related to the Sales module entities to be used in [Advanced Reporting](https://developer.adobe.com/commerce/php/development/advanced-reporting/modules/).
+
+----------------------------------------
+
+TITLE: Illustrating Less Mixin Naming Conventions
+DESCRIPTION: Provides examples of acceptable and unacceptable Less mixin naming conventions in the Magento UI library.
+
+LANGUAGE: css
+CODE:
+// Acceptable:
+.mixin-name() {}
+.transition() {}
+.mixin() {}
+._button-gradient() {}
+
+// Unacceptable:
+.mixinName() {}
+.__transition() {}
+.MiXiN() {}
+._button--gradient() {}
+
+----------------------------------------
+
+TITLE: Configuring Multishipping Payment Specification in Magento 2
+DESCRIPTION: XML configuration example showing how to modify the payment specification for the Multishipping checkout type using dependency injection configuration.
+
+LANGUAGE: xml
+CODE:
+<type name="Magento\Multishipping\Model\Checkout\Type\Multishipping">
+     <arguments>
+         <argument name="paymentSpecification" xsi:type="object">multishippingPaymentSpecification</argument>
+     </arguments>
+</type>
+
+----------------------------------------
+
+TITLE: Listing Module Dependencies in Magento 2
+DESCRIPTION: Lists the module dependencies for the Magento_Weee module. These modules must be present for Magento_Weee to function correctly.
+
+LANGUAGE: markdown
+CODE:
+- Magento_Catalog
+- Magento_Checkout
+- Magento_Customer
+- Magento_Quote
+- Magento_Sales
+- Magento_Store
+- Magento_Tax
+
+----------------------------------------
+
+TITLE: Module Description in Markdown
+DESCRIPTION: Core module description explaining the purpose of CompareListGraphQl module in Magento 2.
+
+LANGUAGE: markdown
+CODE:
+# CompareListGraphQl module\n\nThe CompareListGraphQl module is designed to implement compare product functionality.
+
+----------------------------------------
+
+TITLE: Markdown Documentation Header for Magento Integration Tests
+DESCRIPTION: Simple markdown header and description text that identifies this as the functional test module documentation for Magento Integration module.
+
+LANGUAGE: markdown
+CODE:
+# Integration Functional Tests
+
+The Functional Test Module for **Magento Integration** module.
+
+----------------------------------------
+
+TITLE: Module Dependencies Specification in Markdown
+DESCRIPTION: Lists the required module dependencies for Magento_WishlistAnalytics implementation, including Magento_Analytics and Magento_Wishlist modules.
+
+LANGUAGE: markdown
+CODE:
+- Magento_Analytics\n- Magento_Wishlist
+
+----------------------------------------
+
+TITLE: Listing UI Components Extended by Magento_OfflineShipping Module
+DESCRIPTION: This snippet outlines the UI components extended by the Magento_OfflineShipping module in the view/adminhtml/ui_component directory. It provides information about the module's impact on the admin interface.
+
+LANGUAGE: markdown
+CODE:
+This module extends following ui components located in the `view/adminhtml/ui_component` directory:
+
+- `sales_rule_form`
+- `salesrulestaging_update_form`
+
+----------------------------------------
+
+TITLE: Markdown Project Header
+DESCRIPTION: Header documentation for the Magento Config functional test module describing its purpose.
+
+LANGUAGE: markdown
+CODE:
+# Config Functional Tests
+
+The Functional Test Module for **Magento Config** module.
+
+----------------------------------------
+
+TITLE: Describing Magento GraphQL Functional Test Module in Markdown
+DESCRIPTION: This snippet provides a concise description of the Magento GraphQL Functional Test Module using Markdown syntax. It highlights that this is specifically for testing the Magento Graph Ql module.
+
+LANGUAGE: Markdown
+CODE:
+# Graph Ql Functional Tests
+
+The Functional Test Module for **Magento Graph Ql** module.
+
+----------------------------------------
+
+TITLE: Magento Event Observer Declaration
+DESCRIPTION: Defines the catalogsearch_query_save_after event observer in the SaveSearchQueryRelationsObserver class for handling search query relations.
+
+LANGUAGE: markdown
+CODE:
+catalogsearch_query_save_after in the Magento\AdvancedSearch\Model\Recommendations\SaveSearchQueryRelationsObserver
+
+----------------------------------------
+
+TITLE: Describing Magento 2 Indexer Functional Tests in Markdown
+DESCRIPTION: This snippet provides a brief description of the functional test module for the Magento Indexer in Magento 2. It outlines the purpose of the file and its relation to the Magento Indexer module.
+
+LANGUAGE: Markdown
+CODE:
+# Indexer Functional Tests
+
+The Functional Test Module for **Magento Indexer** module.
+
+----------------------------------------
+
+TITLE: Markdown Documentation Header for Magento Wishlist Tests
+DESCRIPTION: Header section describing the purpose of the functional test module for Magento's Wishlist component.
+
+LANGUAGE: markdown
+CODE:
+# Wishlist Functional Tests\n\nThe Functional Test Module for **Magento Wishlist** module.
+
+----------------------------------------
+
+TITLE: Markdown Documentation Header for Swagger Tests
+DESCRIPTION: Documentation header explaining the purpose of the functional test module for Magento Swagger integration.
+
+LANGUAGE: markdown
+CODE:
+# Swagger Functional Tests
+
+The Functional Test Module for **Magento Swagger** module.
+
+----------------------------------------
+
+TITLE: NewRelic Deploy Marker Command
+DESCRIPTION: Console command for creating deployment markers in New Relic with optional message, changelog and user parameters.
+
+LANGUAGE: bash
+CODE:
+bin/magento newrelic:create:deploy-marker <message> <change_log> [<user>]
+
+----------------------------------------
+
+TITLE: Magento Admin Layout Handles
+DESCRIPTION: Lists the adminhtml layout handles used by the module for catalog search functionality in the admin interface.
+
+LANGUAGE: markdown
+CODE:
+catalog_search_block
+catalog_search_edit
+catalog_search_relatedgrid
+
+----------------------------------------
+
+TITLE: Defining PayPal Functional Test Module in Markdown
+DESCRIPTION: This markdown snippet describes the purpose of the file, which is to document the Functional Test Module for the Magento PayPal integration. It provides a brief explanation of what the file contains.
+
+LANGUAGE: markdown
+CODE:
+# Paypal Functional Tests
+
+The Functional Test Module for **Magento Paypal** module.
+
+----------------------------------------
+
+TITLE: Markdown Documentation Header
+DESCRIPTION: Documentation header defining the purpose of the Search Functional Tests module
+
+LANGUAGE: markdown
+CODE:
+# Search Functional Tests
+
+The Functional Test Module for **Magento Search** module.
+
+----------------------------------------
+
+TITLE: Magento 2 Layout Configuration Paths
+DESCRIPTION: Directory paths for frontend layouts implemented by the Magento_GoogleGtag module in the view/frontend/layout directory.
+
+LANGUAGE: markdown
+CODE:
+- `default`
+- `checkout_onepage_success`
+
+----------------------------------------
+
+TITLE: Defining Magento Catalog GraphQL Functional Test Module in Markdown
+DESCRIPTION: This markdown snippet provides a brief description of the functional test module for the Magento Catalog GraphQL module. It specifies the module's purpose and its relationship to the main Magento Catalog GraphQL module.
+
+LANGUAGE: Markdown
+CODE:
+# Catalog Graph Ql Functional Tests
+
+The Functional Test Module for **Magento Catalog Graph Ql** module.
+
+----------------------------------------
+
+TITLE: Documenting Quote Functional Tests in Markdown
+DESCRIPTION: This snippet provides a markdown header and brief description for the Quote Functional Tests in Magento 2. It outlines the purpose of the file and its relation to the Magento Quote module.
+
+LANGUAGE: Markdown
+CODE:
+# Quote Functional Tests
+
+The Functional Test Module for **Magento Quote** module.
+
+----------------------------------------
+
+TITLE: Magento Security Test Module Description
+DESCRIPTION: Markdown header and description explaining the purpose of the security functional test module for Magento 2.
+
+LANGUAGE: markdown
+CODE:
+# Security Functional Tests
+
+The Functional Test Module for **Magento Security** module.
+
+----------------------------------------
+
+TITLE: Describing Magento_LoginAsCustomerFrontendUi Module in Markdown
+DESCRIPTION: This markdown snippet provides an overview of the Magento_LoginAsCustomerFrontendUi module, explaining its purpose and relationship to the Login As Customer feature. It also includes a link to further documentation.
+
+LANGUAGE: markdown
+CODE:
+# Magento_LoginAsCustomerFrontendUi module
+
+This module provides UI for Storefront for Login As Customer functionality.
+
+## Additional information
+
+This module is a part of Login As Customer feature.
+
+[Learn more about Login As Customer feature](https://experienceleague.adobe.com/docs/commerce-admin/customers/customer-accounts/manage/login-as-customer.html).
+
+----------------------------------------
+
+TITLE: Specifying Module Dependencies in Markdown
+DESCRIPTION: This snippet outlines the module dependencies for Magento_OfflinePayments, listing Magento_Store and Magento_Catalog as required modules.
+
+LANGUAGE: markdown
+CODE:
+- `Magento_Store`
+- `Magento_Catalog`
+
+----------------------------------------
+
+TITLE: Documentation Header in Markdown
+DESCRIPTION: Markdown header describing the purpose of the Swatches GraphQL functional test module
+
+LANGUAGE: markdown
+CODE:
+# Swatches Graph Ql Functional Tests\n\nThe Functional Test Module for **Magento Swatches Graph Ql** module.
+
+----------------------------------------
+
+TITLE: Markdown Header and Description
+DESCRIPTION: Basic markdown documentation explaining the purpose of the Weee functional test module
+
+LANGUAGE: markdown
+CODE:
+# Weee Functional Tests
+
+The Functional Test Module for **Magento Weee** module.
+
+----------------------------------------
+
+TITLE: Listing Layout Files for Magento_GoogleOptimizer
+DESCRIPTION: Enumerates the layout files introduced by the Magento_GoogleOptimizer module in both frontend and adminhtml areas.
+
+LANGUAGE: markdown
+CODE:
+- `view/adminhtml/layout`:
+    - `catalog_product_new`
+    - `cms_page_edit`
+- `view/frontend/layout`:
+    - `catalog_category_view`
+    - `catalog_product_view`
+    - `cms_page_view`
+
+----------------------------------------
+
+TITLE: Markdown Documentation Header
+DESCRIPTION: Header documentation explaining the purpose of the MSRP functional test module.
+
+LANGUAGE: markdown
+CODE:
+# Msrp Functional Tests
+
+The Functional Test Module for **Magento Msrp** module.
+
+----------------------------------------
+
+TITLE: Using Magento Filesystem Class Path
+DESCRIPTION: The fully qualified class name for the main filesystem interface in Magento 2
+
+LANGUAGE: php
+CODE:
+\Magento\Framework\Filesystem
+
+----------------------------------------
+
+TITLE: Magento Shipping Test Module Header
+DESCRIPTION: Markdown header and brief description indicating this is the functional test module documentation for the Magento Shipping component.
+
+LANGUAGE: markdown
+CODE:
+# Shipping Functional Tests
+
+The Functional Test Module for **Magento Shipping** module.
+
+----------------------------------------
+
+TITLE: Verbose Performance Monitor Log Output
+DESCRIPTION: Example of the verbose performance monitoring log output showing detailed metrics including memory usage before and after, wall time measurements, and system/user time statistics.
+
+LANGUAGE: log
+CODE:
+[2023-10-04T20:55:31.174304+00:00] report.ERROR: "Profile information": {
+        "applicationClass":     "Magento\ApplicationServer\App\Application\Interceptor",
+        "applicationServer":    "1",
+        "threadPreviousRequestCount":   "42",
+        "memoryUsageBefore":    "239568640 B",
+        "memoryUsageAfter":     "239686808 B",
+        "memoryUsageAfterComparedToPrevious":   "0 B",
+        "memoryUsageDelta":     "118168 B",
+        "peakMemoryUsageBefore":        "243053632 B",
+        "peakMemoryUsageAfter": "243053632 B",
+        "peakMemoryUsageDelta": "0 B",
+        "wallTimeBefore":       "2023-10-04T20:55:31.170300",
+        "wallTimeAfter":        "2023-10-04T20:55:31.174200",
+        "wallTimeElapsed":      "0.0038700103759766 s",
+        "userTimeBefore":       "3.771626 s",
+        "userTimeAfter":        "3.771626 s",
+        "userTimeElapsed":      "0 s",
+        "systemTimeBefore":     "0.095585 s",
+        "systemTimeAfter":      "0.099126 s",
+        "systemTimeElapsed":    "0.003541 s"
+}
+
+----------------------------------------
+
+TITLE: Layout Handles Introduced by Magento_AsynchronousOperations
+DESCRIPTION: Specifies the layout handles introduced by the Magento_AsynchronousOperations module in the view/adminhtml/layout directory.
+
+LANGUAGE: markdown
+CODE:
+- `bulk_bulk_details`
+- `bulk_bulk_details_modal`
+- `bulk_index_index`
+
+----------------------------------------
+
+TITLE: Documentation Header - Markdown
+DESCRIPTION: Header section describing the purpose of the functional test module for Magento's layered navigation component.
+
+LANGUAGE: markdown
+CODE:
+# Layered Navigation Functional Tests
+
+The Functional Test Module for **Magento Layered Navigation** module.
+
+----------------------------------------
+
+TITLE: Remote Storage Module Markdown Documentation
+DESCRIPTION: Basic module documentation header showing the module name in Markdown format.
+
+LANGUAGE: markdown
+CODE:
+# Magento_RemoteStorage module
+
+----------------------------------------
+
+TITLE: Media Storage Console Command
+DESCRIPTION: Command line interface command for resizing product images in Magento 2.
+
+LANGUAGE: bash
+CODE:
+bin/magento catalog:images:resize
+
+----------------------------------------
+
+TITLE: Markdown Title and Description
+DESCRIPTION: Simple markdown header and description text describing the EAV functional test module.
+
+LANGUAGE: markdown
+CODE:
+# Eav Functional Tests
+
+The Functional Test Module for **Magento Eav** module.
+
+----------------------------------------
+
+TITLE: JWT Module Overview in Markdown
+DESCRIPTION: Brief introduction to the JWT module explaining its purpose as an abstraction layer for working with JSON Web Tokens.
+
+LANGUAGE: markdown
+CODE:
+# JWT
+
+**JWT** module provides abstraction to work with JWTs along with useful utilities.
+
+----------------------------------------
+
+TITLE: Markdown Documentation for Offline Payments Testing
+DESCRIPTION: Simple markdown header and description explaining the purpose of the functional test module for Magento offline payments implementation.
+
+LANGUAGE: markdown
+CODE:
+# Offline Payments Functional Tests
+
+The Functional Test Module for **Magento Offline Payments** module.
+
+----------------------------------------
+
+TITLE: Defining Layout Handles in Magento 2 Frontend
+DESCRIPTION: Lists the layout handles introduced by the Magento_Weee module in the frontend area. These handles are used for customizing the storefront interface.
+
+LANGUAGE: markdown
+CODE:
+- `view/frontend/layout`:
+    - `checkout_cart_index`
+    - `checkout_index_index`
+    - `checkout_item_price_renderers`
+    - `default`
+    - `sales_email_item_price`
+    - `sales_email_order_creditmemo_items`
+    - `sales_email_order_invoice_items`
+    - `sales_email_order_items`
+    - `sales_guest_creditmemo`
+    - `sales_guest_invoice`
+    - `sales_guest_print`
+    - `sales_guest_printcreditmemo`
+    - `sales_guest_printinvoice`
+    - `sales_guest_view`
+    - `sales_order_creditmemo`
+    - `sales_order_invoice`
+    - `sales_order_item_price`
+    - `sales_order_print`
+    - `sales_order_printcreditmemo`
+    - `sales_order_printinvoice`
+    - `sales_order_view`
+
+----------------------------------------
+
+TITLE: Installing Magento_MediaGalleryMetadataApi Module in Magento 2
+DESCRIPTION: Instructions for installing the Magento_MediaGalleryMetadataApi module in Magento 2. It refers to the general module management documentation.
+
+LANGUAGE: markdown
+CODE:
+## Installation details
+
+For information about module installation in Magento 2, see [Enable or disable modules](https://experienceleague.adobe.com/docs/commerce-operations/installation-guide/tutorials/manage-modules.html).
+
+----------------------------------------
+
+TITLE: Documenting Advanced Search Test Module
+DESCRIPTION: Markdown header and description defining the purpose of the Advanced Search functional test module in Magento 2.
+
+LANGUAGE: markdown
+CODE:
+# Advanced Search Functional Tests
+
+The Functional Test Module for **Magento Advanced Search** module.
+
+----------------------------------------
+
+TITLE: Demonstrating Less Variable Naming Conventions
+DESCRIPTION: Shows examples of acceptable and unacceptable Less variable naming conventions in the Magento UI library.
+
+LANGUAGE: css
+CODE:
+// Acceptable:
+@link-color-hover;
+@color-primary;
+@color-2;
+
+// Private variables:
+@_padding-left;
+@_font-size;
+
+// Unacceptable:
+@Link-Color-Hover;
+@colorPrimary;
+@color--primary;
+@paddingleft;
+@__font-size;
+
+----------------------------------------
+
+TITLE: Defining UI Components in Magento 2
+DESCRIPTION: Lists the UI components introduced by the Magento_Weee module. These components are used for creating and customizing user interface elements.
+
+LANGUAGE: markdown
+CODE:
+- `view/adminhtml/ui_component`:
+    - `product_attribute_add_form`
+- `view/frontend/ui_component`:
+    - `widget_recently_compared`
+    - `widget_recently_viewed`
+
+----------------------------------------
+
+TITLE: Markdown Documentation Header for Magento 2 Configurable Product Tests
+DESCRIPTION: Markdown header describing the purpose of the functional test module for Magento configurable products.
+
+LANGUAGE: markdown
+CODE:
+# Configurable Product Functional Tests
+
+The Functional Test Module for **Magento Configurable Product** module.
+
+----------------------------------------
+
+TITLE: Demonstrating Selector Naming Conventions
+DESCRIPTION: Shows examples of recommended and not recommended selector naming practices in the Magento UI library.
+
+LANGUAGE: css
+CODE:
+// Recommended:
+.nav-bar {
+    ...
+}
+
+._active {
+    ...
+}
+
+// Not recommended:
+.navBar {
+   ...
+}
+
+.nav_bar {
+   ...
+}
+
+#foo {
+    ...
+}
+
+.navigation-panel-in-footer {
+   ...
+}
+
+.nvpf {
+   ...
+}
+
+----------------------------------------
+
+TITLE: Layout Handle Definitions
+DESCRIPTION: Frontend layout handles defined by the module for controlling the display of layered navigation in different contexts.
+
+LANGUAGE: xml
+CODE:
+catalog_category_view_type_layered
+catalog_category_view_type_layered_without_children
+catalogsearch_result_index
+
+----------------------------------------
+
+TITLE: Magento Order Statuses List in Markdown
+DESCRIPTION: List of Magento order statuses that support cancellation through the OrderCancellationUi module
+
+LANGUAGE: markdown
+CODE:
+`RECEIVED`, `PENDING` or `PROCESSING`
+
+----------------------------------------
+
+TITLE: Markdown Documentation Header
+DESCRIPTION: Header section defining the purpose of the functional test module for Magento Sales Analytics
+
+LANGUAGE: markdown
+CODE:
+# Sales Analytics Functional Tests
+
+The Functional Test Module for **Magento Sales Analytics** module.
+
+----------------------------------------
+
+TITLE: Listing Module Dependencies in Markdown
+DESCRIPTION: Lists the dependencies required for the Magento_CustomerAnalytics module installation. The module depends on Magento_Customer and Magento_Analytics.
+
+LANGUAGE: markdown
+CODE:
+- `Magento_Customer`
+- `Magento_Analytics`
+
+----------------------------------------
+
+TITLE: UI Component Extensions
+DESCRIPTION: Administrative UI components extended by the module for managing product attributes and their display in layered navigation.
+
+LANGUAGE: xml
+CODE:
+product_attribute_add_form
+product_attributes_grid
+product_attributes_listing
+
+----------------------------------------
+
+TITLE: Markdown Header and Description for Magento Cron Tests
+DESCRIPTION: Simple markdown documentation describing the purpose of the cron functional test module.
+
+LANGUAGE: markdown
+CODE:
+# Cron Functional Tests
+
+The Functional Test Module for **Magento Cron** module.
+
+----------------------------------------
+
+TITLE: Defining Log Search Results Interface in PHP for Magento 2 Login as Customer
+DESCRIPTION: This code snippet defines the LogSearchResultsInterface for the Login as Customer log entity search results data. It is part of the public API for the Magento_LoginAsCustomerLog module.
+
+LANGUAGE: php
+CODE:
+\Magento\LoginAsCustomerLog\Api\Data\LogSearchResultsInterface
+
+----------------------------------------
+
+TITLE: Demonstrating Less Code Formatting Standards
+DESCRIPTION: Shows examples of recommended and not recommended Less code formatting practices in the Magento UI library.
+
+LANGUAGE: css
+CODE:
+// Recommended:
+.nav {
+    background-color: @nav__background-color;
+    color: @nav__color;
+}
+
+.nav,
+.bar {
+    color: @color__base;
+}
+
+// Not recommended:
+.nav{color: @nav__color;}
+
+.nav, .bar {
+    color: @color__base;
+}
+
+.nav {
+    color : @nav__color;
+    background-color:@nav__background-color
+}
+
+----------------------------------------
+
+TITLE: Listing Magento_Wishlist Module UI Components
+DESCRIPTION: Specifies the UI components that can be extended using configuration files in the Magento_Wishlist module.
+
+LANGUAGE: markdown
+CODE:
+- `view/base/ui_component`:
+    - `customer_form`
+- `view/frontend/ui_component`:
+    - `widget_recently_compared`
+    - `widget_recently_viewed`
+
+----------------------------------------
+
+TITLE: Message Queue Consumer Command
+DESCRIPTION: Message queue consumer identifier for asynchronous product image resizing operations.
+
+LANGUAGE: text
+CODE:
+media.storage.catalog.image.resize
+
+----------------------------------------
+
+TITLE: Apache License 2.0 Boilerplate Notice Template
+DESCRIPTION: Standard boilerplate notice text to be included when applying the Apache License 2.0 to a work. The template includes placeholders for copyright year and owner information.
+
+LANGUAGE: text
+CODE:
+Copyright [yyyy] [name of copyright owner]
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+
+----------------------------------------
+
+TITLE: Listing UI Components Extended by Magento_GoogleOptimizer
+DESCRIPTION: Identifies the UI components that are extended by the Magento_GoogleOptimizer module in the adminhtml area.
+
+LANGUAGE: markdown
+CODE:
+- `category_form`
+- `cms_page_form`
+- `new_category_form`
+
+----------------------------------------
+
+TITLE: Listing Magento_Backend Module Dependencies
+DESCRIPTION: Lists the Magento 2 modules that depend on the Magento_Backend module. This information is crucial for understanding the impact of disabling or uninstalling the module.
+
+LANGUAGE: markdown
+CODE:
+- Magento_Analytics
+- Magento_Authorization
+- Magento_NewRelicReporting
+- Magento_ProductVideo
+- Magento_ReleaseNotification
+- Magento_Search
+- Magento_Security
+- Magento_Swatches
+- Magento_Ui
+- Magento_User
+- Magento_Webapi
+
+----------------------------------------
+
+TITLE: Defining Component Registration Patterns in Magento 2
+DESCRIPTION: Configuration that maps component types (module, library, setup) to their respective path patterns in the Magento 2 file system. This defines how different components are discovered and registered during the application initialization.
+
+LANGUAGE: config
+CODE:
+# "Component Type" "Component Name" "Path Pattern"
+module * /
+library * /
+setup
+pub
+
+----------------------------------------
+
+TITLE: Listing Magento_Wishlist Module Layouts
+DESCRIPTION: Provides a list of layouts and layout handles introduced by the Magento_Wishlist module in various directories.
+
+LANGUAGE: markdown
+CODE:
+- `view/adminhtml/layout`:
+    - `customer_index_wishlist`
+- `view/base/layout`:
+    - `catalog_product_prices`
+- `view/frantend/layout`:
+    - `catalog_category_view`
+    - `catalog_product_view`
+    - `catalogsearch_advanced_result`
+    - `checkout_cart_index`
+    - `checkout_cart_item_renderers`
+    - `customer_account`
+    - `default`
+    - `wishlist_email_items`
+    - `wishlist_email_rss`
+    - `wishlist_index_configure`
+    - `wishlist_index_configure_type_bundle`
+    - `wishlist_index_configure_type_configurable`
+    - `wishlist_index_configure_type_downloadable`
+    - `wishlist_index_configure_type_grouped`
+    - `wishlist_index_configure_type_simple`
+    - `wishlist_index_index`
+    - `wishlist_index_share`
+    - `wishlist_shared_index.xml`
+
+----------------------------------------
+
+TITLE: Magento 2 Core Exception Class Paths
+DESCRIPTION: A comprehensive list of fully qualified class names for Magento 2 framework exceptions. These exceptions handle various error scenarios like localization issues, missing files, validation failures, database errors, and message queue problems.
+
+LANGUAGE: php
+CODE:
+\Magento\Framework\Exception\LocalizedException
+\Magento\Framework\View\Asset\File\NotFoundException
+\Magento\Framework\Config\Dom\ValidationException
+\Magento\Framework\Search\Request\EmptyRequestDataException
+\Magento\Framework\Search\Request\NonExistingRequestNameException
+\Magento\Framework\DB\Adapter\ConnectionException
+\Magento\Framework\DB\Adapter\DeadlockException
+\Magento\Framework\DB\Adapter\LockWaitException
+\Magento\Framework\DB\Adapter\DuplicateException
+\Magento\Framework\DB\DataConverter\DataConversionException
+\Magento\Framework\DB\FieldDataConversionException
+\Magento\Catalog\Model\Product\Image\NotLoadInfoImageException
+\Magento\Framework\MessageQueue\ConnectionLostException
+
+----------------------------------------
+
+TITLE: Module Name Definition in Markdown
+DESCRIPTION: Defines the module name and provides a brief description of its functionality for extending catalog image uploader features.
+
+LANGUAGE: markdown
+CODE:
+# Magento_MediaGalleryCatalogIntegration module\n\nThis module extends catalog image uploader functionality.
+
+----------------------------------------
+
+TITLE: Describing Magento 2 Email Functional Tests in Markdown
+DESCRIPTION: This snippet provides a brief description of the Functional Test Module for the Magento Email module. It is written in Markdown format and serves as a documentation header for the test suite.
+
+LANGUAGE: markdown
+CODE:
+# Email Functional Tests
+
+The Functional Test Module for **Magento Email** module.
+
+----------------------------------------
+
+TITLE: Configuring Magento 2 Component Registration Pattern
+DESCRIPTION: Pattern definition for registering Magento 2 components, specifying the format as componentType, componentName, and globPattern with app/code/Magento as the base path.
+
+LANGUAGE: config
+CODE:
+# Format: <componentType=module|library|theme|language|*> <componentName> <globPattern> or simply <globPattern>
+app/code/Magento
+
+----------------------------------------
+
+TITLE: Extending Admin Notifications UI Component in Magento 2
+DESCRIPTION: This snippet specifies the configuration file used for extending admin notifications using UI components. It indicates the path to the XML file that defines the notification area UI component.
+
+LANGUAGE: markdown
+CODE:
+You can extend admin notifications using the `view/adminhtml/ui_component/notification_area.xml` configuration file.
+
+----------------------------------------
+
+TITLE: Running Media Gallery Synchronization Command in Magento 2
+DESCRIPTION: This command synchronizes media storage and media assets in the database. It is executed from the Magento 2 root directory using the command line interface.
+
+LANGUAGE: bash
+CODE:
+bin/magento media-gallery:sync
+
+----------------------------------------
+
+TITLE: Configuring Exclusion Patterns for Magento 2 Components
+DESCRIPTION: This configuration specifies glob patterns for excluding various directories and components in a Magento 2 project. It includes patterns for the root directory, test files, PHP server files, public files, and setup files.
+
+LANGUAGE: plaintext
+CODE:
+# Format: <componentType=module|library|theme|language|*> <componentName> <globPattern> or simply <globPattern>
+* * /
+dev/tests
+phpserver
+pub
+setup
+
+----------------------------------------
+
+TITLE: UI Component Configuration Files in Magento_AsynchronousOperations
+DESCRIPTION: Lists the UI component configuration files provided by the Magento_AsynchronousOperations module in the view/adminhtml/ui_component/ directory.
+
+LANGUAGE: markdown
+CODE:
+- `bulk_details_form`
+- `bulk_details_form_modal`
+- `bulk_listing`
+- `failed_operation_listing`
+- `failed_operation_modal_listing`
+- `notification_area`
+- `retriable_operation_listing`
+- `retriable_operation_modal_listing`
+
+----------------------------------------
+
+TITLE: Defining Component Pattern Format in Magento 2
+DESCRIPTION: Documents the format syntax for specifying component patterns in Magento 2. The pattern allows defining component type (module, library, theme, language, or wildcard), component name, and glob pattern.
+
+LANGUAGE: plaintext
+CODE:
+# Format: <componentType=module|library|theme|language|*> <componentName> <globPattern> or simply <globPattern>
+
+----------------------------------------
+
+TITLE: Link Format Example in Markdown
+DESCRIPTION: Demonstrates the markdown syntax for creating clickable links in release notification content. The format combines a URL with bracketed display text.
+
+LANGUAGE: markdown
+CODE:
+https://developer.adobe.com/commerce/docs/ [Adobe Commerce Developer Documentation]
+
+----------------------------------------
+
+TITLE: Magento 2 CMS URL Rewrite Test Module Header
+DESCRIPTION: Markdown header and description for the CMS URL Rewrite functional test module documentation.
+
+LANGUAGE: markdown
+CODE:
+# Cms Url Rewrite Functional Tests
+
+The Functional Test Module for **Magento Cms Url Rewrite** module.
+
+----------------------------------------
+
+TITLE: Static Method Call with Multiple Arguments in PHP for Magento 2
+DESCRIPTION: This snippet shows a static method call on the 'Foo' class, invoking the 'bar' method with two arguments: a variable and the result of a getData() method call. It's a common pattern in Magento 2 for accessing static methods.
+
+LANGUAGE: PHP
+CODE:
+Foo::bar($foo, $this->getData('bar'))
+
+----------------------------------------
+
+TITLE: Defining Admin Notification Layouts in Magento 2
+DESCRIPTION: This snippet lists the layout handles introduced by the Magento_AdminNotification module in the adminhtml/layout directory. These layouts are used for rendering admin notifications.
+
+LANGUAGE: markdown
+CODE:
+- `adminhtml_notification_index`
+- `adminhtml_notification_block`
+
+----------------------------------------
+
+TITLE: Illustrating Variable Naming and Location Conventions
+DESCRIPTION: Demonstrates the recommended naming and location practices for variables in the Magento UI library.
+
+LANGUAGE: css
+CODE:
+// Local variables in _module.less:
+//
+//  Variables
+//  _____________________________________________
+
+//  Colors
+@btn__color: @color-brownie;
+@btn-primary__color: @color-white;
+@btn-secondary__color: @color-white;
+
+// Value variables:
+@primary__color: @color-phoenix;
+@indent__base: 2rem;
+@border-radius-round: 100%;
+
+// Parameter variables:
+@color-orange: '';
+@link__hover__color: '';
+@nav-element__background-color: '';
+@secondary__color: '';
+@side-nav__indent__s: '';
+@side-nav-el__background-color: '';
+@side-nav-el__active__background-color: '';
+@side-nav-el__active-focus__background-color: '';
+@side-nav-el__active-focus__font-size__xl: '';
+@text__color__base: '';
+
+----------------------------------------
+
+TITLE: Hash Generation Method Call in PHP for Magento 2
+DESCRIPTION: This snippet calls a method 'generateHash' on the current object, passing the result of a function call to 'foo' and another variable as arguments. It's commonly used for generating secure hashes in Magento 2.
+
+LANGUAGE: PHP
+CODE:
+$this->generateHash(foo($bar), $foo)
+
+----------------------------------------
+
+TITLE: Saving Currency Conversion Rates in Magento 2
+DESCRIPTION: The SaveRates.php controller is responsible for saving rates for defined currencies in the Magento 2 system.
+
+LANGUAGE: PHP
+CODE:
+CurrencySymbol\Controller\Adminhtml\System\Currency\SaveRates.php
+
+----------------------------------------
+
+TITLE: Defining Magento 2 Module Class in PHP
+DESCRIPTION: This snippet defines a class named 'Foo' within a Magento 2 module namespace. The class implements an interface called 'InterfaceName'. It follows the Magento 2 coding standards and file structure conventions.
+
+LANGUAGE: PHP
+CODE:
+<?php
+/**
+ * Copyright © Magento, Inc. All rights reserved.
+ * See COPYING.txt for license details.
+ */
+namespace Magento\ModuleName\SubDirectoryName;
+
+class Foo implements InterfaceName
+{
+}
+
+----------------------------------------
+
+TITLE: Demonstrating Mixin and Extend Naming Conventions
+DESCRIPTION: Shows examples of recommended naming practices for mixins and extends in the Magento UI library.
+
+LANGUAGE: css
+CODE:
+// Mixin naming:
+.extend__clearfix (...) {
+    ...
+}
+
+.vendor-prefix__flex-direction (...) {
+    ...
+}
+
+// Extend naming:
+.abs-sidebar-block {
+    ...
+}
+
+.abs-account-block {
+    ...
+}
+
+----------------------------------------
+
+TITLE: Markdown Documentation for Currency Symbol Tests
+DESCRIPTION: Header and description of the functional test module for Magento Currency Symbol functionality.
+
+LANGUAGE: markdown
+CODE:
+# Currency Symbol Functional Tests
+
+The Functional Test Module for **Magento Currency Symbol** module.
+
+----------------------------------------
+
+TITLE: Defining Empty Magento 2 PHP Class
+DESCRIPTION: Demonstrates the standard structure for defining a new class in Magento 2, including copyright header and proper namespace declaration. This template shows the minimum required elements for a valid Magento 2 class file.
+
+LANGUAGE: PHP
+CODE:
+<?php
+/**
+ * Copyright © Magento, Inc. All rights reserved.
+ * See COPYING.txt for license details.
+ */
+namespace Magento\ModuleName\SubDirectoryName;
+
+class Foo
+{
+}
+
+----------------------------------------
+
+TITLE: Directory Structure Documentation
+DESCRIPTION: Lists the key layout directories and files used by the ProductVideo module for both frontend and admin interfaces.
+
+LANGUAGE: markdown
+CODE:
+- `view/adminhtml/layout`
+    - `catalog_product_new`
+- `view/frontend/layout`
+    - `catalog_product_view`
+
+----------------------------------------
+
+TITLE: Illustrating Less Comment Formatting
+DESCRIPTION: Demonstrates the recommended format for comments in Less files within the Magento UI library.
+
+LANGUAGE: css
+CODE:
+//
+//  First level comment
+//  _____________________________________________
+
+.nav {
+    background-color: @nav__background-color;
+}
+
+//
+//  Second level comment
+//  ---------------------------------------------
+
+.nav {
+    background-color: @nav__background-color;
+}
+
+//  Comment
+.nav {
+    //  New line comment
+    background-color: @nav__background-color; // ToDo UI: todo inline comment
+    color: @nav__color; // inline comment
+}
+
+----------------------------------------
+
+TITLE: Implementing MyClass Interface in PHP for Magento 2
+DESCRIPTION: This code snippet defines a class named MyClassChild that implements the MyClass interface. It's a partial implementation within the Magento 2 framework, containing only the class declaration without any method implementations.
+
+LANGUAGE: PHP
+CODE:
+<?php
+/**
+ * Copyright © Magento, Inc. All rights reserved.
+ * See COPYING.txt for license details.
+ */
+
+MyClassChild implements \MyClass
+{
+
+
+
+----------------------------------------
+
+TITLE: Swatches Test Module Documentation
+DESCRIPTION: Markdown documentation header describing the functional test module for Magento Swatches Layered Navigation functionality
+
+LANGUAGE: markdown
+CODE:
+# Swatches Layered Navigation Functional Tests
+
+The Functional Test Module for **Magento Swatches Layered Navigation** module.
+
+----------------------------------------
+
+TITLE: Defining PHP Class Implementing Interface in Magento 2
+DESCRIPTION: This snippet defines a PHP class named Foo that implements an interface called InterfaceName. The class is currently empty with no properties or methods defined.
+
+LANGUAGE: PHP
+CODE:
+<?php
+/**
+ * Copyright © Magento, Inc. All rights reserved.
+ * See COPYING.txt for license details.
+ */
+
+class Foo
+    implements InterfaceName
+{
+}
+
+----------------------------------------
+
+TITLE: Referencing Collection Class for Filtering Operations in Magento 2
+DESCRIPTION: Recommends using a successor of the Magento\Framework\Model\ResourceModel\Db\Collection\AbstractCollection class for filtering operations.
+
+LANGUAGE: markdown
+CODE:
+Magento\Framework\Model\ResourceModel\Db\Collection\AbstractCollection
+
+----------------------------------------
+
+TITLE: Module Name Declaration in Markdown
+DESCRIPTION: Declares the name of the Magento module being documented.
+
+LANGUAGE: markdown
+CODE:
+# Magento_MediaGalleryMetadata module
+
+----------------------------------------
+
+TITLE: Instantiating PHP Class with Namespace in Magento 2
+DESCRIPTION: Creates a new instance of MyClass using the fully qualified namespace syntax. Includes standard Magento 2 copyright header comment block.
+
+LANGUAGE: php
+CODE:
+<?php
+/**
+ * Copyright © Magento, Inc. All rights reserved.
+ * See COPYING.txt for license details.
+ */
+
+$myClass = new \MyClass();
+
+----------------------------------------
+
+TITLE: Markdown Documentation Header
+DESCRIPTION: Markdown header describing the purpose of the functional test module for Magento Admin Notifications.
+
+LANGUAGE: markdown
+CODE:
+# Admin Notification Functional Tests
+
+The Functional Test Module for **Magento Admin Notification** module.
+
+----------------------------------------
+
+TITLE: Registering Magento 2 Theme Component
+DESCRIPTION: Shows how to register a Magento 2 theme component using ComponentRegistrar. The method requires the component type constant, theme name, and current directory path.
+
+LANGUAGE: php
+CODE:
+ComponentRegistrar::register(ComponentRegistrar::THEME, '<theme name>', __DIR__);
+
+----------------------------------------
+
+TITLE: Using Translation Methods in Magento 2 PHP
+DESCRIPTION: This snippet demonstrates the usage of translation methods in Magento 2. It shows an incorrect usage with ___toString() and correct usage with the __() method for string translation.
+
+LANGUAGE: PHP
+CODE:
+<?php
+
+$obj1->___toString('Irrelevant string');
+$obj2->__('Some string');
+$obj3->__('One more string');
+
+----------------------------------------
+
+TITLE: Markdown Documentation Header for Magento2 GraphQL Tests
+DESCRIPTION: Markdown header describing the purpose of the Downloadable GraphQL functional test module for Magento 2.
+
+LANGUAGE: markdown
+CODE:
+# Downloadable Graph Ql Functional Tests
+
+The Functional Test Module for **Magento Customer Downloadable Graph Ql** module.
+
+----------------------------------------
+
+TITLE: Creating Magento 2 Framework Objects in PHP
+DESCRIPTION: This snippet demonstrates how to instantiate Magento 2 framework objects, including Phrase and DataObject. It shows the use of both fully qualified and relative class names for creating these objects.
+
+LANGUAGE: PHP
+CODE:
+<?php
+
+new \Magento\Framework\Phrase('Testing');
+new Phrase('More testing');
+new \Magento\Framework\DataObject();
+
+----------------------------------------
+
+TITLE: Instantiating PHP Class in Magento 2
+DESCRIPTION: Creates a new instance of MyClass using PHP's new operator. Includes Magento's standard copyright notice as a file header comment.
+
+LANGUAGE: php
+CODE:
+<?php
+/**
+ * Copyright © Magento, Inc. All rights reserved.
+ * See COPYING.txt for license details.
+ */
+
+$myClass = new MyClass();
+
+----------------------------------------
+
+TITLE: Cron Configuration XML Path
+DESCRIPTION: Location of the cron configuration file that defines the NewRelic reporting schedule.
+
+LANGUAGE: plaintext
+CODE:
+etc/crontab.xml
+
+----------------------------------------
+
+TITLE: Declaring Magento 2 Module and Theme in Configuration
+DESCRIPTION: This snippet declares a Magento 2 module and a frontend theme. The module is named 'Magento_Module', which follows the standard Magento naming convention. The frontend theme is specified as 'Test/theme One', indicating a custom theme under the 'Test' namespace.
+
+LANGUAGE: plaintext
+CODE:
+module Magento_Module *
+theme frontend/Test/theme One*
+
+----------------------------------------
+
+TITLE: Layout Configuration Files in Magento_Marketplace
+DESCRIPTION: Lists the XML layout files defined in the module's view/adminhtml/layout directory that control the admin interface displays.
+
+LANGUAGE: markdown
+CODE:
+- `marketplace_index_index`
+- `marketplace_partners_index`
+
+----------------------------------------
+
+TITLE: Extending Magento 2 Base Class in PHP
+DESCRIPTION: This snippet defines a new class 'MyClassChild' that extends the '\MyClass'. It's a typical pattern in Magento 2 for creating custom functionality based on existing classes.
+
+LANGUAGE: PHP
+CODE:
+<?php
+/**
+ * Copyright © Magento, Inc. All rights reserved.
+ * See COPYING.txt for license details.
+ */
+
+MyClassChild extends \MyClass
+{
+
+
+
+----------------------------------------
+
+TITLE: Configuring Sitemap Location in robots.txt
+DESCRIPTION: Specifies the XML sitemap location for search engine crawlers. This directive helps search engines locate and process the sitemap for efficient website indexing.
+
+LANGUAGE: txt
+CODE:
+Sitemap: http://store.com/sitemap.xml
+
+----------------------------------------
+
+TITLE: Defining Layout Handle in Magento 2 EncryptionKey Module
+DESCRIPTION: Specifies the layout handle introduced by the Magento_EncryptionKey module in the adminhtml area. This layout is likely used for the encryption key management interface in the Magento admin panel.
+
+LANGUAGE: markdown
+CODE:
+- `adminhtml_crypt_key_index`
+
+----------------------------------------
+
+TITLE: Configuring PHPUnit Test Groups Comment Block
+DESCRIPTION: Comment block explaining the purpose and usage of the phpunitGroupConfig.php configuration file. It allows developers to list PHPUnit tests that need to be run in isolation, with one class name per line.
+
+LANGUAGE: text
+CODE:
+# Optional configuration file for dev/tests/utils/phpunitGroupConfig.php
+# List rest phpunit tests that have to be isolated in their own groups, e.g. long running test, special environments, etc
+# One per line by class name
+
+----------------------------------------
+
+TITLE: Implementing Custom Class in Magento 2 PHP
+DESCRIPTION: This snippet defines a class named MyClassChild that implements the MyClass interface. It includes the standard Magento copyright notice. The class implementation is incomplete in the provided code.
+
+LANGUAGE: PHP
+CODE:
+<?php
+/**
+ * Copyright © Magento, Inc. All rights reserved.
+ * See COPYING.txt for license details.
+ */
+
+MyClassChild implements MyClass
+{
+
+
+
+----------------------------------------
+
+TITLE: Implementing Proxy Class for Magento2 Object Manager
+DESCRIPTION: A proxy class implementation that extends SampleMixed and implements NoninterceptableInterface. Provides lazy loading functionality through object manager with support for shared and non-shared instances, serialization, and debugging capabilities.
+
+LANGUAGE: PHP
+CODE:
+namespace Magento\Framework\ObjectManager\Code\Generator;\n\n/**\n * Proxy class for @see \Magento\Framework\ObjectManager\Code\Generator\SampleMixed\n */\nclass SampleMixed_Proxy extends SampleMixed implements \Magento\Framework\ObjectManager\NoninterceptableInterface\n{\n    /**\n     * Object Manager instance\n     *\n     * @var \Magento\Framework\ObjectManagerInterface\n     */\n    protected $_objectManager = null;\n\n    /**\n     * Proxied instance name\n     *\n     * @var string\n     */\n    protected $_instanceName = null;\n\n    /**\n     * Proxied instance\n     *\n     * @var \Magento\Framework\ObjectManager\Code\Generator\SampleMixed\n     */\n    protected $_subject = null;\n\n    /**\n     * Instance shareability flag\n     *\n     * @var bool\n     */\n    protected $_isShared = null;\n\n    /**\n     * Proxy constructor\n     *\n     * @param \Magento\Framework\ObjectManagerInterface $objectManager\n     * @param string $instanceName\n     * @param bool $shared\n     */\n    public function __construct(\Magento\Framework\ObjectManagerInterface $objectManager, $instanceName = '\\Magento\\Framework\\ObjectManager\\Code\\Generator\\SampleMixed', $shared = true)\n    {\n        $this->_objectManager = $objectManager;\n        $this->_instanceName = $instanceName;\n        $this->_isShared = $shared;\n    }\n\n    /**\n     * @return array\n     */\n    public function __sleep()\n    {\n        return ['_subject', '_isShared', '_instanceName'];\n    }\n\n    /**\n     * Retrieve ObjectManager from global scope\n     */\n    public function __wakeup()\n    {\n        $this->_objectManager = \Magento\Framework\App\ObjectManager::getInstance();\n    }\n\n    /**\n     * Clone proxied instance\n     */\n    public function __clone()\n    {\n        if ($this->_subject) {\n            $this->_subject = clone $this->_getSubject();\n        }\n    }\n\n    /**\n     * Debug proxied instance\n     */\n    public function __debugInfo()\n    {\n        return ['i' => $this->_subject];\n    }\n\n    /**\n     * Get proxied instance\n     *\n     * @return \Magento\Framework\ObjectManager\Code\Generator\SampleMixed\n     */\n    protected function _getSubject()\n    {\n        if (!$this->_subject) {\n            $this->_subject = true === $this->_isShared\n                ? $this->_objectManager->get($this->_instanceName)\n                : $this->_objectManager->create($this->_instanceName);\n        }\n        return $this->_subject;\n    }\n\n    /**\n     * {@inheritdoc}\n     */\n    public function setMixed(mixed $mixed = null) : void\n    {\n        $this->_getSubject()->setMixed($mixed);\n    }\n\n    /**\n     * {@inheritdoc}\n     */\n    public function getMixed() : mixed\n    {\n        return $this->_getSubject()->getMixed();\n    }\n}
+
+----------------------------------------
+
+TITLE: Module Name Declaration in Markdown
+DESCRIPTION: Declares the module name and provides its primary purpose in implementing MediaContentSyncronization functionality for the Magento_Catalog module.
+
+LANGUAGE: markdown
+CODE:
+# Magento_MediaContentCatalog module
+
+The Magento_MediaContentCatalog provides the implementation of MediaContentSyncronization functionality for Magento_Catalog module
+
+----------------------------------------
+
+TITLE: Implementing Magento2 Class Structure in PHP
+DESCRIPTION: Defines a PHP class 'Foo' that implements 'InterfaceName' within the Magento module namespace structure. Includes standard Magento copyright header and follows PSR coding standards.
+
+LANGUAGE: PHP
+CODE:
+<?php
+/**
+ * Copyright © Magento, Inc. All rights reserved.
+ * See COPYING.txt for license details.
+ */
+namespace Magento\ModuleName\SubDirectoryName;
+
+/**
+ * Class Foo responsibility is ...
+ */
+class Foo implements InterfaceName
+{
+}
+
+----------------------------------------
+
+TITLE: Defining Interceptor Class for ReflectionIntersectionTypeSample in PHP
+DESCRIPTION: This class extends ReflectionIntersectionTypeSample and implements InterceptorInterface. It uses the Interceptor trait and overrides various methods to provide plugin functionality.
+
+LANGUAGE: PHP
+CODE:
+namespace Magento\Framework\Interception\Code\Generator\ReflectionIntersectionTypeSample;
+
+/**
+ * Interceptor class for @see \Magento\Framework\Interception\Code\Generator\ReflectionIntersectionTypeSample
+ */
+class Interceptor extends \Magento\Framework\Interception\Code\Generator\ReflectionIntersectionTypeSample implements \Magento\Framework\Interception\InterceptorInterface
+{
+    use \Magento\Framework\Interception\Interceptor;
+
+    public function __construct(\Psr\Log\LoggerInterface $logger, $pathInMenuStructure = '', ?\Magento\Backend\Model\Menu\Item\Factory $menuItemFactory = null, ?\Magento\Framework\Serialize\SerializerInterface $serializer = null)
+    {
+        $this->___init();
+        parent::__construct($logger, $pathInMenuStructure, $menuItemFactory, $serializer);
+    }
+
+    /**
+     * {@inheritdoc}
+     */
+    public function getValue() : \Magento\Backend\Model\Menu&\Magento\Framework\Interception\Code\Generator\ReflectionIntersectionTypeSample
+    {
+        $pluginInfo = $this->pluginList->getNext($this->subjectType, 'getValue');
+        return $pluginInfo ? $this->___callPlugins('getValue', func_get_args(), $pluginInfo) : parent::getValue();
+    }
+
+    /**
+     * {@inheritdoc}
+     */
+    public function setValue(\Magento\Backend\Model\Menu&\Magento\Framework\Interception\Code\Generator\ReflectionIntersectionTypeSample $value)
+    {
+        $pluginInfo = $this->pluginList->getNext($this->subjectType, 'setValue');
+        return $pluginInfo ? $this->___callPlugins('setValue', func_get_args(), $pluginInfo) : parent::setValue($value);
+    }
+
+    /**
+     * {@inheritdoc}
+     */
+    public function add(\Magento\Backend\Model\Menu\Item $item, $parentId = null, $index = null)
+    {
+        $pluginInfo = $this->pluginList->getNext($this->subjectType, 'add');
+        return $pluginInfo ? $this->___callPlugins('add', func_get_args(), $pluginInfo) : parent::add($item, $parentId, $index);
+    }
+
+    /**
+     * {@inheritdoc}
+     */
+    public function get($itemId)
+    {
+        $pluginInfo = $this->pluginList->getNext($this->subjectType, 'get');
+        return $pluginInfo ? $this->___callPlugins('get', func_get_args(), $pluginInfo) : parent::get($itemId);
+    }
+
+    /**
+     * {@inheritdoc}
+     */
+    public function move($itemId, $toItemId, $sortIndex = null)
+    {
+        $pluginInfo = $this->pluginList->getNext($this->subjectType, 'move');
+        return $pluginInfo ? $this->___callPlugins('move', func_get_args(), $pluginInfo) : parent::move($itemId, $toItemId, $sortIndex);
+    }
+
+    /**
+     * {@inheritdoc}
+     */
+    public function remove($itemId)
+    {
+        $pluginInfo = $this->pluginList->getNext($this->subjectType, 'remove');
+        return $pluginInfo ? $this->___callPlugins('remove', func_get_args(), $pluginInfo) : parent::remove($itemId);
+    }
+
+    /**
+     * {@inheritdoc}
+     */
+    public function reorder($itemId, $position)
+    {
+        $pluginInfo = $this->pluginList->getNext($this->subjectType, 'reorder');
+        return $pluginInfo ? $this->___callPlugins('reorder', func_get_args(), $pluginInfo) : parent::reorder($itemId, $position);
+    }
+
+    /**
+     * {@inheritdoc}
+     */
+    public function isLast(\Magento\Backend\Model\Menu\Item $item)
+    {
+        $pluginInfo = $this->pluginList->getNext($this->subjectType, 'isLast');
+        return $pluginInfo ? $this->___callPlugins('isLast', func_get_args(), $pluginInfo) : parent::isLast($item);
+    }
+
+    /**
+     * {@inheritdoc}
+     */
+    public function getFirstAvailable()
+    {
+        $pluginInfo = $this->pluginList->getNext($this->subjectType, 'getFirstAvailable');
+        return $pluginInfo ? $this->___callPlugins('getFirstAvailable', func_get_args(), $pluginInfo) : parent::getFirstAvailable();
+    }
+
+    /**
+     * {@inheritdoc}
+     */
+    public function getParentItems($itemId)
+    {
+        $pluginInfo = $this->pluginList->getNext($this->subjectType, 'getParentItems');
+        return $pluginInfo ? $this->___callPlugins('getParentItems', func_get_args(), $pluginInfo) : parent::getParentItems($itemId);
+    }
+
+    /**
+     * {@inheritdoc}
+     */
+    public function serialize()
+    {
+        $pluginInfo = $this->pluginList->getNext($this->subjectType, 'serialize');
+        return $pluginInfo ? $this->___callPlugins('serialize', func_get_args(), $pluginInfo) : parent::serialize();
+    }
+
+    /**
+     * {@inheritdoc}
+     */
+    public function toArray()
+    {
+        $pluginInfo = $this->pluginList->getNext($this->subjectType, 'toArray');
+        return $pluginInfo ? $this->___callPlugins('toArray', func_get_args(), $pluginInfo) : parent::toArray();
+    }
+
+    /**
+     * {@inheritdoc}
+     */
+    public function unserialize($serialized)
+    {
+        $pluginInfo = $this->pluginList->getNext($this->subjectType, 'unserialize');
+        return $pluginInfo ? $this->___callPlugins('unserialize', func_get_args(), $pluginInfo) : parent::unserialize($serialized);
+    }
+
+    /**
+     * {@inheritdoc}
+     */
+    public function populateFromArray(array $data)
+    {
+        $pluginInfo = $this->pluginList->getNext($this->subjectType, 'populateFromArray');
+        return $pluginInfo ? $this->___callPlugins('populateFromArray', func_get_args(), $pluginInfo) : parent::populateFromArray($data);
+    }
+}
+
+----------------------------------------
+
+TITLE: Module Title Declaration in Markdown
+DESCRIPTION: Module header declaration using markdown formatting
+
+LANGUAGE: markdown
+CODE:
+# Magento_MediaContentCatalog module
+
+----------------------------------------
+
+TITLE: Implementing Backend Menu Interceptor Class in PHP
+DESCRIPTION: A PHP class that implements the interceptor pattern for Magento2 backend menu operations. It extends the base SampleBackendMenu class and implements the InterceptorInterface, providing plugin capability for all menu management methods.
+
+LANGUAGE: PHP
+CODE:
+namespace Magento\Framework\Interception\Code\Generator\SampleBackendMenu;
+
+/**
+ * Interceptor class for @see \Magento\Framework\Interception\Code\Generator\SampleBackendMenu
+ */
+class Interceptor extends \Magento\Framework\Interception\Code\Generator\SampleBackendMenu implements \Magento\Framework\Interception\InterceptorInterface
+{
+    use \Magento\Framework\Interception\Interceptor;
+
+    public function __construct(\Psr\Log\LoggerInterface $logger, $pathInMenuStructure = '', ?\Magento\Backend\Model\Menu\Item\Factory $menuItemFactory = null, ?\Magento\Framework\Serialize\SerializerInterface $serializer = null)
+    {
+        $this->___init();
+        parent::__construct($logger, $pathInMenuStructure, $menuItemFactory, $serializer);
+    }
+
+    /**
+     * {@inheritdoc}
+     */
+    public function add(\Magento\Backend\Model\Menu\Item $item, $parentId = null, $index = null)
+    {
+        $pluginInfo = $this->pluginList->getNext($this->subjectType, 'add');
+        return $pluginInfo ? $this->___callPlugins('add', func_get_args(), $pluginInfo) : parent::add($item, $parentId, $index);
+    }
+
+    /**
+     * {@inheritdoc}
+     */
+    public function get($itemId)
+    {
+        $pluginInfo = $this->pluginList->getNext($this->subjectType, 'get');
+        return $pluginInfo ? $this->___callPlugins('get', func_get_args(), $pluginInfo) : parent::get($itemId);
+    }
+
+    /**
+     * {@inheritdoc}
+     */
+    public function move($itemId, $toItemId, $sortIndex = null)
+    {
+        $pluginInfo = $this->pluginList->getNext($this->subjectType, 'move');
+        return $pluginInfo ? $this->___callPlugins('move', func_get_args(), $pluginInfo) : parent::move($itemId, $toItemId, $sortIndex);
+    }
+
+    /**
+     * {@inheritdoc}
+     */
+    public function remove($itemId)
+    {
+        $pluginInfo = $this->pluginList->getNext($this->subjectType, 'remove');
+        return $pluginInfo ? $this->___callPlugins('remove', func_get_args(), $pluginInfo) : parent::remove($itemId);
+    }
+
+    /**
+     * {@inheritdoc}
+     */
+    public function reorder($itemId, $position)
+    {
+        $pluginInfo = $this->pluginList->getNext($this->subjectType, 'reorder');
+        return $pluginInfo ? $this->___callPlugins('reorder', func_get_args(), $pluginInfo) : parent::reorder($itemId, $position);
+    }
+
+    /**
+     * {@inheritdoc}
+     */
+    public function isLast(\Magento\Backend\Model\Menu\Item $item)
+    {
+        $pluginInfo = $this->pluginList->getNext($this->subjectType, 'isLast');
+        return $pluginInfo ? $this->___callPlugins('isLast', func_get_args(), $pluginInfo) : parent::isLast($item);
+    }
+
+    /**
+     * {@inheritdoc}
+     */
+    public function getFirstAvailable()
+    {
+        $pluginInfo = $this->pluginList->getNext($this->subjectType, 'getFirstAvailable');
+        return $pluginInfo ? $this->___callPlugins('getFirstAvailable', func_get_args(), $pluginInfo) : parent::getFirstAvailable();
+    }
+
+    /**
+     * {@inheritdoc}
+     */
+    public function getParentItems($itemId)
+    {
+        $pluginInfo = $this->pluginList->getNext($this->subjectType, 'getParentItems');
+        return $pluginInfo ? $this->___callPlugins('getParentItems', func_get_args(), $pluginInfo) : parent::getParentItems($itemId);
+    }
+
+    /**
+     * {@inheritdoc}
+     */
+    public function serialize()
+    {
+        $pluginInfo = $this->pluginList->getNext($this->subjectType, 'serialize');
+        return $pluginInfo ? $this->___callPlugins('serialize', func_get_args(), $pluginInfo) : parent::serialize();
+    }
+
+    /**
+     * {@inheritdoc}
+     */
+    public function toArray()
+    {
+        $pluginInfo = $this->pluginList->getNext($this->subjectType, 'toArray');
+        return $pluginInfo ? $this->___callPlugins('toArray', func_get_args(), $pluginInfo) : parent::toArray();
+    }
+
+    /**
+     * {@inheritdoc}
+     */
+    public function unserialize($serialized)
+    {
+        $pluginInfo = $this->pluginList->getNext($this->subjectType, 'unserialize');
+        return $pluginInfo ? $this->___callPlugins('unserialize', func_get_args(), $pluginInfo) : parent::unserialize($serialized);
+    }
+
+    /**
+     * {@inheritdoc}
+     */
+    public function populateFromArray(array $data)
+    {
+        $pluginInfo = $this->pluginList->getNext($this->subjectType, 'populateFromArray');
+        return $pluginInfo ? $this->___callPlugins('populateFromArray', func_get_args(), $pluginInfo) : parent::populateFromArray($data);
+    }
+}
+
+----------------------------------------
+
+TITLE: PHP Class Definition with Interface Implementation
+DESCRIPTION: Defines a PHP class named 'Foo' that implements 'InterfaceName' interface. The file includes Magento's standard copyright notice and follows PSR coding standards.
+
+LANGUAGE: PHP
+CODE:
+<?php
+/**
+ * Copyright © Magento, Inc. All rights reserved.
+ * See COPYING.txt for license details.
+ */
+
+class Foo implements InterfaceName
+{
+}
+
+----------------------------------------
+
+TITLE: Defining ProductExtension Class in PHP for Magento 2 Catalog Module
+DESCRIPTION: This code snippet defines the ProductExtension class within the Magento\Catalog\Api\Data namespace. It extends the AbstractSimpleObject class and implements the ProductExtensionInterface. This class serves as an extension for the ProductInterface in the Magento 2 Catalog module.
+
+LANGUAGE: PHP
+CODE:
+namespace Magento\Catalog\Api\Data;
+
+/**
+ * Extension class for @see \Magento\Catalog\Api\Data\ProductInterface
+ */
+class ProductExtension extends \Magento\Framework\Api\AbstractSimpleObject implements ProductExtensionInterface
+{
+}
+
+----------------------------------------
+
+TITLE: Defining Save Logs Interface in PHP for Magento 2 Login as Customer
+DESCRIPTION: This code snippet defines the SaveLogsInterface for saving login as custom logs entities. It is part of the public API for the Magento_LoginAsCustomerLog module.
+
+LANGUAGE: php
+CODE:
+\Magento\LoginAsCustomerLog\Api\SaveLogsInterface
+
+----------------------------------------
+
+TITLE: PHP Namespace Declaration with Use Statement
+DESCRIPTION: Defines a namespace within the Magento Framework and imports a class using the use statement. Includes standard Magento copyright header comment.
+
+LANGUAGE: PHP
+CODE:
+<?php
+/**
+ * Copyright © Magento, Inc. All rights reserved.
+ * See COPYING.txt for license details.
+ */
+namespace Magento\Framework\MyNamespace;
+
+use \MyClass;
+
+----------------------------------------
+
+TITLE: Configuring Media Gallery Synchronization Message Queue Consumer in Magento 2
+DESCRIPTION: This configuration specifies the message queue consumer for running media files synchronization. It is used in the Magento 2 message queue system.
+
+LANGUAGE: yaml
+CODE:
+media.gallery.synchronization
+
+----------------------------------------
+
+TITLE: Updating Magento 2 Dependencies After Adding Sample Data
+DESCRIPTION: This bash command updates the dependencies in the Magento root directory after adding sample data packages to the composer.json file.
+
+LANGUAGE: bash
+CODE:
+# composer update
+
+----------------------------------------
+
+TITLE: Declaring Namespace and Importing Class in Magento 2 PHP File
+DESCRIPTION: This snippet defines a namespace within the Magento Framework and imports a class using the 'use' statement. It includes the standard Magento 2 copyright notice as a file-level docblock.
+
+LANGUAGE: PHP
+CODE:
+<?php
+/**
+ * Copyright © Magento, Inc. All rights reserved.
+ * See COPYING.txt for license details.
+ */
+namespace Magento\Framework\MyNamespace;
+
+use MyClass;
+
+----------------------------------------
+
+TITLE: Unlinking Magento 2 Sample Data (GitHub)
+DESCRIPTION: This bash command unlinks the sample data from your Magento 2 instance when it was deployed from the GitHub repository. It requires specifying the sample data clone directory and the path to your Magento instance.
+
+LANGUAGE: bash
+CODE:
+# php -f <sample-data_clone_dir>/dev/tools/build-sample-data.php – --command=unlink --ce-source="<path_to_your_magento_instance>"
+
+----------------------------------------
+
+TITLE: Defining Magento 2 Module Class in PHP
+DESCRIPTION: This snippet defines a PHP class named 'Foo' for a Magento 2 module. The class implements an interface called 'InterfaceName'. The file includes the Magento copyright notice and is placed within a specific namespace.
+
+LANGUAGE: PHP
+CODE:
+<?php
+/**
+ * Copyright © Magento, Inc. All rights reserved.
+ * See COPYING.txt for license details.
+ */
+namespace Magento\ModuleName\SubDirectoryName;
+
+Foo implements InterfaceName
+{
+}
+
+----------------------------------------
+
+TITLE: Copyright Disclaimer Template
+DESCRIPTION: Sample copyright disclaimer template for employers/organizations.
+
+LANGUAGE: text
+CODE:
+Yoyodyne, Inc., hereby disclaims all copyright interest in the program
+`Gnomovision' (which makes passes at compilers) written by James Hacker.
+
+<signature of Ty Coon>, 1 April 1989
+Ty Coon, President of Vice
+
+----------------------------------------
+
+TITLE: Implementing PHP Class with Interface in Magento 2
+DESCRIPTION: Defines a basic PHP class named 'Foo' that implements 'InterfaceName' interface. Includes the standard Magento copyright header comment block.
+
+LANGUAGE: PHP
+CODE:
+<?php
+/**
+ * Copyright © Magento, Inc. All rights reserved.
+ * See COPYING.txt for license details.
+ */
+
+class  Foo  implements InterfaceName
+{
+}
+
+----------------------------------------
+
+TITLE: Example GPL Copyright Notice
+DESCRIPTION: Standard copyright and license notice template for use in source files under GPL v2.
+
+LANGUAGE: text
+CODE:
+<one line to give the program's name and a brief idea of what it does.>
+Copyright (C) <year>  <name of author>
+
+This program is free software; you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation; either version 2 of the License, or
+(at your option) any later version.
+
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License
+along with this program; if not, write to the Free Software
+Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA
+
+----------------------------------------
+
+TITLE: Function Call with String Argument in PHP for Magento 2
+DESCRIPTION: This snippet demonstrates calling a function 'foo' with a single string argument 'bar'. It shows how to pass string literals as function arguments in PHP.
+
+LANGUAGE: PHP
+CODE:
+foo(
+    'bar'
+)
+
+----------------------------------------
+
+TITLE: Running Varnish Test Cases for Magento 2
+DESCRIPTION: This command runs all Varnish Test Cases (VTC) in the current directory. It requires Varnish to be installed on the system. The tests check the behavior of Magento 2's VCL file.
+
+LANGUAGE: shell
+CODE:
+varnishtest *.vtc
+
+----------------------------------------
+
+TITLE: Magento Module and Library Path Configuration
+DESCRIPTION: Basic path configuration settings that specify the locations for Magento 2 modules and framework library components. These are essential directory markers used by Magento's autoloader and module system.
+
+LANGUAGE: magento
+CODE:
+module * /
+library * /
+library magento/framework */
+
+----------------------------------------
+
+TITLE: Configuring PHPUnit Test Groups in Magento 2
+DESCRIPTION: A comment block explaining the purpose of the phpunitGroupConfig.php configuration file. Used to list integration tests that need to be run in isolation, with one class name per line.
+
+LANGUAGE: plaintext
+CODE:
+# Optional configuration file for dev/tests/utils/phpunitGroupConfig.php
+# List integration phpunit tests that have to be isolated in their own groups, e.g. long running test, special environments, etc
+# One per line by class name
+
+----------------------------------------
+
+TITLE: Defining Test Exclusions for Magento 2
+DESCRIPTION: This snippet provides a list of file and directory paths to be excluded from testing in the Magento 2 project. It includes framework components, test files, and specific modules across different areas of the Magento 2 codebase.
+
+LANGUAGE: plaintext
+CODE:
+# Format: path to directory or path to file
+#
+# Example:
+# app/code/Magento/Catalog
+# dev/tests/static/framework/bootstrap.php
+lib/internal/Magento/Framework/Cache/Backend/Eaccelerator.php
+lib/internal/Magento/Framework/Image/Adapter/ImageMagick.php
+lib/internal/Magento/Framework/Interception/Test/Unit/Code/Generator/InterceptorTest.php
+lib/internal/Magento/Framework/Interception/Test/Unit/Config/ConfigTest.php
+dev/tests/integration/framework/deployTestModules.php
+dev/tests/integration/testsuite/Magento/Framework/Code/Generator/AutoloaderTest.php
+dev/tests/integration/testsuite/Magento/Framework/Communication/ConfigTest.php
+dev/tests/integration/testsuite/Magento/Framework/Filter/DirectiveProcessor/SimpleDirectiveTest.php
+dev/tests/integration/testsuite/Magento/Framework/Session/ConfigTest.php
+dev/tests/integration/testsuite/Magento/Framework/Session/SessionManagerTest.php
+dev/tests/integration/testsuite/Magento/LayeredNavigation/Block/Navigation/AbstractFiltersTest.php
+dev/tests/integration/testsuite/Magento/LayeredNavigation/Block/Navigation/CategoryTest.php
+dev/tests/api-functional/testsuite/Magento/Customer/Api/AddressRepositoryTest.php
+dev/tests/api-functional/testsuite/Magento/Framework/Model/Entity/HydratorTest.php
+dev/tests/api-functional/testsuite/Magento/Integration/Model/AdminTokenServiceTest.php
+dev/tests/api-functional/testsuite/Magento/Integration/Model/CustomerTokenServiceTest.php
+app/code/Magento/Developer/Test/Unit/Console/Command/DevTestsRunCommandTest.php
+app/code/Magento/OfflineShipping/Test/Unit/Model/ResourceModel/Carrier/Tablerate/CSV/ColumnResolverTest.php
+
+----------------------------------------
+
+TITLE: Defining Magento 2 CSP SRI Hashes Block Class in PHP
+DESCRIPTION: This code snippet defines the Hashes class within the Magento\Csp\Block\Sri namespace. It extends the Template block and implements methods for handling Subresource Integrity hashes.
+
+LANGUAGE: PHP
+CODE:
+<?php
+declare(strict_types=1);
+
+namespace Magento\Csp\Block\Sri;
+
+use Magento\Framework\View\Element\Template;
+use Magento\Csp\Api\InlineUtilInterface;
+
+/**
+ * Block for rendering SRI hashes.
+ */
+class Hashes extends Template
+{
+    /**
+     * @var InlineUtilInterface
+     */
+    private $inlineUtil;
+
+    /**
+     * @param Template\Context $context
+     * @param InlineUtilInterface $inlineUtil
+     * @param array $data
+     */
+    public function __construct(
+        Template\Context $context,
+        InlineUtilInterface $inlineUtil,
+        array $data = []
+    ) {
+        parent::__construct($context, $data);
+        $this->inlineUtil = $inlineUtil;
+    }
+
+    /**
+     * Retrieve hash for a static asset.
+     *
+     * @param string $url
+     * @return string|null
+     */
+    public function getHash(string $url): ?string
+    {
+        return $this->inlineUtil->getHash($url);
+    }
+
+    /**
+     * Check whether hash exists for a static asset.
+     *
+     * @param string $url
+     * @return bool
+     */
+    public function hashExists(string $url): bool
+    {
+        return $this->inlineUtil->hashExists($url);
+    }
+
+    /**
+     * Generate HTML attribute for SRI.
+     *
+     * @param string $url
+     * @return string
+     */
+    public function getHashAttributes(string $url): string
+    {
+        $hash = $this->getHash($url);
+        if (!$hash) {
+            return '';
+        }
+
+        return sprintf('integrity="%s" crossorigin="anonymous"', $hash);
+    }
+}
+
+----------------------------------------
+
+TITLE: Configuring Isolated GraphQL Test Group
+DESCRIPTION: Lists the GraphQL test class that needs to be run in isolation due to special requirements like extended runtime or environment dependencies. The specified test is for customer quote checkout end-to-end testing.
+
+LANGUAGE: text
+CODE:
+Magento\GraphQl\Quote\Customer\CheckoutEndToEnd
+
+----------------------------------------
+
+TITLE: Defining Global Glob Pattern for Magento 2 Components
+DESCRIPTION: This snippet defines a global glob pattern that applies to all component types in Magento 2. It uses the wildcard '*' for both component type and name, and specifies the root directory '/' as the glob pattern.
+
+LANGUAGE: plaintext
+CODE:
+* * /
+
+----------------------------------------
+
+TITLE: Running Magento with PHP Built-in Server
+DESCRIPTION: Command to start PHP's built-in web server for Magento 2, specifying the host, port, document root, and router script location.
+
+LANGUAGE: shell
+CODE:
+php -S 127.0.0.1:8082 -t ./pub/ ./phpserver/router.php
+
+----------------------------------------
+
+TITLE: Defining Global Ignore Rule for Magento 2 Components
+DESCRIPTION: This rule ignores all files and directories for all component types in Magento 2. It uses a specific format to define the ignore pattern, which includes the component type, component name, and glob pattern.
+
+LANGUAGE: plaintext
+CODE:
+* * /
+
+----------------------------------------
+
+TITLE: Implementing Magento 2 Interceptor Class with Plugin Support
+DESCRIPTION: Class implementation that provides method interception functionality for various method signatures including void returns, nullable types, string operations, and variadic parameters. The class uses plugin system to intercept and modify method behavior.
+
+LANGUAGE: PHP
+CODE:
+namespace Magento\Framework\Interception\Code\Generator\TSample;
+
+/**
+ * Interceptor class for @see \Magento\Framework\Interception\Code\Generator\TSample
+ */
+class Interceptor extends \Magento\Framework\Interception\Code\Generator\TSample implements \Magento\Framework\Interception\InterceptorInterface
+{
+    use \Magento\Framework\Interception\Interceptor;
+
+    public function __construct()
+    {
+        $this->___init();
+    }
+
+    /**
+     * {@inheritdoc}
+     */
+    public function returnVoid() : void
+    {
+        $pluginInfo = $this->pluginList->getNext($this->subjectType, 'returnVoid');
+        $pluginInfo ? $this->___callPlugins('returnVoid', func_get_args(), $pluginInfo) : parent::returnVoid();
+    }
+
+    /**
+     * {@inheritdoc}
+     */
+    public function getNullableValue() : ?string
+    {
+        $pluginInfo = $this->pluginList->getNext($this->subjectType, 'getNullableValue');
+        return $pluginInfo ? $this->___callPlugins('getNullableValue', func_get_args(), $pluginInfo) : parent::getNullableValue();
+    }
+
+    /**
+     * {@inheritdoc}
+     */
+    public function getValue() : string
+    {
+        $pluginInfo = $this->pluginList->getNext($this->subjectType, 'getValue');
+        return $pluginInfo ? $this->___callPlugins('getValue', func_get_args(), $pluginInfo) : parent::getValue();
+    }
+
+    /**
+     * {@inheritdoc}
+     */
+    public function setValue(string $value)
+    {
+        $pluginInfo = $this->pluginList->getNext($this->subjectType, 'setValue');
+        return $pluginInfo ? $this->___callPlugins('setValue', func_get_args(), $pluginInfo) : parent::setValue($value);
+    }
+
+    /**
+     * {@inheritdoc}
+     */
+    public function typeHintedFirstVariadicParameter(string ... $variadicValue)
+    {
+        $pluginInfo = $this->pluginList->getNext($this->subjectType, 'typeHintedFirstVariadicParameter');
+        return $pluginInfo ? $this->___callPlugins('typeHintedFirstVariadicParameter', func_get_args(), $pluginInfo) : parent::typeHintedFirstVariadicParameter(... $variadicValue);
+    }
+
+    /**
+     * {@inheritdoc}
+     */
+    public function typeHintedSecondVariadicParameter(string $value, string ... $variadicValue)
+    {
+        $pluginInfo = $this->pluginList->getNext($this->subjectType, 'typeHintedSecondVariadicParameter');
+        return $pluginInfo ? $this->___callPlugins('typeHintedSecondVariadicParameter', func_get_args(), $pluginInfo) : parent::typeHintedSecondVariadicParameter($value, ... $variadicValue);
+    }
+
+    /**
+     * {@inheritdoc}
+     */
+    public function byRefTypeHintedVariadic(string &... $variadicValue)
+    {
+        $pluginInfo = $this->pluginList->getNext($this->subjectType, 'byRefTypeHintedVariadic');
+        return $pluginInfo ? $this->___callPlugins('byRefTypeHintedVariadic', func_get_args(), $pluginInfo) : parent::byRefTypeHintedVariadic(... $variadicValue);
+    }
+}
+
+----------------------------------------
+
+TITLE: Defining PageBuilder Stage Render Block in Magento 2
+DESCRIPTION: This code snippet defines a block class for the PageBuilder module in Magento 2. It is used to render the stage in the admin interface for the Page Builder functionality.
+
+LANGUAGE: PHP
+CODE:
+Magento\PageBuilder\Block\Adminhtml\Stage\Render
+
+----------------------------------------
+
+TITLE: Implementing SampleFactory Class for Magento 2 Object Manager in PHP
+DESCRIPTION: This class implements a factory for creating instances of the Sample class. It uses Magento's Object Manager for dependency injection and instance creation. The class constructor accepts an ObjectManagerInterface and an optional instance name, while the create method generates new instances with specified parameters.
+
+LANGUAGE: PHP
+CODE:
+namespace Magento\Framework\ObjectManager\Code\Generator;
+
+/**
+ * Factory class for @see \Magento\Framework\ObjectManager\Code\Generator\Sample
+ */
+class SampleFactory
+{
+    /**
+     * Object Manager instance
+     *
+     * @var \Magento\Framework\ObjectManagerInterface
+     */
+    protected $_objectManager = null;
+
+    /**
+     * Instance name to create
+     *
+     * @var string
+     */
+    protected $_instanceName = null;
+
+    /**
+     * Factory constructor
+     *
+     * @param \Magento\Framework\ObjectManagerInterface $objectManager
+     * @param string $instanceName
+     */
+    public function __construct(\Magento\Framework\ObjectManagerInterface $objectManager, $instanceName = '\\Magento\\Framework\\ObjectManager\\Code\\Generator\\Sample')
+    {
+        $this->_objectManager = $objectManager;
+        $this->_instanceName = $instanceName;
+    }
+
+    /**
+     * Create class instance with specified parameters
+     *
+     * @param array $data
+     * @return \Magento\Framework\ObjectManager\Code\Generator\Sample
+     */
+    public function create(array $data = [])
+    {
+        return $this->_objectManager->create($this->_instanceName, $data);
+    }
+}
+
+----------------------------------------
+
+TITLE: Defining LoginAsCustomerAssistance NotAllowedPopup Block in Magento 2
+DESCRIPTION: This code snippet defines a block class for the LoginAsCustomerAssistance module in Magento 2. It is used to render a popup in the admin interface when login as customer is not allowed.
+
+LANGUAGE: PHP
+CODE:
+Magento\LoginAsCustomerAssistance\Block\Adminhtml\NotAllowedPopup
+
+----------------------------------------
+
+TITLE: HTTP 200 Response Headers with Security Configuration
+DESCRIPTION: HTTP response headers for a successful verification request. Includes security headers like X-Frame-Options and Strict-Transport-Security, along with basic response metadata like content type and length.
+
+LANGUAGE: http
+CODE:
+HTTP/1.1 200 OK
+Server: Apache
+X-Frame-Options: SAMEORIGIN
+Strict-Transport-Security: max-age=14400
+Strict-Transport-Security: max-age=14400
+Content-Type: text/html; charset=UTF-8
+Date: Mon, 22 Apr 2013 09:52:36 GMT
+Content-Length: 8
+Connection: keep-alive
+Set-Cookie: ...
+
+VERIFIED
+
+----------------------------------------
+
+TITLE: Defining Global Dependency Pattern for Magento 2 Components
+DESCRIPTION: This configuration line sets a global pattern for all component types in Magento 2. It uses the format '<componentType> <componentName> <globPattern>' or simply '<globPattern>' to define dependencies. The asterisk (*) is used as a wildcard to match all component types and names.
+
+LANGUAGE: plaintext
+CODE:
+* * /
+
+----------------------------------------
+
+TITLE: HTTP Response Headers with Continue and OK Status
+DESCRIPTION: Series of HTTP response headers showing multiple 100 Continue interim responses followed by a final 200 OK response. Includes security headers like X-Frame-Options and Strict-Transport-Security along with standard response metadata.
+
+LANGUAGE: http
+CODE:
+HTTP/1.1 100 Continue
+Set-Cookie: ...
+
+HTTP/1.1 100 Continue
+Set-Cookie: ...
+
+HTTP/1.1 101 Continue
+Set-Cookie: ...
+
+HTTP/1.1 100 Continue
+Set-Cookie: ...
+
+HTTP/1.1 200 OK
+Server: Apache
+X-Frame-Options: SAMEORIGIN
+Strict-Transport-Security: max-age=14400
+Strict-Transport-Security: max-age=14400
+Content-Type: text/html; charset=UTF-8
+Date: Mon, 22 Apr 2013 09:52:36 GMT
+Content-Length: 8
+Connection: keep-alive
+Set-Cookie: ...
+
+VERIFIED
+
+----------------------------------------
+
+TITLE: Extending PHP Class in Magento 2
+DESCRIPTION: PHP class declaration that extends MyClass. Contains standard Magento 2 copyright header and license reference.
+
+LANGUAGE: php
+CODE:
+<?php
+/**
+ * Copyright © Magento, Inc. All rights reserved.
+ * See COPYING.txt for license details.
+ */
+
+MyClassChild extends MyClass
+{
+
+----------------------------------------
+
+TITLE: Interactive Program Notice Example
+DESCRIPTION: Example notice text for interactive programs to display their copyright and GPL terms.
+
+LANGUAGE: text
+CODE:
+Gnomovision version 69, Copyright (C) year name of author
+Gnomovision comes with ABSOLUTELY NO WARRANTY; for details type `show w'.
+This is free software, and you are welcome to redistribute it
+under certain conditions; type `show c' for details.
+
+----------------------------------------
+
+TITLE: Static Method Call without Arguments in PHP for Magento 2
+DESCRIPTION: This snippet shows a static method call on the 'Foo' class, invoking the 'foo' method without any arguments. It demonstrates how to call static methods in PHP when no parameters are required.
+
+LANGUAGE: PHP
+CODE:
+Foo::foo()
+
+----------------------------------------
+
+TITLE: Describing Magento Translation Functional Test Module in Markdown
+DESCRIPTION: This snippet defines the purpose of the file, which is to introduce the functional test module for the Magento Translation component. It uses Markdown syntax to format the title and emphasize the module name.
+
+LANGUAGE: Markdown
+CODE:
+# Translation Functional Tests
+
+The Functional Test Module for **Magento Translation** module.
+
+----------------------------------------
+
+TITLE: Object Method Call with String Argument in PHP for Magento 2
+DESCRIPTION: This snippet demonstrates calling a method 'foo' on the current object ($this) with a string argument 'bar'. It's a typical way of invoking object methods in Magento 2 and PHP in general.
+
+LANGUAGE: PHP
+CODE:
+$this->foo('bar')
+
+----------------------------------------
+
+TITLE: Defining Magento Sales Test Module Documentation
+DESCRIPTION: Simple markdown header and description defining the purpose of the Sales functional test module in Magento 2.
+
+LANGUAGE: markdown
+CODE:
+# Sales Functional Tests
+
+The Functional Test Module for **Magento Sales** module.
+
+----------------------------------------
+
+TITLE: Custom Function Definition in PHP for Magento 2
+DESCRIPTION: This snippet defines a custom function 'foo' that takes two parameters: $merchantMd5 and $merchantApiLogin. It's likely used for merchant-related operations in Magento 2.
+
+LANGUAGE: PHP
+CODE:
+function foo($merchantMd5, $merchantApiLogin)
+
+----------------------------------------
+
+TITLE: Review Analytics Test Module Title
+DESCRIPTION: Markdown header and description for the Review Analytics functional test module documentation.
+
+LANGUAGE: markdown
+CODE:
+# Review Analytics Functional Tests\n\nThe Functional Test Module for **Magento Review Analytics** module.
+
+----------------------------------------
+
+TITLE: String Manipulation in PHP for Magento 2
+DESCRIPTION: This snippet demonstrates string manipulation using PHP's built-in functions strtoupper() and strtolower(). It converts a concatenated string to lowercase and then to uppercase.
+
+LANGUAGE: PHP
+CODE:
+strtoupper(strtolower($foo . $bar))
+
+----------------------------------------
+
+TITLE: Markdown Header for Newsletter Tests
+DESCRIPTION: Markdown documentation header indicating the purpose of the functional test module for Magento Newsletter component
+
+LANGUAGE: markdown
+CODE:
+# Newsletter Functional Tests
+
+The Functional Test Module for **Magento Newsletter** module.
+
+----------------------------------------
+
+TITLE: Initializing MyClass in PHP for Magento 2
+DESCRIPTION: This snippet creates a new instance of the MyClass class. It's a simple initialization without any parameters or additional configuration.
+
+LANGUAGE: PHP
+CODE:
+<?php
+/**
+ * Copyright © Magento, Inc. All rights reserved.
+ * See COPYING.txt for license details.
+ */
+
+$myClass = new MyClass;
+
+----------------------------------------
+
+TITLE: Defining New Relic Reporting Functional Tests in Markdown
+DESCRIPTION: This snippet provides a brief description of the functional test module for Magento New Relic Reporting. It explains that the tests are specifically for the New Relic Reporting module within the Magento 2 framework.
+
+LANGUAGE: markdown
+CODE:
+# New Relic Reporting Functional Tests
+
+The Functional Test Module for **Magento New Relic Reporting** module.
+
+----------------------------------------
+
+TITLE: Configuring Magento 2 Library and Language
+DESCRIPTION: Defines the library and language settings for a Magento 2 project. The library is set to 'magento/test One*' and the language is set to 'magento_test_lang' for PHP files.
+
+LANGUAGE: magento_test_lang
+CODE:
+library magento/test One*
+language magento_test_lang *.php
+
+----------------------------------------
+
+TITLE: Describing Magento MySQL MQ Functional Test Module in Markdown
+DESCRIPTION: This snippet provides a brief description of the functional test module for Magento's MySQL Message Queue implementation. It specifies that the module is designed for testing the Magento MySQL MQ module.
+
+LANGUAGE: markdown
+CODE:
+# Mysql Mq Functional Tests
+
+The Functional Test Module for **Magento Mysql Mq** module.
+
+----------------------------------------
+
+TITLE: Defining Text File Glob Patterns
+DESCRIPTION: Specifies glob patterns to match text files. Includes patterns for specific files and wildcard directory matching.
+
+LANGUAGE: glob
+CODE:
+{one,two}.txt
+bar
+baz/*.txt
+
+----------------------------------------
+
+TITLE: Defining Magento 2 Message Queue Test Module in Markdown
+DESCRIPTION: This snippet defines the purpose of the file, which is to introduce the functional test module for the Magento Message Queue component. It uses Markdown syntax to format the text.
+
+LANGUAGE: Markdown
+CODE:
+# Message Queue Functional Tests
+
+The Functional Test Module for **Magento Message Queue** module.
+
+----------------------------------------
+
+TITLE: Defining SampleSearchResults Class in PHP for Magento 2
+DESCRIPTION: This code defines a SampleSearchResults class that extends Magento's SearchResults class. It overrides the getItems method to return an array of Sample objects, providing type-specific information for search results.
+
+LANGUAGE: PHP
+CODE:
+namespace Magento\Framework\Api\Code\Generator;
+
+class SampleSearchResults extends \Magento\Framework\Api\SearchResults
+{
+    /**
+     * Returns array of items
+     *
+     * @return \Magento\Framework\Api\Code\Generator\Sample[]
+     */
+    public function getItems()
+    {
+        return parent::getItems();
+    }
+}
+
+----------------------------------------
+
+TITLE: Documenting DHL Test Module in Markdown
+DESCRIPTION: A basic markdown header and description explaining the purpose of the DHL functional test module for Magento 2.
+
+LANGUAGE: markdown
+CODE:
+# Dhl Functional Tests
+
+The Functional Test Module for **Magento Dhl** module.
+
+----------------------------------------
+
+TITLE: Defining SampleMapper Class in PHP for Magento 2 API Code Generator
+DESCRIPTION: This snippet defines the SampleMapper class which is used to map between Magento model objects and Sample DTOs. It includes a constructor for dependency injection of a SampleBuilder, and a method to extract a DTO from a model object.
+
+LANGUAGE: PHP
+CODE:
+namespace Magento\Framework\Api\Code\Generator;
+
+/**
+ * Mapper class for @see \Magento\Framework\Api\Code\Generator\Sample
+ */
+class SampleMapper
+{
+    /**
+     * sampleBuilder
+     *
+     * @var \Magento\Framework\Api\Code\Generator\SampleBuilder
+     */
+    protected $sampleBuilder = null;
+
+    /**
+     * \Magento\Framework\Api\Code\Generator\Sample[]
+     *
+     * @var array
+     */
+    protected $registry = [
+        
+    ];
+
+    /**
+     * Mapper constructor
+     *
+     * @param \Magento\Framework\Api\Code\Generator\Sample $sampleBuilder
+     */
+    public function __construct(\Magento\Framework\Api\Code\Generator\SampleBuilder $sampleBuilder)
+    {
+        $this->sampleBuilder = $sampleBuilder;
+    }
+
+    /**
+     * Extract data object from model
+     *
+     * @param \Magento\Framework\Model\AbstractModel $object
+     * @return \Magento\Framework\Api\Code\Generator\Sample
+     */
+    public function extractDto(\Magento\Framework\Model\AbstractModel $object)
+    {
+        $this->sampleBuilder->populateWithArray($object->getData());
+        return $this->sampleBuilder->create();
+    }
+}
+
+----------------------------------------
+
+TITLE: Describing Magento 2 Customer Import Export Test Module in Markdown
+DESCRIPTION: This markdown snippet provides a brief description of the functional test module for Magento's Customer Import Export feature. It specifies that this is a test module for the main Customer Import Export module in Magento 2.
+
+LANGUAGE: markdown
+CODE:
+# Customer Import Export Functional Tests
+
+The Functional Test Module for **Magento Customer Import Export** module.
+
+----------------------------------------
+
+TITLE: Product Extension Class Definition in PHP
+DESCRIPTION: Defines a Magento2 product extension class with methods to handle string and complex object attributes. Includes getters and setters for string attributes, complex object arrays, and typed complex objects.
+
+LANGUAGE: PHP
+CODE:
+namespace Magento\Catalog\Api\Data;
+
+/**
+ * Extension class for @see \Magento\Catalog\Api\Data\ProductInterface
+ */
+class ProductExtension extends \Magento\Framework\Api\AbstractSimpleObject implements ProductExtensionInterface
+{
+    /**
+     * @return string|null
+     */
+    public function getStringAttribute()
+    {
+        return $this->_get('string_attribute');
+    }
+
+    /**
+     * @param string $stringAttribute
+     * @return $this
+     */
+    public function setStringAttribute($stringAttribute)
+    {
+        $this->setData('string_attribute', $stringAttribute);
+        return $this;
+    }
+
+    /**
+     * @return \Magento\Bundle\Api\Data\OptionInterface[]|null
+     */
+    public function getComplexObjectAttribute()
+    {
+        return $this->_get('complex_object_attribute');
+    }
+
+    /**
+     * @param \Magento\Bundle\Api\Data\OptionInterface[] $complexObjectAttribute
+     * @return $this
+     */
+    public function setComplexObjectAttribute($complexObjectAttribute)
+    {
+        $this->setData('complex_object_attribute', $complexObjectAttribute);
+        return $this;
+    }
+
+    /**
+     * @return \Magento\Bundle\Api\Data\BundleOptionInterface|null
+     */
+    public function getComplexObjectAttributeWithTypeDeclaration()
+    {
+        return $this->_get('complex_object_attribute_with_type_declaration');
+    }
+
+    /**
+     * @param \Magento\Bundle\Api\Data\BundleOptionInterface $complexObjectAttributeWithTypeDeclaration
+     * @return $this
+     */
+    public function setComplexObjectAttributeWithTypeDeclaration(\Magento\Bundle\Api\Data\BundleOptionInterface $complexObjectAttributeWithTypeDeclaration)
+    {
+        $this->setData('complex_object_attribute_with_type_declaration', $complexObjectAttributeWithTypeDeclaration);
+        return $this;
+    }
+}
+
+----------------------------------------
+
+TITLE: Markdown Documentation - Magento Catalog URL Rewrite GraphQL Tests
+DESCRIPTION: Simple markdown documentation explaining the purpose of the functional test module for Magento Catalog URL Rewrite GraphQL functionality.
+
+LANGUAGE: markdown
+CODE:
+# Catalog Url Rewrite Graph Ql Functional Tests
+
+The Functional Test Module for **Magento Catalog Url Rewrite Graph Ql** module.
+
+----------------------------------------
+
+TITLE: Defining Interceptor Class for ReflectionUnionTypeSample in PHP
+DESCRIPTION: This code defines an Interceptor class that extends ReflectionUnionTypeSample and implements InterceptorInterface. It includes a constructor and methods for getting and setting values with union type hints (int|string).
+
+LANGUAGE: PHP
+CODE:
+namespace Magento\Framework\Interception\Code\Generator\ReflectionUnionTypeSample;
+
+/**
+ * Interceptor class for @see \Magento\Framework\Interception\Code\Generator\ReflectionUnionTypeSample
+ */
+class Interceptor extends \Magento\Framework\Interception\Code\Generator\ReflectionUnionTypeSample implements \Magento\Framework\Interception\InterceptorInterface
+{
+    use \Magento\Framework\Interception\Interceptor;
+
+    public function __construct()
+    {
+        $this->___init();
+    }
+
+    /**
+     * {@inheritdoc}
+     */
+    public function getValue() : int|string
+    {
+        $pluginInfo = $this->pluginList->getNext($this->subjectType, 'getValue');
+        return $pluginInfo ? $this->___callPlugins('getValue', func_get_args(), $pluginInfo) : parent::getValue();
+    }
+
+    /**
+     * {@inheritdoc}
+     */
+    public function setValue(int|string $value)
+    {
+        $pluginInfo = $this->pluginList->getNext($this->subjectType, 'setValue');
+        return $pluginInfo ? $this->___callPlugins('setValue', func_get_args(), $pluginInfo) : parent::setValue($value);
+    }
+}
+
+----------------------------------------
+
+TITLE: Markdown Header for Magento2 Catalog URL Rewrite Tests
+DESCRIPTION: Markdown heading and description for the Magento 2 Catalog URL Rewrite functional test module documentation.
+
+LANGUAGE: markdown
+CODE:
+# Catalog Url Rewrite Functional Tests
+
+The Functional Test Module for **Magento Catalog Url Rewrite** module.
+
+----------------------------------------
+
+TITLE: Defining MongoBinData Class in PHP for Unit Testing
+DESCRIPTION: This code snippet defines a fake MongoBinData class that mimics the structure of the real MongoDB extension's MongoBinData class. It includes a constant for BYTE_ARRAY and a public property for binary data. This class is only defined if the 'mongo' extension is not loaded.
+
+LANGUAGE: PHP
+CODE:
+<?php
+/**
+ * Copyright © Magento, Inc. All rights reserved.
+ * See COPYING.txt for license details.
+ */
+if (!extension_loaded('mongo')) {
+    /**
+     * \MongoBinData fake class to let unit tests go even without mongo extension
+     * All the comments copied from documentation
+     * @see http://php.net/manual/en/class.mongobindata.php for reference to real \MongoBinData class
+     */
+    class MongoBinData
+    {
+        /**
+         * Array of bytes
+         */
+        const BYTE_ARRAY = 2;
+
+        /**
+         * @var $bin
+         */
+        public $bin;
+    }
+}
+
+----------------------------------------
+
+TITLE: Markdown Documentation Header for Magento Catalog Analytics Tests
+DESCRIPTION: Header and brief description of the Magento Catalog Analytics functional test module documentation.
+
+LANGUAGE: markdown
+CODE:
+# Catalog Analytics Functional Tests
+
+The Functional Test Module for **Magento Catalog Analytics** module.
+
+----------------------------------------
+
+TITLE: Markdown Header and Description for Magento Catalog Tests
+DESCRIPTION: Simple markdown documentation describing the purpose of the functional test module for Magento's catalog system.
+
+LANGUAGE: markdown
+CODE:
+# Catalog Functional Tests
+
+The Functional Test Module for **Magento Catalog** module.
+
+----------------------------------------
+
+TITLE: Markdown Header for Send Friend Tests
+DESCRIPTION: Markdown heading and description for the Send Friend functional test module documentation
+
+LANGUAGE: markdown
+CODE:
+# Send Friend Functional Tests
+
+The Functional Test Module for **Magento Send Friend** module.
+
+----------------------------------------
+
+TITLE: Markdown Header and Description
+DESCRIPTION: Simple markdown documentation describing the purpose of the Page Cache Functional Test Module.
+
+LANGUAGE: markdown
+CODE:
+# Page Cache Functional Tests
+
+The Functional Test Module for **Magento Page Cache** module.
+
+----------------------------------------
+
+TITLE: Markdown Header and Description
+DESCRIPTION: Basic markdown documentation header and description for the Magento Widget functional test module.
+
+LANGUAGE: markdown
+CODE:
+# Widget Functional Tests
+
+The Functional Test Module for **Magento Widget** module.
+
+----------------------------------------
+
+TITLE: Markdown Title for Magento 2 Functional Tests
+DESCRIPTION: Markdown header and description for functional test documentation, specifying the scope of testing for ConfigurableProduct and Wishlist modules.
+
+LANGUAGE: markdown
+CODE:
+# Magento 2 Functional Tests
+
+The Functional Tests Module for **Magento_ConfigurableProduct** and **Magento_Wishlist** Modules.
+
+----------------------------------------
+
+TITLE: Markdown Documentation Header
+DESCRIPTION: Title and brief description of the Magento 2 functional testing module for configurable product catalog search
+
+LANGUAGE: markdown
+CODE:
+# Magento 2 Functional Tests
+
+The Functional Tests Module for **Magento_ConfigurableProductCatalogSearch** Module.
+
+----------------------------------------
+
+TITLE: Markdown Header for Magento 2 Catalog Import Export Tests
+DESCRIPTION: Simple markdown header and description for the Magento 2 Catalog Import Export functional test module documentation.
+
+LANGUAGE: markdown
+CODE:
+# Catalog Import Export Functional Tests
+
+The Functional Test Module for **Magento Catalog Import Export** module.

@@ -1,0 +1,4359 @@
+TITLE: Creating Basic Flask Web Application in Python
+DESCRIPTION: A simple Flask application example that creates a web server and returns 'Hello, World!' at the root route. This demonstrates the minimal setup required to create a Flask web application.
+
+LANGUAGE: python
+CODE:
+# save this as app.py
+from flask import Flask
+
+app = Flask(__name__)
+
+@app.route("/")
+def hello():
+    return "Hello, World!"
+
+----------------------------------------
+
+TITLE: Initializing Flask Application Factory in Python
+DESCRIPTION: This code snippet demonstrates how to create an application factory function for a Flask app. It sets up configuration, creates necessary directories, and defines a simple route.
+
+LANGUAGE: python
+CODE:
+import os
+
+from flask import Flask
+
+
+def create_app(test_config=None):
+    # create and configure the app
+    app = Flask(__name__, instance_relative_config=True)
+    app.config.from_mapping(
+        SECRET_KEY='dev',
+        DATABASE=os.path.join(app.instance_path, 'flaskr.sqlite'),
+    )
+
+    if test_config is None:
+        # load the instance config, if it exists, when not testing
+        app.config.from_pyfile('config.py', silent=True)
+    else:
+        # load the test config if passed in
+        app.config.from_mapping(test_config)
+
+    # ensure the instance folder exists
+    try:
+        os.makedirs(app.instance_path)
+    except OSError:
+        pass
+
+    # a simple page that says hello
+    @app.route('/hello')
+    def hello():
+        return 'Hello, World!'
+
+    return app
+
+----------------------------------------
+
+TITLE: Flask Extension Initialization Pattern
+DESCRIPTION: Demonstrates the correct way to initialize Flask extensions using the factory pattern, showing both the incorrect direct initialization and the proper two-step initialization approach.
+
+LANGUAGE: python
+CODE:
+def create_app(config_filename):
+    app = Flask(__name__)
+    app.config.from_pyfile(config_filename)
+
+    db = SQLAlchemy(app)
+
+LANGUAGE: python
+CODE:
+db = SQLAlchemy()
+
+LANGUAGE: python
+CODE:
+def create_app(config_filename):
+    app = Flask(__name__)
+    app.config.from_pyfile(config_filename)
+
+    from yourapplication.model import db
+    db.init_app(app)
+
+----------------------------------------
+
+TITLE: Implementing User Registration View in Flask
+DESCRIPTION: This snippet shows the implementation of a user registration view. It handles both GET and POST requests, validates user input, inserts new users into the database, and handles potential errors.
+
+LANGUAGE: python
+CODE:
+@bp.route('/register', methods=('GET', 'POST'))
+def register():
+    if request.method == 'POST':
+        username = request.form['username']
+        password = request.form['password']
+        db = get_db()
+        error = None
+
+        if not username:
+            error = 'Username is required.'
+        elif not password:
+            error = 'Password is required.'
+
+        if error is None:
+            try:
+                db.execute(
+                    "INSERT INTO user (username, password) VALUES (?, ?)",
+                    (username, generate_password_hash(password)),
+                )
+                db.commit()
+            except db.IntegrityError:
+                error = f"User {username} is already registered."
+            else:
+                return redirect(url_for("auth.login"))
+
+        flash(error)
+
+    return render_template('auth/register.html')
+
+----------------------------------------
+
+TITLE: Initializing SQLAlchemy with Declarative Mapping in Flask
+DESCRIPTION: Sets up a basic SQLAlchemy configuration using the declarative approach with a SQLite database. Creates database session and base model class.
+
+LANGUAGE: python
+CODE:
+from sqlalchemy import create_engine
+from sqlalchemy.orm import scoped_session, sessionmaker, declarative_base
+
+engine = create_engine('sqlite:////tmp/test.db')
+db_session = scoped_session(sessionmaker(autocommit=False,
+                                         autoflush=False,
+                                         bind=engine))
+Base = declarative_base()
+Base.query = db_session.query_property()
+
+def init_db():
+    # import all modules here that might define models so that
+    # they will be registered properly on the metadata.  Otherwise
+    # you will have to import them first before calling init_db()
+    import yourapplication.models
+    Base.metadata.create_all(bind=engine)
+
+----------------------------------------
+
+TITLE: Initializing a Flask Application in Python
+DESCRIPTION: This snippet demonstrates how to create a basic Flask application, including configuration setup and defining a simple route. It shows the essential steps in the application setup phase.
+
+LANGUAGE: python
+CODE:
+from flask import Flask
+
+app = Flask(__name__)
+app.config.from_mapping(
+    SECRET_KEY="dev",
+)
+app.config.from_prefixed_env()
+
+@app.route("/")
+def index():
+    return "Hello, World!"
+
+----------------------------------------
+
+TITLE: Implementing Asynchronous Route Handler in Flask
+DESCRIPTION: Demonstrates how to create an asynchronous route handler in Flask using async def and await. The example shows an async function querying a database and returning JSON data.
+
+LANGUAGE: python
+CODE:
+@app.route("/get-data")
+async def get_data():
+    data = await async_db_query(...)
+    return jsonify(data)
+
+----------------------------------------
+
+TITLE: Implementing File Upload and Validation in Flask
+DESCRIPTION: Defines functions to check file extensions and handle file uploads. Includes a route for file upload with validation and secure saving of files.
+
+LANGUAGE: python
+CODE:
+def allowed_file(filename):
+    return '.' in filename and \
+           filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
+
+@app.route('/', methods=['GET', 'POST'])
+def upload_file():
+    if request.method == 'POST':
+        # check if the post request has the file part
+        if 'file' not in request.files:
+            flash('No file part')
+            return redirect(request.url)
+        file = request.files['file']
+        # If the user does not select a file, the browser submits an
+        # empty file without a filename.
+        if file.filename == '':
+            flash('No selected file')
+            return redirect(request.url)
+        if file and allowed_file(file.filename):
+            filename = secure_filename(file.filename)
+            file.save(os.path.join(app.config['UPLOAD_FOLDER'], filename))
+            return redirect(url_for('download_file', name=filename))
+    return '''
+    <!doctype html>
+    <title>Upload new File</title>
+    <h1>Upload new File</h1>
+    <form method=post enctype=multipart/form-data>
+      <input type=file name=file>
+      <input type=submit value=Upload>
+    </form>
+    '''
+
+----------------------------------------
+
+TITLE: Basic Flask Configuration Example
+DESCRIPTION: Demonstrates basic configuration of a Flask application using dictionary-style access and the update method.
+
+LANGUAGE: python
+CODE:
+app = Flask(__name__)
+app.config['TESTING'] = True
+
+app.config.update(
+    TESTING=True,
+    SECRET_KEY='192b9bdd22ab9ed4d12e236c78afcb9a393ec15f71bbf5dc987d54727823bcbf'
+)
+
+----------------------------------------
+
+TITLE: Configuring Flask for SPA and API
+DESCRIPTION: This snippet shows how to set up a Flask application to serve a Single-Page Application and provide an API endpoint. It includes configuration for static file serving, a heartbeat endpoint for health checks, and a catch-all route for the SPA.
+
+LANGUAGE: Python
+CODE:
+from flask import Flask, jsonify
+
+app = Flask(__name__, static_folder='app', static_url_path="/app")
+
+
+@app.route("/heartbeat")
+def heartbeat():
+    return jsonify({"status": "healthy"})
+
+
+@app.route('/', defaults={'path': ''})
+@app.route('/<path:path>')
+def catch_all(path):
+    return app.send_static_file("index.html")
+
+----------------------------------------
+
+TITLE: Loading Flask Config from Python File
+DESCRIPTION: Shows how to load Flask configuration from a Python module and environment variable.
+
+LANGUAGE: python
+CODE:
+app = Flask(__name__)
+app.config.from_object('yourapplication.default_settings')
+app.config.from_envvar('YOURAPPLICATION_SETTINGS')
+
+----------------------------------------
+
+TITLE: Registering Flask Blueprint
+DESCRIPTION: Shows how to register a blueprint with a Flask application, including examples of basic registration and registration with URL prefix.
+
+LANGUAGE: python
+CODE:
+from flask import Flask
+from yourapplication.simple_page import simple_page
+
+app = Flask(__name__)
+app.register_blueprint(simple_page)
+
+----------------------------------------
+
+TITLE: Initializing SQLite Database for Flask Application
+DESCRIPTION: This snippet defines functions to initialize the database using the SQL schema and register a command-line command for database initialization. It also includes a converter registration for timestamp handling.
+
+LANGUAGE: python
+CODE:
+def init_db():
+    db = get_db()
+
+    with current_app.open_resource('schema.sql') as f:
+        db.executescript(f.read().decode('utf8'))
+
+
+@click.command('init-db')
+def init_db_command():
+    """Clear the existing data and create new tables."""
+    init_db()
+    click.echo('Initialized the database.')
+
+
+sqlite3.register_converter(
+    "timestamp", lambda v: datetime.fromisoformat(v.decode())
+)
+
+----------------------------------------
+
+TITLE: Creating Basic Flask Blueprint
+DESCRIPTION: Demonstrates how to create a simple Flask blueprint that renders static templates. The blueprint includes basic routing and template rendering with error handling.
+
+LANGUAGE: python
+CODE:
+from flask import Blueprint, render_template, abort
+from jinja2 import TemplateNotFound
+
+simple_page = Blueprint('simple_page', __name__,
+                        template_folder='templates')
+
+@simple_page.route('/', defaults={'page': 'index'})
+@simple_page.route('/<page>')
+def show(page):
+    try:
+        return render_template(f'pages/{page}.html')
+    except TemplateNotFound:
+        abort(404)
+
+----------------------------------------
+
+TITLE: Class-based Flask Configuration
+DESCRIPTION: Example of using Python classes to manage different configuration environments like production, development and testing.
+
+LANGUAGE: python
+CODE:
+class Config(object):
+    TESTING = False
+
+class ProductionConfig(Config):
+    DATABASE_URI = 'mysql://user@localhost/foo'
+
+class DevelopmentConfig(Config):
+    DATABASE_URI = "sqlite:////tmp/foo.db"
+
+class TestingConfig(Config):
+    DATABASE_URI = 'sqlite:///:memory:'
+    TESTING = True
+
+----------------------------------------
+
+TITLE: Rendering a WTForms Form in a Jinja2 Template
+DESCRIPTION: This HTML template demonstrates how to render a complete form using the previously defined macro. It iterates through the form fields and applies the render_field macro to each.
+
+LANGUAGE: HTML
+CODE:
+{% from "_formhelpers.html" import render_field %}
+<form method=post>
+  <dl>
+    {{ render_field(form.username) }}
+    {{ render_field(form.email) }}
+    {{ render_field(form.password) }}
+    {{ render_field(form.confirm) }}
+    {{ render_field(form.accept_tos) }}
+  </dl>
+  <p><input type=submit value=Register>
+</form>
+
+----------------------------------------
+
+TITLE: Setting Content Security Policy Header in Flask
+DESCRIPTION: Shows how to set a strict Content Security Policy (CSP) header in a Flask response to control resource loading.
+
+LANGUAGE: python
+CODE:
+response.headers['Content-Security-Policy'] = "default-src 'self'"
+
+----------------------------------------
+
+TITLE: Defining a Registration Form Class with WTForms in Python
+DESCRIPTION: This snippet demonstrates how to create a RegistrationForm class using WTForms. It includes various field types and validators for a typical user registration form.
+
+LANGUAGE: Python
+CODE:
+from wtforms import Form, BooleanField, StringField, PasswordField, validators
+
+class RegistrationForm(Form):
+    username = StringField('Username', [validators.Length(min=4, max=25)])
+    email = StringField('Email Address', [validators.Length(min=6, max=35)])
+    password = PasswordField('New Password', [
+        validators.DataRequired(),
+        validators.EqualTo('confirm', message='Passwords must match')
+    ])
+    confirm = PasswordField('Repeat Password')
+    accept_tos = BooleanField('I accept the TOS', [validators.DataRequired()])
+
+----------------------------------------
+
+TITLE: Defining MongoDB Document Models with MongoEngine
+DESCRIPTION: This snippet demonstrates how to define MongoDB document models using MongoEngine. It includes examples of basic field types and embedded documents.
+
+LANGUAGE: python
+CODE:
+import mongoengine as me
+
+class Movie(me.Document):
+    title = me.StringField(required=True)
+    year = me.IntField()
+    rated = me.StringField()
+    director = me.StringField()
+    actors = me.ListField()
+
+class Imdb(me.EmbeddedDocument):
+    imdb_id = me.StringField()
+    rating = me.DecimalField()
+    votes = me.IntField()
+
+class Movie(me.Document):
+    ...
+    imdb = me.EmbeddedDocumentField(Imdb)
+
+----------------------------------------
+
+TITLE: Configuring Flask Database Session Management
+DESCRIPTION: Sets up automatic database session cleanup at the end of each request using Flask's teardown_appcontext decorator.
+
+LANGUAGE: python
+CODE:
+from yourapplication.database import db_session
+
+@app.teardown_appcontext
+def shutdown_session(exception=None):
+    db_session.remove()
+
+----------------------------------------
+
+TITLE: REST API Implementation using MethodView
+DESCRIPTION: Complete REST API implementation using MethodView for handling different HTTP methods
+
+LANGUAGE: python
+CODE:
+from flask.views import MethodView
+
+class ItemAPI(MethodView):
+    init_every_request = False
+
+    def __init__(self, model):
+        self.model = model
+        self.validator = generate_validator(model)
+
+    def _get_item(self, id):
+        return self.model.query.get_or_404(id)
+
+    def get(self, id):
+        item = self._get_item(id)
+        return jsonify(item.to_json())
+
+    def patch(self, id):
+        item = self._get_item(id)
+        errors = self.validator.validate(item, request.json)
+
+        if errors:
+            return jsonify(errors), 400
+
+        item.update_from_json(request.json)
+        db.session.commit()
+        return jsonify(item.to_json())
+
+    def delete(self, id):
+        item = self._get_item(id)
+        db.session.delete(item)
+        db.session.commit()
+        return "", 204
+
+----------------------------------------
+
+TITLE: Handling JSON Responses in Flask Views
+DESCRIPTION: Shows how to return JSON responses from Flask views using direct dict returns and jsonify.
+
+LANGUAGE: python
+CODE:
+@app.route("/user/<int:id>")
+def user_detail(id):
+    user = User.query.get_or_404(id)
+    return {
+        "username": User.username,
+        "email": User.email,
+        "picture": url_for("static", filename=f"users/{id}/profile.png"),
+    }
+
+LANGUAGE: python
+CODE:
+from flask import jsonify
+
+@app.route("/users")
+def user_list():
+    users = User.query.order_by(User.name).all()
+    return jsonify([u.to_json() for u in users])
+
+----------------------------------------
+
+TITLE: Initializing and Managing SQLite3 Connection in Flask
+DESCRIPTION: This snippet demonstrates how to set up a SQLite3 database connection in Flask, including connection initialization and automatic closing when the context ends. It uses Flask's app context and the 'g' object for efficient connection management.
+
+LANGUAGE: Python
+CODE:
+import sqlite3
+from flask import g
+
+DATABASE = '/path/to/database.db'
+
+def get_db():
+    db = getattr(g, '_database', None)
+    if db is None:
+        db = g._database = sqlite3.connect(DATABASE)
+    return db
+
+@app.teardown_appcontext
+def close_connection(exception):
+    db = getattr(g, '_database', None)
+    if db is not None:
+        db.close()
+
+----------------------------------------
+
+TITLE: Blueprint Usage with Current App
+DESCRIPTION: Shows how to access the application configuration within a blueprint using Flask's current_app context proxy. This approach allows blueprints to access application configuration without direct coupling.
+
+LANGUAGE: python
+CODE:
+from flask import current_app, Blueprint, render_template
+admin = Blueprint('admin', __name__, url_prefix='/admin')
+
+@admin.route('/')
+def index():
+    return render_template(current_app.config['INDEX_TEMPLATE'])
+
+----------------------------------------
+
+TITLE: Applying Login Required Decorator to Flask Route
+DESCRIPTION: This example demonstrates how to apply the login_required decorator to a Flask route, ensuring that only authenticated users can access the secret_page view.
+
+LANGUAGE: python
+CODE:
+@app.route('/secret_page')
+@login_required
+def secret_page():
+    pass
+
+----------------------------------------
+
+TITLE: Implementing Login Required Decorator in Python for Flask
+DESCRIPTION: This code snippet defines a login_required decorator that checks if a user is logged in before allowing access to a view. It redirects to the login page if the user is not authenticated.
+
+LANGUAGE: python
+CODE:
+from functools import wraps
+from flask import g, request, redirect, url_for
+
+def login_required(f):
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        if g.user is None:
+            return redirect(url_for('login', next=request.url))
+        return f(*args, **kwargs)
+    return decorated_function
+
+----------------------------------------
+
+TITLE: Initializing Blog Blueprint in Flask
+DESCRIPTION: Sets up the basic blog blueprint with necessary imports and blueprint registration in the Flask application factory.
+
+LANGUAGE: python
+CODE:
+from flask import (
+    Blueprint, flash, g, redirect, render_template, request, url_for
+)
+from werkzeug.exceptions import abort
+
+from flaskr.auth import login_required
+from flaskr.db import get_db
+
+bp = Blueprint('blog', __name__)
+
+LANGUAGE: python
+CODE:
+def create_app():
+    app = ...
+    # existing code omitted
+
+    from . import blog
+    app.register_blueprint(blog.bp)
+    app.add_url_rule('/', endpoint='index')
+
+    return app
+
+----------------------------------------
+
+TITLE: Creating and Registering a Flask Blueprint for Authentication
+DESCRIPTION: This snippet demonstrates how to create a Blueprint for authentication and register it with the Flask application. It sets up the basic structure for organizing authentication-related views.
+
+LANGUAGE: python
+CODE:
+import functools
+
+from flask import (
+    Blueprint, flash, g, redirect, render_template, request, session, url_for
+)
+from werkzeug.security import check_password_hash, generate_password_hash
+
+from flaskr.db import get_db
+
+bp = Blueprint('auth', __name__, url_prefix='/auth')
+
+LANGUAGE: python
+CODE:
+def create_app():
+    app = ...
+    # existing code omitted
+
+    from . import auth
+    app.register_blueprint(auth.bp)
+
+    return app
+
+----------------------------------------
+
+TITLE: Handling Form Submission and Validation in Flask View
+DESCRIPTION: This code snippet shows how to handle form submission and validation in a Flask view function. It creates a form instance, validates the data, and processes it if valid.
+
+LANGUAGE: Python
+CODE:
+@app.route('/register', methods=['GET', 'POST'])
+def register():
+    form = RegistrationForm(request.form)
+    if request.method == 'POST' and form.validate():
+        user = User(form.username.data, form.email.data,
+                    form.password.data)
+        db_session.add(user)
+        flash('Thanks for registering')
+        return redirect(url_for('login'))
+    return render_template('register.html', form=form)
+
+----------------------------------------
+
+TITLE: Initializing Flask Application Package
+DESCRIPTION: Main __init__.py file that creates the Flask application instance and imports views. This is the core of the Flask package structure.
+
+LANGUAGE: python
+CODE:
+from flask import Flask
+app = Flask(__name__)
+
+import yourapplication.views
+
+----------------------------------------
+
+TITLE: Creating a Convenient Query Function for SQLite3 in Flask
+DESCRIPTION: This function simplifies database querying by combining cursor creation, query execution, and result fetching. It supports both multiple and single result queries, and includes proper cursor closure.
+
+LANGUAGE: Python
+CODE:
+def query_db(query, args=(), one=False):
+    cur = get_db().execute(query, args)
+    rv = cur.fetchall()
+    cur.close()
+    return (rv[0] if rv else None) if one else rv
+
+----------------------------------------
+
+TITLE: Connecting to SQLite Database in Flask
+DESCRIPTION: This snippet defines functions to connect to a SQLite database and close the connection. It uses Flask's g object for request-scoped data storage and current_app for accessing the application context.
+
+LANGUAGE: python
+CODE:
+import sqlite3
+from datetime import datetime
+
+import click
+from flask import current_app, g
+
+
+def get_db():
+    if 'db' not in g:
+        g.db = sqlite3.connect(
+            current_app.config['DATABASE'],
+            detect_types=sqlite3.PARSE_DECLTYPES
+        )
+        g.db.row_factory = sqlite3.Row
+
+    return g.db
+
+
+def close_db(e=None):
+    db = g.pop('db', None)
+
+    if db is not None:
+        db.close()
+
+----------------------------------------
+
+TITLE: Configuring Basic Logging in Flask
+DESCRIPTION: This code snippet shows how to configure basic logging for a Flask application using dictConfig. It sets up a formatter, a stream handler, and configures the root logger with an INFO level.
+
+LANGUAGE: python
+CODE:
+from logging.config import dictConfig
+
+dictConfig({
+    'version': 1,
+    'formatters': {'default': {
+        'format': '[%(asctime)s] %(levelname)s in %(module)s: %(message)s',
+    }},
+    'handlers': {'wsgi': {
+        'class': 'logging.StreamHandler',
+        'stream': 'ext://flask.logging.wsgi_errors_stream',
+        'formatter': 'default'
+    }},
+    'root': {
+        'level': 'INFO',
+        'handlers': ['wsgi']
+    }
+})
+
+app = Flask(__name__)
+
+----------------------------------------
+
+TITLE: Basic Flask Message Flashing Implementation in Python
+DESCRIPTION: Demonstrates a basic Flask application setup with message flashing functionality, including user login and flash message display. Uses Flask's flash() function to show success/error messages.
+
+LANGUAGE: python
+CODE:
+from flask import Flask, flash, redirect, render_template, \
+     request, url_for
+
+app = Flask(__name__)
+app.secret_key = b'_5#y2L"F4Q8z\n\xec]/'
+
+@app.route('/')
+def index():
+    return render_template('index.html')
+
+@app.route('/login', methods=['GET', 'POST'])
+def login():
+    error = None
+    if request.method == 'POST':
+        if request.form['username'] != 'admin' or \
+                request.form['password'] != 'secret':
+            error = 'Invalid credentials'
+        else:
+            flash('You were successfully logged in')
+            return redirect(url_for('index'))
+    return render_template('login.html', error=error)
+
+----------------------------------------
+
+TITLE: Generating Large CSV with Flask Route
+DESCRIPTION: This snippet demonstrates how to create a Flask route that generates a large CSV file on the fly using a generator function.
+
+LANGUAGE: python
+CODE:
+@app.route('/large.csv')
+def generate_large_csv():
+    def generate():
+        for row in iter_all_rows():
+            yield f"{','.join(row)}\n"
+    return generate(), {"Content-Type": "text/csv"}
+
+----------------------------------------
+
+TITLE: Implementing a Generic Exception Handler for HTTP Errors
+DESCRIPTION: Shows how to create a generic exception handler for HTTPException to return JSON instead of HTML for HTTP errors.
+
+LANGUAGE: python
+CODE:
+from flask import json
+from werkzeug.exceptions import HTTPException
+
+@app.errorhandler(HTTPException)
+def handle_exception(e):
+    """Return JSON instead of HTML for HTTP errors."""
+    # start with the correct headers and status code from the error
+    response = e.get_response()
+    # replace the body with JSON
+    response.data = json.dumps({
+        "code": e.code,
+        "name": e.name,
+        "description": e.description,
+    })
+    response.content_type = "application/json"
+    return response
+
+----------------------------------------
+
+TITLE: Logging User Login Attempts in Flask
+DESCRIPTION: This snippet demonstrates how to log successful and failed login attempts using Flask's app.logger. It includes user authentication and redirects based on the login result.
+
+LANGUAGE: python
+CODE:
+@app.route('/login', methods=['POST'])
+def login():
+    user = get_user(request.form['username'])
+
+    if user.check_password(request.form['password']):
+        login_user(user)
+        app.logger.info('%s logged in successfully', user.username)
+        return redirect(url_for('index'))
+    else:
+        app.logger.info('%s failed to log in', user.username)
+        abort(401)
+
+----------------------------------------
+
+TITLE: Creating Base Layout Template in Flask with Jinja
+DESCRIPTION: This snippet demonstrates how to create a base layout template using Jinja in Flask. It includes placeholders for title, header, and content, as well as conditional rendering for user authentication status.
+
+LANGUAGE: html+jinja
+CODE:
+<!doctype html>
+<title>{% block title %}{% endblock %} - Flaskr</title>
+<link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+<nav>
+  <h1>Flaskr</h1>
+  <ul>
+    {% if g.user %}
+      <li><span>{{ g.user['username'] }}</span>
+      <li><a href="{{ url_for('auth.logout') }}">Log Out</a>
+    {% else %}
+      <li><a href="{{ url_for('auth.register') }}">Register</a>
+      <li><a href="{{ url_for('auth.login') }}">Log In</a>
+    {% endif %}
+  </ul>
+</nav>
+<section class="content">
+  <header>
+    {% block header %}{% endblock %}
+  </header>
+  {% for message in get_flashed_messages() %}
+    <div class="flash">{{ message }}</div>
+  {% endfor %}
+  {% block content %}{% endblock %}
+</section>
+
+----------------------------------------
+
+TITLE: Storing Data in Flask g Object
+DESCRIPTION: Demonstrates how to safely store extension-specific data in Flask's g object during a request. It shows two approaches: using a prefixed attribute name and using a namespace object.
+
+LANGUAGE: python
+CODE:
+# an internal prefix with the extension name
+g._hello_user_id = 2
+
+# or an internal prefix as a namespace
+from types import SimpleNamespace
+g._hello = SimpleNamespace()
+g._hello.user_id = 2
+
+----------------------------------------
+
+TITLE: Nginx Reverse Proxy Configuration
+DESCRIPTION: Basic Nginx server configuration that sets up a reverse proxy to forward requests to a WSGI server running locally on port 8000. Includes necessary proxy headers for proper request forwarding.
+
+LANGUAGE: nginx
+CODE:
+server {
+    listen 80;
+    server_name _;
+
+    location / {
+        proxy_pass http://127.0.0.1:8000/;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_set_header X-Forwarded-Host $host;
+        proxy_set_header X-Forwarded-Prefix /;
+    }
+}
+
+----------------------------------------
+
+TITLE: Configuring Flask Test Fixtures with Pytest
+DESCRIPTION: Setup of basic pytest fixtures for Flask application testing, including app configuration, test client, and CLI runner setup.
+
+LANGUAGE: python
+CODE:
+import pytest
+from my_project import create_app
+
+@pytest.fixture()
+def app():
+    app = create_app()
+    app.config.update({
+        "TESTING": True,
+    })
+
+    # other setup can go here
+
+    yield app
+
+    # clean up / reset resources here
+
+
+@pytest.fixture()
+def client(app):
+    return app.test_client()
+
+
+@pytest.fixture()
+def runner(app):
+    return app.test_cli_runner()
+
+----------------------------------------
+
+TITLE: Creating Custom Signals in Flask with Blinker
+DESCRIPTION: Shows how to create custom named signals using Blinker's Namespace class for Flask applications.
+
+LANGUAGE: python
+CODE:
+from blinker import Namespace
+my_signals = Namespace()
+
+model_saved = my_signals.signal('model-saved')
+
+----------------------------------------
+
+TITLE: Configuring ProxyFix Middleware in Flask
+DESCRIPTION: Demonstrates how to implement Werkzeug's ProxyFix middleware to handle X-Forwarded headers in a Flask application behind a proxy. The configuration specifies trust for one proxy level for forwarded protocol, host, prefix, and client IP address headers.
+
+LANGUAGE: python
+CODE:
+from werkzeug.middleware.proxy_fix import ProxyFix
+
+app.wsgi_app = ProxyFix(
+    app.wsgi_app, x_for=1, x_proto=1, x_host=1, x_prefix=1
+)
+
+----------------------------------------
+
+TITLE: Configuring SQLite3 Row Factory for Dict-like Results
+DESCRIPTION: This snippet demonstrates how to configure the SQLite3 connection to return dictionary-like results instead of tuples. It provides two methods: a custom row factory function and using the built-in sqlite3.Row.
+
+LANGUAGE: Python
+CODE:
+def make_dicts(cursor, row):
+    return dict((cursor.description[idx][0], value)
+                for idx, value in enumerate(row))
+
+db.row_factory = make_dicts
+
+# Alternatively:
+db.row_factory = sqlite3.Row
+
+----------------------------------------
+
+TITLE: Initializing Flask App with File Upload Configuration
+DESCRIPTION: Sets up a Flask application with necessary imports and configurations for file uploads. Defines allowed file extensions and upload folder path.
+
+LANGUAGE: python
+CODE:
+import os
+from flask import Flask, flash, request, redirect, url_for
+from werkzeug.utils import secure_filename
+
+UPLOAD_FOLDER = '/path/to/the/uploads'
+ALLOWED_EXTENSIONS = {'txt', 'pdf', 'png', 'jpg', 'jpeg', 'gif'}
+
+app = Flask(__name__)
+app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
+
+----------------------------------------
+
+TITLE: Creating Custom Error Pages in Flask
+DESCRIPTION: Demonstrates how to create and register custom error pages for specific HTTP error codes.
+
+LANGUAGE: python
+CODE:
+from flask import render_template
+
+@app.errorhandler(404)
+def page_not_found(e):
+    # note that we set the 404 status explicitly
+    return render_template('404.html'), 404
+
+----------------------------------------
+
+TITLE: Preventing XSS in Jinja2 Templates
+DESCRIPTION: Demonstrates how to properly quote attributes in Jinja2 templates to prevent XSS attacks through attribute injection.
+
+LANGUAGE: html
+CODE:
+<input value="{{ value }}">
+
+----------------------------------------
+
+TITLE: Converting Flask Decorator-based Routing to Centralized URL Map
+DESCRIPTION: Demonstrates how to convert a Flask application from using decorators for routing to using a centralized URL map with add_url_rule(). This approach can improve application load time by separating routing configuration from view definitions.
+
+LANGUAGE: python
+CODE:
+from flask import Flask
+app = Flask(__name__)
+
+@app.route('/')
+def index():
+    pass
+
+@app.route('/user/<username>')
+def user(username):
+    pass
+
+LANGUAGE: python
+CODE:
+def index():
+    pass
+
+def user(username):
+    pass
+
+LANGUAGE: python
+CODE:
+from flask import Flask
+from yourapplication import views
+app = Flask(__name__)
+app.add_url_rule('/', view_func=views.index)
+app.add_url_rule('/user/<username>', view_func=views.user)
+
+----------------------------------------
+
+TITLE: Querying SQLite3 Database in Flask Application
+DESCRIPTION: These examples demonstrate how to use the 'query_db' function to perform database queries. It shows both multiple result queries and single result queries with parameter binding for SQL injection prevention.
+
+LANGUAGE: Python
+CODE:
+for user in query_db('select * from users'):
+    print(user['username'], 'has the id', user['user_id'])
+
+user = query_db('select * from users where username = ?',
+                [the_username], one=True)
+if user is None:
+    print('No such user')
+else:
+    print(the_username, 'has the id', user['user_id'])
+
+----------------------------------------
+
+TITLE: Defining SQLAlchemy Model with Declarative Mapping
+DESCRIPTION: Creates a User model class using SQLAlchemy's declarative mapping approach with column definitions and basic methods.
+
+LANGUAGE: python
+CODE:
+from sqlalchemy import Column, Integer, String
+from yourapplication.database import Base
+
+class User(Base):
+    __tablename__ = 'users'
+    id = Column(Integer, primary_key=True)
+    name = Column(String(50), unique=True)
+    email = Column(String(120), unique=True)
+
+    def __init__(self, name=None, email=None):
+        self.name = name
+        self.email = email
+
+    def __repr__(self):
+        return f'<User {self.name!r}>'
+
+----------------------------------------
+
+TITLE: Serving Uploaded Files in Flask
+DESCRIPTION: Implements a route to serve uploaded files for download. Uses send_from_directory to securely serve files from the upload folder.
+
+LANGUAGE: python
+CODE:
+from flask import send_from_directory
+
+@app.route('/uploads/<name>')
+def download_file(name):
+    return send_from_directory(app.config["UPLOAD_FOLDER"], name)
+
+----------------------------------------
+
+TITLE: Initializing SQLite3 Database Schema in Flask
+DESCRIPTION: This function demonstrates how to initialize a SQLite3 database schema in a Flask application. It reads a SQL script from a file and executes it within the application context to set up the initial database structure.
+
+LANGUAGE: Python
+CODE:
+def init_db():
+    with app.app_context():
+        db = get_db()
+        with app.open_resource('schema.sql', mode='r') as f:
+            db.cursor().executescript(f.read())
+        db.commit()
+
+----------------------------------------
+
+TITLE: Disabling Autoescape in Jinja2 Template
+DESCRIPTION: Shows how to temporarily disable the autoescape system in a Jinja2 template using the autoescape block.
+
+LANGUAGE: jinja
+CODE:
+{% autoescape false %}
+    <p>autoescaping is disabled here
+    <p>{{ will_not_be_escaped }}
+{% endautoescape %}
+
+----------------------------------------
+
+TITLE: Running Flask Application in Debug Mode
+DESCRIPTION: This command demonstrates how to run a Flask application in debug mode using the Flask command-line interface. It specifies the application package and enables debug mode for interactive debugging and auto-reloading.
+
+LANGUAGE: text
+CODE:
+$ flask --app flaskr run --debug
+
+----------------------------------------
+
+TITLE: Configuring Logging for Multiple Libraries in Flask
+DESCRIPTION: This snippet shows how to configure logging for multiple libraries in a Flask application. It demonstrates adding handlers to the root logger and configuring loggers for specific packages individually.
+
+LANGUAGE: python
+CODE:
+from flask.logging import default_handler
+
+root = logging.getLogger()
+root.addHandler(default_handler)
+root.addHandler(mail_handler)
+
+for logger in (
+    logging.getLogger(app.name),
+    logging.getLogger('sqlalchemy'),
+    logging.getLogger('other_package'),
+):
+    logger.addHandler(default_handler)
+    logger.addHandler(mail_handler)
+
+----------------------------------------
+
+TITLE: Implementing User Logout and Authentication Check in Flask
+DESCRIPTION: This snippet includes functions for user logout, loading the logged-in user for each request, and a decorator to require authentication for specific views.
+
+LANGUAGE: python
+CODE:
+@bp.before_app_request
+def load_logged_in_user():
+    user_id = session.get('user_id')
+
+    if user_id is None:
+        g.user = None
+    else:
+        g.user = get_db().execute(
+            'SELECT * FROM user WHERE id = ?', (user_id,)
+        ).fetchone()
+
+LANGUAGE: python
+CODE:
+@bp.route('/logout')
+def logout():
+    session.clear()
+    return redirect(url_for('index'))
+
+LANGUAGE: python
+CODE:
+def login_required(view):
+    @functools.wraps(view)
+    def wrapped_view(**kwargs):
+        if g.user is None:
+            return redirect(url_for('auth.login'))
+
+        return view(**kwargs)
+
+    return wrapped_view
+
+----------------------------------------
+
+TITLE: Rendering Data to JavaScript in Flask Templates
+DESCRIPTION: Demonstrates how to pass server-side data to JavaScript using the tojson filter in Flask templates.
+
+LANGUAGE: python
+CODE:
+data = generate_report()
+return render_template("report.html", chart_data=data)
+
+LANGUAGE: jinja
+CODE:
+<script>
+    const chart_data = {{ chart_data|tojson }}
+    chartLib.makeChart(chart_data)
+</script>
+
+----------------------------------------
+
+TITLE: Creating Custom Flask CLI Command
+DESCRIPTION: Demonstrates how to create a custom Flask CLI command 'create-user' that takes a 'name' argument.
+
+LANGUAGE: python
+CODE:
+import click
+from flask import Flask
+
+app = Flask(__name__)
+
+@app.cli.command("create-user")
+@click.argument("name")
+def create_user(name):
+    ...
+
+----------------------------------------
+
+TITLE: Creating Grouped Custom Flask CLI Commands
+DESCRIPTION: Shows how to create grouped custom Flask CLI commands using AppGroup, organizing related commands under a common group.
+
+LANGUAGE: python
+CODE:
+import click
+from flask import Flask
+from flask.cli import AppGroup
+
+app = Flask(__name__)
+user_cli = AppGroup('user')
+
+@user_cli.command('create')
+@click.argument('name')
+def create_user(name):
+    ...
+
+app.cli.add_command(user_cli)
+
+----------------------------------------
+
+TITLE: Configuring Email Notifications for Errors in Flask
+DESCRIPTION: This snippet demonstrates how to set up email notifications for error logs in a Flask application. It configures an SMTPHandler to send emails when errors occur, particularly useful for production environments.
+
+LANGUAGE: python
+CODE:
+import logging
+from logging.handlers import SMTPHandler
+
+mail_handler = SMTPHandler(
+    mailhost='127.0.0.1',
+    fromaddr='server-error@example.com',
+    toaddrs=['admin@example.com'],
+    subject='Application Error'
+)
+mail_handler.setLevel(logging.ERROR)
+mail_handler.setFormatter(logging.Formatter(
+    '[%(asctime)s] %(levelname)s in %(module)s: %(message)s'
+))
+
+if not app.debug:
+    app.logger.addHandler(mail_handler)
+
+----------------------------------------
+
+TITLE: Creating a Virtual Environment for Flask in macOS/Linux
+DESCRIPTION: Commands to create a project folder and set up a Python virtual environment for Flask development on macOS or Linux systems.
+
+LANGUAGE: shell
+CODE:
+$ mkdir myproject
+$ cd myproject
+$ python3 -m venv .venv
+
+----------------------------------------
+
+TITLE: Making Test Requests with Flask Test Client
+DESCRIPTION: Example of making HTTP requests using Flask's test client and asserting response content.
+
+LANGUAGE: python
+CODE:
+def test_request_example(client):
+    response = client.get("/posts")
+    assert b"<h2>Hello, World!</h2>" in response.data
+
+----------------------------------------
+
+TITLE: Handling Form Data in Flask Tests
+DESCRIPTION: Demonstrates how to submit form data including file uploads in Flask tests using the test client.
+
+LANGUAGE: python
+CODE:
+from pathlib import Path
+
+# get the resources folder in the tests folder
+resources = Path(__file__).parent / "resources"
+
+def test_edit_user(client):
+    response = client.post("/user/2/edit", data={
+        "name": "Flask",
+        "theme": "dark",
+        "picture": (resources / "picture.png").open("rb"),
+    })
+    assert response.status_code == 200
+
+----------------------------------------
+
+TITLE: Creating a Virtual Environment for Flask in Windows
+DESCRIPTION: Commands to create a project folder and set up a Python virtual environment for Flask development on Windows systems.
+
+LANGUAGE: shell
+CODE:
+> mkdir myproject
+> cd myproject
+> py -3 -m venv .venv
+
+----------------------------------------
+
+TITLE: Category-Based Flash Message Template
+DESCRIPTION: Enhanced template showing how to handle flash messages with categories, allowing for different styling based on message type.
+
+LANGUAGE: html+jinja
+CODE:
+{% with messages = get_flashed_messages(with_categories=true) %}
+  {% if messages %}
+    <ul class=flashes>
+    {% for category, message in messages %}
+      <li class="{{ category }}">{{ message }}</li>
+    {% endfor %}
+    </ul>
+  {% endif %}
+{% endwith %}
+
+----------------------------------------
+
+TITLE: Running Flask Application with Gevent WSGI Server
+DESCRIPTION: Python script to run a Flask application using gevent's WSGIServer. This script imports the necessary components, creates the app, and starts the server on localhost port 8000.
+
+LANGUAGE: python
+CODE:
+from gevent.pywsgi import WSGIServer
+from hello import create_app
+
+app = create_app()
+http_server = WSGIServer(("127.0.0.1", 8000), app)
+http_server.serve_forever()
+
+----------------------------------------
+
+TITLE: Installing Flask using pip
+DESCRIPTION: Command to install Flask within the activated virtual environment using pip package manager.
+
+LANGUAGE: shell
+CODE:
+$ pip install Flask
+
+----------------------------------------
+
+TITLE: Filtered Flash Messages Template
+DESCRIPTION: Template demonstrating how to filter flash messages by category, useful for displaying different types of messages in separate blocks.
+
+LANGUAGE: html+jinja
+CODE:
+{% with errors = get_flashed_messages(category_filter=["error"]) %}
+{% if errors %}
+<div class="alert-message block-message error">
+  <a class="close" href="#">×</a>
+  <ul>
+    {%- for msg in errors %}
+    <li>{{ msg }}</li>
+    {% endfor -%}
+  </ul>
+</div>
+{% endif %}
+{% endwith %}
+
+----------------------------------------
+
+TITLE: Installing uWSGI with Flask in a Virtual Environment
+DESCRIPTION: Commands to create a virtual environment, install a Flask application, and install uWSGI or pyuwsgi for serving the application.
+
+LANGUAGE: text
+CODE:
+$ cd hello-app
+$ python -m venv .venv
+$ . .venv/bin/activate
+$ pip install .  # install your application
+$ pip install pyuwsgi
+
+----------------------------------------
+
+TITLE: Activating Virtual Environment in Windows
+DESCRIPTION: Command to activate the Python virtual environment for Flask development on Windows systems.
+
+LANGUAGE: shell
+CODE:
+> .venv\Scripts\activate
+
+----------------------------------------
+
+TITLE: Creating a Jinja2 Macro for Rendering Form Fields
+DESCRIPTION: This HTML snippet defines a Jinja2 macro for rendering form fields. It includes the field label, input, and any error messages associated with the field.
+
+LANGUAGE: HTML
+CODE:
+{% macro render_field(field) %}
+  <dt>{{ field.label }}
+  <dd>{{ field(**kwargs)|safe }}
+  {% if field.errors %}
+    <ul class=errors>
+    {% for error in field.errors %}
+      <li>{{ error }}</li>
+    {% endfor %}
+    </ul>
+  {% endif %}
+  </dd>
+{% endmacro %}
+
+----------------------------------------
+
+TITLE: Creating and Saving MongoDB Documents with MongoEngine
+DESCRIPTION: This snippet shows how to create and save MongoDB documents using MongoEngine. It demonstrates instantiating document classes, assigning values, and saving to the database.
+
+LANGUAGE: python
+CODE:
+bttf = Movie(title="Back To The Future", year=1985)
+bttf.actors = [
+    "Michael J. Fox",
+    "Christopher Lloyd"
+]
+bttf.imdb = Imdb(imdb_id="tt0088763", rating=8.5)
+bttf.save()
+
+----------------------------------------
+
+TITLE: Flask Project Directory Tree Structure
+DESCRIPTION: Complete directory structure showing the organization of a Flask project including application code, templates, static files, and tests.
+
+LANGUAGE: none
+CODE:
+/home/user/Projects/flask-tutorial
+├── flaskr/
+│   ├── __init__.py
+│   ├── db.py
+│   ├── schema.sql
+│   ├── auth.py
+│   ├── blog.py
+│   ├── templates/
+│   │   ├── base.html
+│   │   ├── auth/
+│   │   │   ├── login.html
+│   │   │   └── register.html
+│   │   └── blog/
+│   │       ├── create.html
+│   │       ├── index.html
+│   │       └── update.html
+│   └── static/
+│       └── style.css
+├── tests/
+│   ├── conftest.py
+│   ├── data.sql
+│   ├── test_factory.py
+│   ├── test_db.py
+│   ├── test_auth.py
+│   └── test_blog.py
+├── .venv/
+├── pyproject.toml
+└── MANIFEST.in
+
+----------------------------------------
+
+TITLE: Processing JSON Requests in Flask Views
+DESCRIPTION: Demonstrates how to handle incoming JSON data in Flask views using request.json.
+
+LANGUAGE: python
+CODE:
+from flask import request
+
+@app.post("/user/<int:id>")
+def user_update(id):
+    user = User.query.get_or_404(id)
+    user.update_from_json(request.json)
+    db.session.commit()
+    return user.to_json()
+
+----------------------------------------
+
+TITLE: Creating SQLite Database Tables for Flask Application
+DESCRIPTION: This SQL script defines the schema for user and post tables in the SQLite database. It includes commands to drop existing tables and create new ones with specified columns and constraints.
+
+LANGUAGE: sql
+CODE:
+DROP TABLE IF EXISTS user;
+DROP TABLE IF EXISTS post;
+
+CREATE TABLE user (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  username TEXT UNIQUE NOT NULL,
+  password TEXT NOT NULL
+);
+
+CREATE TABLE post (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  author_id INTEGER NOT NULL,
+  created TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  title TEXT NOT NULL,
+  body TEXT NOT NULL,
+  FOREIGN KEY (author_id) REFERENCES user (id)
+);
+
+----------------------------------------
+
+TITLE: Flask Project .gitignore Configuration
+DESCRIPTION: Git configuration file specifying which files and directories should be ignored in version control.
+
+LANGUAGE: none
+CODE:
+.venv/
+
+*.pyc
+__pycache__/
+
+instance/
+
+.pytest_cache/
+.coverage
+htmlcov/
+
+dist/
+build/
+*.egg-info/
+
+----------------------------------------
+
+TITLE: Demonstrating Runtime Error Outside Request Context
+DESCRIPTION: Shows the error message that occurs when trying to access request context outside of a valid request.
+
+LANGUAGE: pytb
+CODE:
+RuntimeError: Working outside of request context.\n\nThis typically means that you attempted to use functionality that\nneeded an active HTTP request. Consult the documentation on testing\nfor information about how to avoid this problem.
+
+----------------------------------------
+
+TITLE: Running Flask Application with Waitress
+DESCRIPTION: Examples of running a Flask application using waitress-serve, showing both direct application loading and factory pattern usage.
+
+LANGUAGE: text
+CODE:
+# equivalent to 'from hello import app'
+$ waitress-serve --host 127.0.0.1 hello:app
+
+# equivalent to 'from hello import create_app; create_app()'
+$ waitress-serve --host 127.0.0.1 --call hello:create_app
+
+Serving on http://127.0.0.1:8080
+
+----------------------------------------
+
+TITLE: Configuring Project Metadata in TOML
+DESCRIPTION: This snippet shows how to configure the pyproject.toml file to describe the project's metadata, dependencies, and build system requirements for a Flask application.
+
+LANGUAGE: toml
+CODE:
+[project]
+name = "flaskr"
+version = "1.0.0"
+description = "The basic blog app built in the Flask tutorial."
+dependencies = [
+    "flask",
+]
+
+[build-system]
+requires = ["flit_core<4"]
+build-backend = "flit_core.buildapi"
+
+----------------------------------------
+
+TITLE: Running Flask Development Server in Python Code
+DESCRIPTION: Demonstrates how to start the Flask development server directly in Python code using the app.run() method. This method allows for debug mode and should be placed in a main block to avoid conflicts with production servers.
+
+LANGUAGE: python
+CODE:
+if __name__ == "__main__":
+    app.run(debug=True)
+
+----------------------------------------
+
+TITLE: Initializing Sentry in a Flask Application
+DESCRIPTION: Code snippet showing how to initialize Sentry in a Flask application for error tracking and reporting.
+
+LANGUAGE: python
+CODE:
+import sentry_sdk
+from sentry_sdk.integrations.flask import FlaskIntegration
+
+sentry_sdk.init('YOUR_DSN_HERE', integrations=[FlaskIntegration()])
+
+----------------------------------------
+
+TITLE: Listing Installed Packages in Flask Environment
+DESCRIPTION: This shell command shows how to list all installed packages in the virtual environment after installing the Flask project, demonstrating that the project is now recognized as an installed package.
+
+LANGUAGE: shell
+CODE:
+$ pip list
+
+Package        Version   Location
+-------------- --------- ----------------------------------
+click          6.7
+Flask          1.0
+flaskr         1.0.0     /home/user/Projects/flask-tutorial
+itsdangerous   0.24
+Jinja2         2.10
+MarkupSafe     1.0
+pip            9.0.3
+Werkzeug       0.14.1
+
+----------------------------------------
+
+TITLE: Running Gunicorn with Flask Application
+DESCRIPTION: Demonstrates launching Gunicorn with a Flask application using both direct app import and factory pattern. Shows worker configuration and server startup output.
+
+LANGUAGE: text
+CODE:
+# equivalent to 'from hello import app'
+$ gunicorn -w 4 'hello:app'
+
+# equivalent to 'from hello import create_app; create_app()'
+$ gunicorn -w 4 'hello:create_app()'
+
+Starting gunicorn 20.1.0
+Listening at: http://127.0.0.1:8000 (x)
+Using worker: sync
+Booting worker with pid: x
+Booting worker with pid: x
+Booting worker with pid: x
+Booting worker with pid: x
+
+----------------------------------------
+
+TITLE: Testing Flask Blog Views
+DESCRIPTION: Python tests for Flask blog views, including index, create, update, and delete functionality.
+
+LANGUAGE: python
+CODE:
+import pytest
+from flaskr.db import get_db
+
+
+def test_index(client, auth):
+    response = client.get('/')
+    assert b"Log In" in response.data
+    assert b"Register" in response.data
+
+    auth.login()
+    response = client.get('/')
+    assert b'Log Out' in response.data
+    assert b'test title' in response.data
+    assert b'by test on 2018-01-01' in response.data
+    assert b'test\nbody' in response.data
+    assert b'href="/1/update"' in response.data
+
+@pytest.mark.parametrize('path', (
+    '/create',
+    '/1/update',
+    '/1/delete',
+))
+def test_login_required(client, path):
+    response = client.post(path)
+    assert response.headers["Location"] == "/auth/login"
+
+
+def test_author_required(app, client, auth):
+    # change the post author to another user
+    with app.app_context():
+        db = get_db()
+        db.execute('UPDATE post SET author_id = 2 WHERE id = 1')
+        db.commit()
+
+    auth.login()
+    # current user can't modify other user's post
+    assert client.post('/1/update').status_code == 403
+    assert client.post('/1/delete').status_code == 403
+    # current user doesn't see edit link
+    assert b'href="/1/update"' not in client.get('/').data
+
+
+@pytest.mark.parametrize('path', (
+    '/2/update',
+    '/2/delete',
+))
+def test_exists_required(client, auth, path):
+    auth.login()
+    assert client.post(path).status_code == 404
+
+def test_create(client, auth, app):
+    auth.login()
+    assert client.get('/create').status_code == 200
+    client.post('/create', data={'title': 'created', 'body': ''})
+
+    with app.app_context():
+        db = get_db()
+        count = db.execute('SELECT COUNT(id) FROM post').fetchone()[0]
+        assert count == 2
+
+
+def test_update(client, auth, app):
+    auth.login()
+    assert client.get('/1/update').status_code == 200
+    client.post('/1/update', data={'title': 'updated', 'body': ''})
+
+    with app.app_context():
+        db = get_db()
+        post = db.execute('SELECT * FROM post WHERE id = 1').fetchone()
+        assert post['title'] == 'updated'
+
+
+@pytest.mark.parametrize('path', (
+    '/create',
+    '/1/update',
+))
+def test_create_update_validate(client, auth, path):
+    auth.login()
+    response = client.post(path, data={'title': '', 'body': ''})
+    assert b'Title is required.' in response.data
+
+def test_delete(client, auth, app):
+    auth.login()
+    response = client.post('/1/delete')
+    assert response.headers["Location"] == "/"
+
+    with app.app_context():
+        db = get_db()
+        post = db.execute('SELECT * FROM post WHERE id = 1').fetchone()
+        assert post is None
+
+----------------------------------------
+
+TITLE: Installing Gunicorn in Virtual Environment
+DESCRIPTION: Steps to create a virtual environment and install Gunicorn alongside a Flask application. This process installs both the application and the Gunicorn server.
+
+LANGUAGE: text
+CODE:
+$ cd hello-app
+$ python -m venv .venv
+$ . .venv/bin/activate
+$ pip install .  # install your application
+$ pip install gunicorn
+
+----------------------------------------
+
+TITLE: Managing Database Connection with Flask g Object
+DESCRIPTION: Example showing how to manage a database connection using Flask's g object and teardown_appcontext handler.
+
+LANGUAGE: python
+CODE:
+from flask import g\n\ndef get_db():\n    if 'db' not in g:\n        g.db = connect_to_database()\n\n    return g.db\n\n@app.teardown_appcontext\ndef teardown_db(exception):\n    db = g.pop('db', None)\n\n    if db is not None:\n        db.close()
+
+----------------------------------------
+
+TITLE: Signal Subscription Using Decorator Pattern
+DESCRIPTION: Shows how to subscribe to Flask signals using the connect_via decorator for cleaner code organization.
+
+LANGUAGE: python
+CODE:
+from flask import template_rendered
+
+@template_rendered.connect_via(app)
+def when_template_rendered(sender, template, context, **extra):
+    print(f'Template {template.name} is rendered with {context}')
+
+----------------------------------------
+
+TITLE: Running Gunicorn with Eventlet Worker
+DESCRIPTION: Configuration for running Gunicorn with eventlet async worker support. Requires greenlet>=1.0 for proper context local functionality.
+
+LANGUAGE: text
+CODE:
+$ gunicorn -k eventlet 'hello:create_app()'
+Starting gunicorn 20.1.0
+Listening at: http://127.0.0.1:8000 (x)
+Using worker: eventlet
+Booting worker with pid: x
+
+----------------------------------------
+
+TITLE: URL Route Registration with Parameters
+DESCRIPTION: Examples of defining Flask URL routes with variable parts and different converters.
+
+LANGUAGE: Python
+CODE:
+@app.route('/')
+def index():
+    pass
+
+@app.route('/<username>')
+def show_user(username):
+    pass
+
+@app.route('/post/<int:post_id>')
+def show_post(post_id):
+    pass
+
+----------------------------------------
+
+TITLE: Configuring Maximum Upload Size in Flask
+DESCRIPTION: Sets a maximum file size limit for uploads to prevent large file uploads. Uses the MAX_CONTENT_LENGTH configuration.
+
+LANGUAGE: python
+CODE:
+from flask import Flask, Request
+
+app = Flask(__name__)
+app.config['MAX_CONTENT_LENGTH'] = 16 * 1000 * 1000
+
+----------------------------------------
+
+TITLE: Wrapping Flask App with WsgiToAsgi Adapter in Python
+DESCRIPTION: This snippet demonstrates how to wrap a Flask application with the WsgiToAsgi adapter from asgiref. This allows a Flask app to be served by an ASGI server. The code imports necessary modules, creates a Flask app, and then wraps it with the WsgiToAsgi adapter.
+
+LANGUAGE: python
+CODE:
+from asgiref.wsgi import WsgiToAsgi
+from flask import Flask
+
+app = Flask(__name__)
+
+...
+
+asgi_app = WsgiToAsgi(app)
+
+----------------------------------------
+
+TITLE: Implementing Blog Index View
+DESCRIPTION: Creates the index route to display all blog posts with a JOIN query to include author information.
+
+LANGUAGE: python
+CODE:
+@bp.route('/')
+def index():
+    db = get_db()
+    posts = db.execute(
+        'SELECT p.id, title, body, created, author_id, username'
+        ' FROM post p JOIN user u ON p.author_id = u.id'
+        ' ORDER BY created DESC'
+    ).fetchall()
+    return render_template('blog/index.html', posts=posts)
+
+LANGUAGE: html+jinja
+CODE:
+{% extends 'base.html' %}
+
+{% block header %}
+  <h1>{% block title %}Posts{% endblock %}</h1>
+  {% if g.user %}
+    <a class="action" href="{{ url_for('blog.create') }}">New</a>
+  {% endif %}
+{% endblock %}
+
+{% block content %}
+  {% for post in posts %}
+    <article class="post">
+      <header>
+        <div>
+          <h1>{{ post['title'] }}</h1>
+          <div class="about">by {{ post['username'] }} on {{ post['created'].strftime('%Y-%m-%d') }}</div>
+        </div>
+        {% if g.user['id'] == post['author_id'] %}
+          <a class="action" href="{{ url_for('blog.update', id=post['id']) }}">Edit</a>
+        {% endif %}
+      </header>
+      <p class="body">{{ post['body'] }}</p>
+    </article>
+    {% if not loop.last %}
+      <hr>
+    {% endif %}
+  {% endfor %}
+{% endblock %}
+
+----------------------------------------
+
+TITLE: Teardown Callback Testing Example
+DESCRIPTION: Shows how to test teardown callbacks and context management using test_client and test_request_context.
+
+LANGUAGE: python
+CODE:
+from flask import Flask, request\n\napp = Flask(__name__)\n\n@app.route('/')\ndef hello():\n    print('during view')\n    return 'Hello, World!'\n\n@app.teardown_request\ndef show_teardown(exception):\n    print('after with block')\n\nwith app.test_request_context():\n    print('during with block')\n\n# teardown functions are called after the context with block exits\n\nwith app.test_client() as client:\n    client.get('/')\n    # the contexts are not popped even though the request ended\n    print(request.path)\n\n# the contexts are popped and teardown functions are called after\n# the client with block exits
+
+----------------------------------------
+
+TITLE: Serving ASGI App with Hypercorn
+DESCRIPTION: This command-line instruction shows how to serve the ASGI-wrapped Flask application using Hypercorn, an ASGI server. The command assumes that the ASGI app is named 'asgi_app' and is located in a Python module.
+
+LANGUAGE: text
+CODE:
+$ hypercorn module:asgi_app
+
+----------------------------------------
+
+TITLE: Setting Up Test Fixtures for Flask Application
+DESCRIPTION: Python code defining fixtures for Flask application testing, including temporary database setup and test client creation.
+
+LANGUAGE: python
+CODE:
+import os
+import tempfile
+
+import pytest
+from flaskr import create_app
+from flaskr.db import get_db, init_db
+
+with open(os.path.join(os.path.dirname(__file__), 'data.sql'), 'rb') as f:
+    _data_sql = f.read().decode('utf8')
+
+
+@pytest.fixture
+def app():
+    db_fd, db_path = tempfile.mkstemp()
+
+    app = create_app({
+        'TESTING': True,
+        'DATABASE': db_path,
+    })
+
+    with app.app_context():
+        init_db()
+        get_db().executescript(_data_sql)
+
+    yield app
+
+    os.close(db_fd)
+    os.unlink(db_path)
+
+
+@pytest.fixture
+def client(app):
+    return app.test_client()
+
+
+@pytest.fixture
+def runner(app):
+    return app.test_cli_runner()
+
+----------------------------------------
+
+TITLE: Testing Flask Sessions
+DESCRIPTION: Examples of accessing and modifying Flask session data in tests.
+
+LANGUAGE: python
+CODE:
+from flask import session
+
+def test_modify_session(client):
+    with client.session_transaction() as session:
+        # set a user id without going through the login route
+        session["user_id"] = 1
+
+    response = client.get("/users/me")
+    assert response.json["username"] == "flask"
+
+----------------------------------------
+
+TITLE: Running Flask with Waitress Production Server
+DESCRIPTION: Commands to install and run the Flask application using the Waitress WSGI server
+
+LANGUAGE: text
+CODE:
+$ pip install waitress
+$ waitress-serve --call 'flaskr:create_app'
+
+----------------------------------------
+
+TITLE: Testing Flask Database Connections and Commands
+DESCRIPTION: Python tests for Flask database connections and initialization command.
+
+LANGUAGE: python
+CODE:
+import sqlite3
+
+import pytest
+from flaskr.db import get_db
+
+
+def test_get_close_db(app):
+    with app.app_context():
+        db = get_db()
+        assert db is get_db()
+
+    with pytest.raises(sqlite3.ProgrammingError) as e:
+        db.execute('SELECT 1')
+
+    assert 'closed' in str(e.value)
+
+def test_init_db_command(runner, monkeypatch):
+    class Recorder(object):
+        called = False
+
+    def fake_init_db():
+        Recorder.called = True
+
+    monkeypatch.setattr('flaskr.db.init_db', fake_init_db)
+    result = runner.invoke(args=['init-db'])
+    assert 'Initialized' in result.output
+    assert Recorder.called
+
+----------------------------------------
+
+TITLE: Creating a WSGI File for Flask App Factory Pattern
+DESCRIPTION: Python code to create a WSGI file that imports and creates a Flask application using the app factory pattern.
+
+LANGUAGE: python
+CODE:
+from hello import create_app
+
+app = create_app()
+
+----------------------------------------
+
+TITLE: Configuring Apache httpd for reverse proxy
+DESCRIPTION: This Apache configuration snippet sets up httpd as a reverse proxy. It loads necessary modules, configures ProxyPass to forward requests to a local WSGI server, and sets X-Forwarded headers for proper request handling.
+
+LANGUAGE: apache
+CODE:
+LoadModule proxy_module modules/mod_proxy.so
+LoadModule proxy_http_module modules/mod_proxy_http.so
+ProxyPass / http://127.0.0.1:8000/
+RequestHeader set X-Forwarded-Proto http
+RequestHeader set X-Forwarded-Prefix /
+
+----------------------------------------
+
+TITLE: Setting Up Authentication Actions for Flask Tests
+DESCRIPTION: Python code defining an AuthActions class and fixture for Flask authentication testing.
+
+LANGUAGE: python
+CODE:
+class AuthActions(object):
+    def __init__(self, client):
+        self._client = client
+
+    def login(self, username='test', password='test'):
+        return self._client.post(
+            '/auth/login',
+            data={'username': username, 'password': password}
+        )
+
+    def logout(self):
+        return self._client.get('/auth/logout')
+
+
+@pytest.fixture
+def auth(client):
+    return AuthActions(client)
+
+----------------------------------------
+
+TITLE: Registering Custom Filter in Flask
+DESCRIPTION: Demonstrates two methods to register a custom filter in Flask: using a decorator and manually adding to jinja_env.filters.
+
+LANGUAGE: python
+CODE:
+@app.template_filter('reverse')
+def reverse_filter(s):
+    return s[::-1]
+
+def reverse_filter(s):
+    return s[::-1]
+app.jinja_env.filters['reverse'] = reverse_filter
+
+----------------------------------------
+
+TITLE: Creating Context Processor in Flask
+DESCRIPTION: Demonstrates how to create a context processor in Flask to inject new variables into the template context.
+
+LANGUAGE: python
+CODE:
+@app.context_processor
+def inject_user():
+    return dict(user=g.user)
+
+----------------------------------------
+
+TITLE: Running uWSGI with a Flask Application
+DESCRIPTION: Command to run uWSGI server with a Flask application, specifying HTTP server, master process, worker processes, and the application module.
+
+LANGUAGE: text
+CODE:
+$ uwsgi --http 127.0.0.1:8000 --master -p 4 -w hello:app
+
+----------------------------------------
+
+TITLE: Basic Flask Application Example
+DESCRIPTION: Simple Flask application that demonstrates the minimal setup required to create a web application with a single route returning 'Hello, World!'.
+
+LANGUAGE: python
+CODE:
+from flask import Flask
+
+app = Flask(__name__)
+
+
+@app.route('/')
+def hello():
+    return 'Hello, World!'
+
+----------------------------------------
+
+TITLE: Creating Function Context Processor in Flask
+DESCRIPTION: Shows how to create a context processor that makes a function available to all templates in Flask.
+
+LANGUAGE: python
+CODE:
+@app.context_processor
+def utility_processor():
+    def format_price(amount, currency="€"):
+        return f"{amount:.2f}{currency}"
+    return dict(format_price=format_price)
+
+----------------------------------------
+
+TITLE: Streaming Template in Flask
+DESCRIPTION: Shows how to use Flask's stream_template function to render a template as a stream of smaller incremental strings.
+
+LANGUAGE: python
+CODE:
+from flask import stream_template
+
+@app.get("/timeline")
+def timeline():
+    return stream_template("timeline.html")
+
+----------------------------------------
+
+TITLE: Configuring Eventlet WSGI Server with Flask
+DESCRIPTION: Python script to set up and run a Flask application using Eventlet's WSGI server. Creates a server listening on localhost port 8000.
+
+LANGUAGE: python
+CODE:
+import eventlet
+from eventlet import wsgi
+from hello import create_app
+
+app = create_app()
+wsgi.server(eventlet.listen(("127.0.0.1", 8000)), app)
+
+----------------------------------------
+
+TITLE: Using Context Processor Function in Jinja2 Template
+DESCRIPTION: Demonstrates how to use a function made available by a context processor in a Jinja2 template.
+
+LANGUAGE: jinja
+CODE:
+{{ format_price(0.33) }}
+
+----------------------------------------
+
+TITLE: Implementing Internationalized Application URLs in Flask
+DESCRIPTION: This snippet demonstrates how to set up URL processors for handling language codes in Flask routes. It uses url_defaults and url_value_preprocessor decorators to automatically inject and extract language codes from URLs.
+
+LANGUAGE: python
+CODE:
+from flask import Flask, g
+
+app = Flask(__name__)
+
+@app.url_defaults
+def add_language_code(endpoint, values):
+    if 'lang_code' in values or not g.lang_code:
+        return
+    if app.url_map.is_endpoint_expecting(endpoint, 'lang_code'):
+        values['lang_code'] = g.lang_code
+
+@app.url_value_preprocessor
+def pull_lang_code(endpoint, values):
+    g.lang_code = values.pop('lang_code', None)
+
+@app.route('/<lang_code>/')
+def index():
+    ...
+
+@app.route('/<lang_code>/about')
+def about():
+    ...
+
+----------------------------------------
+
+TITLE: Importing Database Module in Flask Application Factory
+DESCRIPTION: This snippet shows how to import and initialize the database module within the Flask application factory function.
+
+LANGUAGE: python
+CODE:
+def create_app():
+    app = ...
+    # existing code omitted
+
+    from . import db
+    db.init_app(app)
+
+    return app
+
+----------------------------------------
+
+TITLE: Implementing Template Capture Context Manager in Python
+DESCRIPTION: Creates a context manager to capture and record rendered templates and their context variables during testing. Uses Flask's template_rendered signal to track template rendering events.
+
+LANGUAGE: python
+CODE:
+from flask import template_rendered
+from contextlib import contextmanager
+
+@contextmanager
+def captured_templates(app):
+    recorded = []
+    def record(sender, template, context, **extra):
+        recorded.append((template, context))
+    template_rendered.connect(record, app)
+    try:
+        yield recorded
+    finally:
+        template_rendered.disconnect(record, app)
+
+----------------------------------------
+
+TITLE: Installing Eventlet and Application Dependencies
+DESCRIPTION: Commands for creating a virtual environment and installing the application along with Eventlet dependency.
+
+LANGUAGE: text
+CODE:
+$ cd hello-app
+$ python -m venv .venv
+$ . .venv/bin/activate
+$ pip install .  # install your application
+$ pip install eventlet
+
+----------------------------------------
+
+TITLE: Running uWSGI with Gevent Async Worker
+DESCRIPTION: Command to run uWSGI server with gevent async worker, suitable for applications using gevent for asynchronous operations.
+
+LANGUAGE: text
+CODE:
+$ uwsgi --http 127.0.0.1:8000 --master --gevent 100 -w wsgi:app
+
+----------------------------------------
+
+TITLE: Implementing Signal Emission in Model Class
+DESCRIPTION: Demonstrates how to emit a custom signal within a model class using the send method.
+
+LANGUAGE: python
+CODE:
+class Model(object):
+    ...
+
+    def save(self):
+        model_saved.send(self)
+
+----------------------------------------
+
+TITLE: Implementing Post Update and Delete
+DESCRIPTION: Creates routes and helper functions for updating and deleting blog posts with author verification.
+
+LANGUAGE: python
+CODE:
+def get_post(id, check_author=True):
+    post = get_db().execute(
+        'SELECT p.id, title, body, created, author_id, username'
+        ' FROM post p JOIN user u ON p.author_id = u.id'
+        ' WHERE p.id = ?',
+        (id,)
+    ).fetchone()
+
+    if post is None:
+        abort(404, f"Post id {id} doesn't exist.")
+
+    if check_author and post['author_id'] != g.user['id']:
+        abort(403)
+
+    return post
+
+LANGUAGE: python
+CODE:
+@bp.route('/<int:id>/delete', methods=('POST',))
+@login_required
+def delete(id):
+    get_post(id)
+    db = get_db()
+    db.execute('DELETE FROM post WHERE id = ?', (id,))
+    db.commit()
+    return redirect(url_for('blog.index'))
+
+----------------------------------------
+
+TITLE: Running uWSGI with WSGI File
+DESCRIPTION: Command to run uWSGI server using a WSGI file that creates the Flask application.
+
+LANGUAGE: text
+CODE:
+$ uwsgi --http 127.0.0.1:8000 --master -p 4 -w wsgi:app
+
+----------------------------------------
+
+TITLE: Running Flask Debug Server from Command Line
+DESCRIPTION: Command to start Flask development server in debug mode using the CLI.
+
+LANGUAGE: text
+CODE:
+$ flask --app hello run --debug
+
+----------------------------------------
+
+TITLE: Referencing Static Files in Flask HTML Templates
+DESCRIPTION: This snippet shows how to reference a static CSS file in a Flask HTML template using the url_for function.
+
+LANGUAGE: html
+CODE:
+{{ url_for('static', filename='style.css') }}
+
+----------------------------------------
+
+TITLE: Running Gunicorn with Gevent Worker
+DESCRIPTION: Configuration for running Gunicorn with gevent async worker support. Requires greenlet>=1.0 for proper context local functionality.
+
+LANGUAGE: text
+CODE:
+$ gunicorn -k gevent 'hello:create_app()'
+Starting gunicorn 20.1.0
+Listening at: http://127.0.0.1:8000 (x)
+Using worker: gevent
+Booting worker with pid: x
+
+----------------------------------------
+
+TITLE: Enabling Debug Mode in Flask Python Code
+DESCRIPTION: Python code to enable debug mode when running Flask application directly.
+
+LANGUAGE: python
+CODE:
+app.run(debug=True)
+
+----------------------------------------
+
+TITLE: Hypothetical Implicit Flask Application in Python
+DESCRIPTION: Shows how Flask might look with an implicit application object. This approach is not used due to limitations in flexibility and potential issues with multiple applications.
+
+LANGUAGE: python
+CODE:
+from hypothetical_flask import route
+
+@route('/')
+def index():
+    return 'Hello World!'
+
+----------------------------------------
+
+TITLE: Binding uWSGI to All External IPs
+DESCRIPTION: Command to run uWSGI server binding to all external IPs on a non-privileged port.
+
+LANGUAGE: text
+CODE:
+$ uwsgi --http 0.0.0.0:8000 --master -p 4 -w wsgi:app
+
+----------------------------------------
+
+TITLE: Advanced Flask External Debugger Configuration
+DESCRIPTION: Python code showing advanced configuration for external debugger with passthrough errors enabled.
+
+LANGUAGE: python
+CODE:
+app.run(
+    debug=True, passthrough_errors=True,
+    use_debugger=False, use_reloader=False
+)
+
+----------------------------------------
+
+TITLE: Building Flask Application Wheel Package
+DESCRIPTION: Commands to install build tool and create a wheel distribution package for deployment
+
+LANGUAGE: text
+CODE:
+$ pip install build
+$ python -m build --wheel
+
+----------------------------------------
+
+TITLE: Using Custom Filter in Jinja2 Template
+DESCRIPTION: Shows how to use a custom registered filter (reverse) in a Jinja2 template.
+
+LANGUAGE: jinja
+CODE:
+{% for x in mylist | reverse %}
+{% endfor %}
+
+----------------------------------------
+
+TITLE: Creating a Custom HTTP Exception in Flask
+DESCRIPTION: Demonstrates how to create and register a custom HTTP exception class for non-standard HTTP codes.
+
+LANGUAGE: python
+CODE:
+class InsufficientStorage(werkzeug.exceptions.HTTPException):
+    code = 507
+    description = 'Not enough storage space.'
+
+app.register_error_handler(InsufficientStorage, handle_507)
+
+raise InsufficientStorage()
+
+----------------------------------------
+
+TITLE: Installing Flask Project in Editable Mode
+DESCRIPTION: This shell command demonstrates how to use pip to install the Flask project in editable (development) mode, allowing for changes to be reflected without reinstallation.
+
+LANGUAGE: shell
+CODE:
+$ pip install -e .
+
+----------------------------------------
+
+TITLE: Configuring Flask Package with pyproject.toml
+DESCRIPTION: Package configuration file that defines project dependencies and build system requirements for a Flask application.
+
+LANGUAGE: toml
+CODE:
+[project]
+name = "yourapplication"
+dependencies = [
+    "flask",
+]
+
+[build-system]
+requires = ["flit_core<4"]
+build-backend = "flit_core.buildapi"
+
+----------------------------------------
+
+TITLE: Custom 404 Error Page Template in Flask
+DESCRIPTION: An example of a custom 404 error page template using Jinja2 in Flask.
+
+LANGUAGE: html
+CODE:
+{% extends "layout.html" %}
+{% block title %}Page Not Found{% endblock %}
+{% block body %}
+  <h1>Page Not Found</h1>
+  <p>What you were looking for is just not there.
+  <p><a href="{{ url_for('index') }}">go somewhere nice</a>
+{% endblock %}
+
+----------------------------------------
+
+TITLE: Reusable ListView Implementation
+DESCRIPTION: Generic ListView class that can be used with different models and templates
+
+LANGUAGE: python
+CODE:
+class ListView(View):
+    def __init__(self, model, template):
+        self.model = model
+        self.template = template
+
+    def dispatch_request(self):
+        items = self.model.query.all()
+        return render_template(self.template, items=items)
+
+----------------------------------------
+
+TITLE: Running mod_wsgi-express Server for Flask Application
+DESCRIPTION: Command to start the mod_wsgi-express server with a specified number of worker processes.
+
+LANGUAGE: text
+CODE:
+$ mod_wsgi-express start-server wsgi.py --processes 4
+
+----------------------------------------
+
+TITLE: Implementing Blueprint Error Handlers in Flask
+DESCRIPTION: Shows how to implement error handlers specific to Flask blueprints.
+
+LANGUAGE: python
+CODE:
+from flask import Blueprint
+
+blog = Blueprint('blog', __name__)
+
+# as a decorator
+@blog.errorhandler(500)
+def internal_server_error(e):
+    return render_template('500.html'), 500
+
+# or with register_error_handler
+blog.register_error_handler(500, internal_server_error)
+
+----------------------------------------
+
+TITLE: Basic Function-Based View in Flask
+DESCRIPTION: Simple view function that queries users and renders a template
+
+LANGUAGE: python
+CODE:
+@app.route("/users/")
+def user_list():
+    users = User.query.all()
+    return render_template("users.html", users=users)
+
+----------------------------------------
+
+TITLE: Running Flask Development Server from Command Line
+DESCRIPTION: Demonstrates how to run a Flask application using the 'flask run' command with debug mode enabled. This command starts the development server on http://localhost:5000/.
+
+LANGUAGE: text
+CODE:
+$ flask --app hello run --debug
+
+----------------------------------------
+
+TITLE: Returning API Errors as JSON in Flask
+DESCRIPTION: Demonstrates how to create and use a custom exception class for API errors, returning JSON responses.
+
+LANGUAGE: python
+CODE:
+from flask import jsonify, request
+
+class InvalidAPIUsage(Exception):
+    status_code = 400
+
+    def __init__(self, message, status_code=None, payload=None):
+        super().__init__()
+        self.message = message
+        if status_code is not None:
+            self.status_code = status_code
+        self.payload = payload
+
+    def to_dict(self):
+        rv = dict(self.payload or ())
+        rv['message'] = self.message
+        return rv
+
+@app.errorhandler(InvalidAPIUsage)
+def invalid_api_usage(e):
+    return jsonify(e.to_dict()), e.status_code
+
+# an API app route for getting user information
+# a correct request might be /api/user?user_id=420
+@app.route("/api/user")
+def user_api(user_id):
+    user_id = request.arg.get("user_id")
+    if not user_id:
+        raise InvalidAPIUsage("No user id provided!")
+
+    user = get_user(user_id=user_id)
+    if not user:
+        raise InvalidAPIUsage("No such user!", status_code=404)
+
+    return jsonify(user.to_dict())
+
+----------------------------------------
+
+TITLE: Identifying Process Using Port 5000 with netstat (Linux)
+DESCRIPTION: Shows how to use the 'netstat' command on Linux to identify which process is using port 5000. This is useful for troubleshooting 'Address already in use' errors.
+
+LANGUAGE: text
+CODE:
+$ netstat -nlp | grep 5000
+tcp 0 0 127.0.0.1:5000 0.0.0.0:* LISTEN 6847/python
+
+----------------------------------------
+
+TITLE: Identifying Process Using Port 5000 with netstat (Windows)
+DESCRIPTION: Shows how to use the 'netstat' command on Windows to find the process ID using port 5000. This is helpful for resolving port conflicts on Windows systems.
+
+LANGUAGE: text
+CODE:
+> netstat -ano | findstr 5000
+TCP 127.0.0.1:5000 0.0.0.0:0 LISTENING 6847
+
+----------------------------------------
+
+TITLE: Making Fetch Requests with Form Data and JSON
+DESCRIPTION: Examples of making POST requests using fetch with both FormData and JSON data formats.
+
+LANGUAGE: javascript
+CODE:
+let data = new FormData()
+data.append("name", "Flask Room")
+data.append("description", "Talk about Flask here.")
+fetch(room_url, {
+    "method": "POST",
+    "body": data,
+}).then(...)
+
+LANGUAGE: javascript
+CODE:
+let data = {
+    "name": "Flask Room",
+    "description": "Talk about Flask here.",
+}
+fetch(room_url, {
+    "method": "POST",
+    "headers": {"Content-Type": "application/json"},
+    "body": JSON.stringify(data),
+}).then(...)
+
+----------------------------------------
+
+TITLE: Identifying Process Using Port 5000 with lsof (macOS / Linux)
+DESCRIPTION: Demonstrates the use of the 'lsof' command on macOS or Linux to identify the process using port 5000. This helps in resolving port conflicts during development.
+
+LANGUAGE: text
+CODE:
+$ lsof -P -i :5000
+Python 6847 IPv4 TCP localhost:5000 (LISTEN)
+
+----------------------------------------
+
+TITLE: Installing uWSGI with SSL Support
+DESCRIPTION: Commands to install uWSGI with SSL support using either the uwsgi package or pyuwsgi from source.
+
+LANGUAGE: text
+CODE:
+$ pip install uwsgi
+
+# or
+$ pip install --no-binary pyuwsgi pyuwsgi
+
+----------------------------------------
+
+TITLE: Querying MongoDB Documents with MongoEngine
+DESCRIPTION: This snippet illustrates various ways to query MongoDB documents using MongoEngine. It covers basic equality queries, using query operators, and iterating over query results.
+
+LANGUAGE: python
+CODE:
+bttf = Movies.objects(title="Back To The Future").get_or_404()
+
+some_theron_movie = Movie.objects(actors__in=["Charlize Theron"]).first()
+
+for recents in Movie.objects(year__gte=2017):
+    print(recents.title)
+
+----------------------------------------
+
+TITLE: Installing Flask Application Dependencies
+DESCRIPTION: Commands for setting up a Python virtual environment and installing the application dependencies.
+
+LANGUAGE: text
+CODE:
+$ python3 -m venv .venv
+$ . .venv/bin/activate
+$ pip install -e .
+
+----------------------------------------
+
+TITLE: Initializing Flask Application in Python
+DESCRIPTION: Demonstrates the creation of a Flask application instance and defining a simple route. This explicit instantiation allows for greater flexibility and control over the application object.
+
+LANGUAGE: python
+CODE:
+from flask import Flask
+app = Flask(__name__)
+
+@app.route('/')
+def index():
+    return 'Hello World!'
+
+----------------------------------------
+
+TITLE: Manual ORM Model and Table Definition
+DESCRIPTION: Shows how to manually define and map a User model class to a database table using SQLAlchemy's classical mapping approach.
+
+LANGUAGE: python
+CODE:
+from sqlalchemy import Table, Column, Integer, String
+from sqlalchemy.orm import mapper
+from yourapplication.database import metadata, db_session
+
+class User(object):
+    query = db_session.query_property()
+
+    def __init__(self, name=None, email=None):
+        self.name = name
+        self.email = email
+
+    def __repr__(self):
+        return f'<User {self.name!r}>'
+
+users = Table('users', metadata,
+    Column('id', Integer, primary_key=True),
+    Column('name', String(50), unique=True),
+    Column('email', String(120), unique=True)
+)
+mapper(User, users)
+
+----------------------------------------
+
+TITLE: Running Flask with External Debugger via CLI
+DESCRIPTION: Command to run Flask in debug mode while disabling the built-in debugger and reloader for external debugger compatibility.
+
+LANGUAGE: text
+CODE:
+$ flask --app hello run --debug --no-debugger --no-reload
+
+----------------------------------------
+
+TITLE: Running the Eventlet Server
+DESCRIPTION: Command to start the Eventlet WSGI server and its output showing the server is running.
+
+LANGUAGE: text
+CODE:
+$ python wsgi.py
+(x) wsgi starting up on http://127.0.0.1:8000
+
+----------------------------------------
+
+TITLE: SQL Abstraction Layer Setup
+DESCRIPTION: Demonstrates basic setup for using SQLAlchemy's SQL abstraction layer without ORM functionality.
+
+LANGUAGE: python
+CODE:
+from sqlalchemy import create_engine, MetaData, Table
+
+engine = create_engine('sqlite:////tmp/test.db')
+metadata = MetaData(bind=engine)
+
+----------------------------------------
+
+TITLE: Configuring Flask for External Debugger in Python
+DESCRIPTION: Python code to configure Flask for use with external debuggers by disabling built-in debugger and reloader.
+
+LANGUAGE: python
+CODE:
+app.run(debug=True, use_debugger=False, use_reloader=False)
+
+----------------------------------------
+
+TITLE: Inserting Test Data for Flask Application
+DESCRIPTION: SQL script to insert test user and post data for Flask application testing.
+
+LANGUAGE: sql
+CODE:
+INSERT INTO user (username, password)
+VALUES
+  ('test', 'pbkdf2:sha256:50000$TCI4GzcX$0de171a4f4dac32e3364c7ddc7c14f3e2fa61f2d17574483f7ffbb431b4acb2f'),
+  ('other', 'pbkdf2:sha256:50000$kJPKsz6N$d2d4784f1b030a9761f5ccaeeaca413f27f2ecb76d6168407af962ddce849f79');
+
+INSERT INTO post (title, body, author_id, created)
+VALUES
+  ('test title', 'test' || x'0a' || 'body', 1, '2018-01-01 00:00:00');
+
+----------------------------------------
+
+TITLE: Subdomain Dispatcher Implementation Example
+DESCRIPTION: Example showing how to implement and use the SubdomainDispatcher with a custom application factory.
+
+LANGUAGE: python
+CODE:
+from myapplication import create_app, get_user_for_subdomain
+from werkzeug.exceptions import NotFound
+
+def make_app(subdomain):
+    user = get_user_for_subdomain(subdomain)
+    if user is None:
+        return NotFound()
+
+    return create_app(user)
+
+application = SubdomainDispatcher('example.com', make_app)
+
+----------------------------------------
+
+TITLE: Path-based Flask Application Dispatcher
+DESCRIPTION: Implementation of a dispatcher that creates and manages Flask applications based on URL paths, with fallback to a default application.
+
+LANGUAGE: python
+CODE:
+from threading import Lock
+from wsgiref.util import shift_path_info
+
+class PathDispatcher:
+
+    def __init__(self, default_app, create_app):
+        self.default_app = default_app
+        self.create_app = create_app
+        self.lock = Lock()
+        self.instances = {}
+
+    def get_application(self, prefix):
+        with self.lock:
+            app = self.instances.get(prefix)
+            if app is None:
+                app = self.create_app(prefix)
+                if app is not None:
+                    self.instances[prefix] = app
+            return app
+
+    def __call__(self, environ, start_response):
+        app = self.get_application(_peek_path_info(environ))
+        if app is not None:
+            shift_path_info(environ)
+        else:
+            app = self.default_app
+        return app(environ, start_response)
+
+def _peek_path_info(environ):
+    segments = environ.get("PATH_INFO", "").lstrip("/").split("/", 1)
+    if segments:
+        return segments[0]
+
+    return None
+
+----------------------------------------
+
+TITLE: Installing Waitress and Application
+DESCRIPTION: Commands for creating a virtual environment and installing both the application and Waitress server.
+
+LANGUAGE: text
+CODE:
+$ cd hello-app
+$ python -m venv .venv
+$ . .venv/bin/activate
+$ pip install .  # install your application
+$ pip install waitress
+
+----------------------------------------
+
+TITLE: Path Dispatcher Implementation Example
+DESCRIPTION: Example showing how to implement and use the PathDispatcher with a custom application factory and default application.
+
+LANGUAGE: python
+CODE:
+from myapplication import create_app, default_app, get_user_for_prefix
+
+def make_app(prefix):
+    user = get_user_for_prefix(prefix)
+    if user is not None:
+        return create_app(user)
+
+application = PathDispatcher(default_app, make_app)
+
+----------------------------------------
+
+TITLE: Basic Flask Application Setup
+DESCRIPTION: Simple Flask application setup showing the basic structure required for the dispatching examples.
+
+LANGUAGE: python
+CODE:
+from flask import Flask
+
+app = Flask(__name__)
+
+@app.route('/')
+def hello_world():
+    return 'Hello World!'
+
+----------------------------------------
+
+TITLE: Installing Sentry SDK for Flask
+DESCRIPTION: Instructions for installing the Sentry SDK with Flask integration using pip.
+
+LANGUAGE: text
+CODE:
+$ pip install sentry-sdk[flask]
+
+----------------------------------------
+
+TITLE: Implementing Flask Views Module
+DESCRIPTION: Views module containing route definitions and view functions for the Flask application.
+
+LANGUAGE: python
+CODE:
+from yourapplication import app
+
+@app.route('/')
+def index():
+    return 'Hello World!'
+
+----------------------------------------
+
+TITLE: Subdomain-based Flask Application Dispatcher
+DESCRIPTION: Implementation of a dispatcher that creates and manages Flask applications based on subdomains, using thread-safe instance management.
+
+LANGUAGE: python
+CODE:
+from threading import Lock
+
+class SubdomainDispatcher:
+
+    def __init__(self, domain, create_app):
+        self.domain = domain
+        self.create_app = create_app
+        self.lock = Lock()
+        self.instances = {}
+
+    def get_application(self, host):
+        host = host.split(':')[0]
+        assert host.endswith(self.domain), 'Configuration error'
+        subdomain = host[:-len(self.domain)].rstrip('.')
+        with self.lock:
+            app = self.instances.get(subdomain)
+            if app is None:
+                app = self.create_app(subdomain)
+                self.instances[subdomain] = app
+            return app
+
+    def __call__(self, environ, start_response):
+        app = self.get_application(environ['HTTP_HOST'])
+        return app(environ, start_response)
+
+----------------------------------------
+
+TITLE: Running Flask in Debug Mode
+DESCRIPTION: Shows how to run the Flask development server in debug mode, which enables the interactive debugger and reloader.
+
+LANGUAGE: bash
+CODE:
+$ flask --app hello run --debug
+ * Serving Flask app "hello"
+ * Debug mode: on
+ * Running on http://127.0.0.1:5000/ (Press CTRL+C to quit)
+ * Restarting with inotify reloader
+ * Debugger is active!
+ * Debugger PIN: 223-456-919
+
+----------------------------------------
+
+TITLE: Implementing LazyView Class for On-Demand View Loading in Flask
+DESCRIPTION: Defines a LazyView class that allows for lazy loading of view functions in Flask. This class imports the actual view function only when it's first called, potentially improving application startup time.
+
+LANGUAGE: python
+CODE:
+from werkzeug.utils import import_string, cached_property
+
+class LazyView(object):
+
+    def __init__(self, import_name):
+        self.__module__, self.__name__ = import_name.rsplit('.', 1)
+        self.import_name = import_name
+
+    @cached_property
+    def view(self):
+        return import_string(self.import_name)
+
+    def __call__(self, *args, **kwargs):
+        return self.view(*args, **kwargs)
+
+----------------------------------------
+
+TITLE: Configuring Permanent Session Lifetime in Flask
+DESCRIPTION: Demonstrates how to configure the permanent session lifetime and set a session as permanent in a Flask route.
+
+LANGUAGE: python
+CODE:
+app.config.update(
+    PERMANENT_SESSION_LIFETIME=600
+)
+
+@app.route('/login', methods=['POST'])
+def login():
+    ...
+    session.clear()
+    session['user_id'] = user.id
+    session.permanent = True
+    ...
+
+----------------------------------------
+
+TITLE: Testing Redirects in Flask
+DESCRIPTION: Example of testing redirect behavior in Flask applications using follow_redirects parameter.
+
+LANGUAGE: python
+CODE:
+def test_logout_redirect(client):
+    response = client.get("/logout", follow_redirects=True)
+    # Check that there was one redirect response.
+    assert len(response.history) == 1
+    # Check that the second request was to the index page.
+    assert response.request.path == "/index"
+
+----------------------------------------
+
+TITLE: Implementing HTTP Method Override Middleware in Python
+DESCRIPTION: This code defines a middleware class that intercepts HTTP requests and allows method overriding using the X-HTTP-Method-Override header. It supports common HTTP methods and handles bodyless methods appropriately.
+
+LANGUAGE: Python
+CODE:
+class HTTPMethodOverrideMiddleware(object):
+    allowed_methods = frozenset([
+        'GET',
+        'HEAD',
+        'POST',
+        'DELETE',
+        'PUT',
+        'PATCH',
+        'OPTIONS'
+    ])
+    bodyless_methods = frozenset(['GET', 'HEAD', 'OPTIONS', 'DELETE'])
+
+    def __init__(self, app):
+        self.app = app
+
+    def __call__(self, environ, start_response):
+        method = environ.get('HTTP_X_HTTP_METHOD_OVERRIDE', '').upper()
+        if method in self.allowed_methods:
+            environ['REQUEST_METHOD'] = method
+        if method in self.bodyless_methods:
+            environ['CONTENT_LENGTH'] = '0'
+        return self.app(environ, start_response)
+
+----------------------------------------
+
+TITLE: Setting Cookie Expiration in Flask
+DESCRIPTION: Shows how to set expiration time for cookies in Flask responses using the max_age parameter.
+
+LANGUAGE: python
+CODE:
+# cookie expires after 10 minutes
+response.set_cookie('snakes', '3', max_age=600)
+
+----------------------------------------
+
+TITLE: Initializing Database and Running Flaskr
+DESCRIPTION: Commands to initialize the Flaskr database and run the application in debug mode.
+
+LANGUAGE: text
+CODE:
+$ flask --app flaskr init-db
+$ flask --app flaskr run --debug
+
+----------------------------------------
+
+TITLE: Streaming Template in Flask
+DESCRIPTION: This example shows how to use Flask's stream_template function to render a template piece by piece, returning an iterator of strings.
+
+LANGUAGE: python
+CODE:
+from flask import stream_template
+
+@app.get("/timeline")
+def timeline():
+    return stream_template("timeline.html")
+
+----------------------------------------
+
+TITLE: Filtering Backspace Characters to Prevent Copy/Paste Vulnerabilities
+DESCRIPTION: Shows how to filter out backspace characters from user-generated content to prevent potential vulnerabilities when copying and pasting to terminals.
+
+LANGUAGE: python
+CODE:
+body = body.replace("\b", "")
+
+----------------------------------------
+
+TITLE: Running Flask Development Server
+DESCRIPTION: Commands to activate the virtual environment and start the Flask development server in debug mode.
+
+LANGUAGE: shell
+CODE:
+$ . ./.venv/bin/activate
+$ flask -A task_app run --debug
+
+----------------------------------------
+
+TITLE: Using stream_with_context as a Decorator in Flask
+DESCRIPTION: This example shows how to use stream_with_context as a decorator for a generator function in Flask.
+
+LANGUAGE: python
+CODE:
+@stream_with_context
+def generate():
+    ...
+
+return generate()
+
+----------------------------------------
+
+TITLE: Running mod_wsgi-express as Root for Privileged Ports
+DESCRIPTION: Command to run mod_wsgi-express as root, binding to privileged ports and dropping permissions to a specific user and group.
+
+LANGUAGE: text
+CODE:
+$ sudo /home/hello/.venv/bin/mod_wsgi-express start-server \
+    /home/hello/wsgi.py \
+    --user hello --group hello --port 80 --processes 4
+
+----------------------------------------
+
+TITLE: Running Tests with Coverage
+DESCRIPTION: Commands for installing test dependencies and running tests with coverage reporting.
+
+LANGUAGE: text
+CODE:
+$ pip install -e '.[test]'
+$ coverage run -m pytest
+$ coverage report
+
+----------------------------------------
+
+TITLE: Adding Favicon Link in HTML with Jinja Template
+DESCRIPTION: This snippet demonstrates how to add a link tag in HTML using Jinja templating to reference a favicon in a Flask application. It uses the url_for function to generate the correct static file URL.
+
+LANGUAGE: html
+CODE:
+<link rel="shortcut icon" href="{{ url_for('static', filename='favicon.ico') }}">
+
+----------------------------------------
+
+TITLE: Installing mod_wsgi and Flask Application in Python Virtual Environment
+DESCRIPTION: Commands for creating a virtual environment, installing the Flask application, and installing mod_wsgi.
+
+LANGUAGE: text
+CODE:
+$ cd hello-app
+$ python -m venv .venv
+$ . .venv/bin/activate
+$ pip install .  # install your application
+$ pip install mod_wsgi
+
+----------------------------------------
+
+TITLE: Creating and Activating Virtual Environment (Windows)
+DESCRIPTION: Commands to create and activate a Python virtual environment on Windows command prompt.
+
+LANGUAGE: bash
+CODE:
+$ py -3 -m venv .venv
+$ .venv\Scripts\activate.bat
+
+----------------------------------------
+
+TITLE: Creating New Blog Posts
+DESCRIPTION: Implements the create route for adding new blog posts with form validation and database insertion.
+
+LANGUAGE: python
+CODE:
+@bp.route('/create', methods=('GET', 'POST'))
+@login_required
+def create():
+    if request.method == 'POST':
+        title = request.form['title']
+        body = request.form['body']
+        error = None
+
+        if not title:
+            error = 'Title is required.'
+
+        if error is not None:
+            flash(error)
+        else:
+            db = get_db()
+            db.execute(
+                'INSERT INTO post (title, body, author_id)'
+                ' VALUES (?, ?, ?)',
+                (title, body, g.user['id'])
+            )
+            db.commit()
+            return redirect(url_for('blog.index'))
+
+    return render_template('blog/create.html')
+
+----------------------------------------
+
+TITLE: Installing Testing Dependencies for Flask
+DESCRIPTION: Command to install pytest and coverage for testing a Flask application.
+
+LANGUAGE: shell
+CODE:
+$ pip install pytest coverage
+
+----------------------------------------
+
+TITLE: Running Tests with Coverage Report
+DESCRIPTION: Commands to run tests with coverage reporting, including generating HTML report.
+
+LANGUAGE: bash
+CODE:
+$ coverage run -m pytest
+$ coverage report
+$ coverage html  # open htmlcov/index.html in a browser
+
+----------------------------------------
+
+TITLE: Styling Flask Application with CSS
+DESCRIPTION: This CSS snippet provides styling for various elements in the Flask application, including layout, typography, navigation, forms, and content areas.
+
+LANGUAGE: css
+CODE:
+html { font-family: sans-serif; background: #eee; padding: 1rem; }
+body { max-width: 960px; margin: 0 auto; background: white; }
+h1 { font-family: serif; color: #377ba8; margin: 1rem 0; }
+a { color: #377ba8; }
+hr { border: none; border-top: 1px solid lightgray; }
+nav { background: lightgray; display: flex; align-items: center; padding: 0 0.5rem; }
+nav h1 { flex: auto; margin: 0; }
+nav h1 a { text-decoration: none; padding: 0.25rem 0.5rem; }
+nav ul  { display: flex; list-style: none; margin: 0; padding: 0; }
+nav ul li a, nav ul li span, header .action { display: block; padding: 0.5rem; }
+.content { padding: 0 1rem 1rem; }
+.content > header { border-bottom: 1px solid lightgray; display: flex; align-items: flex-end; }
+.content > header h1 { flex: auto; margin: 1rem 0 0.25rem 0; }
+.flash { margin: 1em 0; padding: 1em; background: #cae6f6; border: 1px solid #377ba8; }
+.post > header { display: flex; align-items: flex-end; font-size: 0.85em; }
+.post > header > div:first-of-type { flex: auto; }
+.post > header h1 { font-size: 1.5em; margin-bottom: 0; }
+.post .about { color: slategray; font-style: italic; }
+.post .body { white-space: pre-line; }
+.content:last-child { margin-bottom: 0; }
+.content form { margin: 1em 0; display: flex; flex-direction: column; }
+.content label { font-weight: bold; margin-bottom: 0.5em; }
+.content input, .content textarea { margin-bottom: 1em; }
+.content textarea { min-height: 12em; resize: vertical; }
+input.danger { color: #cc2f2e; }
+input[type=submit] { align-self: start; min-width: 10em; }
+
+----------------------------------------
+
+TITLE: Testing Flask Application Factory Configuration
+DESCRIPTION: Python tests for the Flask application factory, checking default and test configurations.
+
+LANGUAGE: python
+CODE:
+from flaskr import create_app
+
+
+def test_config():
+    assert not create_app().testing
+    assert create_app({'TESTING': True}).testing
+
+
+def test_hello(client):
+    response = client.get('/hello')
+    assert response.data == b'Hello, World!'
+
+----------------------------------------
+
+TITLE: Rendering Text and HTML with Default Autoescape in Jinja2
+DESCRIPTION: This snippet demonstrates the default behavior of Jinja2 templating when rendering text and HTML content. By default, autoescape is enabled, which means HTML special characters will be escaped.
+
+LANGUAGE: Jinja2
+CODE:
+{{ text }}
+{{ html }}
+
+----------------------------------------
+
+TITLE: Implementing Registration Form Template in Flask
+DESCRIPTION: This snippet shows how to create a registration form template in Flask using Jinja. It extends the base template and provides input fields for username and password.
+
+LANGUAGE: html+jinja
+CODE:
+{% extends 'base.html' %}
+
+{% block header %}
+  <h1>{% block title %}Register{% endblock %}</h1>
+{% endblock %}
+
+{% block content %}
+  <form method="post">
+    <label for="username">Username</label>
+    <input name="username" id="username" required>
+    <label for="password">Password</label>
+    <input type="password" name="password" id="password" required>
+    <input type="submit" value="Register">
+  </form>
+{% endblock %}
+
+----------------------------------------
+
+TITLE: Binding Gunicorn to External IP
+DESCRIPTION: Example of binding Gunicorn to all external IPs on a non-privileged port. Shows the command and server output for external access configuration.
+
+LANGUAGE: text
+CODE:
+$ gunicorn -w 4 -b 0.0.0.0 'hello:create_app()'
+Listening at: http://0.0.0.0:8000 (x)
+
+----------------------------------------
+
+TITLE: Running Tests and Coverage for Flask Project
+DESCRIPTION: Shell commands to run tests and generate coverage reports for a Flask project.
+
+LANGUAGE: shell
+CODE:
+$ pytest
+$ coverage run -m pytest
+$ coverage report
+$ coverage html
+
+----------------------------------------
+
+TITLE: Creating Login Form Template in Flask
+DESCRIPTION: This snippet demonstrates how to implement a login form template in Flask using Jinja. It extends the base template and provides input fields for username and password.
+
+LANGUAGE: html+jinja
+CODE:
+{% extends 'base.html' %}
+
+{% block header %}
+  <h1>{% block title %}Log In{% endblock %}</h1>
+{% endblock %}
+
+{% block content %}
+  <form method="post">
+    <label for="username">Username</label>
+    <input name="username" id="username" required>
+    <label for="password">Password</label>
+    <input type="password" name="password" id="password" required>
+    <input type="submit" value="Log In">
+  </form>
+{% endblock %}
+
+----------------------------------------
+
+TITLE: Creating Custom Click Script for Flask
+DESCRIPTION: Shows how to create a custom Click script for Flask applications using the app factory pattern, allowing for more flexible command-line interfaces.
+
+LANGUAGE: python
+CODE:
+import click
+from flask import Flask
+from flask.cli import FlaskGroup
+
+def create_app():
+    app = Flask('wiki')
+    # other setup
+    return app
+
+@click.group(cls=FlaskGroup, create_app=create_app)
+def cli():
+    """Management script for the Wiki application."""
+
+----------------------------------------
+
+TITLE: Installing Gevent and Dependencies for Flask
+DESCRIPTION: Commands to set up a virtual environment, install the application, and install gevent. This ensures the correct versions of gevent and greenlet are used with the Flask application.
+
+LANGUAGE: text
+CODE:
+$ cd hello-app
+$ python -m venv .venv
+$ . .venv/bin/activate
+$ pip install .  # install your application
+$ pip install gevent
+
+----------------------------------------
+
+TITLE: Testing Flask Authentication Views
+DESCRIPTION: Python tests for Flask authentication views, including registration and login functionality.
+
+LANGUAGE: python
+CODE:
+import pytest
+from flask import g, session
+from flaskr.db import get_db
+
+
+def test_register(client, app):
+    assert client.get('/auth/register').status_code == 200
+    response = client.post(
+        '/auth/register', data={'username': 'a', 'password': 'a'}
+    )
+    assert response.headers["Location"] == "/auth/login"
+
+    with app.app_context():
+        assert get_db().execute(
+            "SELECT * FROM user WHERE username = 'a'",
+        ).fetchone() is not None
+
+
+@pytest.mark.parametrize(('username', 'password', 'message'), (
+    ('', '', b'Username is required.'),
+    ('a', '', b'Password is required.'),
+    ('test', 'test', b'already registered'),
+))
+def test_register_validate_input(client, username, password, message):
+    response = client.post(
+        '/auth/register',
+        data={'username': username, 'password': password}
+    )
+    assert message in response.data
+
+def test_login(client, auth):
+    assert client.get('/auth/login').status_code == 200
+    response = auth.login()
+    assert response.headers["Location"] == "/"
+
+    with client:
+        client.get('/')
+        assert session['user_id'] == 1
+        assert g.user['username'] == 'test'
+
+
+@pytest.mark.parametrize(('username', 'password', 'message'), (
+    ('a', 'test', b'Incorrect username.'),
+    ('test', 'a', b'Incorrect password.'),
+))
+def test_login_validate_input(auth, username, password, message):
+    response = auth.login(username, password)
+    assert message in response.data
+
+def test_logout(client, auth):
+    auth.login()
+
+    with client:
+        auth.logout()
+        assert 'user_id' not in session
+
+----------------------------------------
+
+TITLE: Defining Flask CLI Plugin Entry Point
+DESCRIPTION: Demonstrates how to define an entry point for a Flask CLI plugin in pyproject.toml, allowing extensions to add commands when installed.
+
+LANGUAGE: toml
+CODE:
+[project.entry-points."flask.commands"]
+my-command = "my_extension.commands:cli"
+
+----------------------------------------
+
+TITLE: Generating Secret Key
+DESCRIPTION: Python command to generate a secure random secret key for production use
+
+LANGUAGE: text
+CODE:
+$ python -c 'import secrets; print(secrets.token_hex())'
+
+----------------------------------------
+
+TITLE: Configuring pytest for Flask Project
+DESCRIPTION: TOML configuration for pytest and coverage in a Flask project.
+
+LANGUAGE: toml
+CODE:
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+
+[tool.coverage.run]
+branch = true
+source = ["flaskr"]
+
+----------------------------------------
+
+TITLE: Testing JSON APIs in Flask
+DESCRIPTION: Shows how to send and receive JSON data in Flask tests, including GraphQL query example.
+
+LANGUAGE: python
+CODE:
+def test_json_data(client):
+    response = client.post("/graphql", json={
+        "query": """
+            query User($id: String!) {
+                user(id: $id) {
+                    name
+                    theme
+                    picture_url
+                }
+            }
+        """,
+        "variables":{"id": 2},
+    })
+    assert response.json["data"]["user"]["name"] == "Flask"
+
+----------------------------------------
+
+TITLE: Python Package Dependencies for Flask Tests
+DESCRIPTION: Specifies exact versions of required packages for Flask's test environment. Generated automatically by pip-compile from tests-min.in source file. Each package listed includes the source of its requirement.
+
+LANGUAGE: pip
+CODE:
+blinker==1.9.0
+    # via -r tests-min.in
+click==8.1.3
+    # via -r tests-min.in
+itsdangerous==2.2.0
+    # via -r tests-min.in
+jinja2==3.1.2
+    # via -r tests-min.in
+markupsafe==2.1.1
+    # via
+    #   -r tests-min.in
+    #   jinja2
+    #   werkzeug
+werkzeug==3.1.0
+    # via -r tests-min.in
+
+----------------------------------------
+
+TITLE: Nesting Flask Blueprints
+DESCRIPTION: Demonstrates how to nest blueprints within other blueprints, including URL prefix and subdomain handling.
+
+LANGUAGE: python
+CODE:
+parent = Blueprint('parent', __name__, url_prefix='/parent')
+child = Blueprint('child', __name__, url_prefix='/child')
+parent.register_blueprint(child)
+app.register_blueprint(parent)
+
+----------------------------------------
+
+TITLE: Configuring Flask Secret Key
+DESCRIPTION: Python configuration file for setting the production secret key
+
+LANGUAGE: python
+CODE:
+SECRET_KEY = '192b9bdd22ab9ed4d12e236c78afcb9a393ec15f71bbf5dc987d54727823bcbf'
+
+----------------------------------------
+
+TITLE: Python Testing Dependencies Requirements
+DESCRIPTION: A pip requirements file listing specific versions of Python packages needed for testing. Includes key testing packages like pytest, asgiref, python-dotenv and their associated dependencies.
+
+LANGUAGE: pip
+CODE:
+asgiref==3.8.1
+    # via -r tests.in
+iniconfig==2.0.0
+    # via pytest
+packaging==24.2
+    # via pytest
+pluggy==1.5.0
+    # via pytest
+pytest==8.3.3
+    # via -r tests.in
+python-dotenv==1.0.1
+    # via -r tests.in
+
+----------------------------------------
+
+TITLE: Blueprint Error Handler Implementation
+DESCRIPTION: Shows how to implement custom error handlers within a Flask blueprint for handling specific HTTP error codes.
+
+LANGUAGE: python
+CODE:
+@simple_page.errorhandler(404)
+def page_not_found(e):
+    return render_template('pages/404.html')
+
+----------------------------------------
+
+TITLE: Installing Flask Application from Wheel
+DESCRIPTION: Command to install the Flask application wheel package on a deployment machine
+
+LANGUAGE: text
+CODE:
+$ pip install flaskr-1.0.0-py3-none-any.whl
+
+----------------------------------------
+
+TITLE: Running Flask Development Server
+DESCRIPTION: Demonstrates how to run the Flask development server using the 'flask run' command. The server will start and listen on http://127.0.0.1:5000/.
+
+LANGUAGE: bash
+CODE:
+$ flask --app hello run
+ * Serving Flask app "hello"
+ * Running on http://127.0.0.1:5000/ (Press CTRL+C to quit)
+
+----------------------------------------
+
+TITLE: Initializing Flask Database
+DESCRIPTION: Command to initialize the database in the instance folder after deployment
+
+LANGUAGE: text
+CODE:
+$ flask --app flaskr init-db
+
+----------------------------------------
+
+TITLE: Registering CLI Commands with Blueprints
+DESCRIPTION: Demonstrates how to register CLI commands directly onto blueprints, allowing for organized command grouping based on blueprint structure.
+
+LANGUAGE: python
+CODE:
+from flask import Blueprint
+
+bp = Blueprint('students', __name__)
+
+@bp.cli.command('create')
+@click.argument('name')
+def create(name):
+    ...
+
+app.register_blueprint(bp)
+
+----------------------------------------
+
+TITLE: Installing Flask from Source and Flaskr
+DESCRIPTION: Commands to install Flask from source and then install Flaskr, useful when using the main branch.
+
+LANGUAGE: bash
+CODE:
+$ pip install -e ../..
+$ pip install -e .
+
+----------------------------------------
+
+TITLE: Unsafe JavaScript URI in HTML Anchor Tag
+DESCRIPTION: Shows an example of an unsafe href attribute containing a JavaScript URI, which can lead to XSS vulnerabilities if not properly secured.
+
+LANGUAGE: html
+CODE:
+<a href="{{ value }}">click here</a>
+<a href="javascript:alert('unsafe');">click here</a>
+
+----------------------------------------
+
+TITLE: Installing Test Dependencies and Running Tests
+DESCRIPTION: Commands to install test dependencies and run tests using pytest.
+
+LANGUAGE: bash
+CODE:
+$ pip install '.[test]'
+$ pytest
+
+----------------------------------------
+
+TITLE: Setting HSTS Security Header in Flask
+DESCRIPTION: Demonstrates how to set the HTTP Strict Transport Security (HSTS) header in a Flask response to enforce HTTPS connections.
+
+LANGUAGE: python
+CODE:
+response.headers['Strict-Transport-Security'] = 'max-age=31536000; includeSubDomains'
+
+----------------------------------------
+
+TITLE: Executing Flask Application Python Script
+DESCRIPTION: Shows the command to run a Flask application Python script directly, which will start the development server if the script contains the app.run() call in the main block.
+
+LANGUAGE: text
+CODE:
+$ python hello.py
+
+----------------------------------------
+
+TITLE: Handling Runtime Error Outside Application Context
+DESCRIPTION: Example of a runtime error that occurs when trying to access current_app outside an application context.
+
+LANGUAGE: python
+CODE:
+RuntimeError: Working outside of application context.\n\nThis typically means that you attempted to use functionality that\nneeded to interface with the current application object in some way.\nTo solve this, set up an application context with app.app_context().
+
+----------------------------------------
+
+TITLE: Redirecting Favicon Requests in Flask
+DESCRIPTION: This Python code adds a URL rule to redirect favicon requests to the static file. It's useful when the application is mounted at the root path of the domain.
+
+LANGUAGE: python
+CODE:
+app.add_url_rule('/favicon.ico',
+                 redirect_to=url_for('static', filename='favicon.ico'))
+
+----------------------------------------
+
+TITLE: Creating Flask App with Manual Context
+DESCRIPTION: Example of manually pushing an application context using app.app_context() when initializing an application.
+
+LANGUAGE: python
+CODE:
+def create_app():\n    app = Flask(__name__)\n\n    with app.app_context():\n        init_db()\n\n    return app
+
+----------------------------------------
+
+TITLE: Serving Favicon Directly in Flask
+DESCRIPTION: This Flask route function serves the favicon directly from the static directory. It uses send_from_directory to efficiently send the file and specifies the MIME type explicitly.
+
+LANGUAGE: python
+CODE:
+import os
+from flask import send_from_directory
+
+@app.route('/favicon.ico')
+def favicon():
+    return send_from_directory(os.path.join(app.root_path, 'static'),
+                               'favicon.ico', mimetype='image/vnd.microsoft.icon')
+
+----------------------------------------
+
+TITLE: Creating LocalProxy for Database Connection
+DESCRIPTION: Example of creating a LocalProxy object for database connection using Werkzeug's LocalProxy.
+
+LANGUAGE: python
+CODE:
+from werkzeug.local import LocalProxy\ndb = LocalProxy(get_db)
+
+----------------------------------------
+
+TITLE: Running Flask Factory Applications
+DESCRIPTION: Command-line examples showing how to run Flask applications using the factory pattern, including passing arguments to the factory function.
+
+LANGUAGE: text
+CODE:
+$ flask --app hello run
+
+LANGUAGE: text
+CODE:
+$ flask --app hello:create_app(local_auth=True) run
+
+----------------------------------------
+
+TITLE: Logging Template Renders
+DESCRIPTION: Example code showing how to subscribe to Flask's template_rendered signal to log template rendering events.
+
+LANGUAGE: Python
+CODE:
+def log_template_renders(sender, template, context, **extra):
+    sender.logger.debug('Rendering template "%s" with context %s',
+                        template.name or 'string template',
+                        context)
+
+from flask import template_rendered
+template_rendered.connect(log_template_renders, app)
+
+----------------------------------------
+
+TITLE: URL Generation for JavaScript Fetch Requests
+DESCRIPTION: Shows different methods of generating URLs for fetch requests, including using url_for and handling dynamic URLs in JavaScript.
+
+LANGUAGE: javascript
+CODE:
+const user_url = {{ url_for("user", id=current_user.id)|tojson }}
+fetch(user_url).then(...)
+
+LANGUAGE: javascript
+CODE:
+const SCRIPT_ROOT = {{ request.script_root|tojson }}
+let user_id = ...  // do something to get a user id from the page
+let user_url = `${SCRIPT_ROOT}/user/${user_id}`
+fetch(user_url).then(...)
+
+----------------------------------------
+
+TITLE: Session Mutable Object Modification
+DESCRIPTION: Example demonstrating how to handle modifications to mutable objects in Flask sessions by explicitly marking the session as modified.
+
+LANGUAGE: Python
+CODE:
+# this change is not picked up because a mutable object (here
+# a list) is changed.
+session['objects'].append(42)
+# so mark it as modified yourself
+session.modified = True
+
+----------------------------------------
+
+TITLE: Manual Object Relational Mapping Setup in Flask
+DESCRIPTION: Demonstrates manual ORM setup without using the declarative approach, including engine creation and session management.
+
+LANGUAGE: python
+CODE:
+from sqlalchemy import create_engine, MetaData
+from sqlalchemy.orm import scoped_session, sessionmaker
+
+engine = create_engine('sqlite:////tmp/test.db')
+metadata = MetaData()
+db_session = scoped_session(sessionmaker(autocommit=False,
+                                         autoflush=False,
+                                         bind=engine))
+def init_db():
+    metadata.create_all(bind=engine)
+
+----------------------------------------
+
+TITLE: Custom View Function Configuration
+DESCRIPTION: Example showing how to customize Flask view function behavior by setting special attributes.
+
+LANGUAGE: Python
+CODE:
+def index():
+    if request.method == 'OPTIONS':
+        # custom options handling here
+        ...
+    return 'Hello World!'
+index.provide_automatic_options = False
+index.methods = ['GET', 'OPTIONS']
+
+app.add_url_rule('/', index)
+
+----------------------------------------
+
+TITLE: Accessing Proxied Objects
+DESCRIPTION: Shows how to access the underlying object behind a Flask proxy using _get_current_object().
+
+LANGUAGE: python
+CODE:
+app = current_app._get_current_object()\nmy_signal.send(app)
+
+----------------------------------------
+
+TITLE: Injecting Request Information into Flask Log Messages
+DESCRIPTION: This code creates a custom RequestFormatter class that injects request-specific information (URL and IP address) into log messages. It's useful for adding context to log entries in a Flask application.
+
+LANGUAGE: python
+CODE:
+from flask import has_request_context, request
+from flask.logging import default_handler
+
+class RequestFormatter(logging.Formatter):
+    def format(self, record):
+        if has_request_context():
+            record.url = request.url
+            record.remote_addr = request.remote_addr
+        else:
+            record.url = None
+            record.remote_addr = None
+
+        return super().format(record)
+
+formatter = RequestFormatter(
+    '[%(asctime)s] %(remote_addr)s requested %(url)s\n'
+    '%(levelname)s in %(module)s: %(message)s'
+)
+default_handler.setFormatter(formatter)
+mail_handler.setFormatter(formatter)
+
+----------------------------------------
+
+TITLE: Manual Request Context Management
+DESCRIPTION: Demonstrates how to manually create and manage a request context for testing purposes using test_request_context.
+
+LANGUAGE: python
+CODE:
+def generate_report(year):\n    format = request.args.get("format")\n    ...\n\nwith app.test_request_context(\n    "/make_report/2017", query_string={"format": "short"}\n):\n    generate_report()
+
+----------------------------------------
+
+TITLE: Initializing Flask Extension Class
+DESCRIPTION: Demonstrates the common pattern for creating a Flask extension class with an init_app method. This allows the extension to support the application factory pattern and avoid circular import issues.
+
+LANGUAGE: python
+CODE:
+class HelloExtension:
+    def __init__(self, app=None):
+        if app is not None:
+            self.init_app(app)
+
+    def init_app(self, app):
+        app.before_request(...)
+
+----------------------------------------
+
+TITLE: Creating a Helper Function for Lazy Loading Flask Routes
+DESCRIPTION: Defines a helper function 'url' that simplifies the process of adding lazy-loaded routes to a Flask application. This function wraps view functions in LazyView objects and supports adding multiple URL rules for a single view function.
+
+LANGUAGE: python
+CODE:
+def url(import_name, url_rules=[], **options):
+    view = LazyView(f"yourapplication.{import_name}")
+    for url_rule in url_rules:
+        app.add_url_rule(url_rule, view_func=view, **options)
+
+# add a single route to the index view
+url('views.index', ['/'])
+
+# add two routes to a single function endpoint
+url_rules = ['/user/','/user/<username>']
+url('views.user', url_rules)
+
+----------------------------------------
+
+TITLE: Implementing Flask Extension with Model and View
+DESCRIPTION: Illustrates a complex example of a Flask extension that interacts with Flask-SQLAlchemy to provide a Post model and API view. It shows how to handle dependencies between the extension, model, and view.
+
+LANGUAGE: python
+CODE:
+class PostAPI(MethodView):
+    def __init__(self, model):
+        self.model = model
+
+    def get(self, id):
+        post = self.model.query.get(id)
+        return jsonify(post.to_json())
+
+class BlogExtension:
+    def __init__(self, db):
+        class Post(db.Model):
+            id = db.Column(primary_key=True)
+            title = db.Column(db.String, nullable=False)
+
+        self.post_model = Post
+
+    def init_app(self, app):
+        api_view = PostAPI.as_view(model=self.post_model)
+
+db = SQLAlchemy()
+blog = BlogExtension(db)
+db.init_app(app)
+blog.init_app(app)
+
+----------------------------------------
+
+TITLE: DetailView with URL Variables
+DESCRIPTION: Class-based view handling URL variables for detailed item views
+
+LANGUAGE: python
+CODE:
+class DetailView(View):
+    def __init__(self, model):
+        self.model = model
+        self.template = f"{model.__name__.lower()}/detail.html"
+
+    def dispatch_request(self, id)
+        item = self.model.query.get_or_404(id)
+        return render_template(self.template, item=item)
+
+----------------------------------------
+
+TITLE: Basic Class-Based View Implementation
+DESCRIPTION: Converting a function-based view to a basic class-based view using Flask's View class
+
+LANGUAGE: python
+CODE:
+from flask.views import View
+
+class UserList(View):
+    def dispatch_request(self):
+        users = User.query.all()
+        return render_template("users.html", objects=users)
+
+app.add_url_rule("/users/", view_func=UserList.as_view("user_list"))
+
+----------------------------------------
+
+TITLE: Using SQLite3 Connection in Flask Route
+DESCRIPTION: This example shows how to use the SQLite3 connection within a Flask route. It demonstrates accessing the database connection using the previously defined 'get_db()' function.
+
+LANGUAGE: Python
+CODE:
+@app.route('/')
+def index():
+    cur = get_db().cursor()
+    ...
+
+----------------------------------------
+
+TITLE: Implementing Templating Decorator in Python for Flask
+DESCRIPTION: This code defines a templated decorator that simplifies rendering templates in Flask views. It automatically renders the specified template with the returned dictionary as context.
+
+LANGUAGE: python
+CODE:
+from functools import wraps
+from flask import request, render_template
+
+def templated(template=None):
+    def decorator(f):
+        @wraps(f)
+        def decorated_function(*args, **kwargs):
+            template_name = template
+            if template_name is None:
+                template_name = f"{request.endpoint.replace('.', '/')}.html"
+            ctx = f(*args, **kwargs)
+            if ctx is None:
+                ctx = {}
+            elif not isinstance(ctx, dict):
+                return ctx
+            return render_template(template_name, **ctx)
+        return decorated_function
+    return decorator
+
+----------------------------------------
+
+TITLE: Implementing Caching Decorator in Python for Flask
+DESCRIPTION: This code defines a cached decorator that implements a caching mechanism for Flask views. It caches the result of a view function for a specified timeout period.
+
+LANGUAGE: python
+CODE:
+from functools import wraps
+from flask import request
+
+def cached(timeout=5 * 60, key='view/{}':
+    def decorator(f):
+        @wraps(f)
+        def decorated_function(*args, **kwargs):
+            cache_key = key.format(request.path)
+            rv = cache.get(cache_key)
+            if rv is not None:
+                return rv
+            rv = f(*args, **kwargs)
+            cache.set(cache_key, rv, timeout=timeout)
+            return rv
+        return decorated_function
+    return decorator
+
+----------------------------------------
+
+TITLE: Streaming with Context in Flask
+DESCRIPTION: This snippet demonstrates how to use stream_with_context to keep the request context active during streaming, allowing access to request data within the generator function.
+
+LANGUAGE: python
+CODE:
+from flask import stream_with_context, request
+from markupsafe import escape
+
+@app.route('/stream')
+def streamed_response():
+    def generate():
+        yield '<p>Hello '
+        yield escape(request.args['name'])
+        yield '!</p>'
+    return stream_with_context(generate())
+
+----------------------------------------
+
+TITLE: Implementing Endpoint Decorator in Python for Flask
+DESCRIPTION: This example shows how to use the endpoint decorator to map a custom endpoint to a view function in Flask, providing more flexibility with the Werkzeug routing system.
+
+LANGUAGE: python
+CODE:
+from flask import Flask
+from werkzeug.routing import Rule
+
+app = Flask(__name__)
+app.url_map.add(Rule('/', endpoint='index'))
+
+@app.endpoint('index')
+def my_index():
+    return "Hello world"
+
+----------------------------------------
+
+TITLE: Integrating HTTP Method Override Middleware with Flask
+DESCRIPTION: This snippet demonstrates how to wrap a Flask application with the HTTP Method Override middleware. It imports Flask, creates an app instance, and applies the middleware to the WSGI application.
+
+LANGUAGE: Python
+CODE:
+from flask import Flask
+
+app = Flask(__name__)
+app.wsgi_app = HTTPMethodOverrideMiddleware(app.wsgi_app)
+
+----------------------------------------
+
+TITLE: Setting up Flask-Celery Environment
+DESCRIPTION: Commands to create a virtual environment, install dependencies, and start the Celery worker process for background task processing.
+
+LANGUAGE: shell
+CODE:
+$ python3 -m venv .venv
+$ . ./.venv/bin/activate
+$ pip install -r requirements.txt && pip install -e .
+$ celery -A make_celery worker --loglevel INFO
+
+----------------------------------------
+
+TITLE: Implementing User Login View in Flask
+DESCRIPTION: This snippet demonstrates the implementation of a user login view. It validates user credentials, manages user sessions, and handles authentication errors.
+
+LANGUAGE: python
+CODE:
+@bp.route('/login', methods=('GET', 'POST'))
+def login():
+    if request.method == 'POST':
+        username = request.form['username']
+        password = request.form['password']
+        db = get_db()
+        error = None
+        user = db.execute(
+            'SELECT * FROM user WHERE username = ?', (username,)
+        ).fetchone()
+
+        if user is None:
+            error = 'Incorrect username.'
+        elif not check_password_hash(user['password'], password):
+            error = 'Incorrect password.'
+
+        if error is None:
+            session.clear()
+            session['user_id'] = user['id']
+            return redirect(url_for('index'))
+
+        flash(error)
+
+    return render_template('auth/login.html')
+
+----------------------------------------
+
+TITLE: Cloning and Setting Up Flask Repository
+DESCRIPTION: Instructions for cloning the Flask repository, checking out the correct version, and navigating to the tutorial directory.
+
+LANGUAGE: bash
+CODE:
+# clone the repository
+$ git clone https://github.com/pallets/flask
+$ cd flask
+# checkout the correct version
+$ git tag  # shows the tagged versions
+$ git checkout latest-tag-found-above
+$ cd examples/tutorial
+
+----------------------------------------
+
+TITLE: Executing Gevent WSGI Server Script
+DESCRIPTION: Command to run the Python script that starts the gevent WSGI server with the Flask application. Note that no output is shown when the server starts.
+
+LANGUAGE: text
+CODE:
+$ python wsgi.py
+
+----------------------------------------
+
+TITLE: Creating and Activating Virtual Environment (Unix)
+DESCRIPTION: Commands to create and activate a Python virtual environment on Unix-based systems.
+
+LANGUAGE: bash
+CODE:
+$ python3 -m venv .venv
+$ . .venv/bin/activate
+
+----------------------------------------
+
+TITLE: Testing Flask CLI Commands
+DESCRIPTION: Demonstrates testing Flask CLI commands using the CLI runner fixture.
+
+LANGUAGE: python
+CODE:
+import click
+
+@app.cli.command("hello")
+@click.option("--name", default="World")
+def hello_command(name):
+    click.echo(f"Hello, {name}!")
+
+def test_hello_command(runner):
+    result = runner.invoke(args="hello")
+    assert "World" in result.output
+
+    result = runner.invoke(args=["hello", "--name", "Flask"])
+    assert "Flask" in result.output
+
+----------------------------------------
+
+TITLE: Installing Flaskr
+DESCRIPTION: Command to install Flaskr in editable mode using pip.
+
+LANGUAGE: bash
+CODE:
+$ pip install -e .
+
+----------------------------------------
+
+TITLE: Registering Error Handlers in Flask
+DESCRIPTION: Examples of how to register error handlers using decorators and the register_error_handler method in Flask.
+
+LANGUAGE: python
+CODE:
+@app.errorhandler(werkzeug.exceptions.BadRequest)
+def handle_bad_request(e):
+    return 'bad request!', 400
+
+# or, without the decorator
+app.register_error_handler(400, handle_bad_request)
+
+----------------------------------------
+
+TITLE: Running Flask Development Server
+DESCRIPTION: Command to start the Flask development server for the JavaScript example application.
+
+LANGUAGE: text
+CODE:
+$ flask --app js_example run
+
+----------------------------------------
+
+TITLE: Using Flask Extension with Application Factory
+DESCRIPTION: Shows how to use a Flask extension instance with the application factory pattern. This allows the extension to exist independently of the application and be used in other modules before the app is created.
+
+LANGUAGE: python
+CODE:
+hello = HelloExtension()
+
+def create_app():
+    app = Flask(__name__)
+    hello.init_app(app)
+    return app
+
+----------------------------------------
+
+TITLE: Defining Flask Build Dependencies with pip
+DESCRIPTION: Specifies the required Python packages and their exact versions needed for building the Flask project. Dependencies include build, packaging, and pyproject-hooks packages with their respective versions.
+
+LANGUAGE: pip
+CODE:
+build==1.2.2.post1
+    # via -r build.in
+packaging==24.2
+    # via build
+pyproject-hooks==1.2.0
+    # via build
+
+----------------------------------------
+
+TITLE: Running Flask Application via Command Line
+DESCRIPTION: Command line instruction to start the Flask development server, which runs the application on localhost port 5000.
+
+LANGUAGE: bash
+CODE:
+$ flask run
+  * Running on http://127.0.0.1:5000/ (Press CTRL+C to quit)
+
+----------------------------------------
+
+TITLE: Python pip-compile Requirements File
+DESCRIPTION: Auto-generated requirements file created by pip-compile from dev.in. Lists all development dependencies with pinned versions and their dependency relationships.
+
+LANGUAGE: python
+CODE:
+#
+# This file is autogenerated by pip-compile with Python 3.13
+# by the following command:
+#
+#    pip-compile dev.in
+#
+alamaster==1.0.0
+    # via
+    #   -r /Users/david/Projects/flask/requirements/docs.txt
+    #   sphinx
+
+----------------------------------------
+
+TITLE: Importing Macro with Context in Jinja2
+DESCRIPTION: Demonstrates how to import a macro with context in a Jinja2 template, allowing access to request objects within the imported macro.
+
+LANGUAGE: jinja
+CODE:
+{% from '_helpers.html' import my_macro with context %}
+
+----------------------------------------
+
+TITLE: Generating Dependencies with pip-compile for Flask Project
+DESCRIPTION: This code snippet shows the command used to generate the dependencies file using pip-compile. It specifies the input file 'typing.in' and uses Python 3.13.
+
+LANGUAGE: Shell
+CODE:
+#    pip-compile typing.in
+
+----------------------------------------
+
+TITLE: Creating Flask Project Directory Structure
+DESCRIPTION: Commands to create and navigate to the Flask tutorial project directory.
+
+LANGUAGE: none
+CODE:
+$ mkdir flask-tutorial
+$ cd flask-tutorial
+
+----------------------------------------
+
+TITLE: Rendering Text and HTML with Autoescape Disabled in Jinja2
+DESCRIPTION: This snippet shows how to disable autoescaping for a specific block in Jinja2. When autoescape is set to false, HTML content will be rendered as-is without escaping special characters.
+
+LANGUAGE: Jinja2
+CODE:
+{% autoescape false %}{{ text }}
+{{ html }}{% endautoescape %}
+
+----------------------------------------
+
+TITLE: Initializing and Configuring a Flask Extension (Python)
+DESCRIPTION: This snippet demonstrates how to initialize and configure a hypothetical Flask extension named 'Flask-Foo'. It shows importing the extension, creating an instance, configuring the Flask app, and initializing the extension with the app.
+
+LANGUAGE: python
+CODE:
+from flask_foo import Foo
+
+foo = Foo()
+
+app = Flask(__name__)
+app.config.update(
+    FOO_BAR='baz',
+    FOO_SPAM='eggs',
+)
+
+foo.init_app(app)
+
+----------------------------------------
+
+TITLE: Flask Dependencies with Celery
+DESCRIPTION: Comprehensive list of Python package dependencies with exact version numbers, generated automatically by pip-compile. Includes Flask web framework and Celery task queue with Redis backend, along with all their dependencies and sub-dependencies.
+
+LANGUAGE: pip
+CODE:
+amqp==5.1.1
+async-timeout==4.0.2
+billiard==3.6.4.0
+blinker==1.6.2
+celery[redis]==5.2.7
+click==8.1.3
+click-didyoumean==0.3.0
+click-plugins==1.1.1
+click-repl==0.2.0
+flask==2.3.2
+itsdangerous==2.1.2
+jinja2==3.1.2
+kombu==5.2.4
+markupsafe==2.1.2
+prompt-toolkit==3.0.38
+pytz==2023.3
+redis==4.5.4
+six==1.16.0
+vine==5.0.0
+wcwidth==0.2.6
+werkzeug==2.3.3
+
+----------------------------------------
+
+TITLE: Generating Flask Documentation Dependencies with pip-compile
+DESCRIPTION: This code snippet shows the command used to generate the requirements file for Flask documentation using pip-compile. It specifies the Python version and input file used.
+
+LANGUAGE: Python
+CODE:
+#
+# This file is autogenerated by pip-compile with Python 3.13
+# by the following command:
+#
+#    pip-compile docs.in
+#
+
+----------------------------------------
+
+TITLE: Configuring WSGI Script for Flask Application
+DESCRIPTION: Python script to import or create a Flask application named 'application' for mod_wsgi to use.
+
+LANGUAGE: python
+CODE:
+from hello import app
+
+application = app
+
+LANGUAGE: python
+CODE:
+from hello import create_app
+
+application = create_app()
+
+----------------------------------------
+
+TITLE: Configuring Local Domain in Hosts File
+DESCRIPTION: Example of adding a local domain mapping to the hosts file on Linux systems to enable local development with custom domains.
+
+LANGUAGE: python
+CODE:
+127.0.0.1 hello.localhost
+
+----------------------------------------
+
+TITLE: Including Flask License File in RST Documentation
+DESCRIPTION: reStructuredText directive that includes the project's LICENSE.txt file from parent directory and specifies it should be displayed as plain text.
+
+LANGUAGE: rst
+CODE:
+.. literalinclude:: ../LICENSE.txt
+    :language: text
+
+----------------------------------------
+
+TITLE: Defining RST Document Structure for Flask Documentation
+DESCRIPTION: This RST code defines the structure of the Flask documentation, including the main sections such as User's Guide, API Reference, and Additional Notes. It uses toctree directives to organize the documentation hierarchy.
+
+LANGUAGE: rst
+CODE:
+.. toctree::
+   :maxdepth: 2
+
+   installation
+   quickstart
+   tutorial/index
+   templating
+   testing
+   errorhandling
+   debugging
+   logging
+   config
+   signals
+   views
+   lifecycle
+   appcontext
+   reqcontext
+   blueprints
+   extensions
+   cli
+   server
+   shell
+   patterns/index
+   web-security
+   deploying/index
+   async-await

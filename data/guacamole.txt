@@ -1,0 +1,1959 @@
+TITLE: Implementing Guacamole Tunnel Servlet
+DESCRIPTION: Java implementation of a basic GuacamoleHTTPTunnelServlet that establishes VNC connections via guacd.
+
+LANGUAGE: java
+CODE:
+package org.apache.guacamole.net.example;
+
+import javax.servlet.http.HttpServletRequest;
+import org.apache.guacamole.GuacamoleException;
+import org.apache.guacamole.net.GuacamoleSocket;
+import org.apache.guacamole.net.GuacamoleTunnel;
+import org.apache.guacamole.net.InetGuacamoleSocket;
+import org.apache.guacamole.net.SimpleGuacamoleTunnel;
+import org.apache.guacamole.protocol.ConfiguredGuacamoleSocket;
+import org.apache.guacamole.protocol.GuacamoleConfiguration;
+import org.apache.guacamole.servlet.GuacamoleHTTPTunnelServlet;
+
+public class TutorialGuacamoleTunnelServlet
+    extends GuacamoleHTTPTunnelServlet {
+
+    @Override
+    protected GuacamoleTunnel doConnect(HttpServletRequest request)
+        throws GuacamoleException {
+
+        GuacamoleConfiguration config = new GuacamoleConfiguration();
+        config.setProtocol("vnc");
+        config.setParameter("hostname", "localhost");
+        config.setParameter("port", "5901");
+        config.setParameter("password", "potato");
+
+        GuacamoleSocket socket = new ConfiguredGuacamoleSocket(
+                new InetGuacamoleSocket("localhost", 4822),
+                config
+        );
+
+        return new SimpleGuacamoleTunnel(socket);;
+
+    }
+
+}
+
+----------------------------------------
+
+TITLE: Initializing Guacamole Client in JavaScript
+DESCRIPTION: Creates a new Guacamole client instance using an unconnected tunnel, adds the client's display to the DOM, and establishes a connection.
+
+LANGUAGE: javascript
+CODE:
+var client = new Guacamole.Client(tunnel);
+
+document.body.appendChild(client.getDisplay().getElement());
+
+client.connect();
+
+----------------------------------------
+
+TITLE: Implementing Keyboard Event Handling in Guacamole
+DESCRIPTION: Sets up keyboard event handling using Guacamole.Keyboard, which provides consistent cross-browser keyboard events using X11 keysyms.
+
+LANGUAGE: javascript
+CODE:
+var keyboard = new Guacamole.Keyboard(document);
+
+keyboard.onkeydown = function(keysym) {
+    // Do something ...
+};
+
+keyboard.onkeyup = function(keysym) {
+    // Do something ...
+};
+
+----------------------------------------
+
+TITLE: Implementing Custom GuacamoleHTTPTunnelServlet in Java
+DESCRIPTION: Example implementation of a basic GuacamoleHTTPTunnelServlet extension that creates a tunnel connection to guacd. This snippet demonstrates the minimal implementation required for establishing a connection without authentication.
+
+LANGUAGE: java
+CODE:
+public class MyGuacamoleTunnelServlet
+    extends GuacamoleHTTPTunnelServlet {
+
+    @Override
+    protected GuacamoleTunnel doConnect(HttpServletRequest request)
+        throws GuacamoleException {
+
+        // Connect to guacd here (this is a STUB)
+        GuacamoleSocket socket;
+
+        // Return a new tunnel which uses the connected socket
+        return new SimpleGuacamoleTunnel(socket);
+
+    }
+
+}
+
+----------------------------------------
+
+TITLE: Creating Guacamole Web Client Interface
+DESCRIPTION: HTML and JavaScript code for implementing the client-side interface with mouse and keyboard support.
+
+LANGUAGE: html
+CODE:
+<!DOCTYPE HTML>
+<html>
+    <head>
+        <title>Guacamole Tutorial</title>
+    </head>
+    <body>
+        <!-- Guacamole -->
+        <script type="text/javascript"
+            src="guacamole-common-js/all.min.js"></script>
+
+        <!-- Display -->
+        <div id="display"></div>
+
+        <!-- Init -->
+        <script type="text/javascript"> /* <![CDATA[ */
+
+            var display = document.getElementById("display");
+            var guac = new Guacamole.Client(
+                new Guacamole.HTTPTunnel("tunnel")
+            );
+
+            display.appendChild(guac.getDisplay().getElement());
+            
+            guac.onerror = function(error) {
+                alert(error);
+            };
+
+            guac.connect();
+
+            window.onunload = function() {
+                guac.disconnect();
+            }
+
+            var mouse = new Guacamole.Mouse(guac.getDisplay().getElement());
+
+            mouse.onmousedown = 
+            mouse.onmouseup   =
+            mouse.onmousemove = function(mouseState) {
+                guac.sendMouseState(mouseState);
+            };
+
+            var keyboard = new Guacamole.Keyboard(document);
+
+            keyboard.onkeydown = function (keysym) {
+                guac.sendKeyEvent(1, keysym);
+            };
+
+            keyboard.onkeyup = function (keysym) {
+                guac.sendKeyEvent(0, keysym);
+            };
+
+        /* ]]> */ </script>
+    </body>
+</html>
+
+----------------------------------------
+
+TITLE: Sample XML User Mapping Configuration
+DESCRIPTION: Example user-mapping.xml file showing how to configure VNC connections with authentication
+
+LANGUAGE: xml
+CODE:
+<user-mapping>
+    <!-- Per-user authentication and config information -->
+    <authorize username="USERNAME" password="PASSWORD">
+        <protocol>vnc</protocol>
+        <param name="hostname">localhost</param>
+        <param name="port">5900</param>
+        <param name="password">VNCPASS</param>
+    </authorize>
+
+    <!-- Another user, but using md5 to hash the password
+         (example below uses the md5 hash of "PASSWORD") -->
+    <authorize
+            username="USERNAME2"
+            password="319f4d26e3c536b5dd871bb2c52e3178"
+            encoding="md5">
+
+        <!-- First authorized connection -->
+        <connection name="localhost">
+            <protocol>vnc</protocol>
+            <param name="hostname">localhost</param>
+            <param name="port">5901</param>
+            <param name="password">VNCPASS</param>
+        </connection>
+
+        <!-- Second authorized connection -->
+        <connection name="otherhost">
+            <protocol>vnc</protocol>
+            <param name="hostname">otherhost</param>
+            <param name="port">5900</param>
+            <param name="password">VNCPASS</param>
+        </connection>
+
+    </authorize>
+</user-mapping>
+
+----------------------------------------
+
+TITLE: Configuring Maven Project Structure
+DESCRIPTION: Basic Maven POM file configuration for a Guacamole web application project, defining project metadata and build settings.
+
+LANGUAGE: xml
+CODE:
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 
+                             http://maven.apache.org/maven-v4_0_0.xsd">
+
+    <modelVersion>4.0.0</modelVersion>
+    <groupId>org.apache.guacamole</groupId>
+    <artifactId>guacamole-tutorial</artifactId>
+    <packaging>war</packaging>
+    <version>1.6.0</version>
+    <name>guacamole-tutorial</name>
+
+    <properties>
+        <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+    </properties>
+
+</project>
+
+----------------------------------------
+
+TITLE: Defining Full Guacamole Extension Manifest in JSON
+DESCRIPTION: More complete example of a guac-manifest.json file for a Guacamole extension. Includes CSS, HTML, and resource definitions in addition to the basic required properties.
+
+LANGUAGE: json
+CODE:
+{
+
+    "guacamoleVersion" : "1.6.0",
+
+    "name"      : "My Extension",
+    "namespace" : "my-extension",
+
+    "css" : [ "theme.css" ],
+
+    "html" : [ "loginDisclaimer.html" ],
+
+    "resources" : {
+        "images/logo.png"   : "image/png",
+        "images/cancel.png" : "image/png",
+        "images/delete.png" : "image/png"
+    }
+
+}
+
+----------------------------------------
+
+TITLE: Creating HTTP Tunnel for Guacamole in JavaScript
+DESCRIPTION: Instantiates a new Guacamole HTTP tunnel by providing the relative URL to the server-side tunnel servlet.
+
+LANGUAGE: javascript
+CODE:
+var tunnel = new Guacamole.Tunnel("tunnel");
+
+----------------------------------------
+
+TITLE: Basic Guacamole Protocol Instruction Format
+DESCRIPTION: Demonstrates the basic format of a Guacamole protocol instruction, showing the comma-delimited structure with length-prefixed elements terminated by a semicolon.
+
+LANGUAGE: plaintext
+CODE:
+OPCODE,ARG1,ARG2,ARG3,...;
+
+----------------------------------------
+
+TITLE: Guacamole Protocol Element Format
+DESCRIPTION: Shows how individual elements within a Guacamole instruction are formatted with length prefixes and UTF-8 encoded values.
+
+LANGUAGE: plaintext
+CODE:
+LENGTH.VALUE
+
+----------------------------------------
+
+TITLE: Defining Minimal Guacamole Extension Manifest in JSON
+DESCRIPTION: Example of the minimal required properties for a guac-manifest.json file to define a Guacamole extension. Includes the Guacamole version, extension name, and namespace.
+
+LANGUAGE: json
+CODE:
+{
+    "guacamoleVersion" : "1.6.0",
+    "name" : "My Extension",
+    "namespace" : "my-extension"
+}
+
+----------------------------------------
+
+TITLE: Configuring Optional SAML Login in Guacamole
+DESCRIPTION: Configuration property to allow both traditional login and SAML authentication options, presenting users with a login screen where they can choose their authentication method.
+
+LANGUAGE: properties
+CODE:
+extension-priority: *, saml
+
+----------------------------------------
+
+TITLE: Maven Project Configuration - POM.xml
+DESCRIPTION: Maven configuration file defining project dependencies and build settings for a Guacamole authentication extension.
+
+LANGUAGE: xml
+CODE:
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://maven.apache.org/POM/4.0.0
+                        http://maven.apache.org/maven-v4_0_0.xsd">
+
+    <modelVersion>4.0.0</modelVersion>
+    <groupId>org.apache.guacamole</groupId>
+    <artifactId>guacamole-auth-tutorial</artifactId>
+    <packaging>jar</packaging>
+    <version>1.6.0</version>
+    <name>guacamole-auth-tutorial</name>
+
+    <properties>
+        <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+    </properties>
+
+    <build>
+        <plugins>
+
+            <!-- Written for Java 8 -->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-compiler-plugin</artifactId>
+                <version>3.3</version>
+                <configuration>
+                    <source>1.8</source>
+                    <target>1.8</target>
+                </configuration>
+            </plugin>
+
+        </plugins>
+    </build>
+
+    <dependencies>
+
+        <!-- Guacamole Extension API -->
+        <dependency>
+            <groupId>org.apache.guacamole</groupId>
+            <artifactId>guacamole-ext</artifactId>
+            <version>1.6.0</version>
+            <scope>provided</scope>
+        </dependency>
+
+    </dependencies>
+
+</project>
+
+----------------------------------------
+
+TITLE: Authentication Provider Implementation - Java
+DESCRIPTION: Basic implementation of a Guacamole authentication provider that extends SimpleAuthenticationProvider.
+
+LANGUAGE: java
+CODE:
+package org.apache.guacamole.auth;
+
+import java.util.Map;
+import org.apache.guacamole.GuacamoleException;
+import org.apache.guacamole.net.auth.simple.SimpleAuthenticationProvider;
+import org.apache.guacamole.net.auth.Credentials;
+import org.apache.guacamole.protocol.GuacamoleConfiguration;
+
+/**
+ * Authentication provider implementation intended to demonstrate basic use
+ * of Guacamole's extension API. The credentials and connection information for
+ * a single user are stored directly in guacamole.properties.
+ */
+public class TutorialAuthenticationProvider extends SimpleAuthenticationProvider {
+
+    @Override
+    public String getIdentifier() {
+        return "tutorial";
+    }
+
+    @Override
+    public Map<String, GuacamoleConfiguration>
+        getAuthorizedConfigurations(Credentials credentials)
+        throws GuacamoleException {
+
+        // Do nothing ... yet
+        return null;        
+
+    }
+
+}
+
+----------------------------------------
+
+TITLE: Running guacd Docker Container
+DESCRIPTION: Basic command to run the guacd Docker container which provides the remote desktop proxy daemon
+
+LANGUAGE: console
+CODE:
+$ docker run --name some-guacd -d guacamole/guacd
+
+----------------------------------------
+
+TITLE: Sample guacd Configuration
+DESCRIPTION: Example guacd.conf file showing daemon and server configuration options
+
+LANGUAGE: ini
+CODE:
+#
+# guacd configuration file
+#
+
+[daemon]
+
+pid_file = /var/run/guacd.pid
+log_level = info
+
+[server]
+
+bind_host = localhost
+bind_port = 4822
+
+#
+# The following parameters are valid only if
+# guacd was built with SSL support.
+#
+
+[ssl]
+
+server_certificate = /etc/ssl/certs/guacd.crt
+server_key = /etc/ssl/private/guacd.key
+
+----------------------------------------
+
+TITLE: Extracting guacamole-server Source Code
+DESCRIPTION: Command to extract the guacamole-server source code archive and change into the extracted directory.
+
+LANGUAGE: console
+CODE:
+$ tar -xzf guacamole-server-1.6.0.tar.gz
+$ cd guacamole-server-1.6.0/
+$
+
+----------------------------------------
+
+TITLE: Cloning guacamole-server from Git
+DESCRIPTION: Command to clone the guacamole-server repository from GitHub for latest development code.
+
+LANGUAGE: console
+CODE:
+$ git clone git://github.com/apache/guacamole-server.git
+Cloning into 'guacamole-server'...
+remote: Counting objects: 6769, done.
+remote: Compressing objects: 100% (2244/2244), done.
+remote: Total 6769 (delta 3058), reused 6718 (delta 3008)
+Receiving objects: 100% (6769/6769), 2.32 MiB | 777 KiB/s, done.
+Resolving deltas: 100% (3058/3058), done.
+$
+
+----------------------------------------
+
+TITLE: Implementing Mouse Event Handling in Guacamole
+DESCRIPTION: Sets up mouse event handling using Guacamole.Mouse, which provides consistent cross-browser mouse events.
+
+LANGUAGE: javascript
+CODE:
+var element = document.getElementById("some-arbitrary-id");
+var mouse = new Guacamole.Mouse(element);
+
+mouse.onmousedown =
+mouse.onmousemove =
+mouse.onmouseup   = function(state) {
+
+    // Do something with the mouse state received ...
+
+};
+
+----------------------------------------
+
+TITLE: Building guacamole-client from Source
+DESCRIPTION: Command to build the guacamole-client components using Maven.
+
+LANGUAGE: console
+CODE:
+$ mvn package
+[INFO] Scanning for projects...
+[INFO] ------------------------------------------------------------------------
+[INFO] Reactor Build Order:
+[INFO]
+[INFO] guacamole-client                                                   [pom]
+[INFO] guacamole-common                                                   [jar]
+...
+
+----------------------------------------
+
+TITLE: Creating MySQL Database User
+DESCRIPTION: SQL commands to create a database user and grant required permissions for Guacamole authentication in MySQL
+
+LANGUAGE: mysql
+CODE:
+CREATE USER 'guacamole_user'@'localhost' IDENTIFIED BY 'some_password';
+GRANT SELECT,INSERT,UPDATE,DELETE ON guacamole_db.* TO 'guacamole_user'@'localhost';
+FLUSH PRIVILEGES;
+
+----------------------------------------
+
+TITLE: Creating PostgreSQL Database User
+DESCRIPTION: SQL commands to create a database user and grant required permissions for Guacamole authentication in PostgreSQL
+
+LANGUAGE: sql
+CODE:
+CREATE USER guacamole_user WITH PASSWORD 'some_password';
+GRANT SELECT,INSERT,UPDATE,DELETE ON ALL TABLES IN SCHEMA public TO guacamole_user;
+GRANT SELECT,USAGE ON ALL SEQUENCES IN SCHEMA public TO guacamole_user;
+
+----------------------------------------
+
+TITLE: Creating SQL Server Database User
+DESCRIPTION: SQL commands to create a database user and grant required permissions for Guacamole authentication in SQL Server
+
+LANGUAGE: sql
+CODE:
+CREATE LOGIN guacamole_user WITH PASSWORD = 'some_password';
+USE guacamole_db;
+CREATE USER guacamole_user;
+ALTER ROLE db_datawriter ADD MEMBER guacamole_user;
+ALTER ROLE db_datareader ADD MEMBER guacamole_user;
+
+----------------------------------------
+
+TITLE: Configuring QuickConnect Extension Parameters in Guacamole
+DESCRIPTION: Configuration properties for controlling allowed and denied connection parameters in the QuickConnect extension. These properties are set in the Guacamole configuration to restrict or allow specific parameters in URIs used for ad-hoc connections.
+
+LANGUAGE: plaintext
+CODE:
+quickconnect-allowed-parameters
+quickconnect-denied-parameters
+
+----------------------------------------
+
+TITLE: Creating New User Manually in MySQL
+DESCRIPTION: SQL commands to manually create a new user account in the Guacamole database with proper password hashing
+
+LANGUAGE: mysql
+CODE:
+SET @salt = UNHEX(SHA2(UUID(), 256));
+
+INSERT INTO guacamole_entity (name, type)
+VALUES ('myuser', 'USER');
+
+INSERT INTO guacamole_user (
+    entity_id,
+    password_salt,
+    password_hash,
+    password_date
+)
+SELECT
+    entity_id,
+    @salt,
+    UNHEX(SHA2(CONCAT('mypassword', HEX(@salt)), 256)),
+    CURRENT_TIMESTAMP
+FROM guacamole_entity
+WHERE
+    name = 'myuser'
+    AND type = 'USER';
+
+----------------------------------------
+
+TITLE: Creating Connection with Parameters
+DESCRIPTION: SQL commands to create a new connection entry with associated parameters in the Guacamole database
+
+LANGUAGE: mysql
+CODE:
+INSERT INTO guacamole_connection (connection_name, protocol) VALUES ('test', 'vnc');
+
+SELECT * FROM guacamole_connection WHERE connection_name = 'test' AND parent_id IS NULL;
+
+INSERT INTO guacamole_connection_parameter VALUES (1, 'hostname', 'localhost');
+INSERT INTO guacamole_connection_parameter VALUES (1, 'port', '5901');
+
+----------------------------------------
+
+TITLE: Defining Custom Guacamole Property in Java
+DESCRIPTION: Example of defining a custom integer property for a Guacamole extension by extending the IntegerGuacamoleProperty class. This allows reading custom configuration from guacamole.properties.
+
+LANGUAGE: java
+CODE:
+public class MyProperties {
+
+    public static MY_PROPERTY = new IntegerGuacamoleProperty() {
+
+        @Override
+        public String getName() { return "my-property"; }
+
+    };
+
+}
+
+----------------------------------------
+
+TITLE: Installing LDAP Schema in OpenLDAP
+DESCRIPTION: Commands to add the Guacamole LDAP schema to OpenLDAP using ldapadd utility.
+
+LANGUAGE: bash
+CODE:
+# ldapadd -Q -Y EXTERNAL -H ldapi:/// -f schema/guacConfigGroup.ldif
+
+----------------------------------------
+
+TITLE: Example VNC Connection LDIF Configuration
+DESCRIPTION: LDIF file example showing how to define a VNC connection with user access in LDAP.
+
+LANGUAGE: ldif
+CODE:
+dn: cn=Example Connection,ou=groups,dc=example,dc=net
+objectClass: guacConfigGroup
+objectClass: groupOfNames
+cn: Example Connection
+guacConfigProtocol: vnc
+guacConfigParameter: hostname=localhost
+guacConfigParameter: port=5900
+guacConfigParameter: password=secret
+member: cn=user1,ou=people,dc=example,dc=net
+member: cn=user2,ou=people,dc=example,dc=net
+
+----------------------------------------
+
+TITLE: Multi-Server LDAP Configuration
+DESCRIPTION: YAML configuration for multiple LDAP servers with username pattern matching.
+
+LANGUAGE: yaml
+CODE:
+- hostname: dc1.example.net
+  match-usernames:
+    - COMPANYA\\(.*)
+    - (.*)@a\.example\.net
+
+- hostname: dc2.example.net
+  match-usernames:
+    - COMPANYB\\(.*)
+    - (.*)@b\.example\.net
+
+----------------------------------------
+
+TITLE: Configuring HTTP Header for Guacamole Authentication
+DESCRIPTION: Specifies the HTTP header to be used for authentication in Guacamole's configuration file. By default, the 'REMOTE_USER' header is used, but this can be overridden with the 'http-auth-header' property.
+
+LANGUAGE: properties
+CODE:
+http-auth-header=CUSTOM_AUTH_HEADER
+
+----------------------------------------
+
+TITLE: Reading Custom Guacamole Property Value in Java
+DESCRIPTION: Example of reading the value of a custom property defined for a Guacamole extension from the Environment object.
+
+LANGUAGE: java
+CODE:
+Integer value = environment.getProperty(MyProperties.MY_PROPERTY);
+
+----------------------------------------
+
+TITLE: Configuring JSON Secret Key in guacamole.properties
+DESCRIPTION: Example of generating a 128-bit secret key using md5sum and configuring it in guacamole.properties file.
+
+LANGUAGE: bash
+CODE:
+$ echo -n "ThisIsATest" | md5sum
+4c0b569e4c96df157eee1b65dd0e4d41  -
+
+LANGUAGE: properties
+CODE:
+json-secret-key: 4c0b569e4c96df157eee1b65dd0e4d41
+
+----------------------------------------
+
+TITLE: JSON Authentication Format Structure
+DESCRIPTION: Example of the JSON structure required for authentication, including username, expiration timestamp, and connection configurations.
+
+LANGUAGE: json
+CODE:
+{
+    "username" : "arbitraryUsername",
+    "expires" : TIMESTAMP,
+    "connections" : {
+        "Connection Name" : {
+            "protocol" : "PROTOCOL",
+            "parameters" : {
+                "name1" : "value1",
+                "name2" : "value2",
+                ...
+            }
+        },
+        ...
+    }
+}
+
+----------------------------------------
+
+TITLE: Sample RDP Connection Configuration
+DESCRIPTION: Example of a complete JSON authentication configuration with RDP connections and recording parameters.
+
+LANGUAGE: json
+CODE:
+{
+    "username" : "test",
+    "expires" : "1446323765000",
+    "connections" : {
+        "My Connection" : {
+            "protocol" : "rdp",
+            "parameters" : {
+                "hostname" : "10.10.209.63",
+                "port" : "3389",
+                "ignore-cert": "true",
+                "recording-path": "/recordings",
+                "recording-name": "My-Connection-${GUAC_USERNAME}-${GUAC_DATE}-${GUAC_TIME}"
+            }
+        },
+        "My OTHER Connection" : {
+            "protocol" : "rdp",
+            "parameters" : {
+                "hostname" : "10.10.209.64",
+                "port" : "3389",
+                "ignore-cert": "true",
+                "recording-path": "/recordings",
+                "recording-name": "My-OTHER-Connection-${GUAC_USERNAME}-${GUAC_DATE}-${GUAC_TIME}"
+            }
+        }
+    }
+}
+
+----------------------------------------
+
+TITLE: Encrypting JSON Authentication Data
+DESCRIPTION: Example of using the encrypt-json.sh script to encrypt and sign JSON authentication data.
+
+LANGUAGE: bash
+CODE:
+$ ./encrypt-json.sh 4C0B569E4C96DF157EEE1B65DD0E4D41 auth.json
+
+----------------------------------------
+
+TITLE: Submitting Encrypted Authentication Data
+DESCRIPTION: Example of submitting encrypted authentication data to Guacamole's REST API using curl.
+
+LANGUAGE: bash
+CODE:
+$ curl --data-urlencode "data=BASE64_RESULT" http://localhost:8080/guacamole/api/tokens
+
+----------------------------------------
+
+TITLE: Configuring CAS Extension Priority for Immediate Redirection
+DESCRIPTION: Configuration property to set CAS authentication as the primary authentication method, causing immediate redirection to CAS for unauthenticated users.
+
+LANGUAGE: properties
+CODE:
+extension-priority: cas
+
+----------------------------------------
+
+TITLE: Configuring CAS Extension Priority with Login Screen Option
+DESCRIPTION: Configuration property to allow both traditional Guacamole login and CAS authentication options, presenting users with a login screen rather than immediate redirection.
+
+LANGUAGE: properties
+CODE:
+extension-priority: *, cas
+
+----------------------------------------
+
+TITLE: Configuring Extension Priority for Automatic OpenID Redirection
+DESCRIPTION: This configuration ensures users are redirected to the OpenID identity provider immediately without seeing a Guacamole login screen. It sets the OpenID extension to have priority over all others.
+
+LANGUAGE: properties
+CODE:
+extension-priority: openid
+
+----------------------------------------
+
+TITLE: Configuring Extension Priority for Optional OpenID Login
+DESCRIPTION: This configuration presents users with a normal Guacamole login screen, allowing them to log in with traditional credentials or OpenID. It ensures the OpenID extension does not have priority over other authentication methods.
+
+LANGUAGE: properties
+CODE:
+extension-priority: *, openid
+
+----------------------------------------
+
+TITLE: Configuring Auto-Redirect SAML Priority in Guacamole
+DESCRIPTION: Configuration property to set SAML as the primary authentication method, which causes immediate redirection to the SAML identity provider for unauthenticated users.
+
+LANGUAGE: properties
+CODE:
+extension-priority: saml
+
+----------------------------------------
+
+TITLE: Configuring Duo Authentication Properties in Guacamole
+DESCRIPTION: This snippet shows the configuration properties that need to be set in guacamole.properties to enable Duo authentication. It includes settings for the Duo API hostname, client ID, client secret, redirect URI, authentication timeout, and options for bypassing or enforcing Duo for specific hosts.
+
+LANGUAGE: properties
+CODE:
+duo-api-hostname=api-XXXXXXXX.duosecurity.com
+duo-client-id=YOUR_DUO_CLIENT_ID
+duo-client-secret=YOUR_DUO_CLIENT_SECRET
+duo-redirect-uri=https://your-guacamole-url/
+duo-auth-timeout=5
+duo-bypass-hosts=192.168.1.0/24,10.0.0.1
+duo-enforce-hosts=203.0.113.0/24
+
+----------------------------------------
+
+TITLE: Configuring Auth-Ban Properties in Guacamole
+DESCRIPTION: Configuration properties for the guacamole-auth-ban extension that control failed login thresholds, ban durations, and address tracking limits. These are set in the guacamole.properties file.
+
+LANGUAGE: properties
+CODE:
+ban-max-invalid-attempts="5"
+ban-address-duration="300"
+ban-max-addresses="10485670"
+
+----------------------------------------
+
+TITLE: Get Hyper-V VM ID with PowerShell
+DESCRIPTION: PowerShell command to retrieve the ID of a Hyper-V virtual machine for RDP configuration
+
+LANGUAGE: ps1
+CODE:
+PS C:\> Get-VM VirtualMachineName | Select-Object Id
+
+Id
+--
+ed272546-87bd-4db9-acba-e36e1a9ca20a
+
+
+PS C:\>
+
+----------------------------------------
+
+TITLE: Installing guacamole-auth-restrict Extension
+DESCRIPTION: Steps to install the guacamole-auth-restrict extension by copying the JAR file to the Guacamole extensions directory.
+
+LANGUAGE: bash
+CODE:
+# 1. Create extensions directory if it doesn't exist
+mkdir -p GUACAMOLE_HOME/extensions
+
+# 2. Copy the extension JAR file
+cp guacamole-auth-restrict-1.6.0.jar GUACAMOLE_HOME/extensions/
+
+# 3. Restart your servlet container to apply changes
+
+----------------------------------------
+
+TITLE: Initializing KSM CLI Configuration
+DESCRIPTION: Example of using the KSM CLI tool to generate a base64-encoded configuration blob from a one-time token.
+
+LANGUAGE: console
+CODE:
+$ ./ksm init default US:_-L2NIxWdMatbyYwBnYROLlJVjeg4BzO3xZWoiDkh4U
+
+ewogICJjbGllbnRJZCI6ICJTR1ZzYkc4Z2RHaGxjbVVoSUZSb1pYTmxJSEJ5YjNCbGNuUnBaWE1n\naGdGMlpTQmlaV1Z1SUcxaGJuVmhiR3g1SUhKbFpHRmpkR1ZrTGlCWGFIay9Qdz09IiwKICAicHJp\ndmF0ZUtleSI6ICJWRzhnWlc1emRYSmxJSFJvWVhRZ1lXTjBkV0ZzSUhObGJuTnBkR2wyWlNCMllX\neDFaWE1nWVhKbElHNXZkQ0JsZUhCdmMyVmtJSFpwWVNCdmRYSWdiV0Z1ZFdGc0xpQlVhR1Y1SUcx\naGVTQnViM1FnUVV4TUlHSmxJSE5sYm5OcGRHbDJaU0IyWVd4MVpYTXNJR0oxZENCaGRDQnNaV0Z6\nZENCdmJtVWdjMlZsYlhNZ2RHOGdZbVV1IiwKICAiYXBwS2V5IjogIlYyVnNZMjl0WlNFZ1JXNXFi\nM2tnUVhCaFkyaGxJRWQxWVdOaGJXOXNaU0U9IiwKICAiaG9zdG5hbWUiOiAia2VlcGVyc2VjdXJp\ndHkuY29tIiwKICAic2VydmVyUHVibGljS2V5SWQiOiAiMTAiCn0K\n$
+
+----------------------------------------
+
+TITLE: Defining KSM Token Mappings in YAML
+DESCRIPTION: Example YAML configuration showing how to manually define parameter tokens that map to KSM secrets using Keeper Notation.
+
+LANGUAGE: yaml
+CODE:
+WINDOWS_ADMIN_PASSWORD: keeper://odei1zeejoL7Ceiv3eig0a/field/password
+LINUX_SERVER_KEY: keeper://Chah0VuPh0ohyeuL4che1o/file/idrsa.pem
+
+----------------------------------------
+
+TITLE: KSM Property Configuration
+DESCRIPTION: Example showing how to configure Guacamole properties to use KSM secrets for database credentials.
+
+LANGUAGE: yaml
+CODE:
+mysql-username: keeper://iel4yeic5ahxae7Eereec7/field/login
+mysql-password: keeper://iel4yeic5ahxae7Eereec7/field/password
+
+----------------------------------------
+
+TITLE: Creating Recording Storage Directory in Bash
+DESCRIPTION: This command creates the default directory for storing Guacamole session recordings.
+
+LANGUAGE: bash
+CODE:
+$ mkdir -p /var/lib/guacamole/recordings
+
+----------------------------------------
+
+TITLE: Configuring Maven POM for Guacamole Listener Extension
+DESCRIPTION: Maven POM file configuration for a Guacamole listener extension project, specifying dependencies and build settings.
+
+LANGUAGE: XML
+CODE:
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://maven.apache.org/POM/4.0.0
+                        http://maven.apache.org/maven-v4_0_0.xsd">
+
+    <modelVersion>4.0.0</modelVersion>
+    <groupId>org.apache.guacamole</groupId>
+    <artifactId>guacamole-listener-tutorial</artifactId>
+    <packaging>jar</packaging>
+    <version>1.6.0</version>
+    <name>guacamole-listener-tutorial</name>
+
+    <properties>
+        <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+    </properties>
+
+    <build>
+        <plugins>
+
+            <!-- Written for Java 8 -->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-compiler-plugin</artifactId>
+                <version>3.3</version>
+                <configuration>
+                    <source>1.8</source>
+                    <target>1.8</target>
+                </configuration>
+            </plugin>
+
+        </plugins>
+    </build>
+
+    <dependencies>
+
+        <!-- Guacamole Extension API -->
+        <dependency>
+            <groupId>org.apache.guacamole</groupId>
+            <artifactId>guacamole-ext</artifactId>
+            <version>1.6.0</version>
+            <scope>provided</scope>
+        </dependency>
+
+        <!-- Slf4j API -->
+        <!-- This is needed only if your listener wants to 
+                write to the Guacamole web application log -->
+        <dependency>
+            <groupId>org.slf4j</groupId>
+            <artifactId>slf4j-api</artifactId>
+            <version>1.7.7</version>
+            <scope>provided</scope>
+        </dependency>
+
+    </dependencies>
+
+</project>
+
+----------------------------------------
+
+TITLE: Implementing Basic Guacamole Listener in Java
+DESCRIPTION: Basic implementation of a Guacamole Listener interface that logs received event notifications.
+
+LANGUAGE: Java
+CODE:
+package org.apache.guacamole.event;
+
+import org.apache.guacamole.GuacamoleException;
+import org.apache.guacamole.net.event.listener.Listener;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+/**
+ * A Listener implementation intended to demonstrate basic use
+ * of Guacamole's listener extension API.
+ */
+public class TutorialListener implements Listener {
+
+    private static final Logger logger = 
+         LoggerFactory.getLogger(TutorialListener.class);
+
+    @Override
+    public void handleEvent(Object event) throws GuacamoleException {
+        logger.info("received Guacamole event notification");
+    }
+
+}
+
+----------------------------------------
+
+TITLE: Configuring Guacamole Extension Manifest in JSON
+DESCRIPTION: JSON configuration file (guac-manifest.json) for a Guacamole extension, specifying version, name, namespace, and listener class.
+
+LANGUAGE: JSON
+CODE:
+{
+
+    "guacamoleVersion" : "1.6.0",
+
+    "name"      : "Tutorial Listener Extension",
+    "namespace" : "guac-listener-tutorial",
+
+    "listeners" : [
+        "org.apache.guacamole.event.TutorialListener"
+    ]
+
+}
+
+----------------------------------------
+
+TITLE: Handling Authentication Events in Guacamole Listener
+DESCRIPTION: Java implementation of a Guacamole Listener that logs authentication success and failure events.
+
+LANGUAGE: Java
+CODE:
+package org.apache.guacamole.event;
+
+import org.apache.guacamole.GuacamoleException;
+import org.apache.guacamole.net.event.AuthenticationFailureEvent;
+import org.apache.guacamole.net.event.AuthenticationSuccessEvent;
+import org.apache.guacamole.net.event.listener.Listener;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+/**
+ * A Listener that logs authentication success and failure events.
+ */
+public class TutorialListener implements Listener {
+
+    private static final Logger logger = 
+        LoggerFactory.getLogger(TutorialListener.class);
+
+    @Override
+    public void handleEvent(Object event) throws GuacamoleException {
+
+        if (event instanceof AuthenticationSuccessEvent) {
+            logger.info("successful authentication for user {}", 
+                ((AuthenticationSuccessEvent) event)
+                    .getCredentials().getUsername());
+        }
+        else if (event instanceof AuthenticationFailureEvent) {
+            logger.info("failed authentication for user {}", 
+                ((AuthenticationFailureEvent) event)
+                    .getCredentials().getUsername());
+        }
+    }
+
+}
+
+----------------------------------------
+
+TITLE: Implementing User Blocking in Guacamole Listener
+DESCRIPTION: Java implementation of a Guacamole Listener that logs authentication events and blocks a specific user from logging in.
+
+LANGUAGE: Java
+CODE:
+package org.apache.guacamole.event;
+
+import org.apache.guacamole.GuacamoleException;
+import org.apache.guacamole.GuacamoleSecurityException;
+import org.apache.guacamole.net.event.AuthenticationFailureEvent;
+import org.apache.guacamole.net.event.AuthenticationSuccessEvent;
+import org.apache.guacamole.net.event.listener.Listener;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+/**
+ * A Listener that logs authentication success and failure events
+ * and prevents the "guacadmin" user from logging in by throwing
+ * a GuacamoleSecurityException.
+ */
+public class TutorialListener implements Listener {
+
+    private static final Logger logger = 
+        LoggerFactory.getLogger(TutorialListener.class);
+
+    @Override
+    public void handleEvent(Object event) throws GuacamoleException {
+
+        if (event instanceof AuthenticationSuccessEvent) {
+          final String username = ((AuthenticationSuccessEvent) event)
+              .getCredentials().getUsername();
+
+          if ("guacadmin".equals(username)) {
+            logger.warn("user {} has been blocked", username);
+            throw new GuacamoleSecurityException(
+                "User '" + username + "' is currently blocked");
+          }
+
+          logger.info("successful authentication for user {}", username);
+        }
+        else if (event instanceof AuthenticationFailureEvent) {
+            logger.info("failed authentication for user {}", 
+                ((AuthenticationFailureEvent) event)
+                    .getCredentials().getUsername());
+        }
+    }
+
+}
+
+----------------------------------------
+
+TITLE: Implementing Join Handler in Guacamole Client Plugin
+DESCRIPTION: Example of implementing a join handler function in a Guacamole client plugin. The handler is called whenever a user joins a connection and receives the user object along with handshake arguments.
+
+LANGUAGE: c
+CODE:
+int join_handler(guac_user* user, int argc, char** argv) {
+    /* Synchronize display state, init the user, etc. */
+}
+
+...
+
+/* Within guac_client_init  */
+client->join_handler = join_handler;
+
+----------------------------------------
+
+TITLE: Implementing Leave Handler in Guacamole Client Plugin
+DESCRIPTION: Example of implementing a leave handler function that is called when a user disconnects from a Guacamole session. The handler receives the disconnecting user's object.
+
+LANGUAGE: c
+CODE:
+int leave_handler(guac_user* user) {
+    /* Free user-specific data and clean up */
+}
+
+...
+
+/* Within guac_client_init  */
+client->leave_handler = leave_handler;
+
+----------------------------------------
+
+TITLE: Implementing Free Handler in Guacamole Client Plugin
+DESCRIPTION: Example of implementing a free handler that cleans up resources when a Guacamole connection terminates. Called after all users have disconnected.
+
+LANGUAGE: c
+CODE:
+int free_handler(guac_client* client) {
+    /* Disconnect, free client-specific data, etc. */
+}
+
+...
+
+/* Within guac_client_init  */
+client->free_handler = free_handler;
+
+----------------------------------------
+
+TITLE: Sending Protocol Instructions in Guacamole
+DESCRIPTION: Examples showing how to send Guacamole protocol instructions both to all users via broadcast socket and to individual users.
+
+LANGUAGE: c
+CODE:
+guac_protocol_send_size(client->socket, GUAC_DEFAULT_LAYER, 1024, 768);
+
+guac_protocol_send_size(user->socket, GUAC_DEFAULT_LAYER, 1024, 768);
+
+----------------------------------------
+
+TITLE: Implementing Key Event Handler in Guacamole
+DESCRIPTION: Example of implementing a key event handler that processes keyboard input events from Guacamole clients.
+
+LANGUAGE: c
+CODE:
+int key_handler(guac_user* user, int keysym, int pressed) {
+    /* Do something */
+}
+
+...
+
+/* Within the "join" handler of guac_client */
+user->key_handler = key_handler;
+
+----------------------------------------
+
+TITLE: Implementing Mouse Event Handler in Guacamole
+DESCRIPTION: Example of implementing a mouse event handler that processes mouse movement and button events from Guacamole clients.
+
+LANGUAGE: c
+CODE:
+int mouse_handler(guac_user* user, int x, int y, int button_mask) {
+    /* Do something */
+}
+
+...
+
+/* Within the "join" handler of guac_client */
+user->mouse_handler = mouse_handler;
+
+----------------------------------------
+
+TITLE: Implementing Clipboard Handler in Guacamole
+DESCRIPTION: Example of implementing clipboard handling to process clipboard data received from Guacamole clients.
+
+LANGUAGE: c
+CODE:
+int clipboard_handler(guac_user* user, guac_stream* stream, char* mimetype) {
+    /* Do something */
+}
+
+...
+
+/* Within the "join" handler of guac_client */
+user->clipboard_handler = clipboard_handler;
+
+----------------------------------------
+
+TITLE: Implementing File Handler in Guacamole
+DESCRIPTION: Example of implementing file transfer handling to process files received from Guacamole clients.
+
+LANGUAGE: c
+CODE:
+int file_handler(guac_user* user, guac_stream* stream,
+        char* mimetype, char* filename) {
+    /* Do something */
+}
+
+...
+
+/* Within the "join" handler of guac_client */
+user->file_handler = file_handler;
+
+----------------------------------------
+
+TITLE: Display Size Setting Instruction Example
+DESCRIPTION: Example of a complete Guacamole instruction that sets the display size to 1024x768 pixels.
+
+LANGUAGE: plaintext
+CODE:
+4.size,1.0,4.1024,3.768;
+
+----------------------------------------
+
+TITLE: Protocol Selection Handshake Example
+DESCRIPTION: Example of the initial handshake instruction sent by client to select the VNC protocol.
+
+LANGUAGE: plaintext
+CODE:
+6.select,3.vnc;
+
+----------------------------------------
+
+TITLE: Server Arguments Response Example
+DESCRIPTION: Example of server response listing protocol version and accepted parameters during handshake.
+
+LANGUAGE: plaintext
+CODE:
+4.args,13.VERSION_1_1_0,8.hostname,4.port,8.password,13.swap-red-blue,9.read-only;
+
+----------------------------------------
+
+TITLE: Client Capability Response Example
+DESCRIPTION: Example of client response during handshake showing supported formats and parameters.
+
+LANGUAGE: plaintext
+CODE:
+4.size,4.1024,3.768,2.96;
+5.audio,9.audio/ogg;
+5.video;
+5.image,9.image/png,10.image/jpeg;
+8.timezone,16.America/New_York;
+7.connect,13.VERSION_1_1_0,9.localhost,4.5900,0.,0.,0.;
+
+----------------------------------------
+
+TITLE: Connection Ready Response Example
+DESCRIPTION: Example of server ready response indicating successful connection establishment.
+
+LANGUAGE: plaintext
+CODE:
+5.ready,37.$260d01da-779b-4ee9-afc1-c16bae885cc7;
+
+----------------------------------------
+
+TITLE: Connection Join Request Example
+DESCRIPTION: Example of request to join an existing connection using its unique ID.
+
+LANGUAGE: plaintext
+CODE:
+6.select,37.$260d01da-779b-4ee9-afc1-c16bae885cc7;
+
+----------------------------------------
+
+TITLE: Initializing Basic Guacamole Client Plugin Structure in C
+DESCRIPTION: Defines the minimal required structure for a Guacamole client plugin, including the entry point function guac_client_init.
+
+LANGUAGE: C
+CODE:
+#include <guacamole/client.h>
+
+#include <stdlib.h>
+
+/* Client plugin arguments (empty) */
+const char* TUTORIAL_ARGS[] = { NULL };
+
+int guac_client_init(guac_client* client) {
+
+    /* This example does not implement any arguments */
+    client->args = TUTORIAL_ARGS;
+
+    return 0;
+
+}
+
+----------------------------------------
+
+TITLE: Initializing Remote Display in Guacamole Client Plugin
+DESCRIPTION: Sets up the remote display size and background color using Guacamole protocol instructions in the join handler.
+
+LANGUAGE: C
+CODE:
+int ball_join_handler(guac_user* user, int argc, char** argv) {
+
+    /* Get client associated with user */
+    guac_client* client = user->client;
+
+    /* Get user-specific socket */
+    guac_socket* socket = user->socket;
+
+    /* Send the display size */
+    guac_protocol_send_size(socket, GUAC_DEFAULT_LAYER, 1024, 768);
+
+    /* Prepare a curve which covers the entire layer */
+    guac_protocol_send_rect(socket, GUAC_DEFAULT_LAYER,
+            0, 0, 1024, 768);
+
+    /* Fill curve with solid color */
+    guac_protocol_send_cfill(socket,
+            GUAC_COMP_OVER, GUAC_DEFAULT_LAYER,
+            0x80, 0x80, 0x80, 0xFF);
+
+    /* Mark end-of-frame */
+    guac_protocol_send_sync(socket, client->last_sent_timestamp);
+
+    /* Flush buffer */
+    guac_socket_flush(socket);
+
+    /* User successfully initialized */
+    return 0;
+
+}
+
+----------------------------------------
+
+TITLE: Adding Ball Layer to Guacamole Client Plugin
+DESCRIPTION: Creates a separate layer for the ball and initializes it with a blue square.
+
+LANGUAGE: C
+CODE:
+int ball_join_handler(guac_user* user, int argc, char** argv) {
+
+    /* Get client associated with user */
+    guac_client* client = user->client;
+
+    /* Get ball layer from client data */
+    ball_client_data* data = (ball_client_data*) client->data;
+    guac_layer* ball = data->ball;
+
+    /* Set up ball layer */
+    guac_protocol_send_size(socket, ball, 128, 128);
+
+    /* Prepare a curve which covers the entire layer */
+    guac_protocol_send_rect(socket, ball,
+            0, 0, 128, 128);
+
+    /* Fill curve with solid color */
+    guac_protocol_send_cfill(socket,
+            GUAC_COMP_OVER, ball,
+            0x00, 0x80, 0x80, 0xFF);
+
+    /* Mark end-of-frame */
+    guac_protocol_send_sync(socket, client->last_sent_timestamp);
+
+    /* Flush buffer */
+    guac_socket_flush(socket);
+
+    /* User successfully initialized */
+    return 0;
+
+}
+
+----------------------------------------
+
+TITLE: Implementing Ball Animation Thread in Guacamole Client Plugin
+DESCRIPTION: Creates a separate thread to handle ball movement and collision detection, updating the ball's position continuously.
+
+LANGUAGE: C
+CODE:
+void* ball_render_thread(void* arg) {
+
+    /* Get data */
+    guac_client* client = (guac_client*) arg;
+    ball_client_data* data = (ball_client_data*) client->data;
+
+    /* Update ball position as long as client is running */
+    while (client->state == GUAC_CLIENT_RUNNING) {
+
+        /* Sleep a bit */
+        usleep(30000);
+
+        /* Update position */
+        data->ball_x += data->ball_velocity_x * 30 / 1000;
+        data->ball_y += data->ball_velocity_y * 30 / 1000;
+
+        /* Bounce if necessary */
+        if (data->ball_x < 0) {
+            data->ball_x = -data->ball_x;
+            data->ball_velocity_x = -data->ball_velocity_x;
+        }
+        else if (data->ball_x >= 1024 - 128) {
+            data->ball_x = (2 * (1024 - 128)) - data->ball_x;
+            data->ball_velocity_x = -data->ball_velocity_x;
+        }
+
+        if (data->ball_y < 0) {
+            data->ball_y = -data->ball_y;
+            data->ball_velocity_y = -data->ball_velocity_y;
+        }
+        else if (data->ball_y >= 768 - 128) {
+            data->ball_y = (2 * (768 - 128)) - data->ball_y;
+            data->ball_velocity_y = -data->ball_velocity_y;
+        }
+
+        guac_protocol_send_move(client->socket, data->ball,
+                GUAC_DEFAULT_LAYER, data->ball_x, data->ball_y, 0);
+
+        /* End frame and flush socket */
+        guac_client_end_frame(client);
+        guac_socket_flush(client->socket);
+
+    }
+
+    return NULL;
+
+}
+
+----------------------------------------
+
+TITLE: Enhancing Ball Appearance in Guacamole Client Plugin
+DESCRIPTION: Improves the visual appearance of the ball by using a circular shape, adding a border, and applying translucency.
+
+LANGUAGE: C
+CODE:
+/* Set up ball layer */
+guac_protocol_send_size(socket, ball, 128, 128);
+
+/* Prepare a circular curve */
+guac_protocol_send_arc(socket, data->ball,
+        64, 64, 62, 0, 6.28, 0);
+
+guac_protocol_send_close(socket, data->ball);
+
+/* Draw a 4-pixel black border */
+guac_protocol_send_cstroke(socket,
+        GUAC_COMP_OVER, data->ball,
+        GUAC_LINE_CAP_ROUND, GUAC_LINE_JOIN_ROUND, 4,
+        0x00, 0x00, 0x00, 0xFF);
+
+/* Fill the circle with color */
+guac_protocol_send_cfill(socket,
+        GUAC_COMP_OVER, data->ball,
+        0x00, 0x80, 0x80, 0x80);
+
+----------------------------------------
+
+TITLE: Handling Time and Performance in Guacamole Client Plugin
+DESCRIPTION: Modifies the render thread to account for variable frame rates and client performance, ensuring smooth animation.
+
+LANGUAGE: C
+CODE:
+void* ball_render_thread(void* arg) {
+
+    /* Init time of last frame to current time */
+    guac_timestamp last_frame = guac_timestamp_current();
+
+    /* Update ball position as long as client is running */
+    while (client->state == CLIENT_RUNNING) {
+
+        /* Default to 30ms frames */
+        int frame_duration = 30;
+
+        /* Lengthen frame duration if client is lagging */
+        int processing_lag = guac_client_get_processing_lag(client);
+        if (processing_lag > frame_duration)
+            frame_duration = processing_lag;
+
+        /* Sleep for duration of frame, then get timestamp */
+        usleep(frame_duration);
+        guac_timestamp current = guac_timestamp_current();
+
+        /* Calculate change in time */
+        int delta_t = current - last_frame;
+
+        /* Update position */
+        data->ball_x += data->ball_velocity_x * delta_t / 1000;
+        data->ball_y += data->ball_velocity_y * delta_t / 1000;
+
+        /* Update timestamp */
+        last_frame = current;
+
+    }
+
+}
+
+----------------------------------------
+
+TITLE: Implementing Touch Event Handling in Guacamole
+DESCRIPTION: Sets up touch event handling using Guacamole.Touchpad or Guacamole.Touchscreen, which emulate mouse-like behavior for touch devices.
+
+LANGUAGE: javascript
+CODE:
+var element = document.getElementById("some-arbitrary-id");
+var touch = new Guacamole.Touchpad(element); // or Guacamole.Touchscreen
+
+touch.onmousedown =
+touch.onmousemove =
+touch.onmouseup   = function(state) {
+
+    // Do something with the mouse state received ...
+
+};
+
+----------------------------------------
+
+TITLE: Defining Guacamole On-Screen Keyboard Layout in XML
+DESCRIPTION: Example of an XML layout for the Guacamole on-screen keyboard, defining a simple keyboard with a shift key and letter 'a'.
+
+LANGUAGE: xml
+CODE:
+<keyboard lang="en_US" layout="example" size="5">
+    <row>
+        <key size="4">
+            <cap modifier="shift" keysym="0xFFE1">Shift</cap>
+        </key>
+        <key>
+            <cap>a</cap>
+            <cap if="shift">A</cap>
+        </key>
+    </row>
+</keyboard>
+
+----------------------------------------
+
+TITLE: Displaying Guacamole On-Screen Keyboard in JavaScript
+DESCRIPTION: Creates and displays a Guacamole on-screen keyboard instance using a specified layout file and sets its size.
+
+LANGUAGE: javascript
+CODE:
+// Add keyboard to body
+var keyboard = new Guacamole.OnScreenKeyboard("path/to/layout.xml");
+document.body.appendChild(keyboard.getElement());
+
+// Set size of keyboard to 100 pixels
+keyboard.resize(100);
+
+----------------------------------------
+
+TITLE: Handling On-Screen Keyboard Events in Guacamole
+DESCRIPTION: Sets up event handlers for keydown and keyup events from the Guacamole on-screen keyboard.
+
+LANGUAGE: javascript
+CODE:
+// Assuming we have an instance of Guacamole.OnScreenKeyboard already
+// called "keyboard"
+
+keyboard.onkeydown = function(keysym) {
+    // Do something ...
+};
+
+keyboard.onkeyup = function(keysym) {
+    // Do something ...
+};
+
+----------------------------------------
+
+TITLE: Updating Guacamole HTML with Extension HTML Fragment
+DESCRIPTION: Example of an HTML fragment file that can be used in a Guacamole extension to modify existing HTML in the interface. Uses meta tags to specify how and where to insert the new HTML.
+
+LANGUAGE: html
+CODE:
+<meta name="after" content=".login-ui .login-dialog">
+
+<div class="welcome">
+    <h2>Welcome to our Guacamole server!</h2>
+    <p>
+        Please be sure to read our <a href="/path/to/some/privacy.html">privacy
+        policy</a> before continuing.
+    </p>
+</div>
+
+----------------------------------------
+
+TITLE: Extension Manifest Configuration - JSON
+DESCRIPTION: Manifest file that defines extension properties and authentication provider class location.
+
+LANGUAGE: json
+CODE:
+{
+
+    "guacamoleVersion" : "1.6.0",
+
+    "name"      : "Tutorial Authentication Extension",
+    "namespace" : "guac-auth-tutorial",
+
+    "authProviders" : [
+        "org.apache.guacamole.auth.TutorialAuthenticationProvider"
+    ]
+
+}
+
+----------------------------------------
+
+TITLE: JavaScript Client Pipe Stream Example
+DESCRIPTION: Example JavaScript code showing how to send input directly to a terminal session
+
+LANGUAGE: javascript
+CODE:
+var outputStream = client.createPipeStream('text/plain', 'STDIN');
+
+// Wrap output stream in writer
+var writer = new Guacamole.StringWriter(outputStream);
+
+// Send text
+writer.sendText("hello");
+
+// Send more text
+writer.sendText("world");
+
+// Close writer and stream
+writer.sendEnd();
+
+----------------------------------------
+
+TITLE: Configuring Tomcat HTTP Connector
+DESCRIPTION: XML configuration for Tomcat's HTTP connector to enable proper UTF-8 encoding and set connection parameters.
+
+LANGUAGE: xml
+CODE:
+<Connector port="8080" protocol="HTTP/1.1" 
+           connectionTimeout="20000"
+           URIEncoding="UTF-8"
+           redirectPort="8443" />
+
+----------------------------------------
+
+TITLE: Configuring Tomcat RemoteIpValve
+DESCRIPTION: XML configuration for Tomcat's RemoteIpValve to handle client IP addresses when behind a proxy.
+
+LANGUAGE: xml
+CODE:
+<Valve className="org.apache.catalina.valves.RemoteIpValve"
+               internalProxies="127\.0\.0\.1|0:0:0:0:0:0:0:1"
+               remoteIpHeader="x-forwarded-for"
+               remoteIpProxiesHeader="x-forwarded-by"
+               protocolHeader="x-forwarded-proto" />
+
+----------------------------------------
+
+TITLE: Nginx Proxy Configuration for Guacamole
+DESCRIPTION: Nginx location block configuration for proxying Guacamole traffic including WebSocket support.
+
+LANGUAGE: nginx
+CODE:
+location /guacamole/ {
+    proxy_pass http://HOSTNAME:8080;
+    proxy_buffering off;
+    proxy_http_version 1.1;
+    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    proxy_set_header Upgrade $http_upgrade;
+    proxy_set_header Connection $http_connection;
+    access_log off;
+}
+
+----------------------------------------
+
+TITLE: Apache Proxy Configuration for Guacamole
+DESCRIPTION: Apache configuration blocks for proxying both HTTP and WebSocket Guacamole traffic.
+
+LANGUAGE: apache
+CODE:
+<Location /guacamole/>
+    Order allow,deny
+    Allow from all
+    ProxyPass http://HOSTNAME:8080/guacamole/ flushpackets=on
+    ProxyPassReverse http://HOSTNAME:8080/guacamole/
+</Location>
+
+<Location /guacamole/websocket-tunnel>
+    Order allow,deny
+    Allow from all
+    ProxyPass ws://HOSTNAME:8080/guacamole/websocket-tunnel
+    ProxyPassReverse ws://HOSTNAME:8080/guacamole/websocket-tunnel
+</Location>
+
+----------------------------------------
+
+TITLE: Running guacd with Debug Logging
+DESCRIPTION: Command to run guacd container with debug level logging enabled
+
+LANGUAGE: console
+CODE:
+$ docker run -e GUACD_LOG_LEVEL=debug -d guacamole/guacd
+
+----------------------------------------
+
+TITLE: Exposing guacd to External Services
+DESCRIPTION: Command to run guacd container with port 4822 exposed for external access
+
+LANGUAGE: console
+CODE:
+$ docker run --name some-guacd -d -p 4822:4822 guacamole/guacd
+
+----------------------------------------
+
+TITLE: Running Guacamole with MySQL Database Link
+DESCRIPTION: Command to run Guacamole web application container linked to a MySQL database
+
+LANGUAGE: console
+CODE:
+$ docker run --name some-guacamole \
+    --link some-guacd:guacd \
+    --link some-mysql:mysql \
+    -d -p 8080:8080 guacamole/guacamole
+
+----------------------------------------
+
+TITLE: Initializing MySQL Database Schema
+DESCRIPTION: Command to generate MySQL initialization SQL script from the Guacamole container
+
+LANGUAGE: console
+CODE:
+$ docker run --rm guacamole/guacamole /opt/guacamole/bin/initdb.sh --mysql > initdb.sql
+
+----------------------------------------
+
+TITLE: Running Guacamole with LDAP Authentication
+DESCRIPTION: Command to run Guacamole container configured for LDAP authentication
+
+LANGUAGE: console
+CODE:
+$ docker run --name some-guacamole \
+    --link some-guacd:guacd \
+    -e LDAP_HOSTNAME=172.17.42.1 \
+    -d -p 8080:8080 guacamole/guacamole
+
+----------------------------------------
+
+TITLE: Using guacctl Utility in SSH Sessions
+DESCRIPTION: Example usage of the guacctl utility for file transfers in Guacamole SSH sessions. Shows basic command syntax and options for downloading files and setting directories.
+
+LANGUAGE: shell
+CODE:
+$ guacctl
+guacctl 0.8.0, Guacamole SSH session control utility.
+Usage: guacctl [OPTION] [FILE]...
+
+    -d, --download         download each of the files listed.
+    -s, --set-directory    set the destination directory for future uploaded 
+                           files.
+$ guacctl -d FILENAME
+$ guacctl -s DIRECTORY
+$
+
+----------------------------------------
+
+TITLE: QuickConnect URI Format for Guacamole Connections
+DESCRIPTION: The general format for URIs used with the QuickConnect extension to create ad-hoc connections in Guacamole. This format includes protocol, username, password, host, port, and additional parameters.
+
+LANGUAGE: plaintext
+CODE:
+{protocol}://{username}:{password}@{host}:{port}/?{parameters}
+
+----------------------------------------
+
+TITLE: Example URIs for QuickConnect in Guacamole
+DESCRIPTION: Sample URIs demonstrating how to create ad-hoc connections using the QuickConnect extension for different protocols (SSH, VNC, RDP) with various parameters and settings.
+
+LANGUAGE: plaintext
+CODE:
+ssh://linux1.example.com/
+vnc://linux1.example.com:5900/
+rdp://localuser@windows1.example.com/?security=rdp&ignore-cert=true&disable-audio=true&enable-drive=true&drive-path=/mnt/usb
+
+----------------------------------------
+
+TITLE: Importing Connections using CSV Format in Guacamole
+DESCRIPTION: Example of a CSV file structure for batch importing connections in Guacamole. It includes fields for connection name, protocol, credentials, hostname, group, users, and attributes.
+
+LANGUAGE: csv
+CODE:
+name,protocol,username,password,hostname,group,users,groups,guacd-encryption (attribute)
+conn1,vnc,alice,pass1,conn1.web.com,ROOT,guac user 1;guac user 2,Connection 1 Users,none
+conn2,rdp,bob,pass2,conn2.web.com,ROOT/Parent Group,guac user 1,,ssl
+conn3,ssh,carol,pass3,conn3.web.com,ROOT/Parent Group/Child Group,guac user 2;guac user 3,,
+conn4,kubernetes,,,,,,,
+
+
+----------------------------------------
+
+TITLE: Importing Connections using JSON Format in Guacamole
+DESCRIPTION: Example of a JSON file structure for batch importing connections in Guacamole. It demonstrates how to specify connection details, including name, protocol, parameters, group, users, and attributes.
+
+LANGUAGE: json
+CODE:
+[
+  {
+    "name": "conn1",
+    "protocol": "vnc",
+    "parameters": { "username": "alice", "password": "pass1", "hostname": "conn1.web.com" },
+    "parentIdentifier": "ROOT",
+    "users": [ "guac user 1", "guac user 2" ],
+    "groups": [ "Connection 1 Users" ],
+    "attributes": { "guacd-encryption": "none" }
+  },
+  {
+    "name": "conn2",
+    "protocol": "rdp",
+    "parameters": { "username": "bob", "password": "pass2", "hostname": "conn2.web.com" },
+    "group": "ROOT/Parent Group",
+    "users": [ "guac user 1" ],
+    "attributes": { "guacd-encryption": "none" }
+  },
+  {
+    "name": "conn3",
+    "protocol": "ssh",
+    "parameters": { "username": "carol", "password": "pass3", "hostname": "conn3.web.com" },
+    "group": "ROOT/Parent Group/Child Group",
+    "users": [ "guac user 2", "guac user 3" ]
+  },
+  {
+    "name": "conn4",
+    "protocol": "kubernetes"
+  }
+]
+
+----------------------------------------
+
+TITLE: Importing Connections using YAML Format in Guacamole
+DESCRIPTION: Example of a YAML file structure for batch importing connections in Guacamole. It shows how to define connections with their properties, including name, protocol, parameters, group, users, and attributes.
+
+LANGUAGE: yaml
+CODE:
+---
+  - name: conn1
+    protocol: vnc
+    parameters:
+      username: alice
+      password: pass1
+      hostname: conn1.web.com
+    group: ROOT
+    users:
+      - guac user 1
+      - guac user 2
+    groups:
+    - Connection 1 Users
+    attributes:
+      guacd-encryption: none
+  - name: conn2
+    protocol: rdp
+    parameters:
+      username: bob
+      password: pass2
+      hostname: conn2.web.com
+    group: ROOT/Parent Group
+    users:
+      - guac user 1
+    attributes:
+      guacd-encryption: none
+  - name: conn3
+    protocol: ssh
+    parameters:
+      username: carol
+      password: pass3
+      hostname: conn3.web.com
+    group: ROOT/Parent Group/Child Group
+    users:
+      - guac user 2
+      - guac user 3
+  - name: conn4
+    protocol: kubernetes
+
+----------------------------------------
+
+TITLE: Setting Permissions for Recording Storage Directory in Bash
+DESCRIPTION: These commands set the appropriate ownership and permissions for the Guacamole recording storage directory, assuming guacd runs as 'guacd' user and Tomcat runs in the 'tomcat' group.
+
+LANGUAGE: bash
+CODE:
+$ chown guacd:tomcat /var/lib/guacamole/recordings
+$ chmod 2750 /var/lib/guacamole/recordings
+
+----------------------------------------
+
+TITLE: Verifying Recording Storage Directory Permissions in Bash
+DESCRIPTION: This command displays the permissions and ownership of the Guacamole recording storage directory for verification.
+
+LANGUAGE: bash
+CODE:
+$ ls -ld /var/lib/guacamole/recordings
+drwxr-s---. 1 guacd tomcat 0 Feb  5 05:43 /var/lib/guacamole/recordings/
+
+----------------------------------------
+
+TITLE: Sample guacd Startup Log Messages
+DESCRIPTION: Example log entries showing the typical startup sequence of guacd, including binding to ports and process handoff.
+
+LANGUAGE: plaintext
+CODE:
+guacd[19663]: Guacamole proxy daemon (guacd) version 0.7.0
+guacd[19663]: Unable to bind socket to host ::1, port 4823: Address family
+              not supported by protocol
+guacd[19663]: Successfully bound socket to host 127.0.0.1, port 4823
+guacd[19663]: Exiting and passing control to PID 19665
+guacd[19665]: Exiting and passing control to PID 19666
+guacd[19666]: Listening on host 127.0.0.1, port 4823
+
+----------------------------------------
+
+TITLE: Installing Python Dependencies for Guacamole Manual Build
+DESCRIPTION: Command to install required Python packages using pip. This installs Sphinx, the ReadTheDocs theme, sphinx-inline-tabs, and myst-parser.
+
+LANGUAGE: console
+CODE:
+$ pip install sphinx sphinx-rtd-theme sphinx-inline-tabs myst-parser
+
+----------------------------------------
+
+TITLE: Installing Python Dependencies (Python 3 Specific)
+DESCRIPTION: Alternative command for systems where Python 3's pip is named 'pip3'. Installs the same packages as the previous command.
+
+LANGUAGE: console
+CODE:
+$ pip3 install sphinx sphinx-rtd-theme sphinx-inline-tabs myst-parser
+
+----------------------------------------
+
+TITLE: Building the Guacamole Manual
+DESCRIPTION: Simple make command to build the Guacamole manual using Sphinx. The resulting HTML will be in the build/html/ directory.
+
+LANGUAGE: console
+CODE:
+$ make
+
+----------------------------------------
+
+TITLE: Building Docker Image for Guacamole Manual
+DESCRIPTION: Docker command to build an image containing the Guacamole manual. This creates an Apache httpd Docker image with the manual included.
+
+LANGUAGE: console
+CODE:
+$ docker image build -t guacamole/manual .
+
+----------------------------------------
+
+TITLE: Running Guacamole Manual Docker Container
+DESCRIPTION: Docker command to run the container with the Guacamole manual. This makes the manual accessible via web browser at http://localhost:8080.
+
+LANGUAGE: console
+CODE:
+$ docker container run -p 8080:80 guacamole/manual

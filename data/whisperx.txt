@@ -1,0 +1,165 @@
+TITLE: WhisperX Python API Complete Example
+DESCRIPTION: Complete Python example demonstrating the WhisperX workflow: loading models, transcribing audio, aligning results for accurate timestamps, and assigning speaker labels through diarization.
+
+LANGUAGE: python
+CODE:
+import whisperx
+import gc 
+
+device = "cuda" 
+audio_file = "audio.mp3"
+batch_size = 16 # reduce if low on GPU mem
+compute_type = "float16" # change to "int8" if low on GPU mem (may reduce accuracy)
+
+# 1. Transcribe with original whisper (batched)
+model = whisperx.load_model("large-v2", device, compute_type=compute_type)
+
+# save model to local path (optional)
+# model_dir = "/path/"
+# model = whisperx.load_model("large-v2", device, compute_type=compute_type, download_root=model_dir)
+
+audio = whisperx.load_audio(audio_file)
+result = model.transcribe(audio, batch_size=batch_size)
+print(result["segments"]) # before alignment
+
+# delete model if low on GPU resources
+# import gc; gc.collect(); torch.cuda.empty_cache(); del model
+
+# 2. Align whisper output
+model_a, metadata = whisperx.load_align_model(language_code=result["language"], device=device)
+result = whisperx.align(result["segments"], model_a, metadata, audio, device, return_char_alignments=False)
+
+print(result["segments"]) # after alignment
+
+# delete model if low on GPU resources
+# import gc; gc.collect(); torch.cuda.empty_cache(); del model_a
+
+# 3. Assign speaker labels
+diarize_model = whisperx.DiarizationPipeline(use_auth_token=YOUR_HF_TOKEN, device=device)
+
+# add min/max number of speakers if known
+diarize_segments = diarize_model(audio)
+# diarize_model(audio, min_speakers=min_speakers, max_speakers=max_speakers)
+
+result = whisperx.assign_word_speakers(diarize_segments, result)
+print(diarize_segments)
+print(result["segments"]) # segments are now assigned speaker IDs
+
+----------------------------------------
+
+TITLE: Installing WhisperX via pip
+DESCRIPTION: Simple installation of WhisperX through the Python package manager pip. This is the recommended method for most users.
+
+LANGUAGE: bash
+CODE:
+pip install whisperx
+
+----------------------------------------
+
+TITLE: Basic WhisperX Command Line Usage for English
+DESCRIPTION: Basic command to run WhisperX on an audio file with default parameters (small Whisper model). This processes the audio and generates transcriptions with word-level timestamps.
+
+LANGUAGE: bash
+CODE:
+whisperx path/to/audio.wav
+
+----------------------------------------
+
+TITLE: WhisperX Command Line with Speaker Diarization
+DESCRIPTION: Command to run WhisperX with speaker diarization enabled, which labels the transcript with speaker IDs. Uses large-v2 model and highlights words in the output SRT file.
+
+LANGUAGE: bash
+CODE:
+whisperx path/to/audio.wav --model large-v2 --diarize --highlight_words True
+
+----------------------------------------
+
+TITLE: WhisperX Command Line with Larger Models and Alignment
+DESCRIPTION: Advanced command to run WhisperX with larger models for increased timestamp accuracy. Specifies larger Whisper model, alignment model, and batch size for processing.
+
+LANGUAGE: bash
+CODE:
+whisperx path/to/audio.wav --model large-v2 --align_model WAV2VEC2_ASR_LARGE_LV60K_960H --batch_size 4
+
+----------------------------------------
+
+TITLE: Developer Installation of WhisperX
+DESCRIPTION: Installation method for developers who want to modify the code or contribute to the project, including cloning the repository and installing dependencies.
+
+LANGUAGE: bash
+CODE:
+git clone https://github.com/m-bain/whisperX.git
+cd whisperX
+uv sync --all-extras --dev
+
+----------------------------------------
+
+TITLE: Installing WhisperX directly from GitHub
+DESCRIPTION: Advanced installation method to install the latest version directly from the GitHub repository using uvx.
+
+LANGUAGE: bash
+CODE:
+uvx git+https://github.com/m-bain/whisperX.git
+
+----------------------------------------
+
+TITLE: WhisperX Command Line for Non-English Languages
+DESCRIPTION: Command to run WhisperX on non-English audio, specifying the language code. Example shows German language processing with the large-v2 model.
+
+LANGUAGE: bash
+CODE:
+whisperx --model large-v2 --language de path/to/audio.wav
+
+----------------------------------------
+
+TITLE: WhisperX Command Line for CPU Inference
+DESCRIPTION: Command to run WhisperX on CPU instead of GPU by specifying int8 compute type. Useful for systems without GPU or for Mac OS X users.
+
+LANGUAGE: bash
+CODE:
+whisperx path/to/audio.wav --compute_type int8
+
+----------------------------------------
+
+TITLE: Running WhisperX with French Language Support
+DESCRIPTION: Command to transcribe a French audio file using WhisperX with the large model. The --language parameter specifies French (fr) as the target language for transcription.
+
+LANGUAGE: bash
+CODE:
+whisperx --model large --language fr examples/sample_fr_01.wav
+
+----------------------------------------
+
+TITLE: Running WhisperX with German Language Support
+DESCRIPTION: Command to transcribe a German audio file using WhisperX with the large model. The --language parameter specifies German (de) as the target language for transcription.
+
+LANGUAGE: bash
+CODE:
+whisperx --model large --language de examples/sample_de_01.wav
+
+----------------------------------------
+
+TITLE: Running WhisperX with Japanese Language Support
+DESCRIPTION: Command to transcribe a Japanese audio file using WhisperX with the large model. The --language parameter specifies Japanese (ja) as the target language for transcription.
+
+LANGUAGE: bash
+CODE:
+whisperx --model large --language ja examples/sample_ja_01.wav
+
+----------------------------------------
+
+TITLE: Installing WhisperX using uvx
+DESCRIPTION: Alternative installation method using uvx package manager, which is an option for users of the astral.sh toolchain.
+
+LANGUAGE: bash
+CODE:
+uvx whisperx
+
+----------------------------------------
+
+TITLE: Running WhisperX with Italian Language Support
+DESCRIPTION: Command to transcribe an Italian audio file using WhisperX with the large model. The --language parameter specifies German (de) as the target language, which appears to be an error in the example as it should be Italian (it).
+
+LANGUAGE: bash
+CODE:
+whisperx --model large --language de examples/sample_it_01.wav

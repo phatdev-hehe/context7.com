@@ -1,0 +1,6588 @@
+TITLE: Creating ThemeProvider Component for Dark Mode in React
+DESCRIPTION: This code snippet defines a ThemeProvider component that manages the application's theme state. It handles theme switching between light, dark, and system preferences, and persists the selected theme in local storage.
+
+LANGUAGE: tsx
+CODE:
+import { createContext, useContext, useEffect, useState } from "react"
+
+type Theme = "dark" | "light" | "system"
+
+type ThemeProviderProps = {
+  children: React.ReactNode
+  defaultTheme?: Theme
+  storageKey?: string
+}
+
+type ThemeProviderState = {
+  theme: Theme
+  setTheme: (theme: Theme) => void
+}
+
+const initialState: ThemeProviderState = {
+  theme: "system",
+  setTheme: () => null,
+}
+
+const ThemeProviderContext = createContext<ThemeProviderState>(initialState)
+
+export function ThemeProvider({
+  children,
+  defaultTheme = "system",
+  storageKey = "vite-ui-theme",
+  ...props
+}: ThemeProviderProps) {
+  const [theme, setTheme] = useState<Theme>(
+    () => (localStorage.getItem(storageKey) as Theme) || defaultTheme
+  )
+
+  useEffect(() => {
+    const root = window.document.documentElement
+
+    root.classList.remove("light", "dark")
+
+    if (theme === "system") {
+      const systemTheme = window.matchMedia("(prefers-color-scheme: dark)")
+        .matches
+        ? "dark"
+        : "light"
+
+      root.classList.add(systemTheme)
+      return
+    }
+
+    root.classList.add(theme)
+  }, [theme])
+
+  const value = {
+    theme,
+    setTheme: (theme: Theme) => {
+      localStorage.setItem(storageKey, theme)
+      setTheme(theme)
+    },
+  }
+
+  return (
+    <ThemeProviderContext.Provider {...props} value={value}>
+      {children}
+    </ThemeProviderContext.Provider>
+  )
+}
+
+export const useTheme = () => {
+  const context = useContext(ThemeProviderContext)
+
+  if (context === undefined)
+    throw new Error("useTheme must be used within a ThemeProvider")
+
+  return context
+}
+
+----------------------------------------
+
+TITLE: Building Complete Form with Custom Components
+DESCRIPTION: Shows the complete implementation of a form using custom UI components, React Hook Form, and Zod validation.
+
+LANGUAGE: tsx
+CODE:
+"use client"
+
+import { zodResolver } from "@hookform/resolvers/zod"
+import { useForm } from "react-hook-form"
+import { z } from "zod"
+
+import { Button } from "@/components/ui/button"
+import {
+  Form,
+  FormControl,
+  FormDescription,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from "@/components/ui/form"
+import { Input } from "@/components/ui/input"
+
+const formSchema = z.object({
+  username: z.string().min(2, {
+    message: "Username must be at least 2 characters.",
+  }),
+})
+
+export function ProfileForm() {
+  // ...
+
+  return (
+    <Form {...form}>
+      <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-8">
+        <FormField
+          control={form.control}
+          name="username"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>Username</FormLabel>
+              <FormControl>
+                <Input placeholder="shadcn" {...field} />
+              </FormControl>
+              <FormDescription>
+                This is your public display name.
+              </FormDescription>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+        <Button type="submit">Submit</Button>
+      </form>
+    </Form>
+  )
+}
+
+----------------------------------------
+
+TITLE: Implementing FormField with React Hook Form
+DESCRIPTION: Shows how to use the FormField component with React Hook Form, including form control, labeling, and description.
+
+LANGUAGE: tsx
+CODE:
+const form = useForm()
+
+<FormField
+  control={form.control}
+  name="username"
+  render={({ field }) => (
+    <FormItem>
+      <FormLabel>Username</FormLabel>
+      <FormControl>
+        <Input placeholder="shadcn" {...field} />
+      </FormControl>
+      <FormDescription>This is your public display name.</FormDescription>
+      <FormMessage />
+    </FormItem>
+  )}
+/>
+
+----------------------------------------
+
+TITLE: Configuring JavaScript Import Aliases
+DESCRIPTION: JSON configuration for setting up import aliases in jsconfig.json when using JavaScript instead of TypeScript
+
+LANGUAGE: json
+CODE:
+{
+  "compilerOptions": {
+    "paths": {
+      "@/*": ["./*"]
+    }
+  }
+}
+
+----------------------------------------
+
+TITLE: Rendering DataTable in Page Component
+DESCRIPTION: Demonstrates how to use the DataTable component in a Next.js page, fetching data and passing it to the table.
+
+LANGUAGE: tsx
+CODE:
+import { Payment, columns } from "./columns"
+import { DataTable } from "./data-table"
+
+async function getData(): Promise<Payment[]> {
+  // Fetch data from your API here.
+  return [
+    {
+      id: "728ed52f",
+      amount: 100,
+      status: "pending",
+      email: "m@example.com",
+    },
+    // ...
+  ]
+}
+
+export default async function DemoPage() {
+  const data = await getData()
+
+  return (
+    <div className="container mx-auto py-10">
+      <DataTable columns={columns} data={data} />
+    </div>
+  )
+}
+
+----------------------------------------
+
+TITLE: Creating DataTable Component
+DESCRIPTION: Implements a reusable DataTable component using TanStack Table and shadcn/ui Table components.
+
+LANGUAGE: tsx
+CODE:
+"use client"
+
+import {
+  ColumnDef,
+  flexRender,
+  getCoreRowModel,
+  useReactTable,
+} from "@tanstack/react-table"
+
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table"
+
+interface DataTableProps<TData, TValue> {
+  columns: ColumnDef<TData, TValue>[]
+  data: TData[]
+}
+
+export function DataTable<TData, TValue>({
+  columns,
+  data,
+}: DataTableProps<TData, TValue>) {
+  const table = useReactTable({
+    data,
+    columns,
+    getCoreRowModel: getCoreRowModel(),
+  })
+
+  return (
+    <div className="rounded-md border">
+      <Table>
+        <TableHeader>
+          {table.getHeaderGroups().map((headerGroup) => (
+            <TableRow key={headerGroup.id}>
+              {headerGroup.headers.map((header) => {
+                return (
+                  <TableHead key={header.id}>
+                    {header.isPlaceholder
+                      ? null
+                      : flexRender(
+                          header.column.columnDef.header,
+                          header.getContext()
+                        )}
+                  </TableHead>
+                )
+              })}
+            </TableRow>
+          ))}
+        </TableHeader>
+        <TableBody>
+          {table.getRowModel().rows?.length ? (
+            table.getRowModel().rows.map((row) => (
+              <TableRow
+                key={row.id}
+                data-state={row.getIsSelected() && "selected"}
+              >
+                {row.getVisibleCells().map((cell) => (
+                  <TableCell key={cell.id}>
+                    {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                  </TableCell>
+                ))}
+              </TableRow>
+            ))
+          ) : (
+            <TableRow>
+              <TableCell colSpan={columns.length} className="h-24 text-center">
+                No results.
+              </TableCell>
+            </TableRow>
+          )}
+        </TableBody>
+      </Table>
+    </div>
+  )
+}
+
+----------------------------------------
+
+TITLE: Implementing Combobox Component with React and shadcn-ui in TypeScript
+DESCRIPTION: This code snippet demonstrates how to create a Combobox component using React and shadcn-ui. It combines the Popover and Command components to create an autocomplete input with a list of framework options. The component manages its own state for open/close and selected value.
+
+LANGUAGE: tsx
+CODE:
+"use client"
+
+import * as React from "react"
+import { Check, ChevronsUpDown } from "lucide-react"
+
+import { cn } from "@/lib/utils"
+import { Button } from "@/components/ui/button"
+import {
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from "@/components/ui/command"
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover"
+
+const frameworks = [
+  {
+    value: "next.js",
+    label: "Next.js",
+  },
+  {
+    value: "sveltekit",
+    label: "SvelteKit",
+  },
+  {
+    value: "nuxt.js",
+    label: "Nuxt.js",
+  },
+  {
+    value: "remix",
+    label: "Remix",
+  },
+  {
+    value: "astro",
+    label: "Astro",
+  },
+]
+
+export function ComboboxDemo() {
+  const [open, setOpen] = React.useState(false)
+  const [value, setValue] = React.useState("")
+
+  return (
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>
+        <Button
+          variant="outline"
+          role="combobox"
+          aria-expanded={open}
+          className="w-[200px] justify-between"
+        >
+          {value
+            ? frameworks.find((framework) => framework.value === value)?.label
+            : "Select framework..."}
+          <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent className="w-[200px] p-0">
+        <Command>
+          <CommandInput placeholder="Search framework..." />
+          <CommandList>
+            <CommandEmpty>No framework found.</CommandEmpty>
+            <CommandGroup>
+              {frameworks.map((framework) => (
+                <CommandItem
+                  key={framework.value}
+                  value={framework.value}
+                  onSelect={(currentValue) => {
+                    setValue(currentValue === value ? "" : currentValue)
+                    setOpen(false)
+                  }}
+                >
+                  <Check
+                    className={cn(
+                      "mr-2 h-4 w-4",
+                      value === framework.value ? "opacity-100" : "opacity-0"
+                    )}
+                  />
+                  {framework.label}
+                </CommandItem>
+              ))}
+            </CommandGroup>
+          </CommandList>
+        </Command>
+      </PopoverContent>
+    </Popover>
+  )
+}
+
+----------------------------------------
+
+TITLE: Adding Components with shadcn CLI
+DESCRIPTION: Use the 'add' command to add components and dependencies to your project. This command allows you to specify which components to add or provide a URL to the component.
+
+LANGUAGE: bash
+CODE:
+npx shadcn@latest add [component]
+
+----------------------------------------
+
+TITLE: Basic Usage of Dialog Component in React
+DESCRIPTION: This example demonstrates the basic structure and usage of the Dialog component, including the trigger, content, header, title, and description.
+
+LANGUAGE: tsx
+CODE:
+<Dialog>
+  <DialogTrigger>Open</DialogTrigger>
+  <DialogContent>
+    <DialogHeader>
+      <DialogTitle>Are you absolutely sure?</DialogTitle>
+      <DialogDescription>
+        This action cannot be undone. This will permanently delete your account
+        and remove your data from our servers.
+      </DialogDescription>
+    </DialogHeader>
+  </DialogContent>
+</Dialog>
+
+----------------------------------------
+
+TITLE: Creating Mode Toggle Component for Theme Switching in React
+DESCRIPTION: This code defines a ModeToggle component that allows users to switch between light, dark, and system themes. It uses a dropdown menu to present theme options and updates the theme using the useTheme hook.
+
+LANGUAGE: tsx
+CODE:
+import { Moon, Sun } from "lucide-react"
+
+import { Button } from "@/components/ui/button"
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
+import { useTheme } from "@/components/theme-provider"
+
+export function ModeToggle() {
+  const { setTheme } = useTheme()
+
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <Button variant="outline" size="icon">
+          <Sun className="h-[1.2rem] w-[1.2rem] rotate-0 scale-100 transition-all dark:-rotate-90 dark:scale-0" />
+          <Moon className="absolute h-[1.2rem] w-[1.2rem] rotate-90 scale-0 transition-all dark:rotate-0 dark:scale-100" />
+          <span className="sr-only">Toggle theme</span>
+        </Button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end">
+        <DropdownMenuItem onClick={() => setTheme("light")}>
+          Light
+        </DropdownMenuItem>
+        <DropdownMenuItem onClick={() => setTheme("dark")}>
+          Dark
+        </DropdownMenuItem>
+        <DropdownMenuItem onClick={() => setTheme("system")}>
+          System
+        </DropdownMenuItem>
+      </DropdownMenuContent>
+    </DropdownMenu>
+  )
+}
+
+----------------------------------------
+
+TITLE: Rendering Accordion Component in React
+DESCRIPTION: Example of using the Accordion component with collapsible functionality and custom styling. Demonstrates the composable interface of shadcn/ui components.
+
+LANGUAGE: jsx
+CODE:
+<Accordion collapsible>
+  <AccordionItem value="faq-1" className="border-none">
+    <AccordionTrigger>
+      How do I pull upstream updates in an Open Code approach?
+    </AccordionTrigger>
+    <AccordionContent>
+      <p>
+        shadcn/ui follows a headless component architecture. This means the core
+        of your app can receive fixes by updating your dependencies, for
+        instance, radix-ui or input-otp.
+      </p>
+      <p className="mt-4">
+        The topmost layer, i.e., the one closest to your design system, is not
+        coupled with the implementation of the library. It stays open for
+        modification.
+      </p>
+    </AccordionContent>
+  </AccordionItem>
+</Accordion>
+
+----------------------------------------
+
+TITLE: Using Command Component in React JSX
+DESCRIPTION: This example shows how to use the Command component and its subcomponents to create a command menu interface in React JSX.
+
+LANGUAGE: tsx
+CODE:
+<Command>
+  <CommandInput placeholder="Type a command or search..." />
+  <CommandList>
+    <CommandEmpty>No results found.</CommandEmpty>
+    <CommandGroup heading="Suggestions">
+      <CommandItem>Calendar</CommandItem>
+      <CommandItem>Search Emoji</CommandItem>
+      <CommandItem>Calculator</CommandItem>
+    </CommandGroup>
+    <CommandSeparator />
+    <CommandGroup heading="Settings">
+      <CommandItem>Profile</CommandItem>
+      <CommandItem>Billing</CommandItem>
+      <CommandItem>Settings</CommandItem>
+    </CommandGroup>
+  </CommandList>
+</Command>
+
+----------------------------------------
+
+TITLE: Creating a Complete Bar Chart with Grid, Axis, Tooltip, and Legend
+DESCRIPTION: This comprehensive example demonstrates how to create a bar chart with a grid, x-axis, tooltip, and legend using Recharts and custom shadcn-ui components.
+
+LANGUAGE: tsx
+CODE:
+import { Bar, BarChart, CartesianGrid, XAxis } from "recharts"
+import { ChartContainer, ChartTooltip, ChartTooltipContent, ChartLegend, ChartLegendContent } from "@/components/ui/chart"
+
+<ChartContainer config={chartConfig} className="h-[200px] w-full">
+  <BarChart accessibilityLayer data={chartData}>
+    <CartesianGrid vertical={false} />
+    <XAxis
+      dataKey="month"
+      tickLine={false}
+      tickMargin={10}
+      axisLine={false}
+      tickFormatter={(value) => value.slice(0, 3)}
+    />
+    <ChartTooltip content={<ChartTooltipContent />} />
+    <ChartLegend content={<ChartLegendContent />} />
+    <Bar dataKey="desktop" fill="var(--color-desktop)" radius={4} />
+    <Bar dataKey="mobile" fill="var(--color-mobile)" radius={4} />
+  </BarChart>
+</ChartContainer>
+
+----------------------------------------
+
+TITLE: Configuring registry.json for shadcn-ui Component Registry
+DESCRIPTION: Create a registry.json file in the root of your project to define the registry schema and items. This file is required when using the shadcn CLI to build your registry.
+
+LANGUAGE: json
+CODE:
+{
+  "$schema": "https://ui.shadcn.com/schema/registry.json",
+  "name": "acme",
+  "homepage": "https://acme.com",
+  "items": [
+    // ...
+  ]
+}
+
+----------------------------------------
+
+TITLE: Implementing Form with React Hook Form and Zod
+DESCRIPTION: Demonstrates how to create a form using React Hook Form with Zod validation, including form definition and submit handler.
+
+LANGUAGE: tsx
+CODE:
+"use client"
+
+import { zodResolver } from "@hookform/resolvers/zod"
+import { useForm } from "react-hook-form"
+import { z } from "zod"
+
+const formSchema = z.object({
+  username: z.string().min(2, {
+    message: "Username must be at least 2 characters.",
+  }),
+})
+
+export function ProfileForm() {
+  // 1. Define your form.
+  const form = useForm<z.infer<typeof formSchema>>({
+    resolver: zodResolver(formSchema),
+    defaultValues: {
+      username: "",
+    },
+  })
+
+  // 2. Define a submit handler.
+  function onSubmit(values: z.infer<typeof formSchema>) {
+    // Do something with the form values.
+    // ✅ This will be type-safe and validated.
+    console.log(values)
+  }
+}
+
+----------------------------------------
+
+TITLE: Initializing shadcn Project with CLI
+DESCRIPTION: Use the 'init' command to initialize configuration and dependencies for a new project. This command installs dependencies, adds the 'cn' util, and configures CSS variables.
+
+LANGUAGE: bash
+CODE:
+npx shadcn@latest init
+
+----------------------------------------
+
+TITLE: Using Menubar Component in React
+DESCRIPTION: This code snippet demonstrates how to use the Menubar component in a React application, including creating a menu with items, separators, and shortcuts.
+
+LANGUAGE: tsx
+CODE:
+<Menubar>
+  <MenubarMenu>
+    <MenubarTrigger>File</MenubarTrigger>
+    <MenubarContent>
+      <MenubarItem>
+        New Tab <MenubarShortcut>⌘T</MenubarShortcut>
+      </MenubarItem>
+      <MenubarItem>New Window</MenubarItem>
+      <MenubarSeparator />
+      <MenubarItem>Share</MenubarItem>
+      <MenubarSeparator />
+      <MenubarItem>Print</MenubarItem>
+    </MenubarContent>
+  </MenubarMenu>
+</Menubar>
+
+----------------------------------------
+
+TITLE: Alert Dialog Implementation Example
+DESCRIPTION: Example implementation of an alert dialog with header, description, and action buttons for confirmation flow
+
+LANGUAGE: tsx
+CODE:
+<AlertDialog>
+  <AlertDialogTrigger>Open</AlertDialogTrigger>
+  <AlertDialogContent>
+    <AlertDialogHeader>
+      <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
+      <AlertDialogDescription>
+        This action cannot be undone. This will permanently delete your account
+        and remove your data from our servers.
+      </AlertDialogDescription>
+    </AlertDialogHeader>
+    <AlertDialogFooter>
+      <AlertDialogCancel>Cancel</AlertDialogCancel>
+      <AlertDialogAction>Continue</AlertDialogAction>
+    </AlertDialogFooter>
+  </AlertDialogContent>
+</AlertDialog>
+
+----------------------------------------
+
+TITLE: Implementing Row Selection
+DESCRIPTION: Adds row selection functionality to the table, including a checkbox column and selection state management.
+
+LANGUAGE: tsx
+CODE:
+"use client"
+
+import { ColumnDef } from "@tanstack/react-table"
+
+import { Badge } from "@/components/ui/badge"
+import { Checkbox } from "@/components/ui/checkbox"
+
+export const columns: ColumnDef<Payment>[] = [
+  {
+    id: "select",
+    header: ({ table }) => (
+      <Checkbox
+        checked={
+          table.getIsAllPageRowsSelected() ||
+          (table.getIsSomePageRowsSelected() && "indeterminate")
+        }
+        onCheckedChange={(value) => table.toggleAllPageRowsSelected(!!value)}
+        aria-label="Select all"
+      />
+    ),
+    cell: ({ row }) => (
+      <Checkbox
+        checked={row.getIsSelected()}
+        onCheckedChange={(value) => row.toggleSelected(!!value)}
+        aria-label="Select row"
+      />
+    ),
+    enableSorting: false,
+    enableHiding: false,
+  },
+  // ... other columns
+]
+
+export function DataTable<TData, TValue>({
+  columns,
+  data,
+}: DataTableProps<TData, TValue>) {
+  const [rowSelection, setRowSelection] = React.useState({})
+
+  const table = useReactTable({
+    data,
+    columns,
+    onRowSelectionChange: setRowSelection,
+    state: {
+      rowSelection,
+    },
+    // ... other table options
+  })
+
+  return (
+    <div>
+      <div className="rounded-md border">
+        <Table />
+      </div>
+      <div className="flex-1 text-sm text-muted-foreground">
+        {table.getFilteredSelectedRowModel().rows.length} of{" "}
+        {table.getFilteredRowModel().rows.length} row(s) selected.
+      </div>
+    </div>
+  )
+}
+
+----------------------------------------
+
+TITLE: Implementing Command Menu Dialog in React
+DESCRIPTION: This code snippet demonstrates how to create a command menu dialog that can be toggled with a keyboard shortcut (Cmd/Ctrl + K) in React.
+
+LANGUAGE: tsx
+CODE:
+export function CommandMenu() {
+  const [open, setOpen] = React.useState(false)
+
+  React.useEffect(() => {
+    const down = (e: KeyboardEvent) => {
+      if (e.key === "k" && (e.metaKey || e.ctrlKey)) {
+        e.preventDefault()
+        setOpen((open) => !open)
+      }
+    }
+    document.addEventListener("keydown", down)
+    return () => document.removeEventListener("keydown", down)
+  }, [])
+
+  return (
+    <CommandDialog open={open} onOpenChange={setOpen}>
+      <CommandInput placeholder="Type a command or search..." />
+      <CommandList>
+        <CommandEmpty>No results found.</CommandEmpty>
+        <CommandGroup heading="Suggestions">
+          <CommandItem>Calendar</CommandItem>
+          <CommandItem>Search Emoji</CommandItem>
+          <CommandItem>Calculator</CommandItem>
+        </CommandGroup>
+      </CommandList>
+    </CommandDialog>
+  )
+}
+
+----------------------------------------
+
+TITLE: Implementing a Basic Table Structure in React
+DESCRIPTION: This example demonstrates how to use the imported Table components to create a basic table structure. It includes a caption, header, and a single row of data.
+
+LANGUAGE: tsx
+CODE:
+<Table>
+  <TableCaption>A list of your recent invoices.</TableCaption>
+  <TableHeader>
+    <TableRow>
+      <TableHead className="w-[100px]">Invoice</TableHead>
+      <TableHead>Status</TableHead>
+      <TableHead>Method</TableHead>
+      <TableHead className="text-right">Amount</TableHead>
+    </TableRow>
+  </TableHeader>
+  <TableBody>
+    <TableRow>
+      <TableCell className="font-medium">INV001</TableCell>
+      <TableCell>Paid</TableCell>
+      <TableCell>Credit Card</TableCell>
+      <TableCell className="text-right">$250.00</TableCell>
+    </TableRow>
+  </TableBody>
+</Table>
+
+----------------------------------------
+
+TITLE: Adding Row Actions with Dropdown Menu
+DESCRIPTION: Adds a new column for row actions using a dropdown menu component.
+
+LANGUAGE: tsx
+CODE:
+"use client"
+
+import { ColumnDef } from "@tanstack/react-table"
+import { MoreHorizontal } from "lucide-react"
+
+import { Button } from "@/components/ui/button"
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
+
+export const columns: ColumnDef<Payment>[] = [
+  // ...
+  {
+    id: "actions",
+    cell: ({ row }) => {
+      const payment = row.original
+
+      return (
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button variant="ghost" className="h-8 w-8 p-0">
+              <span className="sr-only">Open menu</span>
+              <MoreHorizontal className="h-4 w-4" />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end">
+            <DropdownMenuLabel>Actions</DropdownMenuLabel>
+            <DropdownMenuItem
+              onClick={() => navigator.clipboard.writeText(payment.id)}
+            >
+              Copy payment ID
+            </DropdownMenuItem>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem>View customer</DropdownMenuItem>
+            <DropdownMenuItem>View payment details</DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
+      )
+    },
+  },
+  // ...
+]
+
+----------------------------------------
+
+TITLE: Implementing Basic Date Picker in React with shadcn-ui
+DESCRIPTION: A client-side React component that implements a date picker using Popover and Calendar components. The component uses date-fns for date formatting and includes a button trigger with calendar icon. The selected date is managed through React state.
+
+LANGUAGE: tsx
+CODE:
+"use client"
+
+import * as React from "react"
+import { format } from "date-fns"
+import { Calendar as CalendarIcon } from "lucide-react"
+
+import { cn } from "@/lib/utils"
+import { Button } from "@/components/ui/button"
+import { Calendar } from "@/components/ui/calendar"
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover"
+
+export function DatePickerDemo() {
+  const [date, setDate] = React.useState<Date>()
+
+  return (
+    <Popover>
+      <PopoverTrigger asChild>
+        <Button
+          variant={"outline"}
+          className={cn(
+            "w-[280px] justify-start text-left font-normal",
+            !date && "text-muted-foreground"
+          )}
+        >
+          <CalendarIcon className="mr-2 h-4 w-4" />
+          {date ? format(date, "PPP") : <span>Pick a date</span>}
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent className="w-auto p-0">
+        <Calendar
+          mode="single"
+          selected={date}
+          onSelect={setDate}
+          initialFocus
+        />
+      </PopoverContent>
+    </Popover>
+  )
+
+----------------------------------------
+
+TITLE: Implementing Mode Toggle Component in Remix
+DESCRIPTION: Creates a mode toggle component using shadcn-ui components and remix-themes hooks. This component allows users to switch between light and dark themes.
+
+LANGUAGE: tsx
+CODE:
+import { Moon, Sun } from "lucide-react"
+import { Theme, useTheme } from "remix-themes"
+
+import { Button } from "./ui/button"
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "./ui/dropdown-menu"
+
+export function ModeToggle() {
+  const [, setTheme] = useTheme()
+
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <Button variant="ghost" size="icon">
+          <Sun className="h-[1.2rem] w-[1.2rem] rotate-0 scale-100 transition-all dark:-rotate-90 dark:scale-0" />
+          <Moon className="absolute h-[1.2rem] w-[1.2rem] rotate-90 scale-0 transition-all dark:rotate-0 dark:scale-100" />
+          <span className="sr-only">Toggle theme</span>
+        </Button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end">
+        <DropdownMenuItem onClick={() => setTheme(Theme.LIGHT)}>
+          Light
+        </DropdownMenuItem>
+        <DropdownMenuItem onClick={() => setTheme(Theme.DARK)}>
+          Dark
+        </DropdownMenuItem>
+      </DropdownMenuContent>
+    </DropdownMenu>
+  )
+}
+
+----------------------------------------
+
+TITLE: Implementing Pagination
+DESCRIPTION: Updates the DataTable component to include pagination functionality and controls.
+
+LANGUAGE: tsx
+CODE:
+import {
+  ColumnDef,
+  flexRender,
+  getCoreRowModel,
+  getPaginationRowModel,
+  useReactTable,
+} from "@tanstack/react-table"
+
+import { Button } from "@/components/ui/button"
+
+export function DataTable<TData, TValue>({
+  columns,
+  data,
+}: DataTableProps<TData, TValue>) {
+  const table = useReactTable({
+    data,
+    columns,
+    getCoreRowModel: getCoreRowModel(),
+    getPaginationRowModel: getPaginationRowModel(),
+  })
+
+  return (
+    <div>
+      <div className="rounded-md border">
+        <Table>{ /* ... */ }</Table>
+      </div>
+      <div className="flex items-center justify-end space-x-2 py-4">
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => table.previousPage()}
+          disabled={!table.getCanPreviousPage()}
+        >
+          Previous
+        </Button>
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => table.nextPage()}
+          disabled={!table.getCanNextPage()}
+        >
+          Next
+        </Button>
+      </div>
+    </div>
+  )
+}
+
+----------------------------------------
+
+TITLE: Basic Drawer Component Implementation
+DESCRIPTION: Example showing the basic structure and usage of the Drawer component with header, description, and footer sections.
+
+LANGUAGE: tsx
+CODE:
+<Drawer>
+  <DrawerTrigger>Open</DrawerTrigger>
+  <DrawerContent>
+    <DrawerHeader>
+      <DrawerTitle>Are you absolutely sure?</DrawerTitle>
+      <DrawerDescription>This action cannot be undone.</DrawerDescription>
+    </DrawerHeader>
+    <DrawerFooter>
+      <Button>Submit</Button>
+      <DrawerClose>
+        <Button variant="outline">Cancel</Button>
+      </DrawerClose>
+    </DrawerFooter>
+  </DrawerContent>
+</Drawer>
+
+----------------------------------------
+
+TITLE: Initializing shadcn/ui Monorepo Project
+DESCRIPTION: Command to create a new monorepo project using shadcn/ui CLI. It prompts the user to select the project type, specifically the 'Next.js (Monorepo)' option.
+
+LANGUAGE: bash
+CODE:
+npx shadcn@canary init
+
+----------------------------------------
+
+TITLE: Configuring Root Layout with Theme Provider
+DESCRIPTION: Setup of the root layout component incorporating the ThemeProvider with system theme support and hydration handling
+
+LANGUAGE: tsx
+CODE:
+import { ThemeProvider } from "@/components/theme-provider"
+
+export default function RootLayout({ children }: RootLayoutProps) {
+  return (
+    <>
+      <html lang="en" suppressHydrationWarning>
+        <head />
+        <body>
+          <ThemeProvider
+            attribute="class"
+            defaultTheme="system"
+            enableSystem
+            disableTransitionOnChange
+          >
+            {children}
+          </ThemeProvider>
+        </body>
+      </html>
+    </>
+  )
+}
+
+----------------------------------------
+
+TITLE: Basic Usage of Sheet Component in React
+DESCRIPTION: This example demonstrates the basic usage of the Sheet component, including its trigger, content, header, title, and description.
+
+LANGUAGE: tsx
+CODE:
+<Sheet>
+  <SheetTrigger>Open</SheetTrigger>
+  <SheetContent>
+    <SheetHeader>
+      <SheetTitle>Are you absolutely sure?</SheetTitle>
+      <SheetDescription>
+        This action cannot be undone. This will permanently delete your account
+        and remove your data from our servers.
+      </SheetDescription>
+    </SheetHeader>
+  </SheetContent>
+</Sheet>
+
+----------------------------------------
+
+TITLE: Adding Sorting Functionality
+DESCRIPTION: Implements sorting for the email column and updates the DataTable component to handle sorting state.
+
+LANGUAGE: tsx
+CODE:
+"use client"
+
+import * as React from "react"
+import {
+  ColumnDef,
+  SortingState,
+  flexRender,
+  getCoreRowModel,
+  getPaginationRowModel,
+  getSortedRowModel,
+  useReactTable,
+} from "@tanstack/react-table"
+
+export function DataTable<TData, TValue>({
+  columns,
+  data,
+}: DataTableProps<TData, TValue>) {
+  const [sorting, setSorting] = React.useState<SortingState>([])
+
+  const table = useReactTable({
+    data,
+    columns,
+    getCoreRowModel: getCoreRowModel(),
+    getPaginationRowModel: getPaginationRowModel(),
+    onSortingChange: setSorting,
+    getSortedRowModel: getSortedRowModel(),
+    state: {
+      sorting,
+    },
+  })
+
+  return (
+    <div>
+      <div className="rounded-md border">
+        <Table>{ /* ... */ }</Table>
+      </div>
+    </div>
+  )
+}
+
+----------------------------------------
+
+TITLE: Using Card Component in React with TypeScript
+DESCRIPTION: Demonstration of how to structure a Card component with header, content, and footer.
+
+LANGUAGE: tsx
+CODE:
+<Card>
+  <CardHeader>
+    <CardTitle>Card Title</CardTitle>
+    <CardDescription>Card Description</CardDescription>
+  </CardHeader>
+  <CardContent>
+    <p>Card Content</p>
+  </CardContent>
+  <CardFooter>
+    <p>Card Footer</p>
+  </CardFooter>
+</Card>
+
+----------------------------------------
+
+TITLE: Defining Complete Registry Configuration in JSON
+DESCRIPTION: Full example of a registry.json file showing the complete structure with schema reference, name, homepage and items configuration.
+
+LANGUAGE: json
+CODE:
+{
+  "$schema": "https://ui.shadcn.com/schema/registry.json",
+  "name": "shadcn",
+  "homepage": "https://ui.shadcn.com",
+  "items": [
+    {
+      "name": "hello-world",
+      "type": "registry:block",
+      "title": "Hello World",
+      "description": "A simple hello world component.",
+      "files": [
+        {
+          "path": "registry/new-york/hello-world/hello-world.tsx",
+          "type": "registry:component"
+        }
+      ]
+    }
+  ]
+}
+
+----------------------------------------
+
+TITLE: Implementing CSS Variable-based Theming
+DESCRIPTION: Example of using CSS variables for background and text colors in components with configuration in components.json
+
+LANGUAGE: tsx
+CODE:
+<div className="bg-background text-foreground" />
+
+LANGUAGE: json
+CODE:
+{
+  "style": "default",
+  "rsc": true,
+  "tailwind": {
+    "config": "",
+    "css": "app/globals.css",
+    "baseColor": "neutral",
+    "cssVariables": true
+  },
+  "aliases": {
+    "components": "@/components",
+    "utils": "@/lib/utils",
+    "ui": "@/registry/new-york-v4/ui",
+    "lib": "@/lib",
+    "hooks": "@/hooks"
+  },
+  "iconLibrary": "lucide"
+}
+
+----------------------------------------
+
+TITLE: Adding Column Visibility Controls
+DESCRIPTION: Implements column visibility toggling and adds a dropdown menu to control column visibility.
+
+LANGUAGE: tsx
+CODE:
+"use client"
+
+import * as React from "react"
+import {
+  ColumnDef,
+  ColumnFiltersState,
+  SortingState,
+  VisibilityState,
+  flexRender,
+  getCoreRowModel,
+  getFilteredRowModel,
+  getPaginationRowModel,
+  getSortedRowModel,
+  useReactTable,
+} from "@tanstack/react-table"
+
+import { Button } from "@/components/ui/button"
+import {
+  DropdownMenu,
+  DropdownMenuCheckboxItem,
+  DropdownMenuContent,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
+
+export function DataTable<TData, TValue>({
+  columns,
+  data,
+}: DataTableProps<TData, TValue>) {
+  const [sorting, setSorting] = React.useState<SortingState>([])
+  const [columnFilters, setColumnFilters] = React.useState<ColumnFiltersState>(
+    []
+  )
+  const [columnVisibility, setColumnVisibility] =
+    React.useState<VisibilityState>({})
+
+  const table = useReactTable({
+    data,
+    columns,
+    onSortingChange: setSorting,
+    onColumnFiltersChange: setColumnFilters,
+    getCoreRowModel: getCoreRowModel(),
+    getPaginationRowModel: getPaginationRowModel(),
+    getSortedRowModel: getSortedRowModel(),
+    getFilteredRowModel: getFilteredRowModel(),
+    onColumnVisibilityChange: setColumnVisibility,
+    state: {
+      sorting,
+      columnFilters,
+      columnVisibility,
+    },
+  })
+
+  return (
+    <div>
+      <div className="flex items-center py-4">
+        <Input
+          placeholder="Filter emails..."
+          value={table.getColumn("email")?.getFilterValue() as string}
+          onChange={(event) =>
+            table.getColumn("email")?.setFilterValue(event.target.value)
+          }
+          className="max-w-sm"
+        />
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button variant="outline" className="ml-auto">
+              Columns
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end">
+            {table
+              .getAllColumns()
+              .filter(
+                (column) => column.getCanHide()
+              )
+              .map((column) => {
+                return (
+                  <DropdownMenuCheckboxItem
+                    key={column.id}
+                    className="capitalize"
+                    checked={column.getIsVisible()}
+                    onCheckedChange={(value) =>
+                      column.toggleVisibility(!!value)
+                    }
+                  >
+                    {column.id}
+                  </DropdownMenuCheckboxItem>
+                )
+              })}
+          </DropdownMenuContent>
+        </DropdownMenu>
+      </div>
+      <div className="rounded-md border">
+        <Table>{ /* ... */ }</Table>
+      </div>
+    </div>
+  )
+}
+
+----------------------------------------
+
+TITLE: Basic Carousel Usage in React
+DESCRIPTION: Example of how to structure a basic carousel with content, items, and navigation buttons.
+
+LANGUAGE: tsx
+CODE:
+<Carousel>
+  <CarouselContent>
+    <CarouselItem>...</CarouselItem>
+    <CarouselItem>...</CarouselItem>
+    <CarouselItem>...</CarouselItem>
+  </CarouselContent>
+  <CarouselPrevious />
+  <CarouselNext />
+</Carousel>
+
+----------------------------------------
+
+TITLE: Implementing Tabs Component in React
+DESCRIPTION: This example demonstrates how to use the Tabs component in a React application, creating a simple tabbed interface with 'Account' and 'Password' tabs.
+
+LANGUAGE: tsx
+CODE:
+<Tabs defaultValue="account" className="w-[400px]">
+  <TabsList>
+    <TabsTrigger value="account">Account</TabsTrigger>
+    <TabsTrigger value="password">Password</TabsTrigger>
+  </TabsList>
+  <TabsContent value="account">Make changes to your account here.</TabsContent>
+  <TabsContent value="password">Change your password here.</TabsContent>
+</Tabs>
+
+----------------------------------------
+
+TITLE: Installing Form Dependencies via CLI
+DESCRIPTION: Command to install the form component and its dependencies using the shadcn CLI.
+
+LANGUAGE: bash
+CODE:
+npx shadcn@latest add form
+
+----------------------------------------
+
+TITLE: Initializing a Basic Bar Chart with Recharts in React
+DESCRIPTION: This snippet demonstrates how to create a basic bar chart using Recharts components and custom chart components from shadcn-ui. It includes the ChartContainer and ChartTooltipContent components.
+
+LANGUAGE: tsx
+CODE:
+import { Bar, BarChart } from "recharts"
+
+import { ChartContainer, ChartTooltipContent } from "@/components/ui/charts"
+
+export function MyChart() {
+  return (
+    <ChartContainer>
+      <BarChart data={data}>
+        <Bar dataKey="value" />
+        <ChartTooltip content={<ChartTooltipContent />} />
+      </BarChart>
+    </ChartContainer>
+  )
+}
+
+----------------------------------------
+
+TITLE: Basic Horizontal Panel Implementation
+DESCRIPTION: Basic example showing how to create a horizontal resizable panel group with two panels and a handle.
+
+LANGUAGE: tsx
+CODE:
+<ResizablePanelGroup direction="horizontal">
+  <ResizablePanel>One</ResizablePanel>
+  <ResizableHandle />
+  <ResizablePanel>Two</ResizablePanel>
+</ResizablePanelGroup>
+
+----------------------------------------
+
+TITLE: Using Accordion Component
+DESCRIPTION: Example implementation of a single-item accordion with collapsible functionality and WAI-ARIA compliance.
+
+LANGUAGE: tsx
+CODE:
+<Accordion type="single" collapsible>
+  <AccordionItem value="item-1">
+    <AccordionTrigger>Is it accessible?</AccordionTrigger>
+    <AccordionContent>
+      Yes. It adheres to the WAI-ARIA design pattern.
+    </AccordionContent>
+  </AccordionItem>
+</Accordion>
+
+----------------------------------------
+
+TITLE: Basic Navigation Menu Implementation - TypeScript/React
+DESCRIPTION: Example of a basic navigation menu structure with a single menu item and link
+
+LANGUAGE: tsx
+CODE:
+<NavigationMenu>
+  <NavigationMenuList>
+    <NavigationMenuItem>
+      <NavigationMenuTrigger>Item One</NavigationMenuTrigger>
+      <NavigationMenuContent>
+        <NavigationMenuLink>Link</NavigationMenuLink>
+      </NavigationMenuContent>
+    </NavigationMenuItem>
+  </NavigationMenuList>
+</NavigationMenu>
+
+----------------------------------------
+
+TITLE: Schema Declaration
+DESCRIPTION: Defines the schema reference for the registry item file.
+
+LANGUAGE: json
+CODE:
+{
+  "$schema": "https://ui.shadcn.com/schema/registry-item.json"
+}
+
+----------------------------------------
+
+TITLE: Basic Sidebar Implementation
+DESCRIPTION: Example of implementing a basic sidebar with a menu in a React component.
+
+LANGUAGE: tsx
+CODE:
+import { Calendar, Home, Inbox, Search, Settings } from "lucide-react"
+
+import {
+  Sidebar,
+  SidebarContent,
+  SidebarGroup,
+  SidebarGroupContent,
+  SidebarGroupLabel,
+  SidebarMenu,
+  SidebarMenuButton,
+  SidebarMenuItem,
+} from "@/components/ui/sidebar"
+
+// Menu items.
+const items = [
+  {
+    title: "Home",
+    url: "#",
+    icon: Home,
+  },
+  {
+    title: "Inbox",
+    url: "#",
+    icon: Inbox,
+  },
+  {
+    title: "Calendar",
+    url: "#",
+    icon: Calendar,
+  },
+  {
+    title: "Search",
+    url: "#",
+    icon: Search,
+  },
+  {
+    title: "Settings",
+    url: "#",
+    icon: Settings,
+  },
+]
+
+export function AppSidebar() {
+  return (
+    <Sidebar>
+      <SidebarContent>
+        <SidebarGroup>
+          <SidebarGroupLabel>Application</SidebarGroupLabel>
+          <SidebarGroupContent>
+            <SidebarMenu>
+              {items.map((item) => (
+                <SidebarMenuItem key={item.title}>
+                  <SidebarMenuButton asChild>
+                    <a href={item.url}>
+                      <item.icon />
+                      <span>{item.title}</span>
+                    </a>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+              ))}
+            </SidebarMenu>
+          </SidebarGroupContent>
+        </SidebarGroup>
+      </SidebarContent>
+    </Sidebar>
+  )
+}
+
+----------------------------------------
+
+TITLE: Creating Theme Provider Component
+DESCRIPTION: Implementation of a client-side Theme Provider component that wraps next-themes functionality for managing dark/light modes
+
+LANGUAGE: tsx
+CODE:
+"use client"
+
+import * as React from "react"
+import { ThemeProvider as NextThemesProvider } from "next-themes"
+
+export function ThemeProvider({
+  children,
+  ...props
+}: React.ComponentProps<typeof NextThemesProvider>) {
+  return <NextThemesProvider {...props}>{children}</NextThemesProvider>
+}
+
+----------------------------------------
+
+TITLE: Implementing Pagination Component in React
+DESCRIPTION: This code demonstrates how to use the Pagination components to create a pagination interface. It includes previous and next buttons, a numbered link, and an ellipsis to indicate more pages.
+
+LANGUAGE: tsx
+CODE:
+<Pagination>
+  <PaginationContent>
+    <PaginationItem>
+      <PaginationPrevious href="#" />
+    </PaginationItem>
+    <PaginationItem>
+      <PaginationLink href="#">1</PaginationLink>
+    </PaginationItem>
+    <PaginationItem>
+      <PaginationEllipsis />
+    </PaginationItem>
+    <PaginationItem>
+      <PaginationNext href="#" />
+    </PaginationItem>
+  </PaginationContent>
+</Pagination>
+
+----------------------------------------
+
+TITLE: Implementing Radio Group in React
+DESCRIPTION: Example of how to use the RadioGroup and RadioGroupItem components in a React component, including labels and default values.
+
+LANGUAGE: tsx
+CODE:
+<RadioGroup defaultValue="option-one">
+  <div className="flex items-center space-x-2">
+    <RadioGroupItem value="option-one" id="option-one" />
+    <Label htmlFor="option-one">Option One</Label>
+  </div>
+  <div className="flex items-center space-x-2">
+    <RadioGroupItem value="option-two" id="option-two" />
+    <Label htmlFor="option-two">Option Two</Label>
+  </div>
+</RadioGroup>
+
+----------------------------------------
+
+TITLE: Basic Dropdown Menu Usage in React
+DESCRIPTION: Example of using the Dropdown Menu component in a React application, demonstrating the basic structure and content.
+
+LANGUAGE: tsx
+CODE:
+<DropdownMenu>
+  <DropdownMenuTrigger>Open</DropdownMenuTrigger>
+  <DropdownMenuContent>
+    <DropdownMenuLabel>My Account</DropdownMenuLabel>
+    <DropdownMenuSeparator />
+    <DropdownMenuItem>Profile</DropdownMenuItem>
+    <DropdownMenuItem>Billing</DropdownMenuItem>
+    <DropdownMenuItem>Team</DropdownMenuItem>
+    <DropdownMenuItem>Subscription</DropdownMenuItem>
+  </DropdownMenuContent>
+</DropdownMenu>
+
+----------------------------------------
+
+TITLE: Using Alert Component in React
+DESCRIPTION: Example of how to use the Alert component with a title, description, and icon in a React application.
+
+LANGUAGE: tsx
+CODE:
+<Alert>
+  <Terminal className="h-4 w-4" />
+  <AlertTitle>Heads up!</AlertTitle>
+  <AlertDescription>
+    You can add components and dependencies to your app using the cli.
+  </AlertDescription>
+</Alert>
+
+----------------------------------------
+
+TITLE: Using Popover Component in React
+DESCRIPTION: Example of how to use the Popover component in a React application, including the trigger and content elements.
+
+LANGUAGE: tsx
+CODE:
+<Popover>
+  <PopoverTrigger>Open</PopoverTrigger>
+  <PopoverContent>Place content for the popover here.</PopoverContent>
+</Popover>
+
+----------------------------------------
+
+TITLE: Basic Select Component Implementation
+DESCRIPTION: Example implementation of a theme selector using the Select component with light, dark, and system options
+
+LANGUAGE: tsx
+CODE:
+<Select>
+  <SelectTrigger className="w-[180px]">
+    <SelectValue placeholder="Theme" />
+  </SelectTrigger>
+  <SelectContent>
+    <SelectItem value="light">Light</SelectItem>
+    <SelectItem value="dark">Dark</SelectItem>
+    <SelectItem value="system">System</SelectItem>
+  </SelectContent>
+</Select>
+
+----------------------------------------
+
+TITLE: Vertical Panel Implementation
+DESCRIPTION: Example demonstrating vertical panel layout using the direction prop set to vertical.
+
+LANGUAGE: tsx
+CODE:
+import {
+  ResizableHandle,
+  ResizablePanel,
+  ResizablePanelGroup,
+} from "@/components/ui/resizable"
+
+export default function Example() {
+  return (
+    <ResizablePanelGroup direction="vertical">
+      <ResizablePanel>One</ResizablePanel>
+      <ResizableHandle />
+      <ResizablePanel>Two</ResizablePanel>
+    </ResizablePanelGroup>
+  )
+}
+
+----------------------------------------
+
+TITLE: Using Toast Hook Example
+DESCRIPTION: Example demonstrating how to use the useToast hook to display toast notifications
+
+LANGUAGE: tsx
+CODE:
+import { useToast } from "@/hooks/use-toast"
+
+LANGUAGE: tsx
+CODE:
+export const ToastDemo = () => {
+  const { toast } = useToast()
+
+  return (
+    <Button
+      onClick={() => {
+        toast({
+          title: "Scheduled: Catch up",
+          description: "Friday, February 10, 2023 at 5:57 PM",
+        })
+      }}
+    >
+      Show Toast
+    </Button>
+  )
+}
+
+----------------------------------------
+
+TITLE: Using Calendar Component in React
+DESCRIPTION: Example of how to use the Calendar component in a React application, including state management for the selected date.
+
+LANGUAGE: tsx
+CODE:
+const [date, setDate] = React.useState<Date | undefined>(new Date())
+
+return (
+  <Calendar
+    mode="single"
+    selected={date}
+    onSelect={setDate}
+    className="rounded-md border"
+  />
+)
+
+----------------------------------------
+
+TITLE: Input OTP with Custom Pattern
+DESCRIPTION: Configures the Input OTP component to use a custom alphanumeric pattern for input validation.
+
+LANGUAGE: tsx
+CODE:
+import { REGEXP_ONLY_DIGITS_AND_CHARS } from "input-otp"
+
+...
+
+<InputOTP
+  maxLength={6}
+  pattern={REGEXP_ONLY_DIGITS_AND_CHARS}
+>
+  <InputOTPGroup>
+    <InputOTPSlot index={0} />
+    {/* ... */}
+  </InputOTPGroup>
+</InputOTP>
+
+----------------------------------------
+
+TITLE: Implementing Context Menu in React Component
+DESCRIPTION: TypeScript code snippet demonstrating the basic usage of the context menu component with trigger and menu items.
+
+LANGUAGE: tsx
+CODE:
+<ContextMenu>
+  <ContextMenuTrigger>Right click</ContextMenuTrigger>
+  <ContextMenuContent>
+    <ContextMenuItem>Profile</ContextMenuItem>
+    <ContextMenuItem>Billing</ContextMenuItem>
+    <ContextMenuItem>Team</ContextMenuItem>
+    <ContextMenuItem>Subscription</ContextMenuItem>
+  </ContextMenuContent>
+</ContextMenu>
+
+----------------------------------------
+
+TITLE: Using Toggle Group Component in React
+DESCRIPTION: Example of how to use the Toggle Group component with multiple Toggle Group Items in a React application.
+
+LANGUAGE: tsx
+CODE:
+<ToggleGroup type="single">
+  <ToggleGroupItem value="a">A</ToggleGroupItem>
+  <ToggleGroupItem value="b">B</ToggleGroupItem>
+  <ToggleGroupItem value="c">C</ToggleGroupItem>
+</ToggleGroup>
+
+----------------------------------------
+
+TITLE: Using Scroll Area Component in React
+DESCRIPTION: Example of how to use the Scroll Area component in a React application, including styling and content.
+
+LANGUAGE: tsx
+CODE:
+<ScrollArea className="h-[200px] w-[350px] rounded-md border p-4">
+  Jokester began sneaking into the castle in the middle of the night and leaving
+  jokes all over the place: under the king's pillow, in his soup, even in the
+  royal toilet. The king was furious, but he couldn't seem to stop Jokester. And
+  then, one day, the people of the kingdom discovered that the jokes left by
+  Jokester were so funny that they couldn't help but laugh. And once they
+  started laughing, they couldn't stop.
+</ScrollArea>
+
+----------------------------------------
+
+TITLE: Implementing Basic Tooltip
+DESCRIPTION: Example of basic tooltip implementation showing the component structure with provider, trigger, and content
+
+LANGUAGE: tsx
+CODE:
+<TooltipProvider>
+  <Tooltip>
+    <TooltipTrigger>Hover</TooltipTrigger>
+    <TooltipContent>
+      <p>Add to library</p>
+    </TooltipContent>
+  </Tooltip>
+</TooltipProvider>
+
+----------------------------------------
+
+TITLE: Complete Registry Item Schema Example
+DESCRIPTION: A full example showing the structure of a registry-item.json file with component definitions, file paths, and styling configurations.
+
+LANGUAGE: json
+CODE:
+{
+  "$schema": "https://ui.shadcn.com/schema/registry-item.json",
+  "name": "hello-world",
+  "type": "registry:block",
+  "title": "Hello World",
+  "description": "A simple hello world component.",
+  "files": [
+    {
+      "path": "registry/new-york/hello-world/hello-world.tsx",
+      "type": "registry:component"
+    },
+    {
+      "path": "registry/new-york/hello-world/use-hello-world.ts",
+      "type": "registry:hook"
+    }
+  ],
+  "cssVars": {
+    "theme": {
+      "font-heading": "Poppins, sans-serif"
+    },
+    "light": {
+      "brand": "20 14.3% 4.1%"
+    },
+    "dark": {
+      "brand": "20 14.3% 4.1%"
+    }
+  }
+}
+
+----------------------------------------
+
+TITLE: Adding Dropdown to Breadcrumb in React
+DESCRIPTION: Example of composing a BreadcrumbItem with a DropdownMenu to create a dropdown within the breadcrumb.
+
+LANGUAGE: tsx
+CODE:
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
+
+...
+
+<BreadcrumbItem>
+  <DropdownMenu>
+    <DropdownMenuTrigger className="flex items-center gap-1">
+      Components
+      <ChevronDownIcon />
+    </DropdownMenuTrigger>
+    <DropdownMenuContent align="start">
+      <DropdownMenuItem>Documentation</DropdownMenuItem>
+      <DropdownMenuItem>Themes</DropdownMenuItem>
+      <DropdownMenuItem>GitHub</DropdownMenuItem>
+    </DropdownMenuContent>
+  </DropdownMenu>
+</BreadcrumbItem>
+
+----------------------------------------
+
+TITLE: Basic Input Usage
+DESCRIPTION: Simple example of using the Input component in JSX.
+
+LANGUAGE: tsx
+CODE:
+<Input />
+
+----------------------------------------
+
+TITLE: Basic Usage of Input OTP Component
+DESCRIPTION: Demonstrates the basic structure and usage of the Input OTP component in a React application.
+
+LANGUAGE: tsx
+CODE:
+<InputOTP maxLength={6}>
+  <InputOTPGroup>
+    <InputOTPSlot index={0} />
+    <InputOTPSlot index={1} />
+    <InputOTPSlot index={2} />
+  </InputOTPGroup>
+  <InputOTPSeparator />
+  <InputOTPGroup>
+    <InputOTPSlot index={3} />
+    <InputOTPSlot index={4} />
+    <InputOTPSlot index={5} />
+  </InputOTPGroup>
+</InputOTP>
+
+----------------------------------------
+
+TITLE: Implementing Accessible Card Title and Description in React
+DESCRIPTION: Updated implementation of CardTitle and CardDescription components for improved accessibility, using div elements instead of h3 and p.
+
+LANGUAGE: tsx
+CODE:
+const CardTitle = React.forwardRef<
+  HTMLDivElement,
+  React.HTMLAttributes<HTMLDivElement>
+>(({ className, ...props }, ref) => (
+  <div
+    ref={ref}
+    className={cn("font-semibold leading-none tracking-tight", className)}
+    {...props}
+  />
+))
+CardTitle.displayName = "CardTitle"
+
+const CardDescription = React.forwardRef<
+  HTMLDivElement,
+  React.HTMLAttributes<HTMLDivElement>
+>(({ className, ...props }, ref) => (
+  <div
+    ref={ref}
+    className={cn("text-sm text-muted-foreground", className)}
+    {...props}
+  />
+))
+CardDescription.displayName = "CardDescription"
+
+----------------------------------------
+
+TITLE: Updating Command Item Styling in React
+DESCRIPTION: This snippet shows how to update the CommandItem component to include additional styling for icons, improving the visual appearance of the command menu.
+
+LANGUAGE: tsx
+CODE:
+const CommandItem = React.forwardRef<
+  React.ElementRef<typeof CommandPrimitive.Item>,
+  React.ComponentPropsWithoutRef<typeof CommandPrimitive.Item>
+>(({ className, ...props }, ref) => (
+  <CommandPrimitive.Item
+    ref={ref}
+    className={cn(
+      "... gap-2 [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0",
+      className
+    )}
+    {...props}
+  />
+))
+
+----------------------------------------
+
+TITLE: Using Hover Card Component
+DESCRIPTION: Example implementation of the HoverCard component with trigger and content elements.
+
+LANGUAGE: tsx
+CODE:
+<HoverCard>
+  <HoverCardTrigger>Hover</HoverCardTrigger>
+  <HoverCardContent>
+    The React Framework – created and maintained by @vercel.
+  </HoverCardContent>
+</HoverCard>
+
+----------------------------------------
+
+TITLE: Using Slider Component in React
+DESCRIPTION: Example of how to use the Slider component in a React application, setting default value, maximum value, and step.
+
+LANGUAGE: tsx
+CODE:
+<Slider defaultValue={[33]} max={100} step={1} />
+
+----------------------------------------
+
+TITLE: Updating Input OTP for Disabled State
+DESCRIPTION: Demonstrates how to add a disabled state to the Input OTP component.
+
+LANGUAGE: tsx
+CODE:
+const InputOTP = React.forwardRef<
+  React.ElementRef<typeof OTPInput>,
+  React.ComponentPropsWithoutRef<typeof OTPInput>
+>(({ className, containerClassName, ...props }, ref) => (
+  <OTPInput
+    ref={ref}
+    containerClassName={cn(
+      "flex items-center gap-2 has-[:disabled]:opacity-50",
+      containerClassName
+    )}
+    className={cn("disabled:cursor-not-allowed", className)}
+    {...props}
+  />
+))
+InputOTP.displayName = "InputOTP"
+
+----------------------------------------
+
+TITLE: Defining Chart Data and Configuration in TypeScript
+DESCRIPTION: This snippet shows how to define chart data and configuration in TypeScript. It includes sample data for desktop and mobile users, and a configuration object with labels and colors.
+
+LANGUAGE: tsx
+CODE:
+const chartData = [
+  { month: "January", desktop: 186, mobile: 80 },
+  { month: "February", desktop: 305, mobile: 200 },
+  { month: "March", desktop: 237, mobile: 120 },
+  { month: "April", desktop: 73, mobile: 190 },
+  { month: "May", desktop: 209, mobile: 130 },
+  { month: "June", desktop: 214, mobile: 140 },
+]
+
+import { type ChartConfig } from "@/components/ui/chart"
+
+const chartConfig = {
+  desktop: {
+    label: "Desktop",
+    color: "#2563eb",
+  },
+  mobile: {
+    label: "Mobile",
+    color: "#60a5fa",
+  },
+} satisfies ChartConfig
+
+----------------------------------------
+
+TITLE: Importing Dropdown Menu Components in React
+DESCRIPTION: Example of importing various Dropdown Menu components from the local UI components directory in a React application.
+
+LANGUAGE: tsx
+CODE:
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
+
+----------------------------------------
+
+TITLE: Basic Usage of Switch Component in React
+DESCRIPTION: Simple example demonstrating how to use the Switch component in a React application.
+
+LANGUAGE: tsx
+CODE:
+<Switch />
+
+----------------------------------------
+
+TITLE: Using Skeleton Component
+DESCRIPTION: Example of using the Skeleton component with styling properties for width, height, and border radius.
+
+LANGUAGE: tsx
+CODE:
+<Skeleton className="w-[100px] h-[20px] rounded-full" />
+
+----------------------------------------
+
+TITLE: Using Carousel API for Advanced Control
+DESCRIPTION: Example of using the Carousel API to access and control carousel state and behavior.
+
+LANGUAGE: tsx
+CODE:
+import { type CarouselApi } from "@/components/ui/carousel"
+
+export function Example() {
+  const [api, setApi] = React.useState<CarouselApi>()
+  const [current, setCurrent] = React.useState(0)
+  const [count, setCount] = React.useState(0)
+
+  React.useEffect(() => {
+    if (!api) {
+      return
+    }
+
+    setCount(api.scrollSnapList().length)
+    setCurrent(api.selectedScrollSnap() + 1)
+
+    api.on("select", () => {
+      setCurrent(api.selectedScrollSnap() + 1)
+    })
+  }, [api])
+
+  return (
+    <Carousel setApi={setApi}>
+      <CarouselContent>
+        <CarouselItem>...</CarouselItem>
+        <CarouselItem>...</CarouselItem>
+        <CarouselItem>...</CarouselItem>
+      </CarouselContent>
+    </Carousel>
+  )
+}
+
+----------------------------------------
+
+TITLE: Using shadcn-ui Components
+DESCRIPTION: Example of importing and using a shadcn-ui Button component in a React component
+
+LANGUAGE: typescript
+CODE:
+import { Button } from "~/components/ui/button"
+
+export default function Home() {
+  return (
+    <div>
+      <Button>Click me</Button>
+    </div>
+  )
+}
+
+----------------------------------------
+
+TITLE: Basic Usage of Toggle Component in React
+DESCRIPTION: Demonstrates the basic implementation of the Toggle component in a React application.
+
+LANGUAGE: tsx
+CODE:
+<Toggle>Toggle</Toggle>
+
+----------------------------------------
+
+TITLE: Using Collapsible Component in React
+DESCRIPTION: Example of how to use the Collapsible component in a React application, demonstrating the structure with trigger and content.
+
+LANGUAGE: tsx
+CODE:
+<Collapsible>
+  <CollapsibleTrigger>Can I use this in my project?</CollapsibleTrigger>
+  <CollapsibleContent>
+    Yes. Free to use for personal and commercial projects. No attribution
+    required.
+  </CollapsibleContent>
+</Collapsible>
+
+----------------------------------------
+
+TITLE: Initializing shadcn-ui
+DESCRIPTION: Command to initialize shadcn-ui in the project
+
+LANGUAGE: bash
+CODE:
+npx shadcn@latest init
+
+----------------------------------------
+
+TITLE: Creating Theme Action Route in Remix
+DESCRIPTION: Implements an action route for storing the preferred theme in session storage when the user changes it. This route is used by the ThemeProvider component.
+
+LANGUAGE: tsx
+CODE:
+import { createThemeAction } from "remix-themes"
+
+import { themeSessionResolver } from "./sessions.server"
+
+export const action = createThemeAction(themeSessionResolver)
+
+----------------------------------------
+
+TITLE: Importing Calendar Component in React
+DESCRIPTION: Example of how to import the Calendar component in a React application.
+
+LANGUAGE: tsx
+CODE:
+import { Calendar } from "@/components/ui/calendar"
+
+----------------------------------------
+
+TITLE: Using Textarea Component in React JSX
+DESCRIPTION: Basic usage of the Textarea component in React JSX.
+
+LANGUAGE: tsx
+CODE:
+<Textarea />
+
+----------------------------------------
+
+TITLE: Importing Dialog Component in React
+DESCRIPTION: This snippet shows how to import the Dialog component and its subcomponents from the project's UI components.
+
+LANGUAGE: tsx
+CODE:
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog"
+
+----------------------------------------
+
+TITLE: Custom Handle Implementation
+DESCRIPTION: Example showing how to implement a custom handle using the withHandle prop on ResizableHandle component.
+
+LANGUAGE: tsx
+CODE:
+import {
+  ResizableHandle,
+  ResizablePanel,
+  ResizablePanelGroup,
+} from "@/components/ui/resizable"
+
+export default function Example() {
+  return (
+    <ResizablePanelGroup direction="horizontal">
+      <ResizablePanel>One</ResizablePanel>
+      <ResizableHandle withHandle />
+      <ResizablePanel>Two</ResizablePanel>
+    </ResizablePanelGroup>
+  )
+}
+
+----------------------------------------
+
+TITLE: Creating a Button-like Link in React
+DESCRIPTION: Example of using the buttonVariants helper to create a link that looks like a button with an outline variant.
+
+LANGUAGE: tsx
+CODE:
+<Link className={buttonVariants({ variant: "outline" })}>Click here</Link>
+
+----------------------------------------
+
+TITLE: Using Separator Component in React JSX
+DESCRIPTION: This example demonstrates the basic usage of the Separator component in a React application. The Separator is a self-closing component used to visually or semantically separate content.
+
+LANGUAGE: tsx
+CODE:
+<Separator />
+
+----------------------------------------
+
+TITLE: Implementing Avatar Component
+DESCRIPTION: Example of implementing the Avatar component with an image source and fallback text.
+
+LANGUAGE: tsx
+CODE:
+<Avatar>
+  <AvatarImage src="https://github.com/shadcn.png" />
+  <AvatarFallback>CN</AvatarFallback>
+</Avatar>
+
+----------------------------------------
+
+TITLE: Using Label Component in React JSX
+DESCRIPTION: This example demonstrates how to use the Label component in React JSX, associating it with an input field.
+
+LANGUAGE: tsx
+CODE:
+<Label htmlFor="email">Your email address</Label>
+
+----------------------------------------
+
+TITLE: Implementing Filtering
+DESCRIPTION: Adds filtering functionality to the email column and updates the DataTable component to handle column filters.
+
+LANGUAGE: tsx
+CODE:
+"use client"
+
+import * as React from "react"
+import {
+  ColumnDef,
+  ColumnFiltersState,
+  SortingState,
+  flexRender,
+  getCoreRowModel,
+  getFilteredRowModel,
+  getPaginationRowModel,
+  getSortedRowModel,
+  useReactTable,
+} from "@tanstack/react-table"
+
+import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
+
+export function DataTable<TData, TValue>({
+  columns,
+  data,
+}: DataTableProps<TData, TValue>) {
+  const [sorting, setSorting] = React.useState<SortingState>([])
+  const [columnFilters, setColumnFilters] = React.useState<ColumnFiltersState>(
+    []
+  )
+
+  const table = useReactTable({
+    data,
+    columns,
+    onSortingChange: setSorting,
+    getCoreRowModel: getCoreRowModel(),
+    getPaginationRowModel: getPaginationRowModel(),
+    getSortedRowModel: getSortedRowModel(),
+    onColumnFiltersChange: setColumnFilters,
+    getFilteredRowModel: getFilteredRowModel(),
+    state: {
+      sorting,
+      columnFilters,
+    },
+  })
+
+  return (
+    <div>
+      <div className="flex items-center py-4">
+        <Input
+          placeholder="Filter emails..."
+          value={(table.getColumn("email")?.getFilterValue() as string) ?? ""}
+          onChange={(event) =>
+            table.getColumn("email")?.setFilterValue(event.target.value)
+          }
+          className="max-w-sm"
+        />
+      </div>
+      <div className="rounded-md border">
+        <Table>{ /* ... */ }</Table>
+      </div>
+    </div>
+  )
+}
+
+----------------------------------------
+
+TITLE: Importing Scroll Area Component in React
+DESCRIPTION: Code snippet showing how to import the Scroll Area component in a React application.
+
+LANGUAGE: tsx
+CODE:
+import { ScrollArea } from "@/components/ui/scroll-area"
+
+----------------------------------------
+
+TITLE: Input OTP with Custom Separator
+DESCRIPTION: Shows how to use the InputOTPSeparator component to add a separator between input groups in the Input OTP component.
+
+LANGUAGE: tsx
+CODE:
+import {
+  InputOTP,
+  InputOTPGroup,
+  InputOTPSeparator,
+  InputOTPSlot,
+} from "@/components/ui/input-otp"
+
+...
+
+<InputOTP maxLength={4}>
+  <InputOTPGroup>
+    <InputOTPSlot index={0} />
+    <InputOTPSlot index={1} />
+  </InputOTPGroup>
+  <InputOTPSeparator />
+  <InputOTPGroup>
+    <InputOTPSlot index={2} />
+    <InputOTPSlot index={3} />
+  </InputOTPGroup>
+</InputOTP>
+
+----------------------------------------
+
+TITLE: Implementing Utility Class-based Theming
+DESCRIPTION: Example of using Tailwind utility classes for theming with dark mode support and configuration
+
+LANGUAGE: tsx
+CODE:
+<div className="bg-zinc-950 dark:bg-white" />
+
+LANGUAGE: json
+CODE:
+{
+  "style": "default",
+  "rsc": true,
+  "tailwind": {
+    "config": "",
+    "css": "app/globals.css",
+    "baseColor": "slate",
+    "cssVariables": false
+  },
+  "aliases": {
+    "components": "@/components",
+    "utils": "@/lib/utils",
+    "ui": "@/registry/new-york-v4/ui",
+    "lib": "@/lib",
+    "hooks": "@/hooks"
+  },
+  "iconLibrary": "lucide"
+}
+
+----------------------------------------
+
+TITLE: Using Button Component with Outline Variant in React
+DESCRIPTION: Example of using the Button component with an outline variant in a React application.
+
+LANGUAGE: tsx
+CODE:
+<Button variant="outline">Button</Button>
+
+----------------------------------------
+
+TITLE: Configuring Carousel Options
+DESCRIPTION: Example of passing options to the carousel using the opts prop to customize behavior.
+
+LANGUAGE: tsx
+CODE:
+<Carousel
+  opts={{
+    align: "start",
+    loop: true,
+  }}
+>
+  <CarouselContent>
+    <CarouselItem>...</CarouselItem>
+    <CarouselItem>...</CarouselItem>
+    <CarouselItem>...</CarouselItem>
+  </CarouselContent>
+</Carousel>
+
+----------------------------------------
+
+TITLE: Using Button Component as a Child Wrapper in React
+DESCRIPTION: Example of using the Button component with the asChild prop to wrap a Link component.
+
+LANGUAGE: tsx
+CODE:
+<Button asChild>
+  <Link href="/login">Login</Link>
+</Button>
+
+----------------------------------------
+
+TITLE: Customizing Sheet Component Size in React
+DESCRIPTION: This snippet shows how to adjust the size of the Sheet component using CSS classes.
+
+LANGUAGE: tsx
+CODE:
+<Sheet>
+  <SheetTrigger>Open</SheetTrigger>
+  <SheetContent className="w-[400px] sm:w-[540px]">
+    <SheetHeader>
+      <SheetTitle>Are you absolutely sure?</SheetTitle>
+      <SheetDescription>
+        This action cannot be undone. This will permanently delete your account
+        and remove your data from our servers.
+      </SheetDescription>
+    </SheetHeader>
+  </SheetContent>
+</Sheet>
+
+----------------------------------------
+
+TITLE: Importing Drawer Components
+DESCRIPTION: Example of importing all necessary Drawer components from the UI library.
+
+LANGUAGE: tsx
+CODE:
+import {
+  Drawer,
+  DrawerClose,
+  DrawerContent,
+  DrawerDescription,
+  DrawerFooter,
+  DrawerHeader,
+  DrawerTitle,
+  DrawerTrigger,
+} from "@/components/ui/drawer"
+
+----------------------------------------
+
+TITLE: Implementing shadcn/ui Button in React Router Component
+DESCRIPTION: Demonstrates how to import and use the shadcn/ui Button component in a React Router route component. Includes metadata configuration and basic layout.
+
+LANGUAGE: tsx
+CODE:
+import { Button } from "~/components/ui/button"
+
+import type { Route } from "./+types/home"
+
+export function meta({}: Route.MetaArgs) {
+  return [
+    { title: "New React Router App" },
+    { name: "description", content: "Welcome to React Router!" },
+  ]
+}
+
+export default function Home() {
+  return (
+    <div className="flex flex-col items-center justify-center min-h-svh">
+      <Button>Click me</Button>
+    </div>
+  )
+}
+
+----------------------------------------
+
+TITLE: Importing Hover Card Components
+DESCRIPTION: Import statement for the HoverCard components from the local UI components directory.
+
+LANGUAGE: tsx
+CODE:
+import {
+  HoverCard,
+  HoverCardContent,
+  HoverCardTrigger,
+} from "@/components/ui/hover-card"
+
+----------------------------------------
+
+TITLE: Implementing Aspect Ratio Component
+DESCRIPTION: Example usage of the AspectRatio component to maintain a 16:9 aspect ratio for an image with custom styling.
+
+LANGUAGE: tsx
+CODE:
+<div className="w-[450px]">
+  <AspectRatio ratio={16 / 9}>
+    <Image src="..." alt="Image" className="rounded-md object-cover" />
+  </AspectRatio>
+</div>
+
+----------------------------------------
+
+TITLE: Customizing Theme Variables in Tailwind CSS v3
+DESCRIPTION: Demonstrates how to override theme variables in Tailwind CSS v3 by extending the theme configuration in the tailwind config file.
+
+LANGUAGE: json
+CODE:
+{
+  "$schema": "https://ui.shadcn.com/schema/registry-item.json",
+  "name": "hello-world",
+  "title": "Hello World",
+  "type": "registry:block",
+  "description": "A complex hello world component",
+  "files": [
+    // ...
+  ],
+  "tailwind": {
+    "config": {
+      "theme": {
+        "extend": {
+          "text": {
+            "base": "3rem"
+          }
+        }
+      }
+    }
+  }
+}
+
+----------------------------------------
+
+TITLE: Displaying Mode Toggle in Astro Page
+DESCRIPTION: This snippet demonstrates how to integrate the ModeToggle component into an Astro page. It imports the necessary styles and the ModeToggle component, then renders it with the client:load directive for client-side interactivity.
+
+LANGUAGE: astro
+CODE:
+---
+import '../styles/globals.css'
+import { ModeToggle } from '@/components/ModeToggle';
+---
+
+<!-- Inline script -->
+
+<html lang="en">
+	<body>
+      <h1>Astro</h1>
+      <ModeToggle client:load />
+	</body>
+</html>
+
+----------------------------------------
+
+TITLE: Importing Input Component
+DESCRIPTION: How to import the Input component from the components directory.
+
+LANGUAGE: tsx
+CODE:
+import { Input } from "@/components/ui/input"
+
+----------------------------------------
+
+TITLE: Customizing Breadcrumb Separator in React
+DESCRIPTION: Example of using a custom separator in the Breadcrumb component, utilizing the Slash icon from lucide-react.
+
+LANGUAGE: tsx
+CODE:
+import { Slash } from "lucide-react"
+
+...
+
+<Breadcrumb>
+  <BreadcrumbList>
+    <BreadcrumbItem>
+      <BreadcrumbLink href="/">Home</BreadcrumbLink>
+    </BreadcrumbItem>
+    <BreadcrumbSeparator>
+      <Slash />
+    </BreadcrumbSeparator>
+    <BreadcrumbItem>
+      <BreadcrumbLink href="/components">Components</BreadcrumbLink>
+    </BreadcrumbItem>
+  </BreadcrumbList>
+</Breadcrumb>
+
+----------------------------------------
+
+TITLE: Adding Custom Colors in Tailwind CSS v3
+DESCRIPTION: Demonstrates how to add custom colors in Tailwind CSS v3 by configuring both CSS variables and extending the Tailwind config with new color definitions.
+
+LANGUAGE: json
+CODE:
+{
+  "$schema": "https://ui.shadcn.com/schema/registry-item.json",
+  "name": "hello-world",
+  "title": "Hello World",
+  "type": "registry:block",
+  "description": "A complex hello world component",
+  "files": [
+    // ...
+  ],
+  "cssVars": {
+    "light": {
+      "brand-background": "20 14.3% 4.1%",
+      "brand-accent": "20 14.3% 4.1%"
+    },
+    "dark": {
+      "brand-background": "20 14.3% 4.1%",
+      "brand-accent": "20 14.3% 4.1%"
+    }
+  },
+  "tailwind": {
+    "config": {
+      "theme": {
+        "extend": {
+          "colors": {
+            "brand": {
+              "DEFAULT": "hsl(var(--brand-background))",
+              "accent": "hsl(var(--brand-accent))"
+            }
+          }
+        }
+      }
+    }
+  }
+}
+
+----------------------------------------
+
+TITLE: Installing Calendar Component Dependencies via npm
+DESCRIPTION: Command to install the required dependencies for the Calendar component using npm.
+
+LANGUAGE: bash
+CODE:
+npm install react-day-picker@8.10.1 date-fns
+
+----------------------------------------
+
+TITLE: Creating a Link with Badge Styling in React
+DESCRIPTION: Demonstrates how to use the badgeVariants helper to create a link that looks like a badge.
+
+LANGUAGE: tsx
+CODE:
+import { badgeVariants } from "@/components/ui/badge"
+
+LANGUAGE: tsx
+CODE:
+<Link className={badgeVariants({ variant: "outline" })}>Badge</Link>
+
+----------------------------------------
+
+TITLE: Importing Progress Component in React
+DESCRIPTION: This code snippet shows how to import the Progress component in a React application.
+
+LANGUAGE: tsx
+CODE:
+import { Progress } from "@/components/ui/progress"
+
+----------------------------------------
+
+TITLE: Handling Carousel Events
+DESCRIPTION: Example of listening to carousel events using the API instance obtained from setApi.
+
+LANGUAGE: tsx
+CODE:
+import { type CarouselApi } from "@/components/ui/carousel"
+
+export function Example() {
+  const [api, setApi] = React.useState<CarouselApi>()
+
+  React.useEffect(() => {
+    if (!api) {
+      return
+    }
+
+    api.on("select", () => {
+      // Do something on select.
+    })
+  }, [api])
+
+  return (
+    <Carousel setApi={setApi}>
+      <CarouselContent>
+        <CarouselItem>...</CarouselItem>
+        <CarouselItem>...</CarouselItem>
+        <CarouselItem>...</CarouselItem>
+      </CarouselContent>
+    </Carousel>
+  )
+}
+
+----------------------------------------
+
+TITLE: Importing Components in shadcn/ui Monorepo
+DESCRIPTION: Examples of importing components, hooks, and utilities from the @workspace/ui package in a monorepo structure.
+
+LANGUAGE: tsx
+CODE:
+import { Button } from "@workspace/ui/components/button"
+
+LANGUAGE: tsx
+CODE:
+import { useTheme } from "@workspace/ui/hooks/use-theme"
+import { cn } from "@workspace/ui/lib/utils"
+
+----------------------------------------
+
+TITLE: Using shadcn-ui Components
+DESCRIPTION: Example of importing and using a shadcn-ui Button component in a React component
+
+LANGUAGE: tsx
+CODE:
+import { Button } from "@/components/ui/button"
+
+export default function Home() {
+  return (
+    <div>
+      <Button>Click me</Button>
+    </div>
+  )
+}
+
+----------------------------------------
+
+TITLE: Importing Pagination Components in React
+DESCRIPTION: This snippet shows how to import various Pagination subcomponents from the ui/pagination module. These components are used to construct a complete pagination interface.
+
+LANGUAGE: tsx
+CODE:
+import {
+  Pagination,
+  PaginationContent,
+  PaginationEllipsis,
+  PaginationItem,
+  PaginationLink,
+  PaginationNext,
+  PaginationPrevious,
+} from "@/components/ui/pagination"
+
+----------------------------------------
+
+TITLE: Adding Plugins to Carousel
+DESCRIPTION: Example of adding plugins to the carousel, such as an autoplay plugin.
+
+LANGUAGE: ts
+CODE:
+import Autoplay from "embla-carousel-autoplay"
+
+export function Example() {
+  return (
+    <Carousel
+      plugins={[
+        Autoplay({
+          delay: 2000,
+        }),
+      ]}
+    >
+      // ...
+    </Carousel>
+  )
+}
+
+----------------------------------------
+
+TITLE: Creating Theme Session Resolver in Remix
+DESCRIPTION: Sets up session storage and creates a theme session resolver using remix-themes. This handles theme persistence and retrieval in the application.
+
+LANGUAGE: tsx
+CODE:
+import { createThemeSessionResolver } from "remix-themes"
+
+// You can default to 'development' if process.env.NODE_ENV is not set
+const isProduction = process.env.NODE_ENV === "production"
+
+const sessionStorage = createCookieSessionStorage({
+  cookie: {
+    name: "theme",
+    path: "/",
+    httpOnly: true,
+    sameSite: "lax",
+    secrets: ["s3cr3t"],
+    // Set domain and secure only if in production
+    ...(isProduction
+      ? { domain: "your-production-domain.com", secure: true }
+      : {}),
+  },
+})
+
+export const themeSessionResolver = createThemeSessionResolver(sessionStorage)
+
+----------------------------------------
+
+TITLE: Installing Dialog Component Dependencies via npm
+DESCRIPTION: This command installs the necessary Radix UI dependency for the Dialog component.
+
+LANGUAGE: bash
+CODE:
+npm install @radix-ui/react-dialog
+
+----------------------------------------
+
+TITLE: Importing Tooltip Components
+DESCRIPTION: Code snippet showing how to import the necessary tooltip components from the UI library
+
+LANGUAGE: tsx
+CODE:
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip"
+
+----------------------------------------
+
+TITLE: Installing Input OTP Dependency
+DESCRIPTION: Command to install the required input-otp package using npm.
+
+LANGUAGE: bash
+CODE:
+npm install input-otp
+
+----------------------------------------
+
+TITLE: Updating Button Component Styling in React
+DESCRIPTION: Example of adding new classes to the button component for automatic icon styling within the button.
+
+LANGUAGE: tsx
+CODE:
+const buttonVariants = cva(
+  "inline-flex ... gap-2 [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0"
+)
+
+----------------------------------------
+
+TITLE: Customizing Theme Variables in Tailwind CSS v4
+DESCRIPTION: Shows how to add or override theme variables in Tailwind CSS v4 using the cssVars.theme configuration to modify text sizes, animations, and fonts.
+
+LANGUAGE: json
+CODE:
+{
+  "$schema": "https://ui.shadcn.com/schema/registry-item.json",
+  "name": "hello-world",
+  "title": "Hello World",
+  "type": "registry:block",
+  "description": "A complex hello world component",
+  "files": [
+    // ...
+  ],
+  "cssVars": {
+    "theme": {
+      "text-base": "3rem",
+      "ease-in-out": "cubic-bezier(0.4, 0, 0.2, 1)",
+      "font-heading": "Poppins, sans-serif"
+    }
+  }
+}
+
+----------------------------------------
+
+TITLE: Importing Popover Component in React
+DESCRIPTION: Code snippet showing how to import the Popover component and its subcomponents in a React application.
+
+LANGUAGE: tsx
+CODE:
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover"
+
+----------------------------------------
+
+TITLE: Installing Radix UI Select Primitive
+DESCRIPTION: Command to manually install the required Radix UI Select dependency
+
+LANGUAGE: bash
+CODE:
+npm install @radix-ui/react-select
+
+----------------------------------------
+
+TITLE: Updating DropdownMenuItem Styling in React
+DESCRIPTION: Code diff showing the addition of new CSS classes to the DropdownMenuItem component for improved icon styling and layout.
+
+LANGUAGE: diff
+CODE:
+const DropdownMenuItem = React.forwardRef<
+  React.ElementRef<typeof DropdownMenuPrimitive.Item>,
+  React.ComponentPropsWithoutRef<typeof DropdownMenuPrimitive.Item> & {
+    inset?: boolean
+  }
+>(({ className, inset, ...props }, ref) => (
+  <DropdownMenuPrimitive.Item
+    ref={ref}
+    className={cn(
+      "relative ... gap-2 [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0",
+      inset && "pl-8",
+      className
+    )}
+    {...props}
+  />
+))
+
+----------------------------------------
+
+TITLE: Using Custom Link Component in Breadcrumb
+DESCRIPTION: Example of using a custom Link component from a routing library with the BreadcrumbLink component.
+
+LANGUAGE: tsx
+CODE:
+import { Link } from "next/link"
+
+...
+
+<Breadcrumb>
+  <BreadcrumbList>
+    <BreadcrumbItem>
+      <BreadcrumbLink asChild>
+        <Link href="/">Home</Link>
+      </BreadcrumbLink>
+    </BreadcrumbItem>
+    {/* ... */}
+  </BreadcrumbList>
+</Breadcrumb>
+
+----------------------------------------
+
+TITLE: Importing Button Component in React
+DESCRIPTION: Example of how to import the Button component in a React application.
+
+LANGUAGE: tsx
+CODE:
+import { Button } from "@/components/ui/button"
+
+----------------------------------------
+
+TITLE: Importing Menubar Components in React
+DESCRIPTION: This code snippet shows how to import the various Menubar components for use in a React application.
+
+LANGUAGE: tsx
+CODE:
+import {
+  Menubar,
+  MenubarContent,
+  MenubarItem,
+  MenubarMenu,
+  MenubarSeparator,
+  MenubarShortcut,
+  MenubarTrigger,
+} from "@/components/ui/menubar"
+
+----------------------------------------
+
+TITLE: Installing Avatar Dependencies Manually
+DESCRIPTION: Command to manually install the required Radix UI Avatar dependency using npm.
+
+LANGUAGE: bash
+CODE:
+npm install @radix-ui/react-avatar
+
+----------------------------------------
+
+TITLE: Updating DropdownMenuSubTrigger Styling in React
+DESCRIPTION: Example of adding new CSS classes to the DropdownMenuSubTrigger component for improved icon styling and layout.
+
+LANGUAGE: tsx
+CODE:
+<DropdownMenuPrimitive.SubTrigger
+  ref={ref}
+  className={cn(
+    "flex cursor-default gap-2 select-none items-center rounded-sm px-2 py-1.5 text-sm outline-none focus:bg-accent data-[state=open]:bg-accent [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0",
+    inset && "pl-8",
+    className
+  )}
+  {...props}
+>
+  {/* ... */}
+</DropdownMenuPrimitive.SubTrigger>
+
+----------------------------------------
+
+TITLE: Using Ellipsis in Breadcrumb for Collapsed State
+DESCRIPTION: Example of using the BreadcrumbEllipsis component to show a collapsed state when the breadcrumb is too long.
+
+LANGUAGE: tsx
+CODE:
+import { BreadcrumbEllipsis } from "@/components/ui/breadcrumb"
+
+...
+
+<Breadcrumb>
+  <BreadcrumbList>
+    {/* ... */}
+    <BreadcrumbItem>
+      <BreadcrumbEllipsis />
+    </BreadcrumbItem>
+    {/* ... */}
+  </BreadcrumbList>
+</Breadcrumb>
+
+----------------------------------------
+
+TITLE: Importing Collapsible Component in React
+DESCRIPTION: Code snippet showing how to import the Collapsible component and its sub-components in a React project.
+
+LANGUAGE: tsx
+CODE:
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@/components/ui/collapsible"
+
+----------------------------------------
+
+TITLE: Installing Aspect Ratio Dependencies
+DESCRIPTION: Manual installation of the required Radix UI aspect ratio dependency using npm.
+
+LANGUAGE: bash
+CODE:
+npm install @radix-ui/react-aspect-ratio
+
+----------------------------------------
+
+TITLE: Defining Registry Items in JSON
+DESCRIPTION: Example showing how to configure registry items with component specifications including name, type, title, description and file paths.
+
+LANGUAGE: json
+CODE:
+{
+  "items": [
+    {
+      "name": "hello-world",
+      "type": "registry:block",
+      "title": "Hello World",
+      "description": "A simple hello world component.",
+      "files": [
+        {
+          "path": "registry/new-york/hello-world/hello-world.tsx",
+          "type": "registry:component"
+        }
+      ]
+    }
+  ]
+}
+
+----------------------------------------
+
+TITLE: Installing Alert Dialog via CLI
+DESCRIPTION: Command to add alert dialog component using shadcn CLI
+
+LANGUAGE: bash
+CODE:
+npx shadcn@latest add alert-dialog
+
+----------------------------------------
+
+TITLE: Basic Checkbox Usage
+DESCRIPTION: Simple example showing how to use the Checkbox component in JSX
+
+LANGUAGE: tsx
+CODE:
+<Checkbox />
+
+----------------------------------------
+
+TITLE: Importing Carousel Components in React
+DESCRIPTION: Import statement for various carousel components from a local UI components directory.
+
+LANGUAGE: tsx
+CODE:
+import {
+  Carousel,
+  CarouselContent,
+  CarouselItem,
+  CarouselNext,
+  CarouselPrevious,
+} from "@/components/ui/carousel"
+
+----------------------------------------
+
+TITLE: Installing Dropdown Menu Dependencies via npm
+DESCRIPTION: Command to install the required Radix UI dependency for the Dropdown Menu component using npm.
+
+LANGUAGE: bash
+CODE:
+npm install @radix-ui/react-dropdown-menu
+
+----------------------------------------
+
+TITLE: Creating a Custom Sidebar Trigger
+DESCRIPTION: Example of creating a custom trigger for the sidebar using the useSidebar hook.
+
+LANGUAGE: tsx
+CODE:
+import { useSidebar } from "@/components/ui/sidebar"
+
+export function CustomTrigger() {
+  const { toggleSidebar } = useSidebar()
+
+  return <button onClick={toggleSidebar}>Toggle Sidebar</button>
+}
+
+----------------------------------------
+
+TITLE: Updating Input OTP for Composition Pattern
+DESCRIPTION: Shows the changes required to update the Input OTP component to use composition instead of render props.
+
+LANGUAGE: tsx
+CODE:
+- import { OTPInput, SlotProps } from "input-otp"
++ import { OTPInput, OTPInputContext } from "input-otp"
+
+ const InputOTPSlot = React.forwardRef<
+   React.ElementRef<"div">,
+-   SlotProps & React.ComponentPropsWithoutRef<"div">
+-  >(({ char, hasFakeCaret, isActive, className, ...props }, ref) => {
++   React.ComponentPropsWithoutRef<"div"> & { index: number }
++  >(({ index, className, ...props }, ref) => {
++   const inputOTPContext = React.useContext(OTPInputContext)
++   const { char, hasFakeCaret, isActive } = inputOTPContext.slots[index]
+
+----------------------------------------
+
+TITLE: Importing Label Component in React
+DESCRIPTION: This code snippet shows how to import the Label component in a React project.
+
+LANGUAGE: tsx
+CODE:
+import { Label } from "@/components/ui/label"
+
+----------------------------------------
+
+TITLE: Installing Navigation Menu Dependencies - CLI
+DESCRIPTION: Command to install the navigation menu component using the shadcn CLI
+
+LANGUAGE: bash
+CODE:
+npx shadcn@latest add navigation-menu
+
+----------------------------------------
+
+TITLE: Implementing a Controlled Sidebar
+DESCRIPTION: Example of creating a controlled sidebar using React state.
+
+LANGUAGE: tsx
+CODE:
+export function AppSidebar() {
+  const [open, setOpen] = React.useState(false)
+
+  return (
+    <SidebarProvider open={open} onOpenChange={setOpen}>
+      <Sidebar />
+    </SidebarProvider>
+  )
+}
+
+----------------------------------------
+
+TITLE: Implementing Button Component in TanStack Router
+DESCRIPTION: Example of how to import and use the Button component from shadcn/ui in a TanStack Router route file.
+
+LANGUAGE: tsx
+CODE:
+import { createFileRoute } from "@tanstack/react-router"
+
+import { Button } from "@/components/ui/button"
+
+export const Route = createFileRoute("/")({ 
+  component: App,
+})
+
+function App() {
+  return (
+    <div>
+      <Button>Click me</Button>
+    </div>
+  )
+}
+
+----------------------------------------
+
+TITLE: Installing Tooltip via shadcn CLI
+DESCRIPTION: Command to add the tooltip component using shadcn's CLI tool
+
+LANGUAGE: bash
+CODE:
+npx shadcn@latest add tooltip
+
+----------------------------------------
+
+TITLE: Configuring Tailwind for Custom Component Directories
+DESCRIPTION: Update the tailwind.config.ts file to include the custom registry directory in the content array. This ensures Tailwind styles are applied to components in the registry.
+
+LANGUAGE: ts
+CODE:
+// tailwind.config.ts
+export default {
+  content: ["./registry/**/*.{js,ts,jsx,tsx}"],
+}
+
+----------------------------------------
+
+TITLE: Installing Checkbox Component via CLI
+DESCRIPTION: Command to install the checkbox component using the shadcn CLI tool
+
+LANGUAGE: bash
+CODE:
+npx shadcn@latest add checkbox
+
+----------------------------------------
+
+TITLE: Using SidebarTrigger Component
+DESCRIPTION: Example of using the SidebarTrigger component to toggle the sidebar.
+
+LANGUAGE: tsx
+CODE:
+<SidebarProvider>
+  <Sidebar />
+  <main>
+    <SidebarTrigger />
+  </main>
+</SidebarProvider>
+
+----------------------------------------
+
+TITLE: Configuring Vite for Path Resolution
+DESCRIPTION: Updates to vite.config.ts to add path aliases and Tailwind CSS plugin.
+
+LANGUAGE: typescript
+CODE:
+import path from "path"
+import tailwindcss from "@tailwindcss/vite"
+import react from "@vitejs/plugin-react"
+import { defineConfig } from "vite"
+
+// https://vite.dev/config/
+export default defineConfig({
+  plugins: [react(), tailwindcss()],
+  resolve: {
+    alias: {
+      "@": path.resolve(__dirname, "./src"),
+    },
+  },
+})
+
+----------------------------------------
+
+TITLE: Configuring TypeScript Path Resolution
+DESCRIPTION: TSConfig configuration for setting up path aliases in the Gatsby project
+
+LANGUAGE: typescript
+CODE:
+{
+  "compilerOptions": {
+    // ...
+    "baseUrl": ".",
+    "paths": {
+      "@/*": [
+        "./src/*"
+      ]
+    }
+    // ...
+  }
+}
+
+----------------------------------------
+
+TITLE: Installing Label Component via CLI
+DESCRIPTION: This command installs the Label component using the shadcn CLI tool.
+
+LANGUAGE: bash
+CODE:
+npx shadcn@latest add label
+
+----------------------------------------
+
+TITLE: Integrating Dialog with Context Menu in React
+DESCRIPTION: This example shows how to activate a Dialog component from within a Context Menu, demonstrating the integration of these two components.
+
+LANGUAGE: tsx
+CODE:
+<Dialog>
+  <ContextMenu>
+    <ContextMenuTrigger>Right click</ContextMenuTrigger>
+    <ContextMenuContent>
+      <ContextMenuItem>Open</ContextMenuItem>
+      <ContextMenuItem>Download</ContextMenuItem>
+      <DialogTrigger asChild>
+        <ContextMenuItem>
+          <span>Delete</span>
+        </ContextMenuItem>
+      </DialogTrigger>
+    </ContextMenuContent>
+  </ContextMenu>
+  <DialogContent>
+    <DialogHeader>
+      <DialogTitle>Are you absolutely sure?</DialogTitle>
+      <DialogDescription>
+        This action cannot be undone. Are you sure you want to permanently
+        delete this file from our servers?
+      </DialogDescription>
+    </DialogHeader>
+    <DialogFooter>
+      <Button type="submit">Confirm</Button>
+    </DialogFooter>
+  </DialogContent>
+</Dialog>
+
+----------------------------------------
+
+TITLE: Next.js Link Integration - Style Import
+DESCRIPTION: Import statement for navigation menu trigger styling with Next.js Link component
+
+LANGUAGE: tsx
+CODE:
+import { navigationMenuTriggerStyle } from "@/components/ui/navigation-menu"
+
+----------------------------------------
+
+TITLE: Installing Avatar Dependencies via CLI
+DESCRIPTION: Command to install the Avatar component using the shadcn CLI tool.
+
+LANGUAGE: bash
+CODE:
+npx shadcn@latest add avatar
+
+----------------------------------------
+
+TITLE: Configuring Tailwind CSS in Vite
+DESCRIPTION: CSS import statement to include Tailwind in the project's main CSS file.
+
+LANGUAGE: css
+CODE:
+@import "tailwindcss";
+
+----------------------------------------
+
+TITLE: Installing Tailwind CSS Dependencies
+DESCRIPTION: Command to install Tailwind CSS and autoprefixer as development dependencies
+
+LANGUAGE: bash
+CODE:
+npm install -D tailwindcss@latest autoprefixer@latest
+
+----------------------------------------
+
+TITLE: Next.js Link Integration - Implementation
+DESCRIPTION: Example of implementing a navigation menu item with Next.js Link component and proper styling
+
+LANGUAGE: tsx
+CODE:
+<NavigationMenuItem>
+  <Link href="/docs" legacyBehavior passHref>
+    <NavigationMenuLink className={navigationMenuTriggerStyle()}>
+      Documentation
+    </NavigationMenuLink>
+  </Link>
+</NavigationMenuItem>
+
+----------------------------------------
+
+TITLE: Configuring components.json for UI Package in shadcn/ui Monorepo
+DESCRIPTION: JSON configuration for the components.json file in the UI package workspace. It defines style, Tailwind CSS settings, and import aliases for the monorepo structure.
+
+LANGUAGE: json
+CODE:
+{
+  "$schema": "https://ui.shadcn.com/schema.json",
+  "style": "new-york",
+  "rsc": true,
+  "tsx": true,
+  "tailwind": {
+    "config": "",
+    "css": "src/styles/globals.css",
+    "baseColor": "zinc",
+    "cssVariables": true
+  },
+  "iconLibrary": "lucide",
+  "aliases": {
+    "components": "@workspace/ui/components",
+    "utils": "@workspace/ui/lib/utils",
+    "hooks": "@workspace/ui/hooks",
+    "lib": "@workspace/ui/lib",
+    "ui": "@workspace/ui/components"
+  }
+}
+
+----------------------------------------
+
+TITLE: Formatting Amount Cell
+DESCRIPTION: Updates the column definition to format the amount as a currency and align it to the right.
+
+LANGUAGE: tsx
+CODE:
+export const columns: ColumnDef<Payment>[] = [
+  {
+    accessorKey: "amount",
+    header: () => <div className="text-right">Amount</div>,
+    cell: ({ row }) => {
+      const amount = parseFloat(row.getValue("amount"))
+      const formatted = new Intl.NumberFormat("en-US", {
+        style: "currency",
+        currency: "USD",
+      }).format(amount)
+
+      return <div className="text-right font-medium">{formatted}</div>
+    },
+  },
+]
+
+----------------------------------------
+
+TITLE: Adding shadcn-ui Components
+DESCRIPTION: Command to add specific components from shadcn-ui to your Next.js project. This example adds the Button component.
+
+LANGUAGE: bash
+CODE:
+npx shadcn@latest add button
+
+----------------------------------------
+
+TITLE: Defining Payment Type and Sample Data
+DESCRIPTION: Defines the Payment type and provides sample payment data for the table.
+
+LANGUAGE: typescript
+CODE:
+type Payment = {
+  id: string
+  amount: number
+  status: "pending" | "processing" | "success" | "failed"
+  email: string
+}
+
+export const payments: Payment[] = [
+  {
+    id: "728ed52f",
+    amount: 100,
+    status: "pending",
+    email: "m@example.com",
+  },
+  {
+    id: "489e1d42",
+    amount: 125,
+    status: "processing",
+    email: "example@gmail.com",
+  },
+  // ...
+]
+
+----------------------------------------
+
+TITLE: Importing Alert Component in React
+DESCRIPTION: How to import the Alert component and its subcomponents in a React application.
+
+LANGUAGE: tsx
+CODE:
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
+
+----------------------------------------
+
+TITLE: Initializing shadcn-ui in Next.js Project
+DESCRIPTION: Command to create a new Next.js project or configure an existing one with shadcn-ui. Compatible with Tailwind v4.
+
+LANGUAGE: bash
+CODE:
+npx shadcn@latest init
+
+----------------------------------------
+
+TITLE: Adding shadcn/ui Components
+DESCRIPTION: Command to add a specific component (Button) from shadcn/ui to the project.
+
+LANGUAGE: bash
+CODE:
+npx shadcn@latest add button
+
+----------------------------------------
+
+TITLE: Creating Zod Schema for Form Validation
+DESCRIPTION: Defines a Zod schema to specify the shape and validation rules for the form data.
+
+LANGUAGE: tsx
+CODE:
+"use client"
+
+import { z } from "zod"
+
+const formSchema = z.object({
+  username: z.string().min(2).max(50),
+})
+
+----------------------------------------
+
+TITLE: Importing Radio Group Components in React
+DESCRIPTION: Import statements for the Label, RadioGroup, and RadioGroupItem components in a React project.
+
+LANGUAGE: tsx
+CODE:
+import { Label } from "@/components/ui/label"
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
+
+----------------------------------------
+
+TITLE: CSS Variables and Utility Classes Example
+DESCRIPTION: Example showing the usage of CSS variables and Tailwind utility classes for theming
+
+LANGUAGE: tsx
+CODE:
+<div className="bg-zinc-950 dark:bg-white" />
+<div className="bg-background text-foreground" />
+
+----------------------------------------
+
+TITLE: Initializing shadcn/ui
+DESCRIPTION: Command to run the shadcn init script for project setup.
+
+LANGUAGE: bash
+CODE:
+npx shadcn@latest init
+
+----------------------------------------
+
+TITLE: Implementing shadcn-ui Button Component
+DESCRIPTION: Example of importing and using the Button component in a Next.js page component. Shows basic implementation within a React component.
+
+LANGUAGE: tsx
+CODE:
+import { Button } from "@/components/ui/button"
+
+export default function Home() {
+  return (
+    <div>
+      <Button>Click me</Button>
+    </div>
+  )
+}
+
+----------------------------------------
+
+TITLE: Importing Context Menu Components in React
+DESCRIPTION: TypeScript code snippet showing how to import the necessary context menu components from the UI library.
+
+LANGUAGE: tsx
+CODE:
+import {
+  ContextMenu,
+  ContextMenuContent,
+  ContextMenuItem,
+  ContextMenuTrigger,
+} from "@/components/ui/context-menu"
+
+----------------------------------------
+
+TITLE: Using shadcn UI Button in Astro Component
+DESCRIPTION: Example of importing and using the shadcn UI Button component in an Astro page component.
+
+LANGUAGE: astro
+CODE:
+---
+import { Button } from "@/components/ui/button"
+---
+
+<html lang="en">
+	<head>
+		<meta charset="utf-8" />
+		<meta name="viewport" content="width=device-width" />
+		<link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+		<meta name="generator" content={Astro.generator} />
+		<title>Astro + TailwindCSS</title>
+	</head>
+
+	<body>
+		<div class="grid place-items-center h-screen content-center">
+			<Button>Button</Button>
+		</div>
+	</body>
+</html>
+
+----------------------------------------
+
+TITLE: Recharts Dependency Override Configuration
+DESCRIPTION: Configuration for package.json to override react-is dependency for Recharts compatibility with React 19.
+
+LANGUAGE: json
+CODE:
+{
+  "overrides": {
+    "react-is": "^19.0.0-rc-69d4b800-20241021"
+  }
+}
+
+----------------------------------------
+
+TITLE: Adding shadcn/ui Components to Laravel Project
+DESCRIPTION: Command to add the Switch component from shadcn/ui to the Laravel project using npx.
+
+LANGUAGE: bash
+CODE:
+npx shadcn@latest add switch
+
+----------------------------------------
+
+TITLE: Adding Chart Colors to CSS for Light and Dark Themes
+DESCRIPTION: This CSS snippet defines color variables for charts in both light and dark themes. It uses HSL color values for flexibility and theming support.
+
+LANGUAGE: css
+CODE:
+@layer base {
+  :root {
+    --chart-1: 12 76% 61%;
+    --chart-2: 173 58% 39%;
+    --chart-3: 197 37% 24%;
+    --chart-4: 43 74% 66%;
+    --chart-5: 27 87% 67%;
+  }
+
+  .dark {
+    --chart-1: 220 70% 50%;
+    --chart-2: 160 60% 45%;
+    --chart-3: 30 80% 55%;
+    --chart-4: 280 65% 60%;
+    --chart-5: 340 75% 55%;
+  }
+}
+
+----------------------------------------
+
+TITLE: Importing Navigation Menu Components - TypeScript/React
+DESCRIPTION: Import statement for navigation menu components from the UI components directory
+
+LANGUAGE: tsx
+CODE:
+import {
+  NavigationMenu,
+  NavigationMenuContent,
+  NavigationMenuIndicator,
+  NavigationMenuItem,
+  NavigationMenuLink,
+  NavigationMenuList,
+  NavigationMenuTrigger,
+  NavigationMenuViewport,
+} from "@/components/ui/navigation-menu"
+
+----------------------------------------
+
+TITLE: Registering Block Definition in Registry
+DESCRIPTION: Example of adding a block definition to the registry including metadata and file specifications.
+
+LANGUAGE: tsx
+CODE:
+export const blocks = [
+  // ...
+  {
+    name: "dashboard-01",
+    author: "shadcn (https://ui.shadcn.com)",
+    title: "Dashboard",
+    description: "A simple dashboard with a hello world component.",
+    type: "registry:block",
+    registryDependencies: ["input", "button", "card"],
+    dependencies: ["zod"],
+    files: [
+      {
+        path: "blocks/dashboard-01/page.tsx",
+        type: "registry:page",
+        target: "app/dashboard/page.tsx",
+      },
+      {
+        path: "blocks/dashboard-01/components/hello-world.tsx",
+        type: "registry:component",
+      },
+      {
+        path: "blocks/dashboard-01/components/example-card.tsx",
+        type: "registry:component",
+      },
+      {
+        path: "blocks/dashboard-01/hooks/use-hello-world.ts",
+        type: "registry:hook",
+      },
+      {
+        path: "blocks/dashboard-01/lib/format-date.ts",
+        type: "registry:lib",
+      },
+    ],
+    categories: ["dashboard"],
+  },
+]
+
+----------------------------------------
+
+TITLE: shadcn-ui Configuration Options
+DESCRIPTION: Interactive configuration prompts for setting up shadcn-ui components and styling
+
+LANGUAGE: txt
+CODE:
+Would you like to use TypeScript (recommended)? no / yes
+Which style would you like to use? › Default
+Which color would you like to use as base color? › Slate
+Where is your global CSS file? › › ./src/styles/globals.css
+Do you want to use CSS variables for colors? › no / yes
+Where is your tailwind.config.js located? › tailwind.config.js
+Configure the import alias for components: › @/components
+Configure the import alias for utils: › @/lib/utils
+Are you using React Server Components? › no
+
+----------------------------------------
+
+TITLE: Updating Calendar Component Styling
+DESCRIPTION: Recent change to the Calendar component, updating the color of the 'day_outside' class to improve contrast.
+
+LANGUAGE: tsx
+CODE:
+"day_outside:
+        \"day-outside text-muted-foreground aria-selected:bg-accent/50 aria-selected:text-muted-foreground\","
+
+----------------------------------------
+
+TITLE: Importing Slider Component in React
+DESCRIPTION: Example of how to import the Slider component in a React application.
+
+LANGUAGE: tsx
+CODE:
+import { Slider } from "@/components/ui/slider"
+
+----------------------------------------
+
+TITLE: Building Registry JSON Files with shadcn CLI
+DESCRIPTION: Use the 'build' command to generate the registry JSON files. This command reads the 'registry.json' file and generates the registry JSON files in the 'public/r' directory.
+
+LANGUAGE: bash
+CODE:
+npx shadcn@latest build
+
+----------------------------------------
+
+TITLE: Importing Resizable Components
+DESCRIPTION: Import statement for the ResizableHandle, ResizablePanel, and ResizablePanelGroup components from the local UI components directory.
+
+LANGUAGE: tsx
+CODE:
+import {
+  ResizableHandle,
+  ResizablePanel,
+  ResizablePanelGroup,
+} from "@/components/ui/resizable"
+
+----------------------------------------
+
+TITLE: Displaying Options for shadcn Add Command
+DESCRIPTION: Shows the available options and arguments for the 'add' command, including flags for skipping confirmation, overwriting existing files, and specifying the working directory.
+
+LANGUAGE: txt
+CODE:
+Usage: shadcn add [options] [components...]
+
+add a component to your project
+
+Arguments:
+  components         the components to add or a url to the component.
+
+Options:
+  -y, --yes           skip confirmation prompt. (default: false)
+  -o, --overwrite     overwrite existing files. (default: false)
+  -c, --cwd <cwd>     the working directory. defaults to the current directory. (default: "/Users/shadcn/Desktop")
+  -a, --all           add all available components (default: false)
+  -p, --path <path>   the path to add the component to.
+  -s, --silent        mute output. (default: false)
+  --src-dir           use the src directory when creating a new project. (default: false)
+  --no-src-dir        do not use the src directory when creating a new project.
+  --css-variables     use css variables for theming. (default: true)
+  --no-css-variables  do not use css variables for theming.
+  -h, --help          display help for command
+
+----------------------------------------
+
+TITLE: Responsive Carousel Item Sizing
+DESCRIPTION: Example of setting responsive sizes for carousel items using Tailwind CSS breakpoint classes.
+
+LANGUAGE: tsx
+CODE:
+<Carousel>
+  <CarouselContent>
+    <CarouselItem className="md:basis-1/2 lg:basis-1/3">...</CarouselItem>
+    <CarouselItem className="md:basis-1/2 lg:basis-1/3">...</CarouselItem>
+    <CarouselItem className="md:basis-1/2 lg:basis-1/3">...</CarouselItem>
+  </CarouselContent>
+</Carousel>
+
+----------------------------------------
+
+TITLE: Importing Select Component
+DESCRIPTION: TypeScript code showing how to import the Select component and its subcomponents
+
+LANGUAGE: tsx
+CODE:
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
+
+----------------------------------------
+
+TITLE: Configuring TypeScript Paths in Astro Project
+DESCRIPTION: Modification to tsconfig.json to set up path resolution for the '@' alias in the Astro project.
+
+LANGUAGE: typescript
+CODE:
+{
+  "compilerOptions": {
+    // ...
+    "baseUrl": ".",
+    "paths": {
+      "@/*": [
+        "./src/*"
+      ]
+    }
+    // ...
+  }
+}
+
+----------------------------------------
+
+TITLE: Listing Available Components with shadcn CLI in Bash
+DESCRIPTION: This command runs the shadcn CLI without arguments to view a list of all available components that can be added to the project.
+
+LANGUAGE: bash
+CODE:
+npx shadcn add
+
+----------------------------------------
+
+TITLE: Adding Spacing to Carousel Items
+DESCRIPTION: Example of adding spacing between carousel items using Tailwind CSS utility classes.
+
+LANGUAGE: tsx
+CODE:
+<Carousel>
+  <CarouselContent className="-ml-4">
+    <CarouselItem className="pl-4">...</CarouselItem>
+    <CarouselItem className="pl-4">...</CarouselItem>
+    <CarouselItem className="pl-4">...</CarouselItem>
+  </CarouselContent>
+</Carousel>
+
+----------------------------------------
+
+TITLE: Importing Aspect Ratio Component
+DESCRIPTION: Importing the AspectRatio component along with Next.js Image component for usage.
+
+LANGUAGE: tsx
+CODE:
+import Image from "next/image"
+
+import { AspectRatio } from "@/components/ui/aspect-ratio"
+
+----------------------------------------
+
+TITLE: Adding Alert Dialog Component with shadcn CLI in Bash
+DESCRIPTION: This example demonstrates how to add the alert-dialog component to your project using the shadcn CLI.
+
+LANGUAGE: bash
+CODE:
+npx shadcn add alert-dialog
+
+----------------------------------------
+
+TITLE: Installing remix-themes Package for Remix
+DESCRIPTION: Installs the remix-themes package using npm, which is required for implementing theme functionality in the Remix application.
+
+LANGUAGE: bash
+CODE:
+npm install remix-themes
+
+----------------------------------------
+
+TITLE: Installing next-themes Package
+DESCRIPTION: Command to install the next-themes package using npm package manager
+
+LANGUAGE: bash
+CODE:
+npm install next-themes
+
+----------------------------------------
+
+TITLE: Adding Components with shadcn CLI in Bash
+DESCRIPTION: This command adds a specified component to your project using the shadcn CLI. It also installs all required dependencies for the component.
+
+LANGUAGE: bash
+CODE:
+npx shadcn add [component]
+
+----------------------------------------
+
+TITLE: Adding Registry Categories
+DESCRIPTION: Example of defining new categories in the registry categories configuration file.
+
+LANGUAGE: tsx
+CODE:
+export const registryCategories = [
+  // ...
+  {
+    name: "Input",
+    slug: "input",
+    hidden: false,
+  },
+]
+
+----------------------------------------
+
+TITLE: Installing Menubar Component Dependencies Manually
+DESCRIPTION: This command installs the necessary dependencies for the Menubar component when setting up manually.
+
+LANGUAGE: bash
+CODE:
+npm install @radix-ui/react-menubar
+
+----------------------------------------
+
+TITLE: Implementing Mode Toggle Component in React
+DESCRIPTION: This snippet shows the implementation of a ModeToggle component in React. It uses a dropdown menu to allow users to switch between light, dark, and system themes. The component manages the theme state and updates the DOM accordingly.
+
+LANGUAGE: typescript
+CODE:
+import * as React from "react"
+import { Moon, Sun } from "lucide-react"
+
+import { Button } from "@/components/ui/button"
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
+
+export function ModeToggle() {
+  const [theme, setThemeState] = React.useState<
+    "theme-light" | "dark" | "system"
+  >("theme-light")
+
+  React.useEffect(() => {
+    const isDarkMode = document.documentElement.classList.contains("dark")
+    setThemeState(isDarkMode ? "dark" : "theme-light")
+  }, [])
+
+  React.useEffect(() => {
+    const isDark =
+      theme === "dark" ||
+      (theme === "system" &&
+        window.matchMedia("(prefers-color-scheme: dark)").matches)
+    document.documentElement.classList[isDark ? "add" : "remove"]("dark")
+  }, [theme])
+
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <Button variant="outline" size="icon">
+          <Sun className="h-[1.2rem] w-[1.2rem] rotate-0 scale-100 transition-all dark:-rotate-90 dark:scale-0" />
+          <Moon className="absolute h-[1.2rem] w-[1.2rem] rotate-90 scale-0 transition-all dark:rotate-0 dark:scale-100" />
+          <span className="sr-only">Toggle theme</span>
+        </Button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end">
+        <DropdownMenuItem onClick={() => setThemeState("theme-light")}>
+          Light
+        </DropdownMenuItem>
+        <DropdownMenuItem onClick={() => setThemeState("dark")}>
+          Dark
+        </DropdownMenuItem>
+        <DropdownMenuItem onClick={() => setThemeState("system")}>
+          System
+        </DropdownMenuItem>
+      </DropdownMenuContent>
+    </DropdownMenu>
+  )
+}
+
+----------------------------------------
+
+TITLE: Adding Sidebar Colors to CSS
+DESCRIPTION: CSS variables for theming the sidebar component in light and dark modes.
+
+LANGUAGE: css
+CODE:
+@layer base {
+  :root {
+    --sidebar-background: 0 0% 98%;
+    --sidebar-foreground: 240 5.3% 26.1%;
+    --sidebar-primary: 240 5.9% 10%;
+    --sidebar-primary-foreground: 0 0% 98%;
+    --sidebar-accent: 240 4.8% 95.9%;
+    --sidebar-accent-foreground: 240 5.9% 10%;
+    --sidebar-border: 220 13% 91%;
+    --sidebar-ring: 217.2 91.2% 59.8%;
+  }
+
+  .dark {
+    --sidebar-background: 240 5.9% 10%;
+    --sidebar-foreground: 240 4.8% 95.9%;
+    --sidebar-primary: 224.3 76.3% 48%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 240 3.7% 15.9%;
+    --sidebar-accent-foreground: 240 4.8% 95.9%;
+    --sidebar-border: 240 3.7% 15.9%;
+    --sidebar-ring: 217.2 91.2% 59.8%;
+  }
+}
+
+----------------------------------------
+
+TITLE: Block Directory Structure Example
+DESCRIPTION: Example directory structure for a new block showing the required file organization.
+
+LANGUAGE: txt
+CODE:
+apps
+└── www
+    └── registry
+        └── new-york
+            └── blocks
+                └── dashboard-01
+
+LANGUAGE: txt
+CODE:
+dashboard-01
+└── page.tsx
+└── components
+    └── hello-world.tsx
+    └── example-card.tsx
+└── hooks
+    └── use-hello-world.ts
+└── lib
+    └── format-date.ts
+
+----------------------------------------
+
+TITLE: Creating Inline Theme Script in Astro
+DESCRIPTION: This snippet demonstrates how to create an inline script in Astro to handle theme preference detection and application. It checks localStorage and system preferences to set the initial theme and observes changes to update localStorage.
+
+LANGUAGE: astro
+CODE:
+---
+import '../styles/globals.css'
+---
+
+<script is:inline>
+	const getThemePreference = () => {
+		if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) {
+			return localStorage.getItem('theme');
+		}
+		return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+	};
+	const isDark = getThemePreference() === 'dark';
+	document.documentElement.classList[isDark ? 'add' : 'remove']('dark');
+
+	if (typeof localStorage !== 'undefined') {
+		const observer = new MutationObserver(() => {
+			const isDark = document.documentElement.classList.contains('dark');
+			localStorage.setItem('theme', isDark ? 'dark' : 'light');
+		});
+		observer.observe(document.documentElement, { attributes: true, attributeFilter: ['class'] });
+	}
+</script>
+
+<html lang="en">
+	<body>
+      <h1>Astro</h1>
+	</body>
+</html>
+
+----------------------------------------
+
+TITLE: Gatsby Project Configuration Prompts
+DESCRIPTION: Interactive command-line prompts for configuring a new Gatsby project with TypeScript and Tailwind CSS
+
+LANGUAGE: txt
+CODE:
+✔ What would you like to call your site?
+· your-app-name
+✔ What would you like to name the folder where your site will be created?
+· your-app-name
+✔ Will you be using JavaScript or TypeScript?
+· TypeScript
+✔ Will you be using a CMS?
+· Choose whatever you want
+✔ Would you like to install a styling system?
+· Tailwind CSS
+✔ Would you like to install additional features with other plugins?
+· Choose whatever you want
+✔ Shall we do this? (Y/n) · Yes
+
+----------------------------------------
+
+TITLE: Setting up shadcn-ui Development Environment
+DESCRIPTION: Commands for cloning the repository, creating a branch, installing dependencies and starting the development server.
+
+LANGUAGE: bash
+CODE:
+git clone https://github.com/shadcn-ui/ui.git
+
+LANGUAGE: bash
+CODE:
+git checkout -b username/my-new-block
+
+LANGUAGE: bash
+CODE:
+pnpm install
+
+LANGUAGE: bash
+CODE:
+pnpm www:dev
+
+----------------------------------------
+
+TITLE: Updating Tailwind Configuration for Input OTP
+DESCRIPTION: Adds necessary animations to the Tailwind configuration file for the Input OTP component.
+
+LANGUAGE: javascript
+CODE:
+/** @type {import('tailwindcss').Config} */
+module.exports = {
+  theme: {
+    extend: {
+      keyframes: {
+        "caret-blink": {
+          "0%,70%,100%": { opacity: "1" },
+          "20%,50%": { opacity: "0" },
+        },
+      },
+      animation: {
+        "caret-blink": "caret-blink 1.25s ease-out infinite",
+      },
+    },
+  },
+}
+
+----------------------------------------
+
+TITLE: Adding Components to shadcn/ui Monorepo Project
+DESCRIPTION: Commands to navigate to the app directory and add components using the shadcn/ui CLI. The CLI automatically handles installation paths and import updates.
+
+LANGUAGE: bash
+CODE:
+cd apps/web
+
+LANGUAGE: bash
+CODE:
+npx shadcn@canary add [COMPONENT]
+
+----------------------------------------
+
+TITLE: Installing Tailwind CSS for Vite
+DESCRIPTION: Command to install Tailwind CSS and its Vite plugin.
+
+LANGUAGE: bash
+CODE:
+npm install tailwindcss @tailwindcss/vite
+
+----------------------------------------
+
+TITLE: Running the shadcn-ui Package Workspace
+DESCRIPTION: This command starts the development process for the shadcn-ui package workspace.
+
+LANGUAGE: bash
+CODE:
+pnpm --filter=shadcn-ui dev
+
+----------------------------------------
+
+TITLE: Using shadcn/ui Components in React
+DESCRIPTION: Example of importing and using a shadcn/ui Button component in a React component.
+
+LANGUAGE: typescript
+CODE:
+import { Button } from "@/components/ui/button"
+
+function App() {
+  return (
+    <div className="flex flex-col items-center justify-center min-h-svh">
+      <Button>Click me</Button>
+    </div>
+  )
+}
+
+export default App
+
+----------------------------------------
+
+TITLE: Files Configuration
+DESCRIPTION: Defines the file structure for the registry item including paths, types, and optional target locations.
+
+LANGUAGE: json
+CODE:
+{
+  "files": [
+    {
+      "path": "registry/new-york/hello-world/page.tsx",
+      "type": "registry:page",
+      "target": "app/hello/page.tsx"
+    },
+    {
+      "path": "registry/new-york/hello-world/hello-world.tsx",
+      "type": "registry:component"
+    },
+    {
+      "path": "registry/new-york/hello-world/use-hello-world.ts",
+      "type": "registry:hook"
+    },
+    {
+      "path": "registry/new-york/hello-world/.env",
+      "type": "registry:file",
+      "target": "~/.env"
+    }
+  ]
+}
+
+----------------------------------------
+
+TITLE: Creating a New Branch in Git
+DESCRIPTION: This Git command creates and switches to a new branch for development work.
+
+LANGUAGE: bash
+CODE:
+git checkout -b my-new-branch
+
+----------------------------------------
+
+TITLE: Adding Custom Colors in Tailwind CSS v4
+DESCRIPTION: Shows how to add new custom colors using CSS variables in Tailwind CSS v4. Defines color variables for both light and dark themes that can be used as utility classes.
+
+LANGUAGE: json
+CODE:
+{
+  "$schema": "https://ui.shadcn.com/schema/registry-item.json",
+  "name": "hello-world",
+  "title": "Hello World",
+  "type": "registry:block",
+  "description": "A complex hello world component",
+  "files": [
+    // ...
+  ],
+  "cssVars": {
+    "light": {
+      "brand-background": "20 14.3% 4.1%",
+      "brand-accent": "20 14.3% 4.1%"
+    },
+    "dark": {
+      "brand-background": "20 14.3% 4.1%",
+      "brand-accent": "20 14.3% 4.1%"
+    }
+  }
+}
+
+----------------------------------------
+
+TITLE: Importing Shadcn/UI Components in TSX
+DESCRIPTION: Example of how to import and use shadcn/ui components from the UI package in a TSX file.
+
+LANGUAGE: tsx
+CODE:
+import { Button } from "@workspace/ui/components/button"
+
+----------------------------------------
+
+TITLE: Importing Table Components in React
+DESCRIPTION: This snippet shows how to import various Table-related components from the shadcn-ui library. These components are used to construct a complete table structure.
+
+LANGUAGE: tsx
+CODE:
+import {
+  Table,
+  TableBody,
+  TableCaption,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table"
+
+----------------------------------------
+
+TITLE: Creating Custom Style From Scratch in ShadCN UI
+DESCRIPTION: Shows how to create a completely new style without extending shadcn-ui defaults. Configures custom components, CSS variables, and dependencies from scratch.
+
+LANGUAGE: json
+CODE:
+{
+  "$schema": "https://ui.shadcn.com/schema/registry-item.json",
+  "extends": "none",
+  "name": "new-style",
+  "type": "registry:style",
+  "dependencies": ["tailwind-merge", "clsx"],
+  "registryDependencies": [
+    "utils",
+    "https://example.com/r/button.json",
+    "https://example.com/r/input.json",
+    "https://example.com/r/label.json",
+    "https://example.com/r/select.json"
+  ],
+  "cssVars": {
+    "theme": {
+      "font-sans": "Inter, sans-serif"
+    },
+    "light": {
+      "main": "#88aaee",
+      "bg": "#dfe5f2",
+      "border": "#000",
+      "text": "#000",
+      "ring": "#000"
+    },
+    "dark": {
+      "main": "#88aaee",
+      "bg": "#272933",
+      "border": "#000",
+      "text": "#e6e6e6",
+      "ring": "#fff"
+    }
+  }
+}
+
+----------------------------------------
+
+TITLE: Initializing Shadcn/UI Monorepo with PNPM
+DESCRIPTION: Command to initialize a new shadcn/ui monorepo project using PNPM package manager.
+
+LANGUAGE: bash
+CODE:
+pnpm dlx shadcn@latest init
+
+----------------------------------------
+
+TITLE: Importing Toggle Group Components in React
+DESCRIPTION: Import statement for using the Toggle Group and Toggle Group Item components in a React application.
+
+LANGUAGE: tsx
+CODE:
+import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group"
+
+----------------------------------------
+
+TITLE: Importing buttonVariants Helper in React
+DESCRIPTION: Example of importing the buttonVariants helper function for creating button-like links.
+
+LANGUAGE: tsx
+CODE:
+import { buttonVariants } from "@/components/ui/button"
+
+----------------------------------------
+
+TITLE: Deploying to Fly.io using CLI commands
+DESCRIPTION: Series of commands to set up Fly.io deployment, including app creation, secret management, and volume creation.
+
+LANGUAGE: sh
+CODE:
+fly auth signup
+fly apps create indie-stack-template
+fly apps create indie-stack-template-staging
+fly secrets set SESSION_SECRET=$(openssl rand -hex 32) --app indie-stack-template
+fly secrets set SESSION_SECRET=$(openssl rand -hex 32) --app indie-stack-template-staging
+fly volumes create data --size 1 --app indie-stack-template
+fly volumes create data --size 1 --app indie-stack-template-staging
+
+----------------------------------------
+
+TITLE: Adding Shadcn/UI Components to Web App
+DESCRIPTION: Command to add specific shadcn/ui components to the web application within the monorepo structure.
+
+LANGUAGE: bash
+CODE:
+pnpm dlx shadcn@latest add button -c apps/web
+
+----------------------------------------
+
+TITLE: Configuring Custom Style Extension for ShadCN UI
+DESCRIPTION: Demonstrates how to extend shadcn-ui with custom styles, dependencies, components and CSS variables. Includes configuration for fonts, colors and external package dependencies.
+
+LANGUAGE: json
+CODE:
+{
+  "$schema": "https://ui.shadcn.com/schema/registry-item.json",
+  "name": "example-style",
+  "type": "registry:style",
+  "dependencies": ["@tabler/icons-react"],
+  "registryDependencies": [
+    "login-01",
+    "calendar",
+    "https://example.com/r/editor.json"
+  ],
+  "cssVars": {
+    "theme": {
+      "font-sans": "Inter, sans-serif"
+    },
+    "light": {
+      "brand": "20 14.3% 4.1%"
+    },
+    "dark": {
+      "brand": "20 14.3% 4.1%"
+    }
+  }
+}
+
+----------------------------------------
+
+TITLE: Importing Command Component and Related Subcomponents in React
+DESCRIPTION: This code snippet demonstrates how to import the Command component and its related subcomponents in a React application.
+
+LANGUAGE: tsx
+CODE:
+import {
+  Command,
+  CommandDialog,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+  CommandSeparator,
+  CommandShortcut,
+} from "@/components/ui/command"
+
+----------------------------------------
+
+TITLE: Setting Registry Name in JSON
+DESCRIPTION: Example showing how to set the registry name property used for data attributes and metadata.
+
+LANGUAGE: json
+CODE:
+{
+  "name": "acme"
+}
+
+----------------------------------------
+
+TITLE: Initializing Remix project and committing changes
+DESCRIPTION: Series of commands to initialize the Remix project, create a git repository, and commit initial changes.
+
+LANGUAGE: sh
+CODE:
+npx remix init
+git init # if you haven't already
+git add .
+git commit -m "Initialize project"
+
+----------------------------------------
+
+TITLE: Implementing Open in v0 Button Component in React
+DESCRIPTION: A React component that creates a styled button to open registry items in v0.dev. The component takes a URL parameter and creates a button that opens the specified registry item in v0 when clicked.
+
+LANGUAGE: jsx
+CODE:
+import { Button } from "@/components/ui/button"
+
+export function OpenInV0Button({ url }: { url: string }) {
+  return (
+    <Button
+      aria-label="Open in v0"
+      className="h-8 gap-1 rounded-[6px] bg-black px-3 text-xs text-white hover:bg-black hover:text-white dark:bg-white dark:text-black"
+      asChild
+    >
+      <a
+        href={`https://v0.dev/chat/api/open?url=${url}`}
+        target="_blank"
+        rel="noreferrer"
+      >
+        Open in{" "}
+        <svg
+          viewBox="0 0 40 20"
+          fill="none"
+          xmlns="http://www.w3.org/2000/svg"
+          className="h-5 w-5 text-current"
+        >
+          <path
+            d="M23.3919 0H32.9188C36.7819 0 39.9136 3.13165 39.9136 6.99475V16.0805H36.0006V6.99475C36.0006 6.90167 35.9969 6.80925 35.9898 6.71766L26.4628 16.079C26.4949 16.08 26.5272 16.0805 26.5595 16.0805H36.0006V19.7762H26.5595C22.6964 19.7762 19.4788 16.6139 19.4788 12.7508V3.68923H23.3919V12.7508C23.3919 12.9253 23.4054 13.0977 23.4316 13.2668L33.1682 3.6995C33.0861 3.6927 33.003 3.68923 32.9188 3.68923H23.3919V0Z"
+            fill="currentColor"
+          ></path>
+          <path
+            d="M13.7688 19.0956L0 3.68759H5.53933L13.6231 12.7337V3.68759H17.7535V17.5746C17.7535 19.6705 15.1654 20.6584 13.7688 19.0956Z"
+            fill="currentColor"
+          ></path>
+        </svg>
+      </a>
+    </Button>
+  )
+
+----------------------------------------
+
+TITLE: Importing Avatar Components
+DESCRIPTION: TypeScript example showing how to import the Avatar component and its subcomponents.
+
+LANGUAGE: tsx
+CODE:
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
+
+----------------------------------------
+
+TITLE: Creating a Vite React Project
+DESCRIPTION: Command to create a new Vite project with React and TypeScript template.
+
+LANGUAGE: bash
+CODE:
+npm create vite@latest
+
+----------------------------------------
+
+TITLE: Schema Configuration for components.json
+DESCRIPTION: Basic schema configuration pointing to the official shadcn-ui JSON schema.
+
+LANGUAGE: json
+CODE:
+{
+  "$schema": "https://ui.shadcn.com/schema.json"
+}
+
+----------------------------------------
+
+TITLE: Configuring components.json for Web App in shadcn/ui Monorepo
+DESCRIPTION: JSON configuration for the components.json file in the web app workspace. It defines style, Tailwind CSS settings, and import aliases for the monorepo structure.
+
+LANGUAGE: json
+CODE:
+{
+  "$schema": "https://ui.shadcn.com/schema.json",
+  "style": "new-york",
+  "rsc": true,
+  "tsx": true,
+  "tailwind": {
+    "config": "",
+    "css": "../../packages/ui/src/styles/globals.css",
+    "baseColor": "zinc",
+    "cssVariables": true
+  },
+  "iconLibrary": "lucide",
+  "aliases": {
+    "components": "@/components",
+    "hooks": "@/hooks",
+    "lib": "@/lib",
+    "utils": "@workspace/ui/lib/utils",
+    "ui": "@workspace/ui/components"
+  }
+}
+
+----------------------------------------
+
+TITLE: Importing Alert Dialog Components
+DESCRIPTION: TypeScript code showing how to import all necessary alert dialog components from the UI library
+
+LANGUAGE: tsx
+CODE:
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog"
+
+----------------------------------------
+
+TITLE: Tailwind CSS Path Configuration
+DESCRIPTION: Defines the path to the CSS file that imports Tailwind CSS into your project.
+
+LANGUAGE: json
+CODE:
+{
+  "tailwind": {
+    "css": "styles/global.css"
+  }
+}
+
+----------------------------------------
+
+TITLE: Creating New Remix Project
+DESCRIPTION: Command to create a new Remix project using create-remix CLI
+
+LANGUAGE: bash
+CODE:
+npx create-remix@latest my-app
+
+----------------------------------------
+
+TITLE: Adding shadcn UI Button Component to Astro Project
+DESCRIPTION: Command to add the Button component from shadcn UI to the Astro project using the CLI.
+
+LANGUAGE: bash
+CODE:
+npx shadcn@latest add button
+
+----------------------------------------
+
+TITLE: Importing Checkbox Component
+DESCRIPTION: Example of importing the Checkbox component from the components directory
+
+LANGUAGE: tsx
+CODE:
+import { Checkbox } from "@/components/ui/checkbox"
+
+----------------------------------------
+
+TITLE: Configuring PostCSS
+DESCRIPTION: PostCSS configuration for Tailwind CSS and autoprefixer
+
+LANGUAGE: javascript
+CODE:
+export default {
+  plugins: {
+    tailwindcss: {},
+    autoprefixer: {},
+  },
+}
+
+----------------------------------------
+
+TITLE: Setting up Tailwind CSS Imports
+DESCRIPTION: CSS file configuration to import Tailwind CSS styles
+
+LANGUAGE: css
+CODE:
+@import "tailwindcss" source("../");
+
+----------------------------------------
+
+TITLE: Creating TanStack Router Project with shadcn/ui
+DESCRIPTION: Command to create a new TanStack Router project with Tailwind CSS and shadcn/ui add-ons using npx.
+
+LANGUAGE: bash
+CODE:
+npx create-tsrouter-app@latest my-app --template file-router --tailwind --add-ons shadcn
+
+----------------------------------------
+
+TITLE: Configuring PostCSS
+DESCRIPTION: PostCSS configuration file setup to enable Tailwind CSS processing
+
+LANGUAGE: typescript
+CODE:
+export default {
+  plugins: {
+    "@tailwindcss/postcss": {},
+  },
+}
+
+----------------------------------------
+
+TITLE: Using Sonner Toast Function
+DESCRIPTION: Example of how to use the Sonner toast function to display a simple toast message.
+
+LANGUAGE: tsx
+CODE:
+toast("Event has been created.")
+
+----------------------------------------
+
+TITLE: Modifying Tailwind CSS for Dark Mode in Remix
+DESCRIPTION: Adds a CSS selector for dark mode to the tailwind.css file, allowing the use of the 'dark' class on the html element to apply dark mode styles.
+
+LANGUAGE: css
+CODE:
+.dark,
+:root[class~="dark"] {
+  ...;
+}
+
+----------------------------------------
+
+TITLE: Installing Tailwind Dependencies
+DESCRIPTION: Command to install Tailwind CSS and its required dependencies for the project
+
+LANGUAGE: bash
+CODE:
+npm install tailwindcss @tailwindcss/postcss postcss
+
+----------------------------------------
+
+TITLE: Adding shadcn-ui Components
+DESCRIPTION: Command to add individual shadcn-ui components to the project
+
+LANGUAGE: bash
+CODE:
+npx shadcn@latest add button
+
+----------------------------------------
+
+TITLE: Importing Sheet Component in React
+DESCRIPTION: This snippet shows how to import the Sheet component and its subcomponents in a React application.
+
+LANGUAGE: tsx
+CODE:
+import {
+  Sheet,
+  SheetContent,
+  SheetDescription,
+  SheetHeader,
+  SheetTitle,
+  SheetTrigger,
+} from "@/components/ui/sheet"
+
+----------------------------------------
+
+TITLE: Serving the Registry with Next.js
+DESCRIPTION: Run the Next.js development server to serve your registry files locally.
+
+LANGUAGE: bash
+CODE:
+npm run dev
+
+----------------------------------------
+
+TITLE: Configuring Remix for Tailwind
+DESCRIPTION: Adding Tailwind and PostCSS configuration to remix.config.js
+
+LANGUAGE: javascript
+CODE:
+/** @type {import('@remix-run/dev').AppConfig} */
+export default {
+  ...
+  tailwind: true,
+  postcss: true,
+  ...
+};
+
+----------------------------------------
+
+TITLE: Creating New Gatsby Project
+DESCRIPTION: Initialize a new Gatsby project using the create-gatsby command
+
+LANGUAGE: bash
+CODE:
+npm init gatsby
+
+----------------------------------------
+
+TITLE: Using Progress Component in React
+DESCRIPTION: This code snippet demonstrates how to use the Progress component in a React application, setting a value of 33%.
+
+LANGUAGE: tsx
+CODE:
+<Progress value={33} />
+
+----------------------------------------
+
+TITLE: Importing Tabs Components in React
+DESCRIPTION: This code snippet shows how to import the Tabs components for use in a React application.
+
+LANGUAGE: tsx
+CODE:
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+
+----------------------------------------
+
+TITLE: Adding a Build Script for shadcn Registry
+DESCRIPTION: Add a registry:build script to your package.json file to use the shadcn CLI for building the registry JSON files.
+
+LANGUAGE: json
+CODE:
+{
+  "scripts": {
+    "registry:build": "shadcn build"
+  }
+}
+
+----------------------------------------
+
+TITLE: Installing Alert Component via CLI
+DESCRIPTION: Command to install the Alert component using the shadcn CLI.
+
+LANGUAGE: bash
+CODE:
+npx shadcn@latest add alert
+
+----------------------------------------
+
+TITLE: Installing Popover Component via CLI
+DESCRIPTION: Command to install the Popover component using the shadcn CLI.
+
+LANGUAGE: bash
+CODE:
+npx shadcn@latest add popover
+
+----------------------------------------
+
+TITLE: Importing Switch Component in React
+DESCRIPTION: Example of how to import the Switch component in a React application.
+
+LANGUAGE: tsx
+CODE:
+import { Switch } from "@/components/ui/switch"
+
+----------------------------------------
+
+TITLE: Installing Node Types for Vite
+DESCRIPTION: Command to install Node.js type definitions as a dev dependency for Vite configuration.
+
+LANGUAGE: bash
+CODE:
+npm install -D @types/node
+
+----------------------------------------
+
+TITLE: Setting Carousel Orientation
+DESCRIPTION: Example of setting the orientation of the carousel using the orientation prop.
+
+LANGUAGE: tsx
+CODE:
+<Carousel orientation="vertical | horizontal">
+  <CarouselContent>
+    <CarouselItem>...</CarouselItem>
+    <CarouselItem>...</CarouselItem>
+    <CarouselItem>...</CarouselItem>
+  </CarouselContent>
+</Carousel>
+
+----------------------------------------
+
+TITLE: Installing Scroll Area Component via CLI
+DESCRIPTION: Command to install the Scroll Area component using the shadcn CLI.
+
+LANGUAGE: bash
+CODE:
+npx shadcn@latest add scroll-area
+
+----------------------------------------
+
+TITLE: Setting Fixed Item Sizes in Carousel
+DESCRIPTION: Example of setting fixed sizes for carousel items using Tailwind CSS utility classes.
+
+LANGUAGE: tsx
+CODE:
+<Carousel>
+  <CarouselContent>
+    <CarouselItem className="basis-1/3">...</CarouselItem>
+    <CarouselItem className="basis-1/3">...</CarouselItem>
+    <CarouselItem className="basis-1/3">...</CarouselItem>
+  </CarouselContent>
+</Carousel>
+
+----------------------------------------
+
+TITLE: Importing Breadcrumb Components in React
+DESCRIPTION: Import statement for various Breadcrumb subcomponents in a React application.
+
+LANGUAGE: tsx
+CODE:
+import {
+  Breadcrumb,
+  BreadcrumbItem,
+  BreadcrumbLink,
+  BreadcrumbList,
+  BreadcrumbPage,
+  BreadcrumbSeparator,
+} from "@/components/ui/breadcrumb"
+
+----------------------------------------
+
+TITLE: Responsive Image Component with Light/Dark Mode
+DESCRIPTION: HTML markup for displaying responsive images with light and dark mode variants, including accessibility features.
+
+LANGUAGE: html
+CODE:
+<a href="https://vercel.com/signup?utm_source=shad&utm_medium=web&utm_campaign=docs_cta_signup">
+  <Image
+    src="/images/open-in-v0.png"
+    width="716"
+    height="420"
+    alt="Open in v0"
+    className="border dark:hidden shadow-sm rounded-lg overflow-hidden mt-6 w-full"
+  />
+  <Image
+    src="/images/open-in-v0-dark.png"
+    width="716"
+    height="420"
+    alt="Open in v0"
+    className="border hidden dark:block shadow-sm rounded-lg overflow-hidden mt-6 w-full"
+  />
+  <span class="sr-only">Open in v0</span>
+</a>
+
+----------------------------------------
+
+TITLE: Installing Progress Component via CLI in shadcn-ui
+DESCRIPTION: This command installs the Progress component using the shadcn CLI tool.
+
+LANGUAGE: bash
+CODE:
+npx shadcn@latest add progress
+
+----------------------------------------
+
+TITLE: Defining Column Definitions for Basic Table
+DESCRIPTION: Creates column definitions for the Payment type using TanStack Table's ColumnDef.
+
+LANGUAGE: typescript
+CODE:
+"use client"
+
+import { ColumnDef } from "@tanstack/react-table"
+
+export type Payment = {
+  id: string
+  amount: number
+  status: "pending" | "processing" | "success" | "failed"
+  email: string
+}
+
+export const columns: ColumnDef<Payment>[] = [
+  {
+    accessorKey: "status",
+    header: "Status",
+  },
+  {
+    accessorKey: "email",
+    header: "Email",
+  },
+  {
+    accessorKey: "amount",
+    header: "Amount",
+  },
+]
+
+----------------------------------------
+
+TITLE: Importing Sonner Toast Function
+DESCRIPTION: Code snippet showing how to import the toast function from Sonner.
+
+LANGUAGE: tsx
+CODE:
+import { toast } from "sonner"
+
+----------------------------------------
+
+TITLE: Installing Table Component and TanStack Table
+DESCRIPTION: Commands to add the Table component and install the TanStack Table dependency.
+
+LANGUAGE: bash
+CODE:
+npx shadcn@latest add table
+
+npm install @tanstack/react-table
+
+----------------------------------------
+
+TITLE: Basic Breadcrumb Usage in React
+DESCRIPTION: Example of how to use the Breadcrumb component with its subcomponents in a React application.
+
+LANGUAGE: tsx
+CODE:
+<Breadcrumb>
+  <BreadcrumbList>
+    <BreadcrumbItem>
+      <BreadcrumbLink href="/">Home</BreadcrumbLink>
+    </BreadcrumbItem>
+    <BreadcrumbSeparator />
+    <BreadcrumbItem>
+      <BreadcrumbLink href="/components">Components</BreadcrumbLink>
+    </BreadcrumbItem>
+    <BreadcrumbSeparator />
+    <BreadcrumbItem>
+      <BreadcrumbPage>Breadcrumb</BreadcrumbPage>
+    </BreadcrumbItem>
+  </BreadcrumbList>
+</Breadcrumb>
+
+----------------------------------------
+
+TITLE: Installing Menubar Component via CLI
+DESCRIPTION: This command installs the Menubar component using the shadcn CLI tool.
+
+LANGUAGE: bash
+CODE:
+npx shadcn@latest add menubar
+
+----------------------------------------
+
+TITLE: Tailwind Base Color Configuration
+DESCRIPTION: Sets the default color palette for components, which cannot be changed after initialization.
+
+LANGUAGE: json
+CODE:
+{
+  "tailwind": {
+    "baseColor": "gray" | "neutral" | "slate" | "stone" | "zinc"
+  }
+}
+
+----------------------------------------
+
+TITLE: Importing Textarea Component in React
+DESCRIPTION: Code snippet showing how to import the Textarea component in a React application.
+
+LANGUAGE: tsx
+CODE:
+import { Textarea } from "@/components/ui/textarea"
+
+----------------------------------------
+
+TITLE: Manual Installation of Form Dependencies
+DESCRIPTION: Command to manually install the required dependencies for the form component.
+
+LANGUAGE: bash
+CODE:
+npm install @radix-ui/react-label @radix-ui/react-slot react-hook-form @hookform/resolvers zod
+
+----------------------------------------
+
+TITLE: Installing Badge Component via CLI in shadcn-ui
+DESCRIPTION: Command to install the Badge component using the shadcn CLI.
+
+LANGUAGE: bash
+CODE:
+npx shadcn@latest add badge
+
+----------------------------------------
+
+TITLE: Style Configuration in components.json
+DESCRIPTION: Setting the component style theme, which cannot be changed after initialization.
+
+LANGUAGE: json
+CODE:
+{
+  "style": "new-york"
+}
+
+----------------------------------------
+
+TITLE: Importing Skeleton Component
+DESCRIPTION: How to import the Skeleton component from the components directory.
+
+LANGUAGE: tsx
+CODE:
+import { Skeleton } from "@/components/ui/skeleton"
+
+----------------------------------------
+
+TITLE: Installing Collapsible Component Dependencies Manually
+DESCRIPTION: Command to install the required dependency for the Collapsible component using npm.
+
+LANGUAGE: bash
+CODE:
+npm install @radix-ui/react-collapsible
+
+----------------------------------------
+
+TITLE: Installing Button Component Dependencies with npm
+DESCRIPTION: Command to install the required dependency for the Button component using npm.
+
+LANGUAGE: bash
+CODE:
+npm install @radix-ui/react-slot
+
+----------------------------------------
+
+TITLE: Configuring Registry Homepage in JSON
+DESCRIPTION: Example showing how to set the homepage URL for the registry used in data attributes and metadata.
+
+LANGUAGE: json
+CODE:
+{
+  "homepage": "https://acme.com"
+}
+
+----------------------------------------
+
+TITLE: Adding Toaster Component to Root Layout
+DESCRIPTION: Code snippet showing how to add the Toaster component to the root layout of a Next.js application.
+
+LANGUAGE: tsx
+CODE:
+import { Toaster } from "@/components/ui/sonner"
+
+export default function RootLayout({ children }) {
+  return (
+    <html lang="en">
+      <head />
+      <body>
+        <main>{children}</main>
+        <Toaster />
+      </body>
+    </html>
+  )
+}
+
+----------------------------------------
+
+TITLE: Installing Radio Group Dependencies Manually
+DESCRIPTION: Command to install the necessary dependencies for the Radio Group component manually using npm.
+
+LANGUAGE: bash
+CODE:
+npm install @radix-ui/react-radio-group
+
+----------------------------------------
+
+TITLE: Defining Form Structure in React
+DESCRIPTION: Demonstrates the basic structure of a form using the Form component and its subcomponents.
+
+LANGUAGE: tsx
+CODE:
+<Form>
+  <FormField
+    control={...}
+    name="..."
+    render={() => (
+      <FormItem>
+        <FormLabel />
+        <FormControl>
+          { /* Your form field */}
+        </FormControl>
+        <FormDescription />
+        <FormMessage />
+      </FormItem>
+    )}
+  />
+</Form>
+
+----------------------------------------
+
+TITLE: Configuring Complex Component Registry Item in shadcn-ui
+DESCRIPTION: Demonstrates the structure of a complex registry item that includes multiple file types like pages, components, hooks, utils, and config files. Shows how to organize and specify different component resources within the registry.
+
+LANGUAGE: json
+CODE:
+{
+  "$schema": "https://ui.shadcn.com/schema/registry-item.json",
+  "name": "hello-world",
+  "title": "Hello World",
+  "type": "registry:block",
+  "description": "A complex hello world component",
+  "files": [
+    {
+      "path": "registry/new-york/hello-world/page.tsx",
+      "type": "registry:page",
+      "target": "app/hello/page.tsx"
+    },
+    {
+      "path": "registry/new-york/hello-world/components/hello-world.tsx",
+      "type": "registry:component"
+    },
+    {
+      "path": "registry/new-york/hello-world/components/formatted-message.tsx",
+      "type": "registry:component"
+    },
+    {
+      "path": "registry/new-york/hello-world/hooks/use-hello.ts",
+      "type": "registry:hook"
+    },
+    {
+      "path": "registry/new-york/hello-world/lib/format-date.ts",
+      "type": "registry:utils"
+    },
+    {
+      "path": "registry/new-york/hello-world/hello.config.ts",
+      "type": "registry:file",
+      "target": "~/hello.config.ts"
+    }
+  ]
+}
+
+----------------------------------------
+
+TITLE: Importing Toggle Component in React
+DESCRIPTION: Example of how to import the Toggle component in a React application.
+
+LANGUAGE: tsx
+CODE:
+import { Toggle } from "@/components/ui/toggle"
+
+----------------------------------------
+
+TITLE: Installing Popover Component Dependencies Manually
+DESCRIPTION: Command to install the necessary dependencies for the Popover component manually using npm.
+
+LANGUAGE: bash
+CODE:
+npm install @radix-ui/react-popover
+
+----------------------------------------
+
+TITLE: Installing and Running shadcn CLI
+DESCRIPTION: Install the shadcn CLI (canary version) and run the build script to generate registry JSON files.
+
+LANGUAGE: bash
+CODE:
+npm install shadcn@canary
+npm run registry:build
+
+----------------------------------------
+
+TITLE: Configuring TypeScript Opt-Out in components.json
+DESCRIPTION: JSON configuration showing how to opt-out of TypeScript by setting the tsx flag to false in components.json file
+
+LANGUAGE: json
+CODE:
+{
+  "style": "default",
+  "tailwind": {
+    "config": "tailwind.config.js",
+    "css": "src/app/globals.css",
+    "baseColor": "zinc",
+    "cssVariables": true
+  },
+  "rsc": false,
+  "tsx": false,
+  "aliases": {
+    "utils": "~/lib/utils",
+    "components": "~/components"
+  }
+}
+
+----------------------------------------
+
+TITLE: Adding a Component to the registry.json File
+DESCRIPTION: Update the registry.json file to include the new Hello World component. This defines the component's metadata and file locations for the registry.
+
+LANGUAGE: json
+CODE:
+{
+  "$schema": "https://ui.shadcn.com/schema/registry.json",
+  "name": "acme",
+  "homepage": "https://acme.com",
+  "items": [
+    {
+      "name": "hello-world",
+      "type": "registry:block",
+      "title": "Hello World",
+      "description": "A simple hello world component.",
+      "files": [
+        {
+          "path": "registry/new-york/hello-world/hello-world.tsx",
+          "type": "registry:component"
+        }
+      ]
+    }
+  ]
+}
+
+----------------------------------------
+
+TITLE: Using shadcn/ui Component
+DESCRIPTION: Example of importing and using a shadcn/ui Button component in a React component
+
+LANGUAGE: tsx
+CODE:
+import { Button } from "@/components/ui/button"
+
+function Home() {
+  const router = useRouter()
+  const state = Route.useLoaderData()
+
+  return (
+    <div>
+      <Button>Click me</Button>
+    </div>
+  )
+}
+
+----------------------------------------
+
+TITLE: Installing Scroll Area Component Dependencies Manually
+DESCRIPTION: Command to install the required dependency for the Scroll Area component manually using npm.
+
+LANGUAGE: bash
+CODE:
+npm install @radix-ui/react-scroll-area
+
+----------------------------------------
+
+TITLE: Installing Embla Carousel React Dependency
+DESCRIPTION: Command to install the required Embla Carousel React dependency using npm.
+
+LANGUAGE: bash
+CODE:
+npm install embla-carousel-react
+
+----------------------------------------
+
+TITLE: Creating a Hello World Component in React
+DESCRIPTION: Example of a simple Hello World component using the Button component from shadcn-ui. This component is placed in the registry/new-york directory.
+
+LANGUAGE: tsx
+CODE:
+import { Button } from "@/components/ui/button"
+
+export function HelloWorld() {
+  return <Button>Hello World</Button>
+}
+
+----------------------------------------
+
+TITLE: Configuring TypeScript Paths in tsconfig.json
+DESCRIPTION: Updates to tsconfig.json to add baseUrl and paths for better module resolution.
+
+LANGUAGE: json
+CODE:
+{
+  "files": [],
+  "references": [
+    {
+      "path": "./tsconfig.app.json"
+    },
+    {
+      "path": "./tsconfig.node.json"
+    }
+  ],
+  "compilerOptions": {
+    "baseUrl": ".",
+    "paths": {
+      "@/*": ["./src/*"]
+    }
+  }
+}
+
+----------------------------------------
+
+TITLE: Installing Hover Card Dependencies Manually
+DESCRIPTION: Command to install the required Radix UI hover-card dependency using npm.
+
+LANGUAGE: bash
+CODE:
+npm install @radix-ui/react-hover-card
+
+----------------------------------------
+
+TITLE: Wrapping Root Layout with ThemeProvider in Vite React App
+DESCRIPTION: This snippet demonstrates how to wrap the root layout of a Vite React application with the ThemeProvider component. It sets the default theme to dark and specifies a storage key for persisting the theme preference.
+
+LANGUAGE: tsx
+CODE:
+import { ThemeProvider } from "@/components/theme-provider"
+
+function App() {
+  return (
+    <ThemeProvider defaultTheme="dark" storageKey="vite-ui-theme">
+      {children}
+    </ThemeProvider>
+  )
+}
+
+export default App
+
+----------------------------------------
+
+TITLE: Installing Vaul Dependency
+DESCRIPTION: Command to install the required Vaul dependency for the Drawer component.
+
+LANGUAGE: bash
+CODE:
+npm install vaul
+
+----------------------------------------
+
+TITLE: Navigation Card Component with SVG Icons
+DESCRIPTION: React component implementation for framework navigation cards featuring SVG icons and links to dark mode documentation for different frameworks.
+
+LANGUAGE: jsx
+CODE:
+<div className="grid sm:grid-cols-2 gap-4 sm:gap-6">
+  <LinkedCard href="/docs/dark-mode/next">
+    <svg
+      role="img"
+      viewBox="0 0 24 24"
+      xmlns="http://www.w3.org/2000/svg"
+      className="w-10 h-10"
+      fill="currentColor"
+    >
+      <title>Next.js</title>
+      <path d="M11.5725 0c-.1763 0-.3098.0013-.3584.0067-.0516.0053-.2159.021-.3636.0328-3.4088.3073-6.6017 2.1463-8.624 4.9728C1.1004 6.584.3802 8.3666.1082 10.255c-.0962.659-.108.8537-.108 1.7474s.012 1.0884.108 1.7476c.652 4.506 3.8591 8.2919 8.2087 9.6945.7789.2511 1.6.4223 2.5337.5255.3636.04 1.9354.04 2.299 0 1.6117-.1783 2.9772-.577 4.3237-1.2643.2065-.1056.2464-.1337.2183-.1573-.0188-.0139-.8987-1.1938-1.9543-2.62l-1.919-2.592-2.4047-3.5583c-1.3231-1.9564-2.4117-3.556-2.4211-3.556-.0094-.0026-.0187 1.5787-.0235 3.509-.0067 3.3802-.0093 3.5162-.0516 3.596-.061.115-.108.1618-.2064.2134-.075.0374-.1408.0445-.495.0445h-.406l-.1078-.068a.4383.4383 0 01-.1572-.1712l-.0493-.1056.0053-4.703.0067-4.7054.0726-.0915c.0376-.0493.1174-.1125.1736-.143.0962-.047.1338-.0517.5396-.0517.4787 0 .5584.0187.6827.1547.0353.0377 1.3373 1.9987 2.895 4.3608a10760.433 10760.433 0 004.7344 7.1706l1.9002 2.8782.096-.0633c.8518-.5536 1.7525-1.3418 2.4657-2.1627 1.5179-1.7429 2.4963-3.868 2.8247-6.134.0961-.6591.1078-.854.1078-1.7475 0-.8937-.012-1.0884-.1078-1.7476-.6522-4.506-3.8592-8.2919-8.2087-9.6945-.7672-.2487-1.5836-.42-2.4985-.5232-.169-.0176-1.0835-.0366-1.6123-.037zm4.0685 7.217c.3473 0 .4082.0053.4857.047.1127.0562.204.1642.237.2767.0186.061.0234 1.3653.0186 4.3044l-.0067 4.2175-.7436-1.14-.7461-1.14v-3.066c0-1.982.0093-3.0963.0234-3.1502.0375-.1313.1196-.2346.2323-.2955.0961-.0494.1313-.054.4997-.054z" />
+    </svg>
+    <p className="font-medium mt-2">Next.js</p>
+  </LinkedCard>
+  <!-- Similar cards for Vite, Astro, and Remix -->
+</div>
+
+----------------------------------------
+
+TITLE: Configuring TypeScript Paths in tsconfig.app.json
+DESCRIPTION: Updates to tsconfig.app.json to add baseUrl and paths for IDE path resolution.
+
+LANGUAGE: json
+CODE:
+{
+  "compilerOptions": {
+    "baseUrl": ".",
+    "paths": {
+      "@/*": [
+        "./src/*"
+      ]
+    }
+  }
+}
+
+----------------------------------------
+
+TITLE: Installing Accordion Dependencies Manually
+DESCRIPTION: Command to install the required Radix UI accordion dependency using npm.
+
+LANGUAGE: bash
+CODE:
+npm install @radix-ui/react-accordion
+
+----------------------------------------
+
+TITLE: Using Open in v0 Button Component
+DESCRIPTION: Example usage of the OpenInV0Button component with a sample registry URL.
+
+LANGUAGE: jsx
+CODE:
+<OpenInV0Button url="https://example.com/r/hello-world.json" />
+
+----------------------------------------
+
+TITLE: Importing Input OTP Components
+DESCRIPTION: Imports the necessary components for using Input OTP in a React application.
+
+LANGUAGE: tsx
+CODE:
+import {
+  InputOTP,
+  InputOTPGroup,
+  InputOTPSeparator,
+  InputOTPSlot,
+} from "@/components/ui/input-otp"
+
+----------------------------------------
+
+TITLE: TypeScript Configuration
+DESCRIPTION: TSConfig setup for path aliases and compiler options
+
+LANGUAGE: typescript
+CODE:
+{
+  "compilerOptions": {
+    "jsx": "react-jsx",
+    "moduleResolution": "Bundler",
+    "module": "ESNext",
+    "target": "ES2022",
+    "skipLibCheck": true,
+    "strictNullChecks": true,
+    "baseUrl": ".",
+    "paths": {
+      "@/*": ["./app/*"]
+    }
+  }
+}
+
+----------------------------------------
+
+TITLE: Installing Tabs Component Dependencies Manually
+DESCRIPTION: This command installs the necessary dependency for the Tabs component when setting up manually.
+
+LANGUAGE: bash
+CODE:
+npm install @radix-ui/react-tabs
+
+----------------------------------------
+
+TITLE: Importing Card Components in React with TypeScript
+DESCRIPTION: Example of importing various Card subcomponents from the ui/card module.
+
+LANGUAGE: tsx
+CODE:
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardFooter,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card"
+
+----------------------------------------
+
+TITLE: Installing Tooltip Dependencies via NPM
+DESCRIPTION: Command to install the required Radix UI tooltip dependency using npm package manager
+
+LANGUAGE: bash
+CODE:
+npm install @radix-ui/react-tooltip
+
+----------------------------------------
+
+TITLE: Displaying Options for shadcn Build Command
+DESCRIPTION: Shows the available options and arguments for the 'build' command, including options to specify the registry file path and output directory.
+
+LANGUAGE: txt
+CODE:
+Usage: shadcn build [options] [registry]
+
+build components for a shadcn registry
+
+Arguments:
+  registry             path to registry.json file (default: "./registry.json")
+
+Options:
+  -o, --output <path>  destination directory for json files (default: "./public/r")
+  -c, --cwd <cwd>      the working directory. defaults to the current directory. (default:
+                       "/Users/shadcn/Code/shadcn/ui/packages/shadcn")
+  -h, --help           display help for command
+
+----------------------------------------
+
+TITLE: Installing Checkbox Dependencies
+DESCRIPTION: Command to install required Radix UI checkbox dependency using npm
+
+LANGUAGE: bash
+CODE:
+npm install @radix-ui/react-checkbox
+
+----------------------------------------
+
+TITLE: Configuring ESLint for TypeScript in React + Vite Project
+DESCRIPTION: This snippet shows how to configure the top-level parserOptions in ESLint for a React + TypeScript + Vite project. It sets up the parser to use the latest ECMAScript version, treat files as modules, and specifies the TypeScript configuration files to use.
+
+LANGUAGE: javascript
+CODE:
+export default {
+  // other rules...
+  parserOptions: {
+    ecmaVersion: 'latest',
+    sourceType: 'module',
+    project: ['./tsconfig.json', './tsconfig.node.json'],
+    tsconfigRootDir: __dirname,
+  },
+}
+
+----------------------------------------
+
+TITLE: Installing Input Component via CLI
+DESCRIPTION: Command to install the input component using the shadcn CLI tool.
+
+LANGUAGE: bash
+CODE:
+npx shadcn@latest add input
+
+----------------------------------------
+
+TITLE: Customizing Output Directory for shadcn Build Command
+DESCRIPTION: Example of using the '--output' option with the 'build' command to customize the output directory for generated JSON files.
+
+LANGUAGE: bash
+CODE:
+npx shadcn@latest build --output ./public/registry
+
+----------------------------------------
+
+TITLE: Installing Label Component Dependencies
+DESCRIPTION: This command installs the necessary dependency for the Label component from Radix UI.
+
+LANGUAGE: bash
+CODE:
+npm install @radix-ui/react-label
+
+----------------------------------------
+
+TITLE: Installing Remix Indie Stack using npx
+DESCRIPTION: Command to create a new Remix project using the Indie Stack template.
+
+LANGUAGE: sh
+CODE:
+npx create-remix@latest --template remix-run/indie-stack
+
+----------------------------------------
+
+TITLE: Initializing shadcn-ui Configuration with CLI
+DESCRIPTION: Command to create a new components.json file in your project using the shadcn CLI.
+
+LANGUAGE: bash
+CODE:
+npx shadcn@latest init
+
+----------------------------------------
+
+TITLE: Initializing shadcn-ui Configuration with CLI
+DESCRIPTION: Command to create a new components.json file in your project using the shadcn CLI.
+
+LANGUAGE: bash
+CODE:
+npx shadcn@latest init
+
+----------------------------------------
+
+TITLE: Installing Remix Indie Stack using npx
+DESCRIPTION: Command to create a new Remix project using the Indie Stack template.
+
+LANGUAGE: sh
+CODE:
+npx create-remix@latest --template remix-run/indie-stack
+
+----------------------------------------
+
+TITLE: Importing and Using shadcn/ui Switch Component in React
+DESCRIPTION: Example of how to import and use the Switch component from shadcn/ui in a React component within a Laravel project.
+
+LANGUAGE: tsx
+CODE:
+import { Switch } from "@/components/ui/switch"
+
+const MyPage = () => {
+  return (
+    <div>
+      <Switch />
+    </div>
+  )
+}
+
+export default MyPage
+
+----------------------------------------
+
+TITLE: Adding shadcn/ui Components to Project
+DESCRIPTION: Command to add the Button component from shadcn/ui to the project using npx.
+
+LANGUAGE: bash
+CODE:
+npx shadcn@canary add button
+
+----------------------------------------
+
+TITLE: Installing Dependencies via npm
+DESCRIPTION: Command to install the required react-resizable-panels package using npm.
+
+LANGUAGE: bash
+CODE:
+npm install react-resizable-panels
+
+----------------------------------------
+
+TITLE: Installing Context Menu Component via CLI
+DESCRIPTION: Command to install the context menu component using the shadcn CLI tool.
+
+LANGUAGE: bash
+CODE:
+npx shadcn@latest add context-menu
+
+----------------------------------------
+
+TITLE: Removing forwardRef from Components
+DESCRIPTION: Example of how to update a component to remove forwardRef and use React.ComponentProps instead, as part of the upgrade process for Tailwind v4 and React 19.
+
+LANGUAGE: tsx
+CODE:
+function AccordionItem({
+  className,
+  ...props
+}: React.ComponentProps<typeof AccordionPrimitive.Item>) {
+  return (
+    <AccordionPrimitive.Item
+      data-slot="accordion-item"
+      className={cn("border-b last:border-b-0", className)}
+      {...props}
+    />
+  )
+}
+
+----------------------------------------
+
+TITLE: Initializing shadcn/ui in React Router Project
+DESCRIPTION: Runs the shadcn-ui init command to set up the project for use with shadcn/ui components.
+
+LANGUAGE: bash
+CODE:
+npx shadcn@latest init
+
+----------------------------------------
+
+TITLE: Installing Alert Dialog Dependencies
+DESCRIPTION: Command to install the required Radix UI alert dialog package using npm
+
+LANGUAGE: bash
+CODE:
+npm install @radix-ui/react-alert-dialog
+
+----------------------------------------
+
+TITLE: Updating CSS Variables for Tailwind v4
+DESCRIPTION: Example of how to update CSS variables in globals.css for compatibility with Tailwind v4, including moving :root and .dark out of @layer base, wrapping color values in hsl(), and using @theme inline.
+
+LANGUAGE: css
+CODE:
+:root {
+  --background: hsl(0 0% 100%);
+  --foreground: hsl(0 0% 3.9%);
+}
+
+.dark {
+  --background: hsl(0 0% 3.9%);
+  --foreground: hsl(0 0% 98%);
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+}
+
+----------------------------------------
+
+TITLE: Installing Pagination Component via CLI in shadcn-ui
+DESCRIPTION: This command installs the Pagination component using the shadcn CLI tool. It's a quick way to add the component to your project.
+
+LANGUAGE: bash
+CODE:
+npx shadcn@latest add pagination
+
+----------------------------------------
+
+TITLE: Creating React Router Project with CLI
+DESCRIPTION: Uses the create-react-router CLI to initialize a new React Router project.
+
+LANGUAGE: bash
+CODE:
+npx create-react-router@latest my-app
+
+----------------------------------------
+
+TITLE: Installing Accordion Dependencies via CLI
+DESCRIPTION: Command to install the accordion component using the shadcn CLI tool.
+
+LANGUAGE: bash
+CODE:
+npx shadcn@latest add accordion
+
+----------------------------------------
+
+TITLE: Initializing shadcn UI in Astro Project
+DESCRIPTION: Command to run the shadcn CLI for initial setup in the Astro project.
+
+LANGUAGE: bash
+CODE:
+npx shadcn@latest init
+
+----------------------------------------
+
+TITLE: Updated components.json Configuration
+DESCRIPTION: Configuration file showing import aliases for components, utils, and other project settings
+
+LANGUAGE: json
+CODE:
+{
+  "$schema": "https://ui.shadcn.com/schema.json",
+  "style": "new-york",
+  "tailwind": {
+    // ...
+  },
+  "aliases": {
+    "components": "@/components",
+    "utils": "@/lib/utils",
+    "ui": "@/components/ui",
+    "lib": "@/lib",
+    "hooks": "@/hooks"
+  }
+}
+
+----------------------------------------
+
+TITLE: Installing Aspect Ratio Component via CLI
+DESCRIPTION: Command to install the aspect ratio component using the shadcn CLI tool.
+
+LANGUAGE: bash
+CODE:
+npx shadcn@latest add aspect-ratio
+
+----------------------------------------
+
+TITLE: Setting up and running the development server
+DESCRIPTION: Commands for initial setup and starting the development server for the Remix project.
+
+LANGUAGE: sh
+CODE:
+npm run setup
+npm run dev
+
+----------------------------------------
+
+TITLE: Updating Chart Colors for Tailwind v4
+DESCRIPTION: Diff showing how to update chart color configurations to work with the new CSS variable format in Tailwind v4.
+
+LANGUAGE: diff
+CODE:
+const chartConfig = {
+  desktop: {
+    label: "Desktop",
+-    color: "hsl(var(--chart-1))",
++    color: "var(--chart-1)",
+  },
+  mobile: {
+    label: "Mobile",
+-   color: "hsl(var(--chart-2))",
++   color: "var(--chart-2)",
+  },
+} satisfies ChartConfig
+
+----------------------------------------
+
+TITLE: Installing Breadcrumb Component via CLI
+DESCRIPTION: Command to install the Breadcrumb component using the shadcn CLI.
+
+LANGUAGE: bash
+CODE:
+npx shadcn@latest add breadcrumb
+
+----------------------------------------
+
+TITLE: Configuring Webpack Path Aliases
+DESCRIPTION: Gatsby Node configuration for setting up Webpack path resolution aliases
+
+LANGUAGE: typescript
+CODE:
+import * as path from "path"
+
+export const onCreateWebpackConfig = ({ actions }) => {
+  actions.setWebpackConfig({
+    resolve: {
+      alias: {
+        "@/components": path.resolve(__dirname, "src/components"),
+        "@/lib/utils": path.resolve(__dirname, "src/lib/utils"),
+      },
+    },
+  })
+}
+
+----------------------------------------
+
+TITLE: Configuring Schema Reference in JSON
+DESCRIPTION: Example showing how to specify the schema reference for registry.json validation.
+
+LANGUAGE: json
+CODE:
+{
+  "$schema": "https://ui.shadcn.com/schema/registry.json"
+}
+
+----------------------------------------
+
+TITLE: Installing Carousel Component via CLI
+DESCRIPTION: Command to install the carousel component using the shadcn CLI tool.
+
+LANGUAGE: bash
+CODE:
+npx shadcn@latest add carousel
+
+----------------------------------------
+
+TITLE: Configuring ThemeProvider in Remix Root Component
+DESCRIPTION: Sets up the ThemeProvider in the root component of the Remix application. This includes handling theme retrieval from session storage and wrapping the app with the provider.
+
+LANGUAGE: tsx
+CODE:
+import clsx from "clsx"
+import { PreventFlashOnWrongTheme, ThemeProvider, useTheme } from "remix-themes"
+
+import { themeSessionResolver } from "./sessions.server"
+
+// Return the theme from the session storage using the loader
+export async function loader({ request }: LoaderFunctionArgs) {
+  const { getTheme } = await themeSessionResolver(request)
+  return {
+    theme: getTheme(),
+  }
+}
+// Wrap your app with ThemeProvider.
+// `specifiedTheme` is the stored theme in the session storage.
+// `themeAction` is the action name that's used to change the theme in the session storage.
+export default function AppWithProviders() {
+  const data = useLoaderData<typeof loader>()
+  return (
+    <ThemeProvider specifiedTheme={data.theme} themeAction="/action/set-theme">
+      <App />
+    </ThemeProvider>
+  )
+}
+
+export function App() {
+  const data = useLoaderData<typeof loader>()
+  const [theme] = useTheme()
+  return (
+    <html lang="en" className={clsx(theme)}>
+      <head>
+        <meta charSet="utf-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1" />
+        <Meta />
+        <PreventFlashOnWrongTheme ssrTheme={Boolean(data.theme)} />
+        <Links />
+      </head>
+      <body>
+        <Outlet />
+        <ScrollRestoration />
+        <Scripts />
+        <LiveReload />
+      </body>
+    </html>
+  )
+}
+
+----------------------------------------
+
+TITLE: Dependencies Configuration
+DESCRIPTION: Specifies npm package dependencies with version control and registry dependencies including both local and remote references.
+
+LANGUAGE: json
+CODE:
+{
+  "dependencies": [
+    "@radix-ui/react-accordion",
+    "zod",
+    "lucide-react",
+    "name@1.0.2"
+  ],
+  "registryDependencies": [
+    "button",
+    "input",
+    "select",
+    "https://example.com/r/editor.json"
+  ]
+}
+
+----------------------------------------
+
+TITLE: Installing Drawer Component via NPM
+DESCRIPTION: Command to install the Drawer component using the shadcn CLI tool.
+
+LANGUAGE: bash
+CODE:
+npx shadcn@latest add drawer
+
+----------------------------------------
+
+TITLE: Configuring Root Route with CSS Import
+DESCRIPTION: Root route configuration for TanStack Start with CSS import and meta tags setup
+
+LANGUAGE: tsx
+CODE:
+import type { ReactNode } from "react"
+import { Outlet, createRootRoute } from "@tanstack/react-router"
+import { Meta, Scripts } from "@tanstack/start"
+
+import appCss from "@/styles/app.css?url"
+
+export const Route = createRootRoute({
+  head: () => ({
+    meta: [
+      {
+        charSet: "utf-8",
+      },
+      {
+        name: "viewport",
+        content: "width=device-width, initial-scale=1",
+      },
+      {
+        title: "TanStack Start Starter",
+      },
+    ],
+    links: [
+      {
+        rel: "stylesheet",
+        href: appCss,
+      },
+    ],
+  }),
+  component: RootComponent,
+})
+
+----------------------------------------
+
+TITLE: Running Documentation Locally
+DESCRIPTION: This command starts the development server for the project documentation.
+
+LANGUAGE: bash
+CODE:
+pnpm --filter=www dev
+
+----------------------------------------
+
+TITLE: Installing Input OTP Component via CLI
+DESCRIPTION: Command to add the Input OTP component using the shadcn CLI.
+
+LANGUAGE: bash
+CODE:
+npx shadcn@latest add input-otp
+
+----------------------------------------
+
+TITLE: Importing Accordion Components
+DESCRIPTION: Example of importing the necessary accordion components from the UI components directory.
+
+LANGUAGE: tsx
+CODE:
+import {
+  Accordion,
+  AccordionContent,
+  AccordionItem,
+  AccordionTrigger,
+} from "@/components/ui/accordion"
+
+----------------------------------------
+
+TITLE: Testing CLI in a Specific App
+DESCRIPTION: This command demonstrates how to test the CLI in a specific application directory.
+
+LANGUAGE: bash
+CODE:
+pnpm shadcn <init | add | ...> -c ~/Desktop/my-app
+
+----------------------------------------
+
+TITLE: Installing Radio Group Component via CLI
+DESCRIPTION: Command to install the Radio Group component using the shadcn CLI.
+
+LANGUAGE: bash
+CODE:
+npx shadcn@latest add radio-group
+
+----------------------------------------
+
+TITLE: Tailwind Config Path Configuration
+DESCRIPTION: Specifies the path to the Tailwind configuration file in your project.
+
+LANGUAGE: json
+CODE:
+{
+  "tailwind": {
+    "config": "tailwind.config.js" | "tailwind.config.ts"
+  }
+}
+
+----------------------------------------
+
+TITLE: Displaying Repository Structure in Bash
+DESCRIPTION: This code snippet shows the directory structure of the shadcn-ui project repository, highlighting the organization of apps and packages.
+
+LANGUAGE: bash
+CODE:
+apps
+└── www
+    ├── app
+    ├── components
+    ├── content
+    └── registry
+        ├── default
+        │   ├── example
+        │   └── ui
+        └── new-york
+            ├── example
+            └── ui
+packages
+└── cli
+
+----------------------------------------
+
+TITLE: Installing Switch Component via CLI
+DESCRIPTION: Command to install the Switch component using the shadcn CLI tool.
+
+LANGUAGE: bash
+CODE:
+npx shadcn@latest add switch
+
+----------------------------------------
+
+TITLE: Using Cypress login utility in tests
+DESCRIPTION: TypeScript code snippet demonstrating how to use the Cypress login utility for authenticated feature testing.
+
+LANGUAGE: ts
+CODE:
+cy.login();
+// you are now logged in as a new user
+
+----------------------------------------
+
+TITLE: Installing Sonner Dependencies Manually
+DESCRIPTION: Command to manually install Sonner and next-themes dependencies using npm.
+
+LANGUAGE: bash
+CODE:
+npm install sonner next-themes
+
+----------------------------------------
+
+TITLE: Installing Toast Component via CLI
+DESCRIPTION: Command to add the Toast component using shadcn-ui CLI
+
+LANGUAGE: bash
+CODE:
+npx shadcn@latest add toast
+
+----------------------------------------
+
+TITLE: CSS Variables Configuration
+DESCRIPTION: Defines CSS variables for theming including font, colors, and other design tokens.
+
+LANGUAGE: json
+CODE:
+{
+  "cssVars": {
+    "theme": {
+      "font-heading": "Poppins, sans-serif"
+    },
+    "light": {
+      "brand": "20 14.3% 4.1%",
+      "radius": "0.5rem"
+    },
+    "dark": {
+      "brand": "20 14.3% 4.1%"
+    }
+  }
+}
+
+----------------------------------------
+
+TITLE: Installing Context Menu Dependencies Manually
+DESCRIPTION: Command to install the required dependency for the context menu component using npm.
+
+LANGUAGE: bash
+CODE:
+npm install @radix-ui/react-context-menu
+
+----------------------------------------
+
+TITLE: Installing Tabs Component via CLI
+DESCRIPTION: This command installs the Tabs component using the shadcn CLI tool.
+
+LANGUAGE: bash
+CODE:
+npx shadcn@latest add tabs
+
+----------------------------------------
+
+TITLE: Cleaning up user after Cypress tests
+DESCRIPTION: TypeScript code snippet showing how to use the Cypress cleanup utility to delete the test user after each test.
+
+LANGUAGE: ts
+CODE:
+afterEach(() => {
+  cy.cleanupUser();
+});
+
+----------------------------------------
+
+TITLE: Implementing Root Layout with Toaster Component
+DESCRIPTION: Implementation of the root layout component with Toaster integration for displaying toasts
+
+LANGUAGE: tsx
+CODE:
+import { Toaster } from "@/components/ui/toaster"
+
+export default function RootLayout({ children }) {
+  return (
+    <html lang="en">
+      <head />
+      <body>
+        <main>{children}</main>
+        <Toaster />
+      </body>
+    </html>
+  )
+}
+
+----------------------------------------
+
+TITLE: Installing Select Component Dependencies
+DESCRIPTION: Command to install the Select component using the shadcn CLI tool
+
+LANGUAGE: bash
+CODE:
+npx shadcn@latest add select
+
+----------------------------------------
+
+TITLE: Importing Tailwind CSS in Root
+DESCRIPTION: Adding Tailwind CSS imports to the Remix root component
+
+LANGUAGE: javascript
+CODE:
+import styles from "./tailwind.css?url"
+
+export const links: LinksFunction = () => [
+  { rel: "stylesheet", href: styles },
+  ...(cssBundleHref ? [{ rel: "stylesheet", href: cssBundleHref }] : []),
+]
+
+----------------------------------------
+
+TITLE: Installing Radix UI Toast Dependencies
+DESCRIPTION: Command to install required Radix UI Toast primitive dependency
+
+LANGUAGE: bash
+CODE:
+npm install @radix-ui/react-toast
+
+----------------------------------------
+
+TITLE: Installing Toggle Group Component via CLI
+DESCRIPTION: Command to install the Toggle Group component using the shadcn CLI.
+
+LANGUAGE: bash
+CODE:
+npx shadcn@latest add toggle-group
+
+----------------------------------------
+
+TITLE: Running the UI Website Workspace
+DESCRIPTION: This command starts the development server for the ui.shadcn.com website workspace.
+
+LANGUAGE: bash
+CODE:
+pnpm --filter=www dev
+
+----------------------------------------
+
+TITLE: Installing Switch Component Dependencies Manually
+DESCRIPTION: Command to install the required dependency for the Switch component manually using npm.
+
+LANGUAGE: bash
+CODE:
+npm install @radix-ui/react-switch
+
+----------------------------------------
+
+TITLE: Installing Table Component via CLI for shadcn-ui
+DESCRIPTION: This command installs the Table component using the shadcn CLI tool. It's a quick way to add the component to your project.
+
+LANGUAGE: bash
+CODE:
+npx shadcn@latest add table
+
+----------------------------------------
+
+TITLE: Tailwind CSS Variables Configuration
+DESCRIPTION: Toggle between using CSS variables or utility classes for theming.
+
+LANGUAGE: json
+CODE:
+{
+  "tailwind": {
+    "cssVariables": true | false
+  }
+}
+
+----------------------------------------
+
+TITLE: Installing Slider Component Dependencies Manually
+DESCRIPTION: Command to install the required dependencies for the slider component manually using npm.
+
+LANGUAGE: bash
+CODE:
+npm install @radix-ui/react-slider
+
+----------------------------------------
+
+TITLE: Initializing shadcn-ui
+DESCRIPTION: Command to initialize shadcn-ui in the project
+
+LANGUAGE: bash
+CODE:
+npx shadcn@latest init
+
+----------------------------------------
+
+TITLE: Adding shadcn/ui Component
+DESCRIPTION: Command to add a specific component from shadcn/ui
+
+LANGUAGE: bash
+CODE:
+npx shadcn@canary add button
+
+----------------------------------------
+
+TITLE: Installing Separator Component Dependencies Manually in shadcn-ui
+DESCRIPTION: This command installs the necessary dependency for the Separator component when adding it manually to your project.
+
+LANGUAGE: bash
+CODE:
+npm install @radix-ui/react-separator
+
+----------------------------------------
+
+TITLE: Initializing shadcn/ui
+DESCRIPTION: Command to initialize shadcn/ui in the project
+
+LANGUAGE: bash
+CODE:
+npx shadcn@canary init
+
+----------------------------------------
+
+TITLE: Adding shadcn-ui Components
+DESCRIPTION: Command to add a specific shadcn-ui component to the project
+
+LANGUAGE: bash
+CODE:
+npx shadcn@latest add button
+
+----------------------------------------
+
+TITLE: Installing Progress Component Dependencies Manually in shadcn-ui
+DESCRIPTION: This command installs the necessary dependency (@radix-ui/react-progress) for the Progress component when adding it manually.
+
+LANGUAGE: bash
+CODE:
+npm install @radix-ui/react-progress
+
+----------------------------------------
+
+TITLE: Adding shadcn/ui Button Component to React Router Project
+DESCRIPTION: Uses the shadcn-ui CLI to add the Button component to the project.
+
+LANGUAGE: bash
+CODE:
+npx shadcn@latest add button
+
+----------------------------------------
+
+TITLE: Import Aliases Configuration
+DESCRIPTION: Configures import aliases for various project components and utilities.
+
+LANGUAGE: json
+CODE:
+{
+  "aliases": {
+    "utils": "@/lib/utils",
+    "components": "@/components",
+    "ui": "@/app/ui",
+    "lib": "@/lib",
+    "hooks": "@/hooks"
+  }
+}
+
+----------------------------------------
+
+TITLE: Installing Toggle Group Dependencies Manually
+DESCRIPTION: Command to install the required dependency for the Toggle Group component manually.
+
+LANGUAGE: bash
+CODE:
+npm install @radix-ui/react-toggle-group
+
+----------------------------------------
+
+TITLE: Creating a New Laravel Project with React
+DESCRIPTION: Command to create a new Laravel project with Inertia and React using the Laravel installer.
+
+LANGUAGE: bash
+CODE:
+laravel new my-app --react
+
+----------------------------------------
+
+TITLE: Installing a Registry Item Using shadcn CLI
+DESCRIPTION: Use the shadcn CLI to install a registry item from a local or remote URL.
+
+LANGUAGE: bash
+CODE:
+npx shadcn@latest add http://localhost:3000/r/hello-world.json
+
+----------------------------------------
+
+TITLE: Installing Command Component Dependencies via npm
+DESCRIPTION: This snippet shows how to install the required cmdk dependency using npm.
+
+LANGUAGE: bash
+CODE:
+npm install cmdk
+
+----------------------------------------
+
+TITLE: Creating Astro Project with Tailwind and React
+DESCRIPTION: Command to create a new Astro project with Tailwind CSS and React support using npx.
+
+LANGUAGE: bash
+CODE:
+npx create-astro@latest astro-app  --template with-tailwindcss --install --add react --git
+
+----------------------------------------
+
+TITLE: Running All Tests
+DESCRIPTION: This command runs all the tests in the repository using Vitest.
+
+LANGUAGE: bash
+CODE:
+pnpm test
+
+----------------------------------------
+
+TITLE: Installing Toggle Component Dependencies via npm
+DESCRIPTION: Command to install the required Radix UI Toggle dependency using npm.
+
+LANGUAGE: bash
+CODE:
+npm install @radix-ui/react-toggle
+
+----------------------------------------
+
+TITLE: Initializing Dependencies with shadcn CLI in Bash
+DESCRIPTION: This command initializes dependencies for a new project using the shadcn CLI. It installs dependencies, adds the 'cn' util, configures 'tailwind.config.js', and sets up CSS variables.
+
+LANGUAGE: bash
+CODE:
+npx shadcn init
+
+----------------------------------------
+
+TITLE: Installing Sheet Component Dependencies with npm
+DESCRIPTION: This command installs the necessary dependency for the Sheet component using npm.
+
+LANGUAGE: bash
+CODE:
+npm install @radix-ui/react-dialog
+
+----------------------------------------
+
+TITLE: Installing Slider Component via CLI
+DESCRIPTION: Command to install the slider component using the shadcn CLI.
+
+LANGUAGE: bash
+CODE:
+npx shadcn@latest add slider
+
+----------------------------------------
+
+TITLE: Displaying Options for shadcn Init Command
+DESCRIPTION: Shows the available options and arguments for the 'init' command, including flags for skipping confirmation, using defaults, forcing overwrite, and specifying working directory.
+
+LANGUAGE: txt
+CODE:
+Usage: shadcn init [options] [components...]
+
+initialize your project and install dependencies
+
+Arguments:
+  components         the components to add or a url to the component.
+
+Options:
+  -y, --yes           skip confirmation prompt. (default: true)
+  -d, --defaults,     use default configuration. (default: false)
+  -f, --force         force overwrite of existing configuration. (default: false)
+  -c, --cwd <cwd>     the working directory. defaults to the current directory. (default: "/Users/shadcn/Desktop")
+  -s, --silent        mute output. (default: false)
+  --src-dir           use the src directory when creating a new project. (default: false)
+  --no-src-dir        do not use the src directory when creating a new project.
+  --css-variables     use css variables for theming. (default: true)
+  --no-css-variables  do not use css variables for theming.
+  -h, --help          display help for command
+
+----------------------------------------
+
+TITLE: Installing Skeleton Component via CLI
+DESCRIPTION: Command to install the skeleton component using the shadcn CLI tool.
+
+LANGUAGE: bash
+CODE:
+npx shadcn@latest add skeleton
+
+----------------------------------------
+
+TITLE: Running CLI Tests
+DESCRIPTION: This command executes the test suite for the CLI package.
+
+LANGUAGE: bash
+CODE:
+pnpm --filter=shadcn test
+
+----------------------------------------
+
+TITLE: Installing Sidebar Component via CLI
+DESCRIPTION: Command to install the sidebar component using the shadcn CLI.
+
+LANGUAGE: bash
+CODE:
+npx shadcn@latest add sidebar
+
+----------------------------------------
+
+TITLE: Testing the CLI Locally
+DESCRIPTION: This command allows testing of the CLI in the local environment after running the development script.
+
+LANGUAGE: bash
+CODE:
+pnpm shadcn
+
+----------------------------------------
+
+TITLE: Installing Separator Component via CLI in shadcn-ui
+DESCRIPTION: This command installs the Separator component using the shadcn CLI tool. It's a quick way to add the component to your project.
+
+LANGUAGE: bash
+CODE:
+npx shadcn@latest add separator
+
+----------------------------------------
+
+TITLE: Running the CLI Development Script
+DESCRIPTION: This command runs the development script for the CLI, enabling local testing and development.
+
+LANGUAGE: bash
+CODE:
+pnpm shadcn:dev
+
+----------------------------------------
+
+TITLE: Installing Hover Card Dependencies via CLI
+DESCRIPTION: Command to install the hover-card component using the shadcn CLI tool.
+
+LANGUAGE: bash
+CODE:
+npx shadcn@latest add hover-card
+
+----------------------------------------
+
+TITLE: Installing Dependencies with pnpm
+DESCRIPTION: This command installs all project dependencies using the pnpm package manager.
+
+LANGUAGE: bash
+CODE:
+pnpm install
+
+----------------------------------------
+
+TITLE: Installing Textarea Component via CLI
+DESCRIPTION: Command to install the textarea component using the shadcn CLI tool.
+
+LANGUAGE: bash
+CODE:
+npx shadcn@latest add textarea
+
+----------------------------------------
+
+TITLE: Navigating to Project Directory in Bash
+DESCRIPTION: This command changes the current working directory to the cloned project folder.
+
+LANGUAGE: bash
+CODE:
+cd ui
+
+----------------------------------------
+
+TITLE: Installing Sonner via CLI
+DESCRIPTION: Command to add Sonner to the project using the shadcn CLI.
+
+LANGUAGE: bash
+CODE:
+npx shadcn@latest add sonner
+
+----------------------------------------
+
+TITLE: Cloning the Repository in Bash
+DESCRIPTION: This command clones the forked repository to the local machine, allowing contributors to start working on the project.
+
+LANGUAGE: bash
+CODE:
+git clone https://github.com/your-username/ui.git
+
+----------------------------------------
+
+TITLE: Installing Collapsible Component via CLI
+DESCRIPTION: Command to install the Collapsible component using the shadcn CLI tool.
+
+LANGUAGE: bash
+CODE:
+npx shadcn@latest add collapsible
+
+----------------------------------------
+
+TITLE: Deprecating tailwindcss-animate Plugin
+DESCRIPTION: Diff showing how to replace the deprecated tailwindcss-animate plugin with tw-animate-css in the globals.css file.
+
+LANGUAGE: diff
+CODE:
+- @plugin 'tailwindcss-animate';
++ @import "tw-animate-css";
+
+----------------------------------------
+
+TITLE: Installing Card Component via CLI in shadcn-ui
+DESCRIPTION: Command to install the Card component using the shadcn CLI.
+
+LANGUAGE: bash
+CODE:
+npx shadcn@latest add card
+
+----------------------------------------
+
+TITLE: Updating Dependencies for Tailwind v4
+DESCRIPTION: Command to update project dependencies to their latest versions for compatibility with Tailwind v4 and React 19.
+
+LANGUAGE: bash
+CODE:
+pnpm up "@radix-ui/*" cmdk lucide-react recharts tailwind-merge clsx --latest

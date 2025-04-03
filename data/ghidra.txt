@@ -1,0 +1,1941 @@
+TITLE: Running Ghidra Headless Analyzer
+DESCRIPTION: Command to import and analyze PostgreSQL object files using Ghidra's headless analyzer. Creates a new Ghidra project and imports all files from the specified directory.
+
+LANGUAGE: bash
+CODE:
+cd <ghidra_install_dir>/support
+./analyzeHeadless <ghidra_project_dir> postgres_object_files -import ~/postgres_object_files/*
+
+----------------------------------------
+
+TITLE: Building Ghidra from Source
+DESCRIPTION: Instructions for creating a development build of Ghidra from the source repository, including installing build tools, downloading the source, fetching dependencies, and building the project.
+
+LANGUAGE: markdown
+CODE:
+##### Install build tools:
+* [JDK 21 64-bit][jdk]
+* [Gradle 8.5+][gradle] (or provided Gradle wrapper if Internet connection is available)
+* [Python3][python3] (version 3.9 to 3.13) with bundled pip
+* make, gcc, and g++ (Linux/macOS-only)
+* [Microsoft Visual Studio][vs] 2017+ or [Microsoft C++ Build Tools][vcbuildtools] with the
+  following components installed (Windows-only):
+  - MSVC
+  - Windows SDK
+  - C++ ATL
+
+##### Download and extract the source:
+[Download from GitHub][master]
+```
+unzip ghidra-master
+cd ghidra-master
+```
+**NOTE:** Instead of downloading the compressed source, you may instead want to clone the GitHub 
+repository: `git clone https://github.com/NationalSecurityAgency/ghidra.git`
+
+##### Download additional build dependencies into source repository:
+**NOTE:** If an Internet connection is available and you did not install Gradle, the following 
+`gradle` commands may be replaced with `./gradle(.bat)`.
+```
+gradle -I gradle/support/fetchDependencies.gradle
+```
+
+##### Create development build: 
+```
+gradle buildGhidra
+```
+The compressed development build will be located at `build/dist/`.
+
+----------------------------------------
+
+TITLE: Opening a Program with PyGhidra
+DESCRIPTION: Shows how to use PyGhidra to open a binary file, set up a Ghidra project, and perform analysis.
+
+LANGUAGE: python
+CODE:
+import pyghidra
+
+with pyghidra.open_program("binary_file.exe") as flat_api:
+    program = flat_api.getCurrentProgram()
+    listing = program.getListing()
+    print(listing.getCodeUnitAt(flat_api.toAddr(0x1234)))
+
+    # We are also free to import ghidra while in this context to do more advanced things.
+    from ghidra.app.decompiler.flatapi import FlatDecompilerAPI
+    decomp_api = FlatDecompilerAPI(flat_api)
+    ...
+    decomp_api.dispose()
+
+----------------------------------------
+
+TITLE: Installing Ghidra from Pre-built Release
+DESCRIPTION: Steps to install Ghidra from an official pre-built multi-platform release, including JDK installation, downloading the release file, extraction, and launching Ghidra or PyGhidra.
+
+LANGUAGE: markdown
+CODE:
+* Install [JDK 21 64-bit][jdk]
+* Download a Ghidra [release file][releases]
+  - **NOTE:** The official multi-platform release file is named 
+    `ghidra_<version>_<release>_<date>.zip` which can be found under the "Assets" drop-down.
+    Downloading either of the files named "Source Code" is not correct for this step.
+* Extract the Ghidra release file
+* Launch Ghidra: `./ghidraRun` (`ghidraRun.bat` for Windows)
+  - or launch [PyGhidra][pyghidra]: `./support/pyGhidraRun` (`support\pyGhidraRun.bat` for Windows)
+
+----------------------------------------
+
+TITLE: Setting Up Ghidra Development Environment with Gradle
+DESCRIPTION: This Gradle command downloads Maven Central dependencies and sets up the repository for development. Dependencies are stored in $HOME/.gradle/ by default.
+
+LANGUAGE: shell
+CODE:
+gradle prepdev
+
+----------------------------------------
+
+TITLE: Setting Up Ghidra Development Environment in Eclipse
+DESCRIPTION: Steps to set up a development environment for Ghidra using Eclipse IDE, including installing necessary tools, preparing the development environment, and importing Ghidra projects into Eclipse.
+
+LANGUAGE: markdown
+CODE:
+##### Install build and development tools:
+* Follow the above [build instructions](#build) so the build completes without errors
+* Install [Eclipse IDE for Java Developers][eclipse]
+
+##### Prepare the development environment:
+``` 
+gradle prepdev eclipse buildNatives
+```
+
+##### Import Ghidra projects into Eclipse:
+* *File* -> *Import...*
+* *General* | *Existing Projects into Workspace*
+* Select root directory to be your downloaded or cloned ghidra source repository
+* Check *Search for nested projects*
+* Click *Finish*
+
+When Eclipse finishes building the projects, Ghidra can be launched and debugged with the provided
+**Ghidra** Eclipse *run configuration*.
+
+----------------------------------------
+
+TITLE: Starting PyGhidra and Importing Ghidra Modules
+DESCRIPTION: Demonstrates how to start PyGhidra and import Ghidra and Java modules for further processing.
+
+LANGUAGE: python
+CODE:
+import pyghidra
+pyghidra.start()
+
+import ghidra
+from ghidra.app.util.headless import HeadlessAnalyzer
+from ghidra.program.flatapi import FlatProgramAPI
+from ghidra.base.project import GhidraProject
+from java.lang import String
+
+# do things
+
+----------------------------------------
+
+TITLE: Downloading Dependencies with Gradle for Ghidra
+DESCRIPTION: This Gradle command downloads non-Maven Central dependencies and creates a 'dependencies' directory in the repository root.
+
+LANGUAGE: shell
+CODE:
+gradle -I gradle/support/fetchDependencies.gradle
+
+----------------------------------------
+
+TITLE: Configuring Ghidra Server Startup Parameters
+DESCRIPTION: This snippet outlines the command-line syntax for starting a Ghidra server, including various optional parameters for configuring network settings, authentication modes, and other server behaviors. It also specifies the required repository path parameter.
+
+LANGUAGE: plaintext
+CODE:
+[-ip <hostname>] [-i #.#.#.#] [-p#] [-n]
+[-a#] [-d<ad_domain>] [-e<days>] [-jaas <config_file>] [-u] [-autoProvision] [-anonymous] [-ssh]
+<repository_path>
+
+----------------------------------------
+
+TITLE: Configuring PyGhidra Launcher
+DESCRIPTION: Shows how to configure the JVM for PyGhidra using a PyGhidraLauncher, including adding classpaths and VM arguments.
+
+LANGUAGE: python
+CODE:
+from pyghidra.launcher import HeadlessPyGhidraLauncher
+
+launcher = HeadlessPyGhidraLauncher()
+launcher.add_classpaths("log4j-core-2.17.1.jar", "log4j-api-2.17.1.jar")
+launcher.add_vmargs("-Dlog4j2.formatMsgNoLookups=true")
+launcher.start()
+
+----------------------------------------
+
+TITLE: Building Native Components for Ghidra
+DESCRIPTION: This Gradle command builds native components for the current platform. It requires native tool chains to be present.
+
+LANGUAGE: shell
+CODE:
+gradle buildNatives
+
+----------------------------------------
+
+TITLE: Generating Eclipse Project Files for Ghidra
+DESCRIPTION: These Gradle commands generate nested Eclipse project files which can then be imported into Eclipse as existing projects.
+
+LANGUAGE: shell
+CODE:
+gradle cleanEclipse eclipse
+
+----------------------------------------
+
+TITLE: Configuring VM Arguments for Ghidra Server
+DESCRIPTION: This snippet shows the VM argument required for PKI authentication mode in Ghidra Server. It specifies the path to the cacerts file used for PKI authentication.
+
+LANGUAGE: plaintext
+CODE:
+-Dghidra.cacerts=<cacerts-path>     (required for PKI mode only)
+
+----------------------------------------
+
+TITLE: Building Ghidra Native Components with Gradle
+DESCRIPTION: Commands to build native binaries for the current platform using Gradle or Gradle wrapper.
+
+LANGUAGE: bash
+CODE:
+cd <GhidraInstallDir>/support/gradle/
+gradle buildNatives
+
+# Or with Gradle wrapper:
+cd <GhidraInstallDir>/support/gradle/
+./gradlew(.bat) buildNatives
+
+----------------------------------------
+
+TITLE: Installing Elasticsearch BSim Plugin
+DESCRIPTION: Command to install the lsh plugin for Elasticsearch using the elasticsearch-plugin script. This must be executed in the Elasticsearch installation directory for each node in the cluster.
+
+LANGUAGE: bash
+CODE:
+bin/elasticsearch-plugin install file:///path/to/ghidra/Ghidra/Extensions/BSimElasticPlugin/data/lsh.zip
+
+----------------------------------------
+
+TITLE: Generating Signature Files with bsim in Bash
+DESCRIPTION: This command generates signature files from binaries in a Ghidra project. It specifies the project location, BSim database URL, and output directory for the generated signatures.
+
+LANGUAGE: bash
+CODE:
+cd <ghidra_install_dir>/support
+mkdir ~/bsim_sigs
+./bsim generatesigs ghidra:/<ghidra_project_dir>/postgres_object_files --bsim file:/<database_dir>/example ~/bsim_sigs
+
+----------------------------------------
+
+TITLE: Building Uncompressed Ghidra Distribution
+DESCRIPTION: This Gradle command builds Ghidra to build/dist in an uncompressed form. The resulting distribution is intended to run only on the platform on which it was built.
+
+LANGUAGE: shell
+CODE:
+gradle assembleAll
+
+----------------------------------------
+
+TITLE: Installing Ghidra Extensions
+DESCRIPTION: Commands to manually install Ghidra extensions by extracting extension archives to the extensions directory.
+
+LANGUAGE: bash
+CODE:
+cd <GhidraInstallDir>/Ghidra/Extensions
+unzip ../../Extensions/Ghidra/<extension>.zip
+
+----------------------------------------
+
+TITLE: Building Python3 Packages for PyGhidra and Debugger
+DESCRIPTION: This Gradle command builds Python3 packages for PyGhidra and the Debugger components of Ghidra.
+
+LANGUAGE: shell
+CODE:
+gradle buildPyPackage
+
+----------------------------------------
+
+TITLE: Running Combined Tests and Generating Report for Ghidra
+DESCRIPTION: This Gradle command runs both unit and integration tests for Ghidra and generates a combined report.
+
+LANGUAGE: shell
+CODE:
+gradle combinedTestReport
+
+----------------------------------------
+
+TITLE: Running Integration Tests for Ghidra
+DESCRIPTION: This Gradle command runs the integration tests for Ghidra.
+
+LANGUAGE: shell
+CODE:
+gradle integrationTest
+
+----------------------------------------
+
+TITLE: Reassembling Python Package Source for Debugger Development
+DESCRIPTION: This Gradle command reassembles the Python package source after making changes to the Python code in the debugger development process.
+
+LANGUAGE: shell
+CODE:
+gradle assemblePyPackage
+
+----------------------------------------
+
+TITLE: Preparing PyGhidra for Development
+DESCRIPTION: This Gradle command sets up a Python virtual environment and installs an editable PyGhidra module for development and debugging.
+
+LANGUAGE: shell
+CODE:
+gradle prepPyGhidra
+
+----------------------------------------
+
+TITLE: Building Compressed Ghidra Distribution
+DESCRIPTION: This Gradle command builds Ghidra to build/dist in a compressed form. The resulting distribution is intended to run only on the platform on which it was built.
+
+LANGUAGE: shell
+CODE:
+gradle buildGhidra
+
+----------------------------------------
+
+TITLE: Initializing Basic Debugger Script Structure in Java
+DESCRIPTION: Basic template for creating a Ghidra debugger script by implementing FlatDebuggerAPI interface.
+
+LANGUAGE: java
+CODE:
+import ghidra.app.script.GhidraScript;
+import ghidra.debug.flatapi.FlatDebuggerAPI;
+
+public class DemoDebuggerScript extends GhidraScript implements FlatDebuggerAPI {
+	@Override
+	protected void run() throws Exception {
+	}
+}
+
+----------------------------------------
+
+TITLE: Creating a New BSim Database in Bash
+DESCRIPTION: This command creates a new BSim database with specified parameters. It sets the database URL, template (medium_nosize), which affects vector indexing and size differences handling for varnodes.
+
+LANGUAGE: bash
+CODE:
+./bsim createdatabase file:/<database_dir>/example medium_nosize
+
+----------------------------------------
+
+TITLE: Executing SQL Query in Java for Ghidra
+DESCRIPTION: This function executes a SQL query on a given database connection. It handles resource management and exception handling, returning the result set for further processing.
+
+LANGUAGE: Java
+CODE:
+public static ResultSet executeQuery(Connection conn, String query) throws SQLException {
+    Statement stmt = null;
+    try {
+        stmt = conn.createStatement();
+        return stmt.executeQuery(query);
+    } catch (SQLException e) {
+        logger.error("Error executing query: " + e.getMessage());
+        throw e;
+    } finally {
+        if (stmt != null) {
+            stmt.close();
+        }
+    }
+}
+
+----------------------------------------
+
+TITLE: Implementing Java Callbacks for Standard Library Functions
+DESCRIPTION: Example implementation of standard library functions using Java callbacks in a PcodeUseropLibrary. Shows implementation of strlen and RET functions.
+
+LANGUAGE: Java
+CODE:
+public static class JavaStdLibPcodeUseropLibrary<T> extends AnnotatedPcodeUseropLibrary<T> {
+	private final AddressSpace space;
+	private final Register regRSP;
+	private final Register regRAX;
+	private final Register regRDI;
+	private final Register regRSI;
+
+	public JavaStdLibPcodeUseropLibrary(SleighLanguage language) {
+		space = language.getDefaultSpace();
+		regRSP = language.getRegister("RSP");
+		regRAX = language.getRegister("RAX");
+		regRDI = language.getRegister("RDI");
+		regRSI = language.getRegister("RSI");
+	}
+
+	@PcodeUserop
+	public void __x86_64_RET(
+			@OpExecutor PcodeExecutor<T> executor,
+			@OpState PcodeExecutorState<T> state) {
+		PcodeArithmetic<T> arithmetic = state.getArithmetic();
+		T tRSP = state.getVar(regRSP, Reason.EXECUTE_READ);
+		long lRSP = arithmetic.toLong(tRSP, Purpose.OTHER);
+		T tReturn = state.getVar(space, lRSP, 8, true, Reason.EXECUTE_READ);
+		long lReturn = arithmetic.toLong(tReturn, Purpose.BRANCH);
+		state.setVar(regRSP, arithmetic.fromConst(lRSP + 8, 8));
+		((PcodeThreadExecutor<T>) executor).getThread()
+				.overrideCounter(space.getAddress(lReturn));
+	}
+
+	@PcodeUserop
+	public void __libc_strlen(@OpState PcodeExecutorState<T> state) {
+		PcodeArithmetic<T> arithmetic = state.getArithmetic();
+		T tStr = state.getVar(regRDI, Reason.EXECUTE_READ);
+		long lStr = arithmetic.toLong(tStr, Purpose.OTHER);
+		T tMaxlen = state.getVar(regRSI, Reason.EXECUTE_READ);
+		long lMaxlen = arithmetic.toLong(tMaxlen, Purpose.OTHER);
+
+		for (int i = 0; i < lMaxlen; i++) {
+			T tChar = state.getVar(space, lStr + i, 1, false, Reason.EXECUTE_READ);
+			if (arithmetic.toLong(tChar, Purpose.OTHER) == 0) {
+				state.setVar(regRAX, arithmetic.fromConst(Integer.toUnsignedLong(i), 8));
+				break;
+			}
+		}
+	}
+}
+
+----------------------------------------
+
+TITLE: Comments Table Schema
+DESCRIPTION: Schema for storing different types of comments (Pre, Post, EOL, Plate) associated with code units at specific addresses.
+
+LANGUAGE: database
+CODE:
+-------------------------------------------------------------------------------
+|  address  |  Pre comment  |  Post comment |  EOL comment  |  Plate comment  |
+-------------------------------------------------------------------------------
+
+----------------------------------------
+
+TITLE: Creating Database Connection in Java for Ghidra
+DESCRIPTION: This snippet demonstrates how to create a database connection using JDBC in the context of Ghidra. It includes error handling and connection parameter setup.
+
+LANGUAGE: Java
+CODE:
+public static Connection createConnection(String url, String user, String password) throws SQLException {
+    try {
+        return DriverManager.getConnection(url, user, password);
+    } catch (SQLException e) {
+        logger.error("Failed to create database connection: " + e.getMessage());
+        throw e;
+    }
+}
+
+----------------------------------------
+
+TITLE: Instructions Table Schema
+DESCRIPTION: Table schema for storing program instructions. Keys on address with instruction prototype ID as data. Used by CodeManager to track program instructions.
+
+LANGUAGE: database
+CODE:
+--------------------------------------
+|  address  |  instruction proto ID  |
+--------------------------------------
+
+----------------------------------------
+
+TITLE: Data Table Schema
+DESCRIPTION: Table schema for storing defined data in the program. Links data locations to their associated datatypes through a composite ID system.
+
+LANGUAGE: database
+CODE:
+-----------------------------
+|  address  |  Datatype ID  |
+-----------------------------
+
+----------------------------------------
+
+TITLE: Running Unit Tests for Ghidra
+DESCRIPTION: This Gradle command runs the unit tests for Ghidra and generates a report.
+
+LANGUAGE: shell
+CODE:
+gradle unitTestReport
+
+----------------------------------------
+
+TITLE: Defining GnuDemangler Class in Java for Ghidra
+DESCRIPTION: Declaration of the GnuDemangler class, which extends Demangler and implements GNU-style symbol name demangling. It includes constructor initialization and a method for demangling symbol names.
+
+LANGUAGE: Java
+CODE:
+# GnuDemangler
+
+----------------------------------------
+
+TITLE: Setting Up Headless Mode for CI Testing on Linux
+DESCRIPTION: These commands set up a virtual framebuffer for running tests in headless mode on Linux, in a CI environment, or in Docker.
+
+LANGUAGE: shell
+CODE:
+Xvfb :99 -nolisten tcp &
+export DISPLAY=:99
+
+----------------------------------------
+
+TITLE: Composite Table Schema
+DESCRIPTION: Schema for storing structure and union definitions, including their components and properties.
+
+LANGUAGE: database
+CODE:
+---------------------------------------------------------------------------------------------
+|  datatype ID  |  name  |  Comment  | isUnion  |  Category ID  |  length  | num components |
+---------------------------------------------------------------------------------------------
+
+----------------------------------------
+
+TITLE: Length Table Schema
+DESCRIPTION: Table for storing explicit lengths of code units when they cannot be determined from instruction or datatype information.
+
+LANGUAGE: database
+CODE:
+------------------------
+|  address  |  length  |
+------------------------
+
+----------------------------------------
+
+TITLE: Installing PyGhidra Python Module
+DESCRIPTION: Command to manually install the PyGhidra Python module and its dependencies from local distribution files.
+
+LANGUAGE: bash
+CODE:
+python3 -m pip install --no-index -f <GhidraInstallDir>/Ghidra/Features/PyGhidra/pypkg/dist pyghidra
+
+----------------------------------------
+
+TITLE: Built-in Datatypes Table Schema
+DESCRIPTION: Schema for storing built-in datatype definitions that have corresponding Java implementations.
+
+LANGUAGE: database
+CODE:
+------------------------------------------------------
+|  datatype ID  |  name  | classname  |  category ID |
+------------------------------------------------------
+
+----------------------------------------
+
+TITLE: Running a Ghidra Script with PyGhidra
+DESCRIPTION: Demonstrates how to run an existing Ghidra Python script using PyGhidra, either programmatically or via command line.
+
+LANGUAGE: python
+CODE:
+import pyghidra
+
+pyghidra.run_script(r"C:\input.exe", r"C:\some_ghidra_script.py")
+
+----------------------------------------
+
+TITLE: GDB Commands for Program Navigation
+DESCRIPTION: Basic GDB commands for navigating to the main function and starting program execution. Used when troubleshooting synchronization issues between static and dynamic listings.
+
+LANGUAGE: gdb
+CODE:
+break main
+continue
+
+----------------------------------------
+
+TITLE: Setting Breakpoints in GDB for srand and rand
+DESCRIPTION: GDB commands to set breakpoints on the srand and rand functions, which are used in the random number generation for mine placement in termmines.
+
+LANGUAGE: gdb
+CODE:
+break srand
+break rand
+
+----------------------------------------
+
+TITLE: Checking Active Debug Session and Target Program in Java
+DESCRIPTION: Validation code to verify active debugging session and target program name.
+
+LANGUAGE: java
+CODE:
+Trace trace = getCurrentTrace();
+if (trace == null) {
+	throw new AssertionError("There is no active session");
+}
+
+if (!"termmines".equals(currentProgram.getName())) {
+	throw new AssertionError("The current program must be termmines");
+}
+
+----------------------------------------
+
+TITLE: Examining Memory with Sleigh Expressions
+DESCRIPTION: Examples of Sleigh expressions for examining memory and registers in Ghidra's debugger. Shows syntax for dereferencing memory, manipulating registers, and performing operations.
+
+LANGUAGE: sleigh
+CODE:
+*:8 RSP         // Dereference stack pointer
+RAX + RCX       // Integer addition
+RAX - RCX       // Integer subtraction
+RAX * RCX       // Integer multiplication
+RAX / RCX       // Unsigned division
+RAX % RCX       // Unsigned remainder
+RAX s/ RCX      // Signed division
+RAX s% RCX      // Signed remainder
+
+----------------------------------------
+
+TITLE: Compiling Sleigh Files for Ghidra
+DESCRIPTION: This Gradle command manually compiles Sleigh files. Ghidra will also do this at runtime when necessary.
+
+LANGUAGE: shell
+CODE:
+gradle sleighCompile
+
+----------------------------------------
+
+TITLE: Symbol Mapping and Validation in Ghidra Debugger
+DESCRIPTION: Code to verify required symbols exist and map them from static to dynamic addresses.
+
+LANGUAGE: java
+CODE:
+List<Symbol> widthSyms = getSymbols("width", null);
+if (widthSyms.isEmpty()) {
+	throw new AssertionError("Symbol 'width' is required");
+}
+List<Symbol> heightSyms = getSymbols("height", null);
+if (heightSyms.isEmpty()) {
+	throw new AssertionError("Symbol 'height' is required");
+}
+List<Symbol> cellsSyms = getSymbols("cells", null);
+if (cellsSyms.isEmpty()) {
+	throw new AssertionError("Symbol 'cells' is required");
+}
+
+Address widthDyn = translateStaticToDynamic(widthSyms.get(0).getAddress());
+if (widthDyn == null) {
+	throw new AssertionError("Symbol 'width' is not mapped to target");
+}
+Address heightDyn = translateStaticToDynamic(heightSyms.get(0).getAddress());
+if (heightDyn == null) {
+	throw new AssertionError("Symbol 'height' is not mapped to target");
+}
+Address cellsDyn = translateStaticToDynamic(cellsSyms.get(0).getAddress());
+if (cellsDyn == null) {
+	throw new AssertionError("Symbol 'cells' is not mapped to target");
+}
+
+----------------------------------------
+
+TITLE: Reading Target Memory in Ghidra Debugger
+DESCRIPTION: Example of reading memory from target process including dimensions and board data.
+
+LANGUAGE: java
+CODE:
+byte[] widthDat = readMemory(widthDyn, 4, monitor);
+byte[] heightDat = readMemory(heightDyn, 4, monitor);
+byte[] cellsData = readMemory(cellsDyn, 1024, monitor);
+
+----------------------------------------
+
+TITLE: Building Javadoc for Ghidra
+DESCRIPTION: This Gradle command builds the Javadoc documentation for Ghidra.
+
+LANGUAGE: shell
+CODE:
+gradle createJavadocs
+
+----------------------------------------
+
+TITLE: Demangling Basic Functions and Methods
+DESCRIPTION: Examples of mangled names for simple C++ functions and class methods, showing the encoding of parameter types and return values.
+
+LANGUAGE: C++
+CODE:
+_Z10enumToEnumP6MYENUM            # enumToEnum(MYENUM *)
+_Z12unionToUnion2_U               # unionToUnion(_U)
+_Z6toChari                        # toChar(int)
+_Z6toEnumv                        # toEnum(void)
+_Z6toLongi                        # toLong(int)
+_Z7toFloati                       # toFloat(int)
+_Z7toFloatidcls                   # toFloat(int,double,char,long,short)
+_Z7toFloatPiPdPcPlPs              # toFloat(int *,double *,char *,long *,short *)
+_Z7toFloatPPiPPdPPcPPlPPs         # toFloat(int * *,double * *,char * *,long * *,short * *)
+_Z8toDoublei                      # toDouble(int)
+_Z9toIntegerf                     # toInteger(float)
+_Z9intToEnum6MYENUM               # intToEnum(MYENUM)
+
+----------------------------------------
+
+TITLE: Required Package Dependencies for GnuDisassembler Build
+DESCRIPTION: List of system packages required to build the GnuDisassembler extension on Linux/macOS systems. These packages provide necessary build tools and libraries.
+
+LANGUAGE: markdown
+CODE:
+* flex
+* bison
+* texinfo
+* zlib1g-dev
+
+----------------------------------------
+
+TITLE: Demangling Constructors and Destructors
+DESCRIPTION: Examples of mangled names for C++ class constructors and destructors, including in-charge variants.
+
+LANGUAGE: C++
+CODE:
+_ZN3FooC1Ei                       # Foo::Foo[in-charge](int)
+_ZN3BarC1Ei                       # Bar::Bar[in-charge](int)
+_ZN3Bar4FredC1Ei                  # Bar::Fred::Fred[in-charge](int)
+
+_ZN3FooD1Ev                       # Foo::~Foo[in-charge](void)
+_ZN3BarD1Ev                       # Bar::~Bar[in-charge](void)
+_ZN3Bar4FredD1Ev                  # Bar::Fred::~Fred[in-charge](void)
+
+----------------------------------------
+
+TITLE: Demangling Template Functions and Classes
+DESCRIPTION: Examples of mangled names for C++ template functions and classes, showing type parameter encoding.
+
+LANGUAGE: C++
+CODE:
+_ZN6Magick14PathCurvetoAbsC2ERKSt4listINS_15PathCurvetoArgsESaIS2_EE
+# Magick::PathCurvetoAbs::PathCurvetoAbs[not-in-charge](const std::list<Magick::PathCurvetoArgs,std::allocator<Magick::PathCurvetoArgs>> &)
+
+_ZNSt4listIN6Magick24PathQuadraticCurvetoArgsESaIS1_EE14_M_create_nodeERKS1_
+# std::list<Magick::PathQuadraticCurvetoArgs,std::allocator<Magick::PathQuadraticCurvetoArgs>>::_M_create_node(const Magick::PathQuadraticCurvetoArgs &)
+
+_ZNKSt8_Rb_treeI8LocationS0_St9_IdentityIS0_ESt4lessIS0_ESaIS0_EE4findERKS0_
+# std::_Rb_tree<Location,Location,std::_Identity<Location>,std::less<Location>,std::allocator<Location>>::find(const Location &) const
+
+----------------------------------------
+
+TITLE: Implementing Sleigh Semantics for Standard Library Functions
+DESCRIPTION: Implementation of standard library functions using pre-compiled Sleigh semantics code, providing an alternative to Java callbacks.
+
+LANGUAGE: Java
+CODE:
+public static class SleighStdLibPcodeUseropLibrary<T> extends AnnotatedPcodeUseropLibrary<T> {
+	private static final String SRC_RET = """
+			RIP = *:8 RSP;
+			RSP = RSP + 8;
+			return [RIP];
+			""";
+	private static final String SRC_STRLEN = """
+			__result = 0;
+			<loop>
+			if (*:1 (str+__result) == 0 || __result >= maxlen) goto <exit>;
+			__result = __result + 1;
+			goto <loop>;
+			<exit>
+			""";
+	private final Register regRAX;
+	private final Register regRDI;
+	private final Register regRSI;
+	private final Varnode vnRAX;
+	private final Varnode vnRDI;
+	private final Varnode vnRSI;
+
+	private PcodeProgram progRet;
+	private PcodeProgram progStrlen;
+
+	public SleighStdLibPcodeUseropLibrary(SleighLanguage language) {
+		regRAX = language.getRegister("RAX");
+		regRDI = language.getRegister("RDI");
+		regRSI = language.getRegister("RSI");
+		vnRAX = new Varnode(regRAX.getAddress(), regRAX.getMinimumByteSize());
+		vnRDI = new Varnode(regRDI.getAddress(), regRDI.getMinimumByteSize());
+		vnRSI = new Varnode(regRSI.getAddress(), regRSI.getMinimumByteSize());
+	}
+
+	@PcodeUserop
+	public void __x86_64_RET(@OpExecutor PcodeExecutor<T> executor,
+			@OpLibrary PcodeUseropLibrary<T> library) {
+		if (progRet == null) {
+			progRet = SleighProgramCompiler.compileUserop(executor.getLanguage(),
+				"__x86_64_RET", List.of(), SRC_RET, PcodeUseropLibrary.nil(), List.of());
+		}
+		progRet.execute(executor, library);
+	}
+
+	@PcodeUserop
+	public void __libc_strlen(@OpExecutor PcodeExecutor<T> executor,
+			@OpLibrary PcodeUseropLibrary<T> library) {
+		if (progStrlen == null) {
+			progStrlen = SleighProgramCompiler.compileUserop(executor.getLanguage(),
+				"__libc_strlen", List.of("__result", "str", "maxlen"),
+				SRC_STRLEN, PcodeUseropLibrary.nil(), List.of(vnRAX, vnRDI, vnRSI));
+		}
+		progStrlen.execute(executor, library);
+	}
+}
+
+----------------------------------------
+
+TITLE: Replacing C++ Standard Library Regex Typedefs
+DESCRIPTION: This snippet defines replacements for regex typedefs in the C++ standard library with their full template specializations.
+
+LANGUAGE: C++
+CODE:
+std::regex\t\tstd::basic_regex<char, std::regex_traits<char> >
+std::wregex\t\tstd::basic_regex<wchar_t, std::regex_traits<wchar_t> >
+
+----------------------------------------
+
+TITLE: Implementing Structured Sleigh for Standard Library Functions
+DESCRIPTION: Implementation using Structured Sleigh, a DSL hosted in Java that provides a more concise way to specify p-code behaviors.
+
+LANGUAGE: Java
+CODE:
+public static class StructuredStdLibPcodeUseropLibrary<T>
+		extends AnnotatedPcodeUseropLibrary<T> {
+	public StructuredStdLibPcodeUseropLibrary(CompilerSpec cs) {
+		new MyStructuredPart(cs).generate(ops);
+	}
+
+	public static class MyStructuredPart extends StructuredSleigh {
+		protected MyStructuredPart(CompilerSpec cs) {
+			super(cs);
+		}
+
+		@StructuredUserop
+		public void __x86_64_RET() {
+			Var RSP = lang("RSP", type("void **"));
+			Var RIP = lang("RIP", type("void *"));
+			RIP.set(RSP.deref());
+			RSP.addiTo(8);
+			_return(RIP);
+		}
+
+		@StructuredUserop
+		public void __libc_strlen() {
+			Var result = lang("RAX", type("long"));
+			Var str = lang("RDI", type("char *"));
+			Var maxlen = lang("RSI", type("long"));
+
+			_for(result.set(0), result.ltiu(maxlen).andb(str.index(result).deref().eq(0)),
+				result.inc(), () -> {
+			});
+		}
+	}
+}
+
+----------------------------------------
+
+TITLE: Replacing pool_allocator with std::allocator in C++
+DESCRIPTION: This snippet replaces the pool_allocator specialization with the standard allocator for char.
+
+LANGUAGE: C++
+CODE:
+std::allocator<char>\t\tpool_allocator<char>
+
+----------------------------------------
+
+TITLE: Replacing C++ Standard Library I/O Stream Typedefs
+DESCRIPTION: This snippet defines replacements for various I/O stream typedefs in the C++ standard library with their full template specializations.
+
+LANGUAGE: C++
+CODE:
+std::stringstream\t\tstd::basic_stringstream<char, std::char_traits<char>, std::allocator<char> >
+std::wstringstream\t\tstd::basic_stringstream<wchar_t, std::char_traits<wchar_t>, std::allocator<wchar_t> >
+std::istringstream\t\tstd::basic_istringstream<char, std::char_traits<char>, std::allocator<char> >
+std::wistringstream\t\tstd::basic_istringstream<wchar_t, std::char_traits<wchar_t>, std::allocator<wchar_t> >
+std::ostringstream\t\tstd::basic_ostringstream<char, std::char_traits<char>, std::allocator<char> >
+std::wostringstream\t\tstd::basic_ostringstream<wchar_t, std::char_traits<wchar_t>, std::allocator<wchar_t> >
+
+----------------------------------------
+
+TITLE: Implementing strnlen in Sleigh for Emulator Injection
+DESCRIPTION: Sleigh code to implement a basic strnlen function for stubbing external calls during emulation. It loops through the string, counting characters up to a maximum length.
+
+LANGUAGE: Sleigh
+CODE:
+RAX = 0;
+<loop>
+if (*:1 (RDI+RAX) == 0 || RAX >= RSI) goto <exit>;
+RAX = RAX + 1;
+goto <loop>;
+<exit>
+emu_skip_decoded();
+
+----------------------------------------
+
+TITLE: Secondary Pass Conversions for C++ Standard Library Types
+DESCRIPTION: This snippet defines secondary replacements for constructor and destructor names of various C++ standard library types.
+
+LANGUAGE: C++
+CODE:
+std::string::string\t\tstd::string::basic_string
+std::string::~string\t\tstd::string::~basic_string
+std::wstring::wstring\t\tstd::wstring::basic_string
+std::wstring::~wstring\t\tstd::wstring::~basic_string
+// ... (more similar replacements)
+
+----------------------------------------
+
+TITLE: Compiling Ghidra Example Emulation Scripts in Linux
+DESCRIPTION: Commands for compiling the deobExampleX86 and deobHookExampleX86 scripts under Linux. These commands use the C99 standard and include a warning flag for implicit function declarations.
+
+LANGUAGE: bash
+CODE:
+cc -std=c99 -Wimplicit-function-declaration -o deobExampleX86 deobExample.c 
+cc -std=c99 -Wimplicit-function-declaration -o deobHookExampleX86 deobHookExample.c
+
+----------------------------------------
+
+TITLE: Removing Namespace Placeholders in C++
+DESCRIPTION: This snippet defines replacements to remove specific namespace placeholders that appear in mangled C++ names.
+
+LANGUAGE: C++
+CODE:
+""\t\t::__1
+""\t\t::__cxx11
+""\t\t__gnu_cxx::
+
+----------------------------------------
+
+TITLE: C++ Memory Management Functions
+DESCRIPTION: Core memory allocation and deallocation functions including operators new/delete and various allocator implementations
+
+LANGUAGE: C++
+CODE:
+??2@YAPEAX_K@Z
+??3@YAXPEAX@Z
+??_U@YAPEAX_K@Z
+??_V@YAXPEAX@Z
+void* malloc(size_t size);
+void free(void* ptr);
+
+----------------------------------------
+
+TITLE: Preparing GhidraDev Eclipse Plugin for Development
+DESCRIPTION: This Gradle command generates the GhidraDev Eclipse projects and prepares the necessary dependencies for plugin development.
+
+LANGUAGE: shell
+CODE:
+gradle prepGhidraDev eclipse -PeclipsePDE
+
+----------------------------------------
+
+TITLE: Windows GUI Functions
+DESCRIPTION: Windows GUI-related functions for window management and drawing
+
+LANGUAGE: C++
+CODE:
+?GetClientRect@CWnd@@QEBAXPEAUtagRECT@@@Z
+?RedrawWindow@CWnd@@QEAAHPEBUtagRECT@@PEAVCRgn@@I@Z
+?GetWindowRect@CWnd@@QEBAXPEAUtagRECT@@@Z
+
+----------------------------------------
+
+TITLE: Processing Memory Data in Ghidra Debugger
+DESCRIPTION: Code to process and display memory contents, converting bytes to game board representation.
+
+LANGUAGE: java
+CODE:
+int width = ByteBuffer.wrap(widthDat).order(ByteOrder.LITTLE_ENDIAN).getInt();
+int height = ByteBuffer.wrap(heightDat).order(ByteOrder.LITTLE_ENDIAN).getInt();
+for (int y = 0; y < height; y++) {
+	for (int x = 0; x < width; x++) {
+		if ((cellsData[(y + 1) * 32 + x + 1] & 0x80) == 0x80) {
+			println("Mine at (%d,%d)".formatted(x, y));
+		}
+	}
+}
+
+----------------------------------------
+
+TITLE: C++ Function Signatures
+DESCRIPTION: Mangled C++ function signatures including classes from MFC, ATL, STL and Windows API functions. These represent the exported/imported functions found in the binary.
+
+LANGUAGE: cpp
+CODE:
+??$AtlMultiply@I@ATL@@YAJPAIII@Z
+??$_Allocate@$07U_Default_allocate_traits@std@@$0A@@std@@YAPAXI@Z
+??$_Construct_in_place@PADABQAD@std@@YAXAAPADABQAD@Z
+// ... additional signatures omitted for brevity
+
+----------------------------------------
+
+TITLE: Running Ghidra Headless Analyzer
+DESCRIPTION: Java command to run Ghidra in headless analyzer mode with arguments.
+
+LANGUAGE: bash
+CODE:
+java -Xmx1024M -jar ghidra.jar <headless-analyzer-args...>
+
+----------------------------------------
+
+TITLE: Defining MicrosoftDemangler Class in C++ for Ghidra
+DESCRIPTION: Declares the MicrosoftDemangler class, which is likely the main interface for demangling Microsoft-style symbols. It includes various member functions and data structures necessary for the demangling process.
+
+LANGUAGE: C++
+CODE:
+class MicrosoftDemangler {
+public:
+    MicrosoftDemangler();
+    ~MicrosoftDemangler();
+
+    // Other member functions and data structures
+};
+
+----------------------------------------
+
+TITLE: Building Ghidra JAR on Linux/Mac
+DESCRIPTION: Command for building Ghidra JAR file on Linux or Mac systems with optional source zip creation.
+
+LANGUAGE: bash
+CODE:
+buildGhidraJar [-srczip singleSrcZipFileName]
+
+----------------------------------------
+
+TITLE: Executing Swift Demangler Command
+DESCRIPTION: Example demonstrating how to use the Swift demangler tool to demangle a Swift symbol. The command uses the --compact and --expand flags to format the output which includes protocol descriptor information.
+
+LANGUAGE: bash
+CODE:
+% swift demangle --compact --expand _\$s7SwiftUI4ViewMp
+Demangling for _$s7SwiftUI4ViewMp
+kind=Global
+  kind=ProtocolDescriptor
+    kind=Type
+      kind=Protocol
+        kind=Module, text="SwiftUI"
+        kind=Identifier, text="View"
+protocol descriptor for SwiftUI.View
+
+----------------------------------------
+
+TITLE: Running Ghidra GUI Mode
+DESCRIPTION: Java command to run Ghidra in GUI mode with 1GB memory allocation.
+
+LANGUAGE: bash
+CODE:
+java -Xmx1024M -jar ghidra.jar -gui
+
+----------------------------------------
+
+TITLE: Building Ghidra JAR on Windows
+DESCRIPTION: Command for building Ghidra JAR file on Windows systems with optional source zip creation.
+
+LANGUAGE: batch
+CODE:
+buildGhidraJar.bat [-srczip singleSrcZipFileName]
+
+----------------------------------------
+
+TITLE: Core Gradle Project Scripts
+DESCRIPTION: Primary gradle scripts that can be applied to project build.gradle files to add specific capabilities. These include support for Java code, native code, processor specifications, help system files, unit tests, and code coverage.
+
+LANGUAGE: gradle
+CODE:
+javaProject.gradle
+nativeProject.gradle
+processorProject.gradle
+helpProject.gradle
+javaTestProject.gradle
+jacocoProject.gradle
+
+----------------------------------------
+
+TITLE: Displaying Ghidra Headless Usage
+DESCRIPTION: Java command to display headless analyzer usage information.
+
+LANGUAGE: bash
+CODE:
+java -Xmx1024M -jar ghidra.jar
+
+----------------------------------------
+
+TITLE: Distribution Build Scripts
+DESCRIPTION: Gradle scripts for including projects in the distribution build process. These scripts are mutually exclusive - only one should be applied to a project.
+
+LANGUAGE: gradle
+CODE:
+distributableGhidraModule.gradle
+distributableGhidraExtension.gradle
+externalGhidraExtension.gradle
+
+----------------------------------------
+
+TITLE: Defining CR16 Processor Configuration in XML for Ghidra
+DESCRIPTION: This XML snippet defines the core configuration for the CR16 processor in Ghidra. It specifies the processor name, endianness, instruction alignment, and register groups.
+
+LANGUAGE: XML
+CODE:
+<?xml version="1.0" encoding="UTF-8"?>
+
+<processor_spec>
+  <properties>
+    <property key="addressesDoNotAppearDirectlyInCode" value="true"/>
+  </properties>
+
+  <programcounter register="PC"/>
+
+  <default_symbols>
+    <symbol name="Reset" address="ram:0x0000" entry="true"/>
+  </default_symbols>
+  
+  <default_memory_blocks>
+    <memory_block name="ram" start_address="ram:0x0000" length="0x10000" mode="rwx"/>
+  </default_memory_blocks>
+  
+</processor_spec>
+
+----------------------------------------
+
+TITLE: Defining CR16 Register Groups in SLEIGH for Ghidra
+DESCRIPTION: This SLEIGH code snippet defines the register groups for the CR16 processor in Ghidra. It includes general-purpose registers, special registers, and condition code flags.
+
+LANGUAGE: SLEIGH
+CODE:
+define register offset=0x1000 size=2 [ r0 r1 r2 r3 r4 r5 r6 r7 r8 r9 r10 r11 r12 r13 r14 r15 ];
+define register offset=0x2000 size=4 [ r0r1 r2r3 r4r5 r6r7 r8r9 r10r11 r12r13 r14r15 ];
+define register offset=0x3000 size=4 [ PC ISP ];
+define register offset=0x3008 size=2 [ ICR CC PSR ];
+define register offset=0x3010 size=2 [ INTBASE ];
+define register offset=0x3014 size=1 [ C Z N F ];
+
+# Specific names for the condition code flags
+define bitrange C = CC[0,1];
+define bitrange Z = CC[1,1];
+define bitrange N = CC[2,1];
+define bitrange F = CC[3,1];
+
+----------------------------------------
+
+TITLE: HeadlessGhidraApplicationConfig Test Classes
+DESCRIPTION: List of test classes that require HeadlessGhidraApplicationConfig configuration for execution
+
+LANGUAGE: text
+CODE:
+AbstractGhidraHeadlessIntegrationTest
+ProcessorEmulatorTestAdapter
+SaveAsOutboundTest
+AbstractDbgTest
+AbstractGProtocolTest
+GProtocolClientServerTestBase
+AbstractHeadlessAnalyzerTest
+SuperListingTest
+EmulatorTest
+
+----------------------------------------
+
+TITLE: Defining SuperH4 Processor Architecture in XML for Ghidra
+DESCRIPTION: XML configuration that specifies the SuperH4 processor architecture for Ghidra. It includes definitions for registers, memory spaces, and the instruction set.
+
+LANGUAGE: XML
+CODE:
+<?xml version="1.0" encoding="UTF-8"?>
+
+<processor_spec>
+  <programcounter register="PC"/>
+
+  <default_symbols>
+    <symbol name="Reset" address="vma:0x0" entry="true"/>
+  </default_symbols>
+    
+  <default_memory_blocks>
+    <memory_block name="IO" start_address="0xf0000000" length="0x10000000" mode="rwv"/>
+  </default_memory_blocks>
+  
+</processor_spec>
+
+----------------------------------------
+
+TITLE: DockingApplicationConfiguration Test Classes
+DESCRIPTION: List of test classes that require DockingApplicationConfiguration for execution
+
+LANGUAGE: text
+CODE:
+AbstractDockingTest;
+AbstractCRIntegrationTest
+AbstractDropDownTextFieldTest<T>
+AbstractFcgTest
+AbstractTaskTest
+AbstractThreadedTableTest
+DefaultThreadedTableFilterTest
+ThreadedTableTest
+AbstractVisualGraphTest
+AbstractSimpleVisualGraphTest
+
+----------------------------------------
+
+TITLE: Building Single Processor Pcode Test
+DESCRIPTION: Command to build a pcode test binary for a specific processor (MIPS16 in this example).
+
+LANGUAGE: bash
+CODE:
+./build --pcodetest MIPS16
+
+----------------------------------------
+
+TITLE: Building All Pcode Tests Command
+DESCRIPTION: Command to build all available pcode test binaries from scratch using the build script.
+
+LANGUAGE: bash
+CODE:
+./build --pcodetest-all
+
+----------------------------------------
+
+TITLE: ApplicationConfiguration Test Classes
+DESCRIPTION: List of test classes that require ApplicationConfiguration for execution
+
+LANGUAGE: text
+CODE:
+AbstractGenericTest
+SolverTest
+TestClassFileCreator
+AbstractAssemblyTest
+AbstractChainedBufferTest
+AbstractCreateDataTypeModelTest
+AbstractGraphAlgorithmsTest
+AbstractHelpModuleLocationTest
+AbstractHelpTest
+AbstractLocalFileSystemTest
+AbstractOpBehaviorTest
+MDMangBaseTest
+StorageEditorModelTest
+VTBaseTestCase
+AbstractEHTest
+AbstractRttiTest
+
+----------------------------------------
+
+TITLE: Display Build Options Command
+DESCRIPTION: Command to display available build options by running the build script without arguments.
+
+LANGUAGE: bash
+CODE:
+./build
+
+----------------------------------------
+
+TITLE: Defining SEMANTICS Lexer Rule in SLEIGH Grammar (Pre-Refactoring)
+DESCRIPTION: This snippet shows the original implementation of the SEMANTICS lexer rule, which used a hack to parse semantics by usurping the input with a new lexer and parser. This approach caused issues with proper parsing and error reporting.
+
+LANGUAGE: ANTLR
+CODE:
+SEMANTICS: '{' { /* usurp the input with a new lexer and parser for semantics, parse the input
+                    until "EOF", and then restore the input to the main lexer/parser */ } ;
+
+----------------------------------------
+
+TITLE: Implementing Mode-Switching in Display Parser Rule
+DESCRIPTION: This snippet demonstrates the correct implementation of mode-switching in the display parser rule. It ensures that the lexer mode is changed before parsing the display content, avoiding lookahead issues.
+
+LANGUAGE: ANTLR
+CODE:
+display
+	:	':' { lexer.pushMode(DISPLAY); } pieces 'is' {lexer.popMode(); }
+	;
+
+pieces
+	: pieces*
+	;
+
+----------------------------------------
+
+TITLE: Defining PDF Manual Selector in Ghidra Index File
+DESCRIPTION: This snippet demonstrates how to specify a PDF manual in the index file. The selector includes the PDF filename and an optional description in brackets.
+
+LANGUAGE: Plain Text
+CODE:
+@68000.pdf [M68000 FAMILY Programmer's Reference Manual, 1992 (M68000PM/AD REV.1)]
+
+----------------------------------------
+
+TITLE: Defining RBRACE Rule in Sub-Grammar (Pre-Refactoring)
+DESCRIPTION: This snippet shows the RBRACE rule in the sub-grammar, which was used to emit an EOF token when encountering a closing brace. This approach led to parsing inconsistencies and difficulties in implementing new features.
+
+LANGUAGE: ANTLR
+CODE:
+RBRACE:	'}' { /* actually, emit EOF */ } ;
+
+----------------------------------------
+
+TITLE: Adding Instruction Mnemonics and Page Numbers to Ghidra Index File
+DESCRIPTION: This example shows how to add instruction mnemonics and their corresponding page numbers for multiple PDF manuals in the index file.
+
+LANGUAGE: Plain Text
+CODE:
+@Intel64_IA32_vol2a.pdf [Intel 64 and IA-32 Vol 2A: Instruction Set Reference, A-M, Nov 2008 (253666-029US)]
+AAA, 74
+AAD, 76
+@Intel64_IA32_vol2b.pdf [Intel 64 and IA-32 Vol 2B: Instruction Set Reference, N-Z, Nov 2008 (253667-029US)]
+NEG, 4
+NOP, 7
+NOT, 9
+
+----------------------------------------
+
+TITLE: Modifying cp-demangle.c for Output Flushing in C
+DESCRIPTION: A small two-line change in cp-demangle.c to send a newline character ('\n') along with a flush to the output stream. This modification prevents the program from hanging when called repeatedly from Ghidra.
+
+LANGUAGE: C
+CODE:
+// Two-line change to send newline and flush output
+// Exact code not provided in the text
+
+----------------------------------------
+
+TITLE: Basic Ghidra Import
+DESCRIPTION: Simple import statement for the Ghidra module
+
+LANGUAGE: python
+CODE:
+import pyghidra
+
+----------------------------------------
+
+TITLE: Test Files Exclusion Patterns - Gitignore
+DESCRIPTION: Patterns to exclude test-related files and exception classes from coverage analysis
+
+LANGUAGE: gitignore
+CODE:
+**/*Test*
+generic/test/**
+
+**/*Exception*
+
+----------------------------------------
+
+TITLE: Type-Checking Conditional Import
+DESCRIPTION: Conditional import using typing.TYPE_CHECKING to import Ghidra builtins only during static type checking
+
+LANGUAGE: python
+CODE:
+import typing
+if typing.TYPE_CHECKING:
+    from ghidra.ghidra_builtins import *
+
+# actual code follows here
+
+----------------------------------------
+
+TITLE: Utility Classes Exclusion Patterns - Gitignore
+DESCRIPTION: Patterns to exclude utility classes and help documentation that are not core to Ghidra's functionality
+
+LANGUAGE: gitignore
+CODE:
+**/certify/**
+**/tracker/**
+**/review/**
+extract/**
+generic/profile/**
+ghidra/app/help/**
+ghidra/cpp/**
+ghidra/feature/fid/debug/**
+ghidra/util/profile/**
+**/stl/**
+ghidra/pcodeCPort/**
+ghidra/program/database/data/DataTypeArchiveTransformer*
+ghidra/sleigh/grammar/**
+ghidra/util/GhidraJarBuilder*
+generic/jar/**
+ghidra/util/JavaSourceFile*
+help/**
+help/screenshot/**
+help/validator/**
+util/DebugThreadDumper**
+JsonDoclet*
+
+----------------------------------------
+
+TITLE: Importing Ghidra Builtins with Runtime Error Handling
+DESCRIPTION: Try-except block to import Ghidra builtins while handling the expected runtime import failure since it's only a stub module
+
+LANGUAGE: python
+CODE:
+try:
+    from ghidra.ghidra_builtins import *
+except:
+    pass
+
+----------------------------------------
+
+TITLE: Interactive Program Notice Template
+DESCRIPTION: Example notice to be displayed when interactive programs start
+
+LANGUAGE: text
+CODE:
+Gnomovision version 69, Copyright (C) year name of author
+Gnomovision comes with ABSOLUTELY NO WARRANTY; for details type `show w'.
+This is free software, and you are welcome to redistribute it
+under certain conditions; type `show c' for details.
+
+----------------------------------------
+
+TITLE: Generated Code Exclusion Patterns - Gitignore
+DESCRIPTION: Patterns to exclude auto-generated code files from coverage analysis
+
+LANGUAGE: gitignore
+CODE:
+ghidra/app/util/cparser/C/**
+ghidra/app/util/cparser/CPP/**
+ghidra/app/util/cparser/cplusplus/**
+
+----------------------------------------
+
+TITLE: Copyright Disclaimer Example
+DESCRIPTION: Sample copyright disclaimer text for employers or institutions
+
+LANGUAGE: text
+CODE:
+Yoyodyne, Inc., hereby disclaims all copyright interest in the program
+`Gnomovision' (which makes passes at compilers) written by James Hacker.
+
+<signature of Ty Coon>, 1 April 1989
+Ty Coon, President of Vice
+
+----------------------------------------
+
+TITLE: Non-Test Classes Exclusion Patterns - Gitignore
+DESCRIPTION: Patterns to exclude classes that are not used during testing or are debug/launch related
+
+LANGUAGE: gitignore
+CODE:
+db/GhidraDBBufferFileAnalyzer*
+db/DbViewer*
+ghidra/DatabaseBenchMarks*
+ghidra/GhidraLauncher*
+ghidra/launch/**
+LaunchSupport*
+ghidra/GhidraThreadGroup*
+ghidra/HelpAdapter*
+ghidra/ClassSearcherStatusReportingTaskMonitor*
+ghidra/app/plugin/debug/**
+
+----------------------------------------
+
+TITLE: Apache License 2.0 Boilerplate Notice Template
+DESCRIPTION: Standard boilerplate notice text for applying the Apache License 2.0 to a new work. The template includes placeholders for copyright year and owner information.
+
+LANGUAGE: text
+CODE:
+Copyright [yyyy] [name of copyright owner] 
+
+Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except in compliance with the License. You may obtain a copy of the License at 
+
+http://www.apache.org/licenses/LICENSE-2.0 
+
+Unless required by applicable law or agreed to in writing, software distributed under the License is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the License for the specific language governing permissions and limitations under the License.
+
+----------------------------------------
+
+TITLE: Creating Elasticsearch User with Curl
+DESCRIPTION: Curl command to create a new user in Elasticsearch with superuser privileges. Replace XXXXXX with the generated password for the elastic user.
+
+LANGUAGE: bash
+CODE:
+curl -k -u elastic:XXXXXX -X POST "https://localhost:9200/_security/user/ghidrauser?pretty" -H 'Content-Type: application/json' -d'
+{
+  "password" : "changeme",
+  "roles" : [ "superuser" ],
+  "full_name" : "Ghidra User",
+  "email" : "ghidrauser@example.com"
+}'
+
+----------------------------------------
+
+TITLE: Windows MFC String Handling
+DESCRIPTION: MFC and ATL string manipulation functions for both ANSI and Unicode strings
+
+LANGUAGE: C++
+CODE:
+?GetString@?$CSimpleStringT@D$0A@@ATL@@QEBAPEBDXZ
+?GetLength@?$CSimpleStringT@_W$0A@@ATL@@QEBAHXZ
+?SetString@?$CSimpleStringT@D$0A@@ATL@@QEAAXPEBDH@Z
+
+----------------------------------------
+
+TITLE: Starting Elasticsearch Single Node
+DESCRIPTION: Command to start a single Elasticsearch node for testing purposes. This will start the database and display logging messages in the console.
+
+LANGUAGE: bash
+CODE:
+bin/elasticsearch
+
+----------------------------------------
+
+TITLE: Cheat Code Discovery in termmines
+DESCRIPTION: No actual code snippets are present in this documentation. The content consists of instructional text describing GUI-based operations in Ghidra's debugger interface.
+
+
+
+----------------------------------------
+
+TITLE: Creating BSim Database with Elasticsearch
+DESCRIPTION: Command to create a BSim database using Elasticsearch as the backend. Adjust the hostname, port number, and repository name as needed.
+
+LANGUAGE: bash
+CODE:
+bsim createdatabase elastic://1.2.3.4:9200/repo medium_32
+
+----------------------------------------
+
+TITLE: Generating and Committing Signatures to Elasticsearch
+DESCRIPTION: Command to generate and commit signatures from a Ghidra Server repository to the Elasticsearch database created earlier.
+
+LANGUAGE: bash
+CODE:
+bsim generatesigs ghidra://1.2.3.4/repo --bsim elastic://1.2.3.4:9200/repo
+
+----------------------------------------
+
+TITLE: Defining BSimFeatureVisualizer Class in Java for Ghidra
+DESCRIPTION: This snippet defines the BSimFeatureVisualizer class, which is likely used for visualizing features in Ghidra. The class is empty, suggesting it may be a placeholder or that its implementation details are not provided in this file.
+
+LANGUAGE: Java
+CODE:
+# BSimFeatureVisualizer
+
+----------------------------------------
+
+TITLE: Using LibreTranslate for String Translation in Ghidra
+DESCRIPTION: Added string translation option using LibreTranslate to translate strings found in a binary. This plugin needs to be manually configured in the tool.
+
+LANGUAGE: Java
+CODE:
+// Example configuration for LibreTranslate plugin
+LibreTranslatePlugin plugin = new LibreTranslatePlugin();
+plugin.setApiKey("your_api_key_here");
+plugin.setSourceLanguage("en");
+plugin.setTargetLanguage("fr");
+plugin.translateStrings(program);
+
+----------------------------------------
+
+TITLE: Markdown Header for Ghidra Debugger
+DESCRIPTION: Simple markdown header indicating the debugger documentation section.
+
+LANGUAGE: markdown
+CODE:
+# Debugger
+
+----------------------------------------
+
+TITLE: Using PyGhidra for Native CPython 3 Interface
+DESCRIPTION: Integrated the DoD Cyber Crime Center's Pyhidra tool (renamed to PyGhidra) to provide a native CPython 3 interface to Ghidra.
+
+LANGUAGE: Python
+CODE:
+# Example usage of PyGhidra
+import ghidra
+
+program = ghidra.program.flatapi.FlatProgramAPI(currentProgram)
+function = program.getFunctionAt(program.getAddressFactory().getAddress("0x1000"))
+print(function.getName())
+
+----------------------------------------
+
+TITLE: Implementing Password-Only Entry Dialog in Java
+DESCRIPTION: Revised PasswordDialog constructors to simplify those used for password-only entry in the Multi-User module.
+
+LANGUAGE: Java
+CODE:
+// Example usage of revised PasswordDialog constructor
+PasswordDialog dialog = new PasswordDialog(parentComponent, "Enter Password", false);
+String password = dialog.getPassword();
+
+----------------------------------------
+
+TITLE: Markdown Header Definition
+DESCRIPTION: Basic markdown heading that establishes the base configuration section
+
+LANGUAGE: markdown
+CODE:
+# Base
+
+----------------------------------------
+
+TITLE: Accessing Java Getters/Setters as Properties in PyGhidra
+DESCRIPTION: Fixed a PyGhidra issue that prevented accessing Java getters/setters as properties on non-public classes.
+
+LANGUAGE: Python
+CODE:
+# Example of accessing Java getter/setter as property in PyGhidra
+class_instance = SomeJavaClass()
+property_value = class_instance.some_property  # Now works for non-public classes
+
+----------------------------------------
+
+TITLE: DemanglerGnu Class Name Definition
+DESCRIPTION: Simple markdown header defining the DemanglerGnu class name, likely a placeholder or reference for a C++ symbol demangler implementation for GNU-style mangled names.
+
+LANGUAGE: markdown
+CODE:
+# DemanglerGnu
+
+----------------------------------------
+
+TITLE: Defining TestDataType Class in Java for Ghidra
+DESCRIPTION: This code defines a TestDataType class that extends StructureDataType and implements BuiltInDataType. It creates a structure with byte, char, and word data types, and provides methods for cloning and getting C type declaration.
+
+LANGUAGE: Java
+CODE:
+public class TestDataType extends StructureDataType implements BuiltInDataType {
+
+    public TestDataType() {
+   		this(null);
+    }
+    public TestDataType(DataTypeManager dtm) {
+    	super("TestDataType", 0, dtm);
+    	add(new ByteDataType());
+    	add(new CharDataType());
+    	add(new WordDataType());
+    }
+
+    public StructureDataType clone(DataTypeManager dataMgr) {
+    	return new TestDataType(dataMgr);
+    }
+   
+	public String getCTypeDeclaration(DataOrganization dataOrganization) {
+		return null;
+	}
+}
+
+----------------------------------------
+
+TITLE: Generating Ordinal to Symbol Name Map Using DUMPBIN
+DESCRIPTION: This command uses the DUMPBIN utility provided with Microsoft Visual Studio to generate an ordinal to symbol name map for a DLL. The output should be stored in a .ord file named after the DLL.
+
+LANGUAGE: batch
+CODE:
+DUMPBIN /EXPORTS <DLL-FILEPATH>
+
+----------------------------------------
+
+TITLE: LGPL License Header Template
+DESCRIPTION: A template for applying the LGPL license notice to new libraries, including copyright declaration and basic terms.
+
+LANGUAGE: text
+CODE:
+<one line to give the library's name and a brief idea of what it does.>
+Copyright (C) <year>  <name of author>
+
+This library is free software; you can redistribute it and/or
+modify it under the terms of the GNU Lesser General Public
+License as published by the Free Software Foundation; either
+version 2.1 of the License, or (at your option) any later version.
+
+This library is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+Lesser General Public License for more details.
+
+You should have received a copy of the GNU Lesser General Public
+License along with this library; if not, write to the Free Software
+Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+
+----------------------------------------
+
+TITLE: Running createPdbXmlFiles.bat with Directory (Windows Batch)
+DESCRIPTION: Example command to run the createPdbXmlFiles.bat script with a directory containing PDB files as an argument. This will recursively process all PDB files in the specified directory and its subdirectories, generating corresponding .PDB.XML files.
+
+LANGUAGE: Batch
+CODE:
+createPdbXmlFiles.bat C:\Symbols
+
+----------------------------------------
+
+TITLE: Copyright Disclaimer Template
+DESCRIPTION: A sample copyright disclaimer template for employers or institutions to disclaim copyright interest in a library.
+
+LANGUAGE: text
+CODE:
+Yoyodyne, Inc., hereby disclaims all copyright interest in the
+library `Frob' (a library for tweaking knobs) written by James Random Hacker.
+
+<signature of Ty Coon>, 1 April 1990
+Ty Coon, President of Vice
+
+----------------------------------------
+
+TITLE: Running createPdbXmlFiles.bat with Single PDB File (Windows Batch)
+DESCRIPTION: Example command to run the createPdbXmlFiles.bat script with a single PDB file as an argument. This will generate a corresponding .PDB.XML file in the same location as the original PDB file.
+
+LANGUAGE: Batch
+CODE:
+createPdbXmlFiles.bat C:\Symbols\samplePdb.pdb
+
+----------------------------------------
+
+TITLE: Structured Data in CSV Format
+DESCRIPTION: A CSV dataset containing 12 rows of mixed data types including bytes, shorts, integers, longs, floating-point numbers, and strings. Each row contains seven columns with different numeric representations and a text value.
+
+LANGUAGE: csv
+CODE:
+"Byte","Short","Integer","Long","Float","Double","String"
+"12","-3792","111809687","-48034526536","0.551","0.641","THREE"
+"0","10614","-76273439","-45475752064","0.738","0.907","FiVe"
+"3","-20233","169219223","8547772070","0.084","0.132","two"
+"22","-30479","20149535","11048740040","0.093","0.404","NINE"
+"85","-31517","36302494","18339881283","0.310","0.025","Four"
+"3","-15195","241289607","20085151849","0.234","0.129","EighT"
+"-33","6105","-759894737","28006575709","0.913","0.285","sIx"
+"2","-27027","129209665","30549335474","0.952","0.773","ten"
+"3","-27026","129209666","30549335475","0.952","0.773","ten"
+"4","-27025","129209666","30549335476","0.952","0.773","ten"
+"-1","-3770","203384798","41372457198","0.016","0.134","SeVEn"
+"9","2113","60639531","60039367759","0.143","0.506","one"
+
+----------------------------------------
+
+TITLE: Apache License 2.0 Copyright Notice Template
+DESCRIPTION: Template for applying the Apache License copyright notice to new work, with placeholder fields for copyright year and owner information.
+
+LANGUAGE: text
+CODE:
+Copyright [yyyy] [name of copyright owner]
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+   http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+
+----------------------------------------
+
+TITLE: Documenting Ghidra Utility Module Dependencies
+DESCRIPTION: Documentation note specifying module independence requirement, indicating that classes in this module must not have dependencies on external classes or JAR files.
+
+LANGUAGE: markdown
+CODE:
+__NOTE:__ Classes in this module may not depend on any classes/jars that reside outside of this\nmodule.
+
+----------------------------------------
+
+TITLE: Sample Program License Header
+DESCRIPTION: Example copyright and license notice template to be included at the start of source files
+
+LANGUAGE: text
+CODE:
+<one line to give the program's name and a brief idea of what it does.>
+Copyright (C) <year>  <name of author>
+
+This program is free software; you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation; either version 2 of the License, or
+(at your option) any later version.
+
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License along
+with this program; if not, write to the Free Software Foundation, Inc.,
+51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
+
+----------------------------------------
+
+TITLE: Markdown Project Marker
+DESCRIPTION: Simple markdown header indicating this is a project root directory.
+
+LANGUAGE: markdown
+CODE:
+# Project
+
+----------------------------------------
+
+TITLE: ProgramGraph Header
+DESCRIPTION: Simple markdown header indicating the ProgramGraph component name.
+
+LANGUAGE: markdown
+CODE:
+# ProgramGraph
+
+----------------------------------------
+
+TITLE: Python Version Release History Table
+DESCRIPTION: A table showing Python release versions, their derivation, release years, owners, and GPL compatibility status.
+
+LANGUAGE: text
+CODE:
+    Release         Derived     Year        Owner       GPL-
+                    from                                compatible? (1)
+
+    0.9.0 thru 1.2              1991-1995   CWI         yes
+    1.3 thru 1.5.2  1.2         1995-1999   CNRI        yes
+    1.6             1.5.2       2000        CNRI        no
+    2.0             1.6         2000        BeOpen.com  no
+    1.6.1           1.6         2001        CNRI        yes (2)
+    2.1             2.0+1.6.1   2001        PSF         no
+    2.0.1           2.0+1.6.1   2001        PSF         yes
+    2.1.1           2.1+2.0.1   2001        PSF         yes
+    2.1.2           2.1.1       2002        PSF         yes
+    2.1.3           2.1.2       2002        PSF         yes
+    2.2 and above   2.1.1       2001-now    PSF         yes
+
+----------------------------------------
+
+TITLE: Jython Section Header
+DESCRIPTION: Markdown header indicating a section for Jython-related content.
+
+LANGUAGE: markdown
+CODE:
+# Jython
+
+----------------------------------------
+
+TITLE: Markdown Header for FunctionID
+DESCRIPTION: A simple markdown heading that identifies this document as being related to FunctionID functionality.
+
+LANGUAGE: markdown
+CODE:
+# FunctionID
+
+----------------------------------------
+
+TITLE: Configuring Debugger RMI Trace Module for Ghidra in Gradle
+DESCRIPTION: This Gradle configuration sets up the Debugger-rmi-trace module for Ghidra. It defines project dependencies and specifies the Java source directories for the module.
+
+LANGUAGE: Gradle
+CODE:
+apply from: "$rootProject.projectDir/gradle/javaProject.gradle"
+apply from: "$rootProject.projectDir/gradle/jacocoProject.gradle"
+apply from: "$rootProject.projectDir/gradle/javaTestProject.gradle"
+apply plugin: 'eclipse'
+eclipse.project.name = 'Debugger RMI Trace'
+
+dependencies {
+    api project(':Debugger')
+
+    api "com.google.guava:guava:$guavaVersion"
+
+    api "org.jdom:jdom-legacy:$jdomLegacyVersion"
+}
+
+// For Java 9, we must explicitly export references to JDOM
+def addExports = { moduleArgs ->
+    moduleArgs.add('--add-exports')
+    moduleArgs.add('java.xml/com.sun.org.apache.xerces.internal.parsers=jdom.legacy')
+    moduleArgs.add('--add-exports')
+    moduleArgs.add('java.xml/com.sun.org.apache.xml.internal.serialize=jdom.legacy')
+}
+
+compileJava {
+    doFirst {
+        addExports(options.compilerArgs)
+    }
+}
+
+compileTestJava {
+    doFirst {
+        addExports(options.compilerArgs)
+    }
+}
+
+----------------------------------------
+
+TITLE: Defining SampleTablePlugin Title
+DESCRIPTION: Simple markdown header defining the name of the sample table plugin
+
+LANGUAGE: markdown
+CODE:
+# SampleTablePlugin
+
+----------------------------------------
+
+TITLE: 68000 Processor Header
+DESCRIPTION: Simple markdown header indicating Motorola 68000 processor documentation
+
+LANGUAGE: markdown
+CODE:
+# 68000
+
+----------------------------------------
+
+TITLE: eBPF Header Definition
+DESCRIPTION: Markdown header defining the eBPF documentation section
+
+LANGUAGE: markdown
+CODE:
+# eBPF
+
+----------------------------------------
+
+TITLE: Markdown Header
+DESCRIPTION: Simple markdown header indicating this is a public release repository
+
+LANGUAGE: markdown
+CODE:
+# Public_Release
+
+----------------------------------------
+
+TITLE: ProgramDiff Heading Declaration in Markdown
+DESCRIPTION: Simple markdown heading declaration for ProgramDiff documentation.
+
+LANGUAGE: markdown
+CODE:
+# ProgramDiff
+
+----------------------------------------
+
+TITLE: GhidraAppConfiguration Test Classes
+DESCRIPTION: List of test classes that require GhidraAppConfiguration for execution
+
+LANGUAGE: text
+CODE:
+DataTypeSelectionTextFieldTest
+AbstractGhidraHeadedIntegrationTest
+AbstractAddressMapDBTestClass
+AbstractCodeBrowserNavigationTest
+AbstractCorrelatorTest
+AbstractCreateArchiveTest
+AbstractDataActionTest
+AbstractEditorTest
+AbstractFileFormatsTest
+AbstractFollowFlowTest
+AbstractFunctionGraphTest
+AbstractFunctionSignatureMarkupTest
+AbstractGFileSystemBaseTest
+AbstractGhidraScriptMgrPluginTest
+AbstractMergeTest
+AbstractProgramBasedTest
+AbstractProgramDiffTest
+AbstractProgramTreePluginTest
+AbstractScreenShotGenerator
+AbstractSelectByFlowPluginTest
+AbstractSymbolTreePluginExternalsTest
+AbstractToolSavingTest
+AbstractVersionControlActionTest
+AbstractVTCorrelatorTest
+AbstractVTMarkupItemTest
+CallTreePluginTest
+DiffTestAdapter
+DWARFTestBase
+AbstractSelfSimilarCorrelatorTest
+AbstractStackEditorTest
+AbstractStructureEditorTest
+AbstractUnionEditorTest
+AbstractStackEditorProviderTest
+AbstractStructureEditorLockedActionsTest
+AbstractStructureEditorUnlockedActionsTest
+AbstractStructureEditorUnlockedCellEditTest
+AbstractDataTypeMergeTest
+AbstractProgramTreeMergeManagerTest
+AbstractListingMergeManagerTest
+AbstractExternalMergerTest
+AbstractDecompilerTest
+AbstractEquatePluginTest
+AbstractLocationReferencesTest
+AbstractMemSearchTest
+AbstractDecompilerFindReferencesActionTest
+GhidraScreenShotGenerator
+TutorialScreenShotGenerator
+AbstractSearchScreenShots
+DiffApplyTestAdapter

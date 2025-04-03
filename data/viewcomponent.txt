@@ -1,0 +1,1446 @@
+TITLE: Implementing Basic ViewComponent Class
+DESCRIPTION: Example of a ViewComponent class implementation with ERB template and initialization.
+
+LANGUAGE: ruby
+CODE:
+class ExampleComponent < ViewComponent::Base
+  erb_template <<-ERB
+    <span title="<%= @title %>"><%= content %></span>
+  ERB
+
+  def initialize(title:)
+    @title = title
+  end
+end
+
+----------------------------------------
+
+TITLE: Implementing Basic ViewComponent in Ruby
+DESCRIPTION: Example of creating a simple MessageComponent class that accepts a name parameter and renders a greeting message.
+
+LANGUAGE: ruby
+CODE:
+# app/components/message_component.rb
+class MessageComponent < ViewComponent::Base
+  def initialize(name:)
+    @name = name
+  end
+end
+
+----------------------------------------
+
+TITLE: Generating ViewComponent using Rails Generator
+DESCRIPTION: Using Rails generator command to create a new ViewComponent with associated test and template files.
+
+LANGUAGE: console
+CODE:
+bin/rails generate component Example title
+
+      invoke  test_unit
+      create  test/components/example_component_test.rb
+      create  app/components/example_component.rb
+      create  app/components/example_component.html.erb
+
+----------------------------------------
+
+TITLE: Rendering ViewComponent in ERB Template
+DESCRIPTION: Example of rendering a ViewComponent in a view template with block content.
+
+LANGUAGE: erb
+CODE:
+<%= render(ExampleComponent.new(title: "my title")) do %>
+  Hello, World!
+<% end %>
+
+----------------------------------------
+
+TITLE: Testing ViewComponent with RSpec
+DESCRIPTION: Unit test example demonstrating how to test a ViewComponent using RSpec and ViewComponent test helpers.
+
+LANGUAGE: ruby
+CODE:
+class MessageComponentTest < GitHub::TestCase
+  include ViewComponent::TestHelpers
+
+  test "renders message" do
+    render_inline(MessageComponent.new(name: "World"))
+
+    assert_selector "h1", text: "Hello, World!"
+  end
+end
+
+----------------------------------------
+
+TITLE: Testing ViewComponent Output with RSpec
+DESCRIPTION: Demonstrates the preferred approach to testing ViewComponents by asserting against rendered content rather than testing instance methods directly.
+
+LANGUAGE: ruby
+CODE:
+# good
+render_inline(MyComponent.new)
+assert_text("Hello, World!")
+
+# bad
+assert_equal(MyComponent.new.message, "Hello, World!")
+
+----------------------------------------
+
+TITLE: Implementing Polymorphic Slots
+DESCRIPTION: Demonstrates how to create polymorphic slots that can render different types of content based on context.
+
+LANGUAGE: ruby
+CODE:
+class ListItemComponent < ViewComponent::Base
+  renders_one :visual, types: {
+    icon: IconComponent,
+    avatar: lambda { |**system_arguments|
+      AvatarComponent.new(size: 16, **system_arguments)
+    }
+  }
+end
+
+----------------------------------------
+
+TITLE: Unit Testing ViewComponent with TestCase in Ruby
+DESCRIPTION: This snippet demonstrates how to write a unit test for a ViewComponent using the ViewComponent::TestCase class. It shows how to use the render_inline helper and assert against the rendered output using Capybara matchers.
+
+LANGUAGE: ruby
+CODE:
+require "test_helper"
+
+class ExampleComponentTest < ViewComponent::TestCase
+  def test_render_component
+    render_inline(ExampleComponent.new(title: "my title")) { "Hello, World!" }
+
+    assert_component_rendered
+
+    assert_selector("span[title='my title']", text: "Hello, World!")
+    # or, to just assert against the text:
+    assert_text("Hello, World!")
+  end
+end
+
+----------------------------------------
+
+TITLE: Using Slots for Component Content
+DESCRIPTION: Shows how to properly use slots for providing markup to components instead of passing HTML as arguments.
+
+LANGUAGE: erb
+CODE:
+# good
+<%= render(MyComponent.new) do |component| %>
+  <% component.with_name do %>
+    <strong>Hello, world!</strong>
+  <% end %>
+<% end %>
+
+LANGUAGE: erb
+CODE:
+# bad
+<%= render MyComponent.new(name: "<strong>Hello, world!</strong>".html_safe) %>
+
+----------------------------------------
+
+TITLE: Rendering ViewComponent in Controllers
+DESCRIPTION: Examples of rendering ViewComponents directly from controller actions, including Turbo Frame support.
+
+LANGUAGE: ruby
+CODE:
+def show
+  render(ExampleComponent.new(title: "My Title"))
+end
+
+LANGUAGE: ruby
+CODE:
+def create
+  render(ExampleComponent.new, content_type: "text/html")
+end
+
+----------------------------------------
+
+TITLE: Implementing Basic Slots in ViewComponent
+DESCRIPTION: Demonstrates how to define and use basic slots in a ViewComponent using renders_one and renders_many.
+
+LANGUAGE: ruby
+CODE:
+# blog_component.rb
+class BlogComponent < ViewComponent::Base
+  renders_one :header
+  renders_many :posts
+end
+
+----------------------------------------
+
+TITLE: Basic Collection Rendering with ViewComponent
+DESCRIPTION: Demonstrates the basic usage of rendering a collection of products using ViewComponent's with_collection method.
+
+LANGUAGE: erb
+CODE:
+<%= render(ProductComponent.with_collection(@products)) %>
+
+LANGUAGE: ruby
+CODE:
+class ProductComponent < ViewComponent::Base
+  def initialize(product:)
+    @product = product
+  end
+end
+
+----------------------------------------
+
+TITLE: Testing ViewComponent Slots in Ruby
+DESCRIPTION: This example demonstrates how to test a ViewComponent that uses slots. It shows how to render a component with multiple slots and assert against the rendered output.
+
+LANGUAGE: ruby
+CODE:
+def test_render_component
+  component = ListComponent.new(title: "Fruits").tap do |c|
+    c.with_item { "Apple" }
+    c.with_item { "Orange" }
+    c.with_extra { "<div><span>rendered html</span></div>".html_safe }
+  end
+
+  render_inline(component)
+
+  assert_selector("ul")
+  assert_selector("li", text: "Apple")
+  assert_selector("li", text: "Orange")
+end
+
+----------------------------------------
+
+TITLE: Implementing Basic ViewComponent Preview in Ruby
+DESCRIPTION: Demonstrates how to create a basic ViewComponent preview with default title and content block examples
+
+LANGUAGE: ruby
+CODE:
+# test/components/previews/example_component_preview.rb
+class ExampleComponentPreview < ViewComponent::Preview
+  def with_default_title
+    render(ExampleComponent.new(title: "Example component default"))
+  end
+
+  def with_content_block
+    render(ExampleComponent.new(title: "This component accepts a block of content")) do
+      tag.div do
+        content_tag(:span, "Hello")
+      end
+    end
+  end
+end
+
+----------------------------------------
+
+TITLE: Using Instance Methods Over Inline Ruby
+DESCRIPTION: Demonstrates the preferred approach of using instance methods instead of inline Ruby in ViewComponent templates.
+
+LANGUAGE: ruby
+CODE:
+# good
+class MyComponent < ViewComponent::Base
+  attr_accessor :name
+
+  def message
+    "Hello, #{name}!"
+  end
+end
+
+LANGUAGE: erb
+CODE:
+<%# bad %>
+<% message = "Hello, #{name}" %>
+
+----------------------------------------
+
+TITLE: Implementing Direct Helper Inclusion in ViewComponent
+DESCRIPTION: Shows how to define and include a helper module directly in a ViewComponent class to access helper methods.
+
+LANGUAGE: ruby
+CODE:
+module IconHelper
+  def icon(name)
+    tag.i data: {feather: name.to_s}
+  end
+end
+
+class UserComponent < ViewComponent::Base
+  include IconHelper
+
+  def profile_icon
+    icon :user
+  end
+end
+
+----------------------------------------
+
+TITLE: Implementing Call Method in ViewComponent
+DESCRIPTION: Shows how to render a ViewComponent without a template file by defining a call method. Includes conditional rendering logic based on component state.
+
+LANGUAGE: ruby
+CODE:
+class InlineComponent < ViewComponent::Base
+  def call
+    if active?
+      link_to "Cancel integration", integration_path, method: :delete
+    else
+      link_to "Integrate now!", integration_path
+    end
+  end
+end
+
+----------------------------------------
+
+TITLE: Component-Local Translation Access in ERB
+DESCRIPTION: Accessing component-specific translations using the dot notation in ERB templates
+
+LANGUAGE: erb
+CODE:
+<%# app/components/example_component.html.erb %>
+<%= t(".hello") %>
+
+----------------------------------------
+
+TITLE: Using Component Slots
+DESCRIPTION: Example of implementing component slots with nested components and custom initialization parameters.
+
+LANGUAGE: ruby
+CODE:
+# blog_component.rb
+class BlogComponent < ViewComponent::Base
+  renders_one :header, "HeaderComponent"
+  renders_many :posts, PostComponent
+
+  class HeaderComponent < ViewComponent::Base
+    attr_reader :classes
+
+    def initialize(classes:)
+      @classes = classes
+    end
+
+    def call
+      content_tag :h1, content, {class: classes}
+    end
+  end
+end
+
+----------------------------------------
+
+TITLE: Using UseHelpers with Module Specification
+DESCRIPTION: Shows how to use use_helpers with the from: keyword to include specific helper methods from modules.
+
+LANGUAGE: ruby
+CODE:
+class UserComponent < ViewComponent::Base
+  use_helpers :icon, :icon?, from: IconHelper
+
+  def profile_icon
+    icon? ? icon(:user) : icon(:guest)
+  end
+end
+
+----------------------------------------
+
+TITLE: Spacer Component Implementation
+DESCRIPTION: Shows how to add spacer components between collection items using the spacer_component option.
+
+LANGUAGE: erb
+CODE:
+<%= render(ProductComponent.with_collection(@products, spacer_component: SpacerComponent.new)) %>
+
+----------------------------------------
+
+TITLE: Using Helper Proxy in ViewComponent
+DESCRIPTION: Demonstrates accessing helper methods through the helpers proxy object in ViewComponent.
+
+LANGUAGE: ruby
+CODE:
+class UserComponent < ViewComponent::Base
+  def profile_icon
+    helpers.icon :user
+  end
+end
+
+----------------------------------------
+
+TITLE: Basic Component Generation in Console
+DESCRIPTION: Demonstrates generating a basic ExampleComponent with title and content attributes using the Rails generator command.
+
+LANGUAGE: console
+CODE:
+bin/rails generate component Example title content
+
+      create  app/components/example_component.rb
+      invoke  test_unit
+      create    test/components/example_component_test.rb
+      invoke  erb
+      create    app/components/example_component.html.erb
+
+----------------------------------------
+
+TITLE: System Testing ViewComponents with JavaScript in Ruby
+DESCRIPTION: This example demonstrates how to perform system tests on ViewComponents that include JavaScript interactions. It uses the with_rendered_component_path helper to visit the rendered component and test JavaScript behavior.
+
+LANGUAGE: ruby
+CODE:
+class ViewComponentSystemTest < ViewComponent::SystemTestCase
+  def test_simple_js_interaction_in_browser_without_layout
+    with_rendered_component_path(render_inline(SimpleJavascriptInteractionWithJsIncludedComponent.new)) do |path|
+      visit(path)
+
+      assert(find("[data-hidden-field]", visible: false))
+      find("[data-button]", text: "Click Me To Reveal Something Cool").click
+      assert(find("[data-hidden-field]", visible: true))
+    end
+  end
+end
+
+----------------------------------------
+
+TITLE: Collection Rendering with Additional Arguments
+DESCRIPTION: Illustrates how to pass additional arguments to component instances when rendering collections.
+
+LANGUAGE: erb
+CODE:
+<%= render(ProductComponent.with_collection(@products, notice: "hi")) %>
+
+LANGUAGE: ruby
+CODE:
+class ProductComponent < ViewComponent::Base
+  with_collection_parameter :item
+
+  erb_template <<-ERB
+    <li>
+      <h2><%= @item.name %></h2>
+      <span><%= @notice %></span>
+    </li>
+  ERB
+
+  def initialize(item:, notice:)
+    @item = item
+    @notice = notice
+  end
+end
+
+----------------------------------------
+
+TITLE: Rendering ViewComponents Outside View Context
+DESCRIPTION: Example of rendering ViewComponents in background jobs or other contexts outside of views.
+
+LANGUAGE: ruby
+CODE:
+ApplicationController.new.view_context.render(MyComponent.new)
+
+----------------------------------------
+
+TITLE: Delegating Helper Methods in ViewComponent
+DESCRIPTION: Shows how to delegate helper methods to the helpers proxy for cleaner syntax.
+
+LANGUAGE: ruby
+CODE:
+class UserComponent < ViewComponent::Base
+  delegate :icon, to: :helpers
+
+  def profile_icon
+    icon :user
+  end
+end
+
+----------------------------------------
+
+TITLE: Using UseHelpers Setter with ERB Template
+DESCRIPTION: Demonstrates using use_helpers to access external helper methods in a component with an ERB template.
+
+LANGUAGE: ruby
+CODE:
+class UseHelpersComponent < ViewComponent::Base
+  use_helpers :icon, :icon?
+
+  erb_template <<-ERB
+    <div class="icon">
+      <%= icon? ? icon(:user) : icon(:guest) %>
+    </div>
+  ERB
+end
+
+----------------------------------------
+
+TITLE: Collection Iteration Context Usage
+DESCRIPTION: Demonstrates how to access iteration context information like first?, last?, size, and index.
+
+LANGUAGE: ruby
+CODE:
+class ProductComponent < ViewComponent::Base
+  erb_template <<-ERB
+    <li class="<%= "featured" if @iteration.first? %>">
+      <%= @product.name %>
+    </li>
+  ERB
+
+  def initialize(product:, product_iteration:)
+    @product = product
+    @iteration = product_iteration
+  end
+end
+
+----------------------------------------
+
+TITLE: Dynamic Parameter Preview Implementation in Ruby
+DESCRIPTION: Shows how to create a preview that accepts dynamic parameters from URL
+
+LANGUAGE: ruby
+CODE:
+# test/components/previews/example_component_preview.rb
+class ExampleComponentPreview < ViewComponent::Preview
+  def with_dynamic_title(title: "Example component default")
+    render(ExampleComponent.new(title: title))
+  end
+end
+
+----------------------------------------
+
+TITLE: Basic YAML Translation Configuration
+DESCRIPTION: Simple example of configuring translations in a sidecar YAML file for ViewComponent
+
+LANGUAGE: yaml
+CODE:
+# app/components/example_component.yml
+en:
+  hello: "Hello world!"
+
+----------------------------------------
+
+TITLE: Using UseHelpers with Prefix
+DESCRIPTION: Demonstrates using use_helpers with module name prefix for helper methods.
+
+LANGUAGE: ruby
+CODE:
+class UserComponent < ViewComponent::Base
+  use_helpers :icon, :icon?, from: IconHelper, prefix: true
+
+  def profile_icon
+    icon_helper_icon? ? icon_helper_icon(:user) : icon_helper_icon(:guest)
+  end
+end
+
+----------------------------------------
+
+TITLE: Using UseHelpers with Custom Prefix
+DESCRIPTION: Shows how to use use_helpers with a custom prefix for helper methods.
+
+LANGUAGE: ruby
+CODE:
+class UserComponent < ViewComponent::Base
+  use_helpers :icon, :icon?, from: IconHelper, prefix: :user
+
+  def profile_icon
+    user_icon? ? user_icon(:user) : user_icon(:guest)
+  end
+end
+
+----------------------------------------
+
+TITLE: Using Single Helper Method
+DESCRIPTION: Demonstrates using use_helper for including a single helper method from a module.
+
+LANGUAGE: ruby
+CODE:
+class UserComponent < ViewComponent::Base
+  use_helper :icon, from: IconHelper
+
+  def profile_icon
+    icon :user
+  end
+end
+
+----------------------------------------
+
+TITLE: Nested URL Helpers Usage Example
+DESCRIPTION: Shows proper usage of nested URL helpers with explicit options in ViewComponent.
+
+LANGUAGE: ruby
+CODE:
+# bad
+edit_user_path # implicitly depends on current request to provide `user`
+
+# good
+edit_user_path(user: current_user)
+
+----------------------------------------
+
+TITLE: Per-Locale YAML Translation Configuration
+DESCRIPTION: Example of setting up translations in separate files for different locales (English and French)
+
+LANGUAGE: yaml
+CODE:
+# app/components/example_component.en.yml
+en:
+  hello: "Hello world!"
+
+# app/components/example_component.fr.yml
+fr:
+  hello: "Bonjour le monde !"
+
+----------------------------------------
+
+TITLE: Alternative Translation Helper Methods
+DESCRIPTION: Different ways to access translations using helpers or I18n directly
+
+LANGUAGE: erb
+CODE:
+<%# app/components/example_component.html.erb %>
+<%= helpers.t("hello") %>
+<%= I18n.t("hello") %>
+
+----------------------------------------
+
+TITLE: Parent Component Translation Configuration
+DESCRIPTION: Setting up translations in a parent component that can be inherited by child components
+
+LANGUAGE: yaml
+CODE:
+# app/components/parent_component.yml
+en:
+  hello: "Hello world!"
+  greeting: "Cheers!"
+
+----------------------------------------
+
+TITLE: Child Component Translation Override
+DESCRIPTION: Example of a child component overriding specific translations while inheriting others
+
+LANGUAGE: yaml
+CODE:
+# app/components/child_component.yml
+en:
+  greeting: "Howdy!"
+
+----------------------------------------
+
+TITLE: Translation Inheritance Implementation
+DESCRIPTION: Ruby implementation showing how translations are accessed in a child component, demonstrating both inherited and overridden translations
+
+LANGUAGE: ruby
+CODE:
+# app/components/child_component.rb
+class ChildComponent < ParentComponent
+  def call
+    t(".hello") # => "Hello world!" (inherited)
+    t(".greeting") # => "Howdy!"    (overridden)
+  end
+end
+
+----------------------------------------
+
+TITLE: Global Translation Access in ERB
+DESCRIPTION: Accessing global Rails translations from within a component template
+
+LANGUAGE: erb
+CODE:
+<%# app/components/example_component.html.erb %>
+<%= t("my.global.translation") %>
+
+----------------------------------------
+
+TITLE: Custom Collection Parameter Configuration
+DESCRIPTION: Shows how to customize the collection parameter name using with_collection_parameter.
+
+LANGUAGE: ruby
+CODE:
+class ProductComponent < ViewComponent::Base
+  with_collection_parameter :item
+
+  def initialize(item:)
+    @item = item
+  end
+end
+
+----------------------------------------
+
+TITLE: Collection Counter Implementation
+DESCRIPTION: Shows how to implement a counter variable for collection items using the _counter suffix.
+
+LANGUAGE: ruby
+CODE:
+class ProductComponent < ViewComponent::Base
+  erb_template <<-ERB
+    <li>
+      <%= @counter %> <%= @product.name %>
+    </li>
+  ERB
+
+  def initialize(product:, product_counter:)
+    @product = product
+    @counter = product_counter
+  end
+end
+
+----------------------------------------
+
+TITLE: Namespaced Component Generation in Console
+DESCRIPTION: Shows how to generate a namespaced component within the Sections module using the Rails generator command.
+
+LANGUAGE: console
+CODE:
+bin/rails generate component Sections::Example title content
+
+      create  app/components/sections/example_component.rb
+      invoke  test_unit
+      create    test/components/sections/example_component_test.rb
+      invoke  erb
+      create    app/components/sections/example_component.html.erb
+
+----------------------------------------
+
+TITLE: ViewComponent Path Configuration in Ruby
+DESCRIPTION: Configuration code for customizing the ViewComponent path in Rails application.rb file.
+
+LANGUAGE: ruby
+CODE:
+# config/application.rb
+config.view_component.view_component_path = "app/views/components"
+config.eager_load_paths << Rails.root.join("app/views/components")
+
+----------------------------------------
+
+TITLE: Component Generation with Slim Template Engine
+DESCRIPTION: Example of generating a component using the Slim template engine instead of the default ERB.
+
+LANGUAGE: console
+CODE:
+bin/rails generate component Example title --template-engine slim
+
+      create  app/components/example_component.rb
+      invoke  test_unit
+      create    test/components/example_component_test.rb
+      invoke  slim
+      create    app/components/example_component.html.slim
+
+----------------------------------------
+
+TITLE: Component Generation with RSpec Testing Framework
+DESCRIPTION: Shows how to generate a component using RSpec instead of the default test framework.
+
+LANGUAGE: console
+CODE:
+bin/rails generate component Example title --test-framework rspec
+
+      create  app/components/example_component.rb
+      invoke  rspec
+      create    spec/components/example_component_spec.rb
+      invoke  erb
+      create    app/components/example_component.html.erb
+
+----------------------------------------
+
+TITLE: Implementing before_render Method in ViewComponent Ruby
+DESCRIPTION: Shows how to define a before_render method in a ViewComponent class that executes before component rendering. This allows access to helper methods through the helpers object.
+
+LANGUAGE: ruby
+CODE:
+# app/components/example_component.rb
+class ExampleComponent < ViewComponent::Base
+  def before_render
+    @my_icon = helpers.star_icon
+  end
+end
+
+----------------------------------------
+
+TITLE: ViewComponent Preview Testing in Ruby
+DESCRIPTION: Examples of testing ViewComponent previews using test cases with parameters and explicit preview class specification
+
+LANGUAGE: ruby
+CODE:
+class ExampleComponentTest < ViewComponent::TestCase
+  def test_render_preview
+    render_preview(:with_default_title)
+
+    assert_text("Example component default")
+  end
+end
+
+----------------------------------------
+
+TITLE: Preview Template Implementation in ERB
+DESCRIPTION: Shows how to create preview templates using ERB with custom layouts and parameter passing
+
+LANGUAGE: erb
+CODE:
+<%# test/components/previews/cell_component_preview/default.html.erb %>
+<table class="table">
+  <tbody>
+    <tr>
+      <%= render CellComponent.new %>
+    </tr>
+  </tbody>
+</div>
+
+----------------------------------------
+
+TITLE: Rendering Basic Slots Template
+DESCRIPTION: Shows how to render basic slots in an ERB template, including both single and multiple slot rendering.
+
+LANGUAGE: erb
+CODE:
+<%# blog_component.html.erb %>
+<h1><%= header %></h1>
+
+<% posts.each do |post| %>
+  <%= post %>
+<% end %>
+
+----------------------------------------
+
+TITLE: Implementing Lambda Slots
+DESCRIPTION: Shows how to create lambda slots for simple content generation or component wrapping with default values.
+
+LANGUAGE: ruby
+CODE:
+class BlogComponent < ViewComponent::Base
+  renders_one :header, ->(classes:) do
+    content_tag :h1 do
+      link_to title, root_path, {class: classes}
+    end
+  end
+
+  renders_many :posts, ->(title:, classes:) do
+    PostComponent.new(title: title, classes: "my-default-class " + classes)
+  end
+end
+
+----------------------------------------
+
+TITLE: Implementing Inline ERB Template in ViewComponent
+DESCRIPTION: Demonstrates how to define an ERB template directly inside a ViewComponent class using the erb_template macro. The component accepts a name parameter that gets rendered in the template.
+
+LANGUAGE: ruby
+CODE:
+class InlineErbComponent < ViewComponent::Base
+  erb_template <<~ERB
+    <h1>Hello, <%= @name %>!</h1>
+  ERB
+
+  def initialize(name)
+    @name = name
+  end
+end
+
+----------------------------------------
+
+TITLE: Handling Slim Template Interpolation in ViewComponent
+DESCRIPTION: Shows how to properly escape interpolations in Slim templates within ViewComponent to control evaluation context. Demonstrates the difference between escaped and unescaped interpolation.
+
+LANGUAGE: ruby
+CODE:
+class InlineSlimComponent < ViewComponent::Base
+  slim_template <<~SLIM
+    p Hello, #{name}!
+    p Hello, \#{name}!
+  SLIM
+
+  def name
+    "World"
+  end
+end
+
+----------------------------------------
+
+TITLE: Generating ViewComponent with Sidecar Directory
+DESCRIPTION: Console command to generate a ViewComponent with a sidecar directory structure using the --sidecar flag. Creates component file and associated template in a subdirectory.
+
+LANGUAGE: console
+CODE:
+bin/rails generate component Example title --sidecar
+  invoke  test_unit
+  create  test/components/example_component_test.rb
+  create  app/components/example_component.rb
+  create  app/components/example_component/example_component.html.erb
+
+----------------------------------------
+
+TITLE: Implementing Variant-Specific Call Methods
+DESCRIPTION: Demonstrates how to define variant-specific rendering methods in ViewComponent using call_* methods. Shows implementation for phone variant alongside default rendering.
+
+LANGUAGE: ruby
+CODE:
+class InlineVariantComponent < ViewComponent::Base
+  def call_phone
+    link_to "Phone", phone_path
+  end
+
+  def call
+    link_to "Default", default_path
+  end
+end
+
+----------------------------------------
+
+TITLE: Configuring RSpec for ViewComponent Testing in Ruby
+DESCRIPTION: This code snippet shows how to configure RSpec to use ViewComponent test helpers. It includes the necessary requires and configuration to enable ViewComponent testing in RSpec.
+
+LANGUAGE: ruby
+CODE:
+# spec/rails_helper.rb
+require "view_component/test_helpers"
+
+RSpec.configure do |config|
+  # ...
+
+  config.include ViewComponent::TestHelpers, type: :component
+end
+
+----------------------------------------
+
+TITLE: Testing ViewComponent Previews in Ruby
+DESCRIPTION: This snippet shows how to use the render_preview helper to test ViewComponent previews in unit tests. It demonstrates rendering a preview and asserting against the rendered output.
+
+LANGUAGE: ruby
+CODE:
+class ExampleComponentTest < ViewComponent::TestCase
+  def test_render_preview
+    render_preview(:with_default_title)
+
+    assert_text("Example component default")
+  end
+end
+
+----------------------------------------
+
+TITLE: Defining a ViewComponent Class in Ruby
+DESCRIPTION: This snippet shows the basic structure of a ViewComponent class, inheriting from ViewComponent::Base.
+
+LANGUAGE: ruby
+CODE:
+class MyComponent < ViewComponent::Base
+end
+
+----------------------------------------
+
+TITLE: ViewComponent ERB Template Example
+DESCRIPTION: An example of a simple ERB template for a ViewComponent, displaying the current time.
+
+LANGUAGE: erb
+CODE:
+<%= Time.now %>
+
+----------------------------------------
+
+TITLE: Compiled ViewComponent Method in Ruby
+DESCRIPTION: This snippet demonstrates how ViewComponent compiles an ERB template into a Ruby method within the component class.
+
+LANGUAGE: ruby
+CODE:
+class MyComponent < ViewComponent::Base
+  def _call_my_component
+    @output_buffer.append = (Time.now)
+    @output_buffer
+  end
+end
+
+----------------------------------------
+
+TITLE: Creating ViewComponent Template in ERB
+DESCRIPTION: ERB template file that defines the HTML structure for the MessageComponent, displaying a greeting with the provided name.
+
+LANGUAGE: erb
+CODE:
+<%# app/components/message_component.html.erb %>
+<h1>Hello, <%= @name %>!<h1>
+
+----------------------------------------
+
+TITLE: Rendering ViewComponent in Rails View
+DESCRIPTION: Example showing how to render the MessageComponent within a Rails view template.
+
+LANGUAGE: erb
+CODE:
+<%# app/views/demo/index.html.erb %>
+<%= render(MessageComponent.new(name: "World")) %>
+
+----------------------------------------
+
+TITLE: Enabling ActiveSupport Notifications for ViewComponent in Ruby
+DESCRIPTION: Configuration to enable ActiveSupport notifications for all ViewComponents in a Rails application. It also sets the event name for notifications.
+
+LANGUAGE: ruby
+CODE:
+# config/application.rb
+# Enable ActiveSupport notifications for all ViewComponents
+config.view_component.instrumentation_enabled = true
+config.view_component.use_deprecated_instrumentation_name = false
+
+----------------------------------------
+
+TITLE: Subscribing to ViewComponent Render Events in Ruby
+DESCRIPTION: Example of how to subscribe to the ViewComponent render event using ActiveSupport::Notifications. It demonstrates accessing event name and payload data.
+
+LANGUAGE: ruby
+CODE:
+ActiveSupport::Notifications.subscribe("render.view_component") do |event| # or !render.view_component
+  event.name    # => "render.view_component"
+  event.payload # => { name: "MyComponent", identifier: "/Users/mona/project/app/components/my_component.rb" }
+end
+
+----------------------------------------
+
+TITLE: Configuring rack-mini-profiler for ViewComponent Profiling in Ruby
+DESCRIPTION: Configuration to enable profiling of ViewComponent rendering alongside views and partials using the rack-mini-profiler gem in a Rails development environment.
+
+LANGUAGE: ruby
+CODE:
+# config/environments/development.rb
+# Profile rendering of ViewComponents
+Rack::MiniProfilerRails.subscribe("render.view_component") do |_name, start, finish, _id, payload|
+  Rack::MiniProfilerRails.render_notification_handler(
+    Rack::MiniProfilerRails.shorten_identifier(payload[:identifier]),
+    finish,
+    start
+  )
+end
+
+----------------------------------------
+
+TITLE: Installing ViewComponent in Rails
+DESCRIPTION: Adding the view_component gem to Rails application Gemfile.
+
+LANGUAGE: ruby
+CODE:
+gem "view_component"
+
+----------------------------------------
+
+TITLE: ViewComponent HTML Output
+DESCRIPTION: Example of the HTML output generated by the ViewComponent render.
+
+LANGUAGE: html
+CODE:
+<span title="my title">Hello, World!</span>
+
+----------------------------------------
+
+TITLE: Rendering ViewComponents to Strings in Controllers
+DESCRIPTION: Example of rendering ViewComponents to strings for reuse in controller actions.
+
+LANGUAGE: ruby
+CODE:
+class PagesController < ApplicationController
+  def index
+    # Doesn't work: triggers a `AbstractController::DoubleRenderError`
+    # @reusable_icon = render IconComponent.new("close")
+
+    # Doesn't work: renders the whole index view as a string
+    # @reusable_icon = render_to_string IconComponent.new("close")
+
+    # Works: renders the component as a string
+    @reusable_icon = IconComponent.new("close").render_in(view_context)
+  end
+end
+
+----------------------------------------
+
+TITLE: Conditional Rendering in ERB Template
+DESCRIPTION: Traditional approach of conditional rendering directly in the ERB template using if statements.
+
+LANGUAGE: erb
+CODE:
+<% if user.requires_confirmation? %>
+  <div class="alert">Please confirm your email address.</div>
+<% end %>
+
+----------------------------------------
+
+TITLE: Conditional Component Rendering in View
+DESCRIPTION: Traditional approach of conditional rendering when calling the component from the view.
+
+LANGUAGE: erb
+CODE:
+<% if current_user.requires_confirmation? %>
+  <%= render(ConfirmEmailComponent.new(user: current_user)) %>
+<% end %>
+
+----------------------------------------
+
+TITLE: ViewComponent with render? Method Implementation
+DESCRIPTION: Implementation of a ViewComponent class using the render? hook to control rendering based on user confirmation status.
+
+LANGUAGE: ruby
+CODE:
+class ConfirmEmailComponent < ViewComponent::Base
+  erb_template <<-ERB
+    <div class="banner">
+      Please confirm your email address.
+    </div>
+  ERB
+
+  def initialize(user:)
+    @user = user
+  end
+
+  def render?
+    @user.requires_confirmation?
+  end
+end
+
+----------------------------------------
+
+TITLE: Simplified Component Rendering
+DESCRIPTION: Clean implementation of component rendering in the view after implementing the render? hook.
+
+LANGUAGE: erb
+CODE:
+<%= render(ConfirmEmailComponent.new(user: current_user)) %>
+
+----------------------------------------
+
+TITLE: Rendering ViewComponent without Monkey Patch in ERB
+DESCRIPTION: Demonstrates how to render a ViewComponent when the render monkey patch is disabled. This approach uses the render_component method instead of the standard render method.
+
+LANGUAGE: erb
+CODE:
+<%= render_component Component.new(message: "bar") %>
+
+----------------------------------------
+
+TITLE: Delegating ActionText Helper in Ruby ViewComponent
+DESCRIPTION: Shows how to delegate the rich_textarea_tag helper from ActionText to the ViewComponent helpers. This workaround allows the use of rich_textarea within a ViewComponent.
+
+LANGUAGE: ruby
+CODE:
+delegate :rich_textarea_tag, to: :helpers
+
+----------------------------------------
+
+TITLE: Implementing OnOffSwitch Component in Ruby with ViewComponent
+DESCRIPTION: This Ruby class defines an OnOffSwitch component using ViewComponent. It initializes with a predicate, path, disabled state, and label. The component determines the appropriate icon class based on the predicate value.
+
+LANGUAGE: ruby
+CODE:
+class OnOffSwitch < ApplicationComponent
+  def initialize(predicate:, path:, disabled: false, label: nil)
+    @predicate = predicate
+    @path = path
+    @disabled = disabled
+    @label = label
+  end
+
+  private
+
+  attr_reader :predicate, :path, :disabled, :label
+
+  def icon_class
+    if predicate
+      "fas fa-toggle-on"
+    else
+      "fas fa-toggle-off"
+    end
+  end
+end
+
+----------------------------------------
+
+TITLE: Rendering OnOffSwitch Component with ERB Template
+DESCRIPTION: This ERB template renders the OnOffSwitch component. It creates a flex container with an icon that changes based on the predicate and disabled state. The component also includes a link when not disabled and allows for additional content.
+
+LANGUAGE: erb
+CODE:
+<div class="d-flex align-items-center">
+  <% if !disabled %>
+    <%= link_to path, class: "text-body", remote: true do %>
+      <span style="font-size: 20pt">
+        <% if predicate %>
+          <span class="text-success">
+            <i class="<%= icon_class %>"></i>
+          </span>
+        <% else %>
+          <span class="text-danger">
+            <i class="<%= icon_class %>"></i>
+          </span>
+        <% end %>
+      </span>
+    <% end %>
+  <% else %>
+    <span style="font-size: 20pt">
+      <span class="text-muted">
+        <i class="<%= icon_class %>"></i>
+      </span>
+    </span>
+  <% end %>
+  &nbsp;
+  <%= content %>
+</div>
+
+----------------------------------------
+
+TITLE: Private Methods in ViewComponent Classes
+DESCRIPTION: Shows how to properly structure ViewComponent classes with private methods that remain accessible in templates.
+
+LANGUAGE: ruby
+CODE:
+# good
+class MyComponent < ViewComponent::Base
+  private
+
+  def method_used_in_template
+  end
+end
+
+# bad
+class MyComponent < ViewComponent::Base
+  def method_used_in_template
+  end
+end
+
+----------------------------------------
+
+TITLE: Avoiding Global State in ViewComponents
+DESCRIPTION: Illustrates the proper way to handle dependencies by explicitly passing them to components rather than relying on global state.
+
+LANGUAGE: ruby
+CODE:
+# good
+class MyComponent < ViewComponent::Base
+  def initialize(name:)
+    @name = name
+  end
+end
+
+# bad
+class MyComponent < ViewComponent::Base
+  def initialize
+    @name = params[:name]
+  end
+end
+
+----------------------------------------
+
+TITLE: Configuring ViewComponent Strip Trailing Whitespace
+DESCRIPTION: Example of configuring a component to strip trailing whitespace before compilation using the strip_trailing_whitespace class method.
+
+LANGUAGE: ruby
+CODE:
+class MyComponent < ViewComponent::Base
+  strip_trailing_whitespace
+end
+
+----------------------------------------
+
+TITLE: Rendering ViewComponent Collection
+DESCRIPTION: Demonstrates how to render a component for each element in a collection, passing additional arguments.
+
+LANGUAGE: ruby
+CODE:
+render(ProductsComponent.with_collection(@products, foo: :bar))
+
+----------------------------------------
+
+TITLE: Setting Collection Parameter Name
+DESCRIPTION: Shows how to set a custom parameter name used when rendering collection elements.
+
+LANGUAGE: ruby
+CODE:
+with_collection_parameter :item
+
+----------------------------------------
+
+TITLE: Implementing Custom Call Method
+DESCRIPTION: Example of implementing a custom call method that wraps the parent component's rendered output in a div.
+
+LANGUAGE: ruby
+CODE:
+def call
+  "<div>#{render_parent_to_string}</div>"
+end
+
+----------------------------------------
+
+TITLE: Running Individual Ruby Tests with m gem
+DESCRIPTION: Command for running specific test files or line numbers using the m gem
+
+LANGUAGE: command
+CODE:
+bundle exec m test/view_component/YOUR_COMPONENT_test.rb:line_number
+
+----------------------------------------
+
+TITLE: Running Rails Version-Specific Tests
+DESCRIPTION: Command for running tests against a specific Rails version using Appraisal
+
+LANGUAGE: command
+CODE:
+bundle exec appraisal rails-5.2 rake
+
+----------------------------------------
+
+TITLE: Running Tests in ViewComponent
+DESCRIPTION: Commands for running specific test files or tests for particular Rails versions using the m gem and Appraisal.
+
+LANGUAGE: command
+CODE:
+bundle exec m test/view_component/YOUR_COMPONENT_test.rb:line_number
+
+LANGUAGE: command
+CODE:
+bundle exec appraisal rails-5.2 rake
+
+----------------------------------------
+
+TITLE: Configuring ViewComponent Preview Route
+DESCRIPTION: Add configuration option to set the endpoint for component previews
+
+LANGUAGE: Ruby
+CODE:
+config.view_component.preview_route = '/rails/view_components'
+
+----------------------------------------
+
+TITLE: Rendering a Component Collection
+DESCRIPTION: Support rendering collections of components
+
+LANGUAGE: Ruby
+CODE:
+render(MyComponent.with_collection(@items))
+
+----------------------------------------
+
+TITLE: Accessing Params in Preview Examples
+DESCRIPTION: Add ability to access params from preview examples
+
+LANGUAGE: Ruby
+CODE:
+def with_params
+  render(MyComponent.new(params[:foo]))
+end
+
+----------------------------------------
+
+TITLE: Using Inline Render Methods
+DESCRIPTION: Allow using inline render method(s) defined on a parent
+
+LANGUAGE: Ruby
+CODE:
+class MyComponent < ViewComponent::Base
+  def call
+    "Hello, world!"
+  end
+end
+
+----------------------------------------
+
+TITLE: Rendering Components Inside Controllers
+DESCRIPTION: Allow components to be rendered inside controllers
+
+LANGUAGE: Ruby
+CODE:
+class MyController < ApplicationController
+  def index
+    render(MyComponent.new)
+  end
+end
+
+----------------------------------------
+
+TITLE: Configuring i18n Translation Structure in YAML
+DESCRIPTION: Example of desired centralized translation structure using namespacing for ViewComponents that is currently not supported.
+
+LANGUAGE: yaml
+CODE:
+en:
+  view_components:
+    login_form:
+      submit: "Log in"
+    nav:
+      user_info:
+        login: "Log in"
+        logout: "Log out"
+
+----------------------------------------
+
+TITLE: Custom FormBuilder Implementation in ERB
+DESCRIPTION: Example showing how to specify a custom form builder when using form helpers in ViewComponents.
+
+LANGUAGE: erb
+CODE:
+<%= form_for(record, builder: CustomFormBuilder) do |f| %>
+  <%= f.text_field :name %>
+<% end %>
+
+----------------------------------------
+
+TITLE: Defining Polymorphic Slots in Ruby ViewComponent
+DESCRIPTION: Example of defining a polymorphic slot in a ViewComponent, allowing for multiple sub-component types within a single slot. This snippet demonstrates the 'Item' component with a 'leading_visual' slot that can render either an icon or an avatar.
+
+LANGUAGE: ruby
+CODE:
+class Item < ViewComponent::Base
+  renders_one :leading_visual, types: {
+    icon: IconComponent, avatar: AvatarComponent
+  }
+end
+
+----------------------------------------
+
+TITLE: Using Polymorphic Slots in ERB Template
+DESCRIPTION: Example of using polymorphic slots in an ERB template. This snippet shows how to render a List component with items that have different leading visuals (avatar and icon) using the polymorphic slot API.
+
+LANGUAGE: erb
+CODE:
+<%= render List.new do |component| %>
+  <% component.with_item do |item| %>
+    <% item.leading_visual_avatar(src: "assets/user/1234.png") %>
+    Profile
+  <% end %>
+  <% component.with_item do |item| %>
+    <% item.leading_visual_icon(icon: :gear) %>
+    Settings
+  <% end %>
+<% end %>
+
+----------------------------------------
+
+TITLE: Implementing Content Wrapping for Slots in Ruby ViewComponent
+DESCRIPTION: Example of implementing content wrapping for slots in a ViewComponent. This snippet demonstrates how to wrap slot content with HTML and handle multiple types of rows using a case statement.
+
+LANGUAGE: ruby
+CODE:
+renders_many :items do |type, *args, **kwargs|
+  content_tag :td, class: kwargs[:table_row_classes] do
+    case type
+    when :foo
+      RowFoo.new(*args, **kwargs)
+    when :bar
+      RowBar.new(*args, **kwargs)
+    end
+  end
+end
+
+----------------------------------------
+
+TITLE: New Slots API in Ruby ViewComponent v3
+DESCRIPTION: Example of the new slots API introduced in ViewComponent v3. This snippet demonstrates the split between getter and setter methods for slots, addressing issues with the previous API design.
+
+LANGUAGE: ruby
+CODE:
+class MyComponent < ViewComponent::Base
+  renders_one :header
+end
+
+c = MyComponent.new
+
+# New API for setting slots
+c.with_header { "hello world" }
+
+# Now `with_content` is valid when defining slots
+c.with_header.with_content("Hello world!")
+
+----------------------------------------
+
+TITLE: Page Layout Configuration in Markdown
+DESCRIPTION: Front matter configuration for the code of conduct page specifying layout, title and navigation order.
+
+LANGUAGE: markdown
+CODE:
+---
+layout: default
+title: Code of conduct
+nav_order: 7
+---

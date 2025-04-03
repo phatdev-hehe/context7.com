@@ -1,0 +1,1670 @@
+TITLE: Creating Basic Observable Example - TypeScript
+DESCRIPTION: Creates an Observable that synchronously emits values 1, 2, 3 and asynchronously emits 4 after 1 second before completing.
+
+LANGUAGE: typescript
+CODE:
+import { Observable } from 'rxjs';
+
+const observable = new Observable((subscriber) => {
+  subscriber.next(1);
+  subscriber.next(2);
+  subscriber.next(3);
+  setTimeout(() => {
+    subscriber.next(4);
+    subscriber.complete();
+  }, 1000);
+});
+
+----------------------------------------
+
+TITLE: Creating a Higher-order Observable in RxJS
+DESCRIPTION: This snippet demonstrates how to create a higher-order Observable by mapping URL strings to HTTP GET requests. It uses the map operator to transform each URL into an Observable returned by http.get().
+
+LANGUAGE: typescript
+CODE:
+const fileObservable = urlObservable.pipe(
+   map(url => http.get(url)),
+);
+
+----------------------------------------
+
+TITLE: Creating a custom delay operator from scratch in RxJS
+DESCRIPTION: Shows how to create a custom operator from scratch using the Observable constructor. This example implements a delay operator that postpones each emitted value by a specified time.
+
+LANGUAGE: typescript
+CODE:
+import { Observable, of } from 'rxjs';
+
+function delay<T>(delayInMillis: number) {
+  return (observable: Observable<T>) =>
+    new Observable<T>((subscriber) => {
+      const allTimerIDs = new Set();
+      let hasCompleted = false;
+      const subscription = observable.subscribe({
+        next(value) {
+          const timerID = setTimeout(() => {
+            subscriber.next(value);
+            allTimerIDs.delete(timerID);
+            if (hasCompleted && allTimerIDs.size === 0) {
+              subscriber.complete();
+            }
+          }, delayInMillis);
+
+          allTimerIDs.add(timerID);
+        },
+        error(err) {
+          subscriber.error(err);
+        },
+        complete() {
+          hasCompleted = true;
+          if (allTimerIDs.size === 0) {
+            subscriber.complete();
+          }
+        },
+      });
+
+      return () => {
+        subscription.unsubscribe();
+        for (const timerID of allTimerIDs) {
+          clearTimeout(timerID);
+        }
+      };
+    });
+}
+
+// Try it out!
+of(1, 2, 3).pipe(delay(1000)).subscribe(console.log);
+
+----------------------------------------
+
+TITLE: Implementing Partial RxJS Observer
+DESCRIPTION: Shows implementation of a partial Observer that only handles next and error notifications, omitting the complete callback. This demonstrates that Observers can function without implementing all callbacks.
+
+LANGUAGE: typescript
+CODE:
+const observer = {
+  next: x => console.log('Observer got a next value: ' + x),
+  error: err => console.error('Observer got an error: ' + err),
+};
+
+----------------------------------------
+
+TITLE: Creating a custom RxJS operator using pipe
+DESCRIPTION: Demonstrates how to create a custom operator that discards odd values and doubles even values using existing operators and the pipe function.
+
+LANGUAGE: typescript
+CODE:
+import { pipe, filter, map } from 'rxjs';
+
+function discardOddDoubleEven() {
+  return pipe(
+    filter((v) => !(v % 2)),
+    map((v) => v + v)
+  );
+}
+
+----------------------------------------
+
+TITLE: Creating and Using a Subject in TypeScript
+DESCRIPTION: Demonstrates how to create a Subject, subscribe to it with multiple observers, and emit values. Shows the multicast behavior of Subjects.
+
+LANGUAGE: typescript
+CODE:
+import { Subject } from 'rxjs';
+
+const subject = new Subject<number>();
+
+subject.subscribe({
+  next: (v) => console.log(`observerA: ${v}`),
+});
+subject.subscribe({
+  next: (v) => console.log(`observerB: ${v}`),
+});
+
+subject.next(1);
+subject.next(2);
+
+// Logs:
+// observerA: 1
+// observerB: 1
+// observerA: 2
+// observerB: 2
+
+----------------------------------------
+
+TITLE: RxJS Operator Function Type Definition
+DESCRIPTION: Shows the required type signature for RxJS operator functions, which must return an OperatorFunction that transforms one Observable type to another.
+
+LANGUAGE: typescript
+CODE:
+(source: Observable<In>) => Observable<Out>
+
+----------------------------------------
+
+TITLE: State Management with RxJS Purity
+DESCRIPTION: Shows how RxJS maintains state purity using scan operator compared to traditional stateful JavaScript approach for counting clicks.
+
+LANGUAGE: typescript
+CODE:
+let count = 0;
+document.addEventListener('click', () => console.log(`Clicked ${++count} times`));
+
+LANGUAGE: typescript
+CODE:
+import { fromEvent, scan } from 'rxjs';
+
+fromEvent(document, 'click')
+  .pipe(scan((count) => count + 1, 0))
+  .subscribe((count) => console.log(`Clicked ${count} times`));
+
+----------------------------------------
+
+TITLE: Value Transformation with RxJS Operators
+DESCRIPTION: Shows how to transform event values using RxJS map and scan operators compared to manual value tracking in JavaScript.
+
+LANGUAGE: typescript
+CODE:
+let count = 0;
+const rate = 1000;
+let lastClick = Date.now() - rate;
+document.addEventListener('click', (event) => {
+  if (Date.now() - lastClick >= rate) {
+    count += event.clientX;
+    console.log(count);
+    lastClick = Date.now();
+  }
+});
+
+LANGUAGE: typescript
+CODE:
+import { fromEvent, throttleTime, map, scan } from 'rxjs';
+
+fromEvent(document, 'click')
+  .pipe(
+    throttleTime(1000),
+    map((event) => event.clientX),
+    scan((count, clientX) => count + clientX, 0)
+  )
+  .subscribe((count) => console.log(count));
+
+----------------------------------------
+
+TITLE: Example Operator Parameter Usage in RxJS
+DESCRIPTION: Demonstrates preferred parameter usage patterns in RxJS operators, contrasting basic usage with named parameters for better readability.
+
+LANGUAGE: typescript
+CODE:
+fakeFlattenMap(n => of(n))  // Basic usage
+fakeFlattenMap(n => of(n), { maxConcurrent: 1 })  // Named parameters
+of(1, 2, 3)  // Simple cases don't need named parameters
+
+----------------------------------------
+
+TITLE: Basic Event Handling with RxJS vs Traditional JavaScript
+DESCRIPTION: Demonstrates the basic difference between traditional event listener implementation and RxJS observable pattern for handling click events.
+
+LANGUAGE: typescript
+CODE:
+document.addEventListener('click', () => console.log('Clicked!'));
+
+LANGUAGE: typescript
+CODE:
+import { fromEvent } from 'rxjs';
+
+fromEvent(document, 'click').subscribe(() => console.log('Clicked!'));
+
+----------------------------------------
+
+TITLE: Flattening a Higher-order Observable using concatMap in RxJS
+DESCRIPTION: This example shows how to flatten a higher-order Observable using the concatMap operator. It subscribes to each inner Observable sequentially, concatenating their emissions into a single stream.
+
+LANGUAGE: typescript
+CODE:
+const fileObservable = urlObservable.pipe(
+   concatMap(url => http.get(url)),
+);
+
+----------------------------------------
+
+TITLE: Importing RxJS Operators in TypeScript (v7.2.0+)
+DESCRIPTION: Demonstrates the new preferred way of importing RxJS operators from the 'rxjs' package in TypeScript for RxJS version 7.2.0 and later.
+
+LANGUAGE: typescript
+CODE:
+import { map } from 'rxjs';
+
+----------------------------------------
+
+TITLE: Basic RxJS Test Using TestScheduler and Marble Diagrams in TypeScript
+DESCRIPTION: Demonstrates how to set up and run a basic test using TestScheduler to test throttleTime operator. The test runs synchronously using virtual time and marble diagrams to assert observable behavior.
+
+LANGUAGE: typescript
+CODE:
+import { TestScheduler } from 'rxjs/testing';
+import { throttleTime } from 'rxjs';
+
+const testScheduler = new TestScheduler((actual, expected) => {
+  expect(actual).deep.equal(expected);
+});
+
+it('generates the stream correctly', () => {
+  testScheduler.run((helpers) => {
+    const { cold, time, expectObservable, expectSubscriptions } = helpers;
+    const e1 = cold(' -a--b--c---|');
+    const e1subs = '  ^----------!';
+    const t = time('   ---|       '); // t = 3
+    const expected = '-a-----c---|';
+
+    expectObservable(e1.pipe(throttleTime(t))).toBe(expected);
+    expectSubscriptions(e1.subscriptions).toBe(e1subs);
+  });
+});
+
+----------------------------------------
+
+TITLE: Visualizing RxJS Debounce Operator with ASCII Marble Diagrams
+DESCRIPTION: This ASCII diagram illustrates the behavior of the RxJS debounce operator. It shows an input stream of events and how the debounce operator affects the output stream by delaying emissions based on a specified time or duration.
+
+LANGUAGE: text
+CODE:
+-a----bc----d-ef----|\n\n ---x\n\n       ---x\n\n               ---x\n\n> debounce()\n\n----a-----c-------f-|
+
+----------------------------------------
+
+TITLE: Combining Multiple RxJS Subscriptions in TypeScript
+DESCRIPTION: Shows how to combine multiple subscriptions using the add() method, allowing multiple subscriptions to be unsubscribed simultaneously. The example creates two interval Observables with different timing and demonstrates parent-child subscription relationship.
+
+LANGUAGE: typescript
+CODE:
+import { interval } from 'rxjs';
+
+const observable1 = interval(400);
+const observable2 = interval(300);
+
+const subscription = observable1.subscribe(x => console.log('first: ' + x));
+const childSubscription = observable2.subscribe(x => console.log('second: ' + x));
+
+subscription.add(childSubscription);
+
+setTimeout(() => {
+  // Unsubscribes BOTH subscription and childSubscription
+  subscription.unsubscribe();
+}, 1000);
+
+----------------------------------------
+
+TITLE: Using BehaviorSubject in TypeScript
+DESCRIPTION: Demonstrates the usage of BehaviorSubject, which maintains a 'current value'. New subscribers immediately receive the current value upon subscription.
+
+LANGUAGE: typescript
+CODE:
+import { BehaviorSubject } from 'rxjs';
+const subject = new BehaviorSubject(0); // 0 is the initial value
+
+subject.subscribe({
+  next: (v) => console.log(`observerA: ${v}`),
+});
+
+subject.next(1);
+subject.next(2);
+
+subject.subscribe({
+  next: (v) => console.log(`observerB: ${v}`),
+});
+
+subject.next(3);
+
+// Logs
+// observerA: 0
+// observerA: 1
+// observerA: 2
+// observerB: 2
+// observerA: 3
+// observerB: 3
+
+----------------------------------------
+
+TITLE: Using ReplaySubject in TypeScript
+DESCRIPTION: Shows how ReplaySubject can buffer and replay a specified number of values to new subscribers. Demonstrates buffering with both size and time window constraints.
+
+LANGUAGE: typescript
+CODE:
+import { ReplaySubject } from 'rxjs';
+const subject = new ReplaySubject(3); // buffer 3 values for new subscribers
+
+subject.subscribe({
+  next: (v) => console.log(`observerA: ${v}`),
+});
+
+subject.next(1);
+subject.next(2);
+subject.next(3);
+subject.next(4);
+
+subject.subscribe({
+  next: (v) => console.log(`observerB: ${v}`),
+});
+
+subject.next(5);
+
+// Logs:
+// observerA: 1
+// observerA: 2
+// observerA: 3
+// observerA: 4
+// observerB: 2
+// observerB: 3
+// observerB: 4
+// observerA: 5
+// observerB: 5
+
+----------------------------------------
+
+TITLE: Using AsyncSubject in TypeScript
+DESCRIPTION: Demonstrates AsyncSubject, which emits only the last value to observers when the sequence completes.
+
+LANGUAGE: typescript
+CODE:
+import { AsyncSubject } from 'rxjs';
+const subject = new AsyncSubject();
+
+subject.subscribe({
+  next: (v) => console.log(`observerA: ${v}`),
+});
+
+subject.next(1);
+subject.next(2);
+subject.next(3);
+subject.next(4);
+
+subject.subscribe({
+  next: (v) => console.log(`observerB: ${v}`),
+});
+
+subject.next(5);
+subject.complete();
+
+// Logs:
+// observerA: 5
+// observerB: 5
+
+----------------------------------------
+
+TITLE: Migrating ConnectableObservable to connectable
+DESCRIPTION: Shows how to replace ConnectableObservable instantiation with the new connectable function. The example demonstrates creating a connectable timer observable.
+
+LANGUAGE: typescript
+CODE:
+import { ConnectableObservable, timer, Subject } from 'rxjs';
+
+// deprecated
+const tick$ = new ConnectableObservable(
+  timer(1_000),
+  () => new Subject());
+tick$.connect();
+
+LANGUAGE: typescript
+CODE:
+import { connectable, timer, Subject } from 'rxjs';
+
+// suggested refactor
+const tick$ = connectable(timer(1_000), {
+  connector: () => new Subject()
+});
+tick$.connect();
+
+----------------------------------------
+
+TITLE: TestScheduler Helper Functions Usage in TypeScript
+DESCRIPTION: Shows the complete set of helper functions available in TestScheduler.run() callback, including cold, hot, expectObservable, and other utility functions.
+
+LANGUAGE: typescript
+CODE:
+testScheduler.run((helpers) => {
+  const { cold, hot, expectObservable, expectSubscriptions, flush, time, animate } = helpers;
+  // use them
+});
+
+----------------------------------------
+
+TITLE: Observable Subscription Example - TypeScript
+DESCRIPTION: Demonstrates how to subscribe to an Observable with handlers for next, error and complete notifications.
+
+LANGUAGE: typescript
+CODE:
+console.log('just before subscribe');
+observable.subscribe({
+  next(x) {
+    console.log('got value ' + x);
+  },
+  error(err) {
+    console.error('something wrong occurred: ' + err);
+  },
+  complete() {
+    console.log('done');
+  },
+});
+console.log('just after subscribe');
+
+----------------------------------------
+
+TITLE: Migrating publish with selector to connect
+DESCRIPTION: Shows how to replace the publish operator with selector to the new connect operator while maintaining the same functionality.
+
+LANGUAGE: typescript
+CODE:
+import { timer, publish, combineLatest } from 'rxjs';
+
+// deprecated
+const tick$ = timer(1_000).pipe(
+  publish((source) => combineLatest([source, source]))
+);
+
+LANGUAGE: typescript
+CODE:
+import { timer, connect, combineLatest } from 'rxjs';
+
+// suggested refactor
+const tick$ = timer(1_000).pipe(
+  connect((source) => combineLatest([source, source]))
+);
+
+----------------------------------------
+
+TITLE: Observable with Interval Example - TypeScript
+DESCRIPTION: Creates an Observable that emits 'hi' every second and demonstrates proper resource cleanup with unsubscribe.
+
+LANGUAGE: typescript
+CODE:
+import { Observable } from 'rxjs';
+
+const observable = new Observable(function subscribe(subscriber) {
+  const intervalId = setInterval(() => {
+    subscriber.next('hi');
+  }, 1000);
+
+  return function unsubscribe() {
+    clearInterval(intervalId);
+  };
+});
+
+----------------------------------------
+
+TITLE: Basic RxJS Subscription Usage in TypeScript
+DESCRIPTION: Demonstrates how to create a basic subscription to an interval Observable and unsubscribe from it. The example shows the fundamental usage of subscription.unsubscribe() to clean up resources.
+
+LANGUAGE: typescript
+CODE:
+import { interval } from 'rxjs';
+
+const observable = interval(1000);
+const subscription = observable.subscribe(x => console.log(x));
+// Later:
+// This cancels the ongoing Observable execution which
+// was started by calling subscribe with an Observer.
+subscription.unsubscribe();
+
+----------------------------------------
+
+TITLE: Importing RxJS Functionality in TypeScript (v7.2.0+)
+DESCRIPTION: Shows how to import specific RxJS functions and operators in TypeScript for version 7.2.0 and later. It demonstrates using the 'of' creation function and the 'map' operator.
+
+LANGUAGE: typescript
+CODE:
+import { of, map } from 'rxjs';
+
+of(1, 2, 3).pipe(map((x) => x + '!!!'));
+
+----------------------------------------
+
+TITLE: Using map operator in RxJS
+DESCRIPTION: Demonstrates the use of the map operator to transform values emitted by an Observable. The example squares each emitted value.
+
+LANGUAGE: typescript
+CODE:
+import { of, map } from 'rxjs';
+
+of(1, 2, 3)
+  .pipe(map((x) => x * x))
+  .subscribe((v) => console.log(`value: ${v}`));
+
+// Logs:
+// value: 1
+// value: 4
+// value: 9
+
+----------------------------------------
+
+TITLE: Importing RxJS Functionality in TypeScript (v7.1.0 or older)
+DESCRIPTION: Shows how to import specific RxJS functions and operators in TypeScript for versions 7.1.0 and older, demonstrating the separate imports for creation functions and operators.
+
+LANGUAGE: typescript
+CODE:
+import { of } from 'rxjs';
+import { map } from 'rxjs/operators';
+
+of(1, 2, 3).pipe(map((x) => x + '!!!'));
+
+----------------------------------------
+
+TITLE: RxJS Subscription Output Example
+DESCRIPTION: Shows the console output of the combined subscriptions example, demonstrating the interleaved execution of both observables before being unsubscribed after 1 second.
+
+LANGUAGE: text
+CODE:
+second: 0
+first: 0
+second: 1
+first: 1
+second: 2
+
+----------------------------------------
+
+TITLE: Basic Observable with Async Scheduler
+DESCRIPTION: Demonstrates using observeOn with asyncScheduler to control notification delivery timing. Shows how values 1,2,3 are emitted asynchronously after subscription.
+
+LANGUAGE: typescript
+CODE:
+import { Observable, observeOn, asyncScheduler } from 'rxjs';
+
+const observable = new Observable((observer) => {
+  observer.next(1);
+  observer.next(2);
+  observer.next(3);
+  observer.complete();
+}).pipe(
+  observeOn(asyncScheduler)
+);
+
+console.log('just before subscribe');
+observable.subscribe({
+  next(x) {
+    console.log('got value ' + x);
+  },
+  error(err) {
+    console.error('something wrong occurred: ' + err);
+  },
+  complete() {
+    console.log('done');
+  },
+});
+console.log('just after subscribe');
+
+----------------------------------------
+
+TITLE: Using RxJS with Global Bundle in JavaScript (v7.1.0 or older)
+DESCRIPTION: Demonstrates how to use RxJS functionality with a globally imported bundle in JavaScript for versions 7.1.0 and older.
+
+LANGUAGE: javascript
+CODE:
+const { of } = rxjs;
+const { map } = rxjs.operators;
+
+of(1, 2, 3).pipe(map((x) => x + '!!!'));
+
+----------------------------------------
+
+TITLE: Observable with Proxy Observer Pattern
+DESCRIPTION: Illustrates how observeOn creates a proxy Observer between the source Observable and final Observer for async scheduling.
+
+LANGUAGE: typescript
+CODE:
+import { Observable, observeOn, asyncScheduler } from 'rxjs';
+
+const observable = new Observable((proxyObserver) => {
+  proxyObserver.next(1);
+  proxyObserver.next(2);
+  proxyObserver.next(3);
+  proxyObserver.complete();
+}).pipe(
+  observeOn(asyncScheduler)
+);
+
+const finalObserver = {
+  next(x) {
+    console.log('got value ' + x);
+  },
+  error(err) {
+    console.error('something wrong occurred: ' + err);
+  },
+  complete() {
+    console.log('done');
+  },
+};
+
+console.log('just before subscribe');
+observable.subscribe(finalObserver);
+console.log('just after subscribe');
+
+----------------------------------------
+
+TITLE: Proxy Observer Implementation
+DESCRIPTION: Shows the internal implementation of how the proxy observer schedules async delivery of values using asyncScheduler.
+
+LANGUAGE: typescript
+CODE:
+const proxyObserver = {
+  next(val) {
+    asyncScheduler.schedule(
+      (x) => finalObserver.next(x),
+      0 /* delay */,
+      val /* will be the x for the function above */
+    );
+  },
+
+  // ...
+};
+
+----------------------------------------
+
+TITLE: Converting Observable to Promise using lastValueFrom in TypeScript
+DESCRIPTION: This snippet demonstrates how to use the lastValueFrom function to convert an Observable to a Promise. It creates an Observable that emits numbers every 2 seconds, takes 10 values, and resolves with the last emitted value.
+
+LANGUAGE: typescript
+CODE:
+import { interval, take, lastValueFrom } from 'rxjs';
+
+async function execute() {
+  const source$ = interval(2000).pipe(take(10));
+  const finalNumber = await lastValueFrom(source$);
+  console.log(`The final number is ${finalNumber}`);
+}
+
+execute();
+
+// Expected output:
+// "The final number is 9"
+
+----------------------------------------
+
+TITLE: Converting Observable to Promise using firstValueFrom in TypeScript
+DESCRIPTION: This example shows how to use the firstValueFrom function to convert an Observable to a Promise. It creates an Observable that emits numbers every 2 seconds and resolves with the first emitted value.
+
+LANGUAGE: typescript
+CODE:
+import { interval, firstValueFrom } from 'rxjs';
+
+async function execute() {
+  const source$ = interval(2000);
+  const firstNumber = await firstValueFrom(source$);
+  console.log(`The first number is ${firstNumber}`);
+}
+
+execute();
+
+// Expected output:
+// "The first number is 0"
+
+----------------------------------------
+
+TITLE: Defining Styles for RxJS Marble Diagram
+DESCRIPTION: CSS-like style definitions for rendering the RxJS marble diagram. It specifies the event radius, operator height, and completion height.
+
+LANGUAGE: css
+CODE:
+[styles]
+event_radius = 33
+operator_height = 60
+completion_height = 80
+
+----------------------------------------
+
+TITLE: Using defaultValue with firstValueFrom in TypeScript
+DESCRIPTION: This snippet demonstrates how to use the defaultValue option with firstValueFrom to provide a fallback value when the Observable completes without emitting any values.
+
+LANGUAGE: typescript
+CODE:
+import { firstValueFrom, EMPTY } from 'rxjs';
+
+const result = await firstValueFrom(EMPTY, { defaultValue: 0 });
+console.log(result);
+
+// Expected output:
+// 0
+
+----------------------------------------
+
+TITLE: RxJS Animation Frame Testing with TestScheduler
+DESCRIPTION: Demonstrates how to test requestAnimationFrame timing using the animate helper function in TestScheduler.
+
+LANGUAGE: typescript
+CODE:
+testScheduler.run((helpers) => {
+  const { animate, cold } = helpers;
+  animate('              ---x---x---x---x');
+  const requests = cold('-r-------r------');
+  /* ... */
+  const expected = '     ---a-------b----';
+});
+
+----------------------------------------
+
+TITLE: Testing Multiple Subscribers with Hot Observables in RxJS
+DESCRIPTION: Shows how to test multiple subscribers that subscribe to a hot observable at different times using marble diagrams.
+
+LANGUAGE: typescript
+CODE:
+testScheduler.run(({ hot, expectObservable }) => {
+  const source = hot('--a--a--a--a--a--a--a--');
+  const sub1 = '      --^-----------!';
+  const sub2 = '      ---------^--------!';
+  const expect1 = '   --a--a--a--a--';
+  const expect2 = '   -----------a--a--a-';
+
+  expectObservable(source, sub1).toBe(expect1);
+  expectObservable(source, sub2).toBe(expect2);
+});
+
+----------------------------------------
+
+TITLE: Synchronous State Assertion in RxJS Tests
+DESCRIPTION: Demonstrates how to test side effects and state changes after an observable stream completes using flush() method.
+
+LANGUAGE: typescript
+CODE:
+let eventCount = 0;
+
+const s1 = cold('--a--b|', { a: 'x', b: 'y' });
+
+// side effect using 'tap' updates a variable
+const result = s1.pipe(tap(() => eventCount++));
+
+expectObservable(result).toBe('--a--b|', { a: 'x', b: 'y' });
+
+// flush - run 'virtual time' to complete all outstanding hot or cold observables
+flush();
+
+expect(eventCount).toBe(2);
+
+----------------------------------------
+
+TITLE: Configuring Deprecated Next Context
+DESCRIPTION: Configuration to re-enable deprecated this context behavior in observer functions, with performance penalty warning.
+
+LANGUAGE: typescript
+CODE:
+import { config } from 'rxjs';
+config.useDeprecatedNextContext = true;
+
+----------------------------------------
+
+TITLE: Using first operator in RxJS
+DESCRIPTION: Shows how to use the first operator to emit only the first value from an Observable sequence.
+
+LANGUAGE: typescript
+CODE:
+import { of, first } from 'rxjs';
+
+of(1, 2, 3)
+  .pipe(first())
+  .subscribe((v) => console.log(`value: ${v}`));
+
+// Logs:
+// value: 1
+
+----------------------------------------
+
+TITLE: Installing RxJS via npm for ES2015
+DESCRIPTION: This command installs the latest version of RxJS using npm. It's suitable for projects using ES2015 or later.
+
+LANGUAGE: shell
+CODE:
+npm install rxjs
+
+----------------------------------------
+
+TITLE: Installing TypeScript typings for ES6 compatibility
+DESCRIPTION: This command installs ES6 typings for TypeScript users to resolve potential errors related to Promise or Iterable types when using RxJS.
+
+LANGUAGE: shell
+CODE:
+typings install es6-shim --ambient
+
+----------------------------------------
+
+TITLE: Installing RxJS for all module types via npm v3
+DESCRIPTION: This command installs RxJS for all module types (CJS/ES6/AMD/TypeScript) using npm version 3 or later.
+
+LANGUAGE: shell
+CODE:
+npm install @reactivex/rxjs
+
+----------------------------------------
+
+TITLE: Installing specific RxJS version for all module types via npm v2
+DESCRIPTION: This command installs a specific version of RxJS (7.3.0) for all module types using npm version 2, which requires explicit version specification.
+
+LANGUAGE: shell
+CODE:
+npm install @reactivex/rxjs@7.3.0
+
+----------------------------------------
+
+TITLE: Importing All RxJS Functionality in TypeScript (v7.2.0+)
+DESCRIPTION: Illustrates how to import the entire set of RxJS functionality as a namespace in TypeScript for version 7.2.0 and later.
+
+LANGUAGE: typescript
+CODE:
+import * as rxjs from 'rxjs';
+
+rxjs.of(1, 2, 3).pipe(rxjs.map((x) => x + '!!!'));
+
+----------------------------------------
+
+TITLE: Using RxJS with Global Bundle in JavaScript (v7.2.0+)
+DESCRIPTION: Demonstrates how to use RxJS functionality with a globally imported bundle in JavaScript for version 7.2.0 and later.
+
+LANGUAGE: javascript
+CODE:
+const { of, map } = rxjs;
+
+of(1, 2, 3).pipe(map((x) => x + '!!!'));
+
+----------------------------------------
+
+TITLE: Importing All RxJS Functionality in TypeScript (v7.1.0 or older)
+DESCRIPTION: Illustrates how to import the entire set of RxJS functionality as namespaces in TypeScript for versions 7.1.0 and older.
+
+LANGUAGE: typescript
+CODE:
+import * as rxjs from 'rxjs';
+import * as operators from 'rxjs';
+
+rxjs.of(1, 2, 3).pipe(operators.map((x) => x + '!!!'));
+
+----------------------------------------
+
+TITLE: Using RxJS with CDN in JavaScript (v7.2.0+)
+DESCRIPTION: Shows how to use RxJS functionality when installed via CDN for version 7.2.0 and later, demonstrating range, filter, and map operations.
+
+LANGUAGE: javascript
+CODE:
+const { range, filter, map } = rxjs;
+
+range(1, 200)
+  .pipe(
+    filter((x) => x % 2 === 1),
+    map((x) => x + x)
+  )
+  .subscribe((x) => console.log(x));
+
+----------------------------------------
+
+TITLE: Using RxJS with CDN in JavaScript (v7.1.0 or older)
+DESCRIPTION: Demonstrates how to use RxJS functionality when installed via CDN for versions 7.1.0 and older, showing the separate imports for creation functions and operators.
+
+LANGUAGE: javascript
+CODE:
+const { range } = rxjs;
+const { filter, map } = rxjs.operators;
+
+range(1, 200)
+  .pipe(
+    filter((x) => x % 2 === 1),
+    map((x) => x + x)
+  )
+  .subscribe((x) => console.log(x));
+
+----------------------------------------
+
+TITLE: Installing RxJS via npm
+DESCRIPTION: Shows how to install RxJS using npm in a shell environment.
+
+LANGUAGE: shell
+CODE:
+npm install rxjs
+
+----------------------------------------
+
+TITLE: Using RxJS Operators in TypeScript (RxJS 7.2+)
+DESCRIPTION: Demonstrates importing and using RxJS operators directly from 'rxjs' in TypeScript for version 7.2 and above. The example shows filtering odd numbers and doubling them using a range observable.
+
+LANGUAGE: typescript
+CODE:
+import { range, filter, map } from 'rxjs';
+
+range(1, 200)
+  .pipe(
+    filter((x) => x % 2 === 1),
+    map((x) => x + x)
+  )
+  .subscribe((x) => console.log(x));
+
+----------------------------------------
+
+TITLE: Using RxJS Operators in TypeScript (RxJS <7.2)
+DESCRIPTION: Shows how to import and use RxJS operators from 'rxjs/operators' in TypeScript for versions below 7.2. The example demonstrates filtering odd numbers and doubling them using a range observable.
+
+LANGUAGE: typescript
+CODE:
+import { range } from 'rxjs';
+import { filter, map } from 'rxjs/operators';
+
+range(1, 200)
+  .pipe(
+    filter((x) => x % 2 === 1),
+    map((x) => x + x)
+  )
+  .subscribe((x) => console.log(x));
+
+----------------------------------------
+
+TITLE: Deprecating Complete Callback in RxJS Subscribe (TypeScript)
+DESCRIPTION: Demonstrates the deprecated signature for passing only the complete callback to subscribe, and shows the recommended alternative using an observer object.
+
+LANGUAGE: typescript
+CODE:
+import { of } from 'rxjs';
+
+// deprecated
+of([1,2,3]).subscribe(null, null, console.info); // difficult to read
+// suggested change
+of([1,2,3]).subscribe({complete: console.info});
+
+----------------------------------------
+
+TITLE: Deprecating Error Callback in RxJS Subscribe (TypeScript)
+DESCRIPTION: Illustrates the deprecated signature for passing only the error callback to subscribe, and provides the recommended approach using an observer object.
+
+LANGUAGE: typescript
+CODE:
+import { throwError } from 'rxjs';
+
+// deprecated 
+throwError('I am an error').subscribe(null, console.error);
+// suggested change
+throwError('I am an error').subscribe({error: console.error});
+
+----------------------------------------
+
+TITLE: Recommended RxJS Subscribe Patterns (TypeScript)
+DESCRIPTION: Shows the recommended patterns for using subscribe: either with a single next callback function or with a full observer object specifying next, error, and complete handlers.
+
+LANGUAGE: typescript
+CODE:
+import { of } from 'rxjs';
+
+// recommended 
+of([1,2,3]).subscribe((v) => console.info(v));
+// also recommended
+of([1,2,3]).subscribe({
+    next: (v) => console.log(v),
+    error: (e) => console.error(e),
+    complete: () => console.info('complete') 
+})
+
+----------------------------------------
+
+TITLE: Refactoring RxJS of() Operator with Scheduler
+DESCRIPTION: Shows how to refactor the deprecated of() operator with scheduler argument to use the scheduled() function instead. The example demonstrates converting of(1, 2, 3, asyncScheduler) to scheduled([1, 2, 3], asyncScheduler).
+
+LANGUAGE: typescript
+CODE:
+import { of, asyncScheduler, scheduled } from 'rxjs';
+
+// Deprecated approach
+of(1, 2, 3, asyncScheduler).subscribe((x) => console.log(x));
+// suggested approach
+scheduled([1, 2, 3], asyncScheduler).subscribe((x) => console.log(x));
+
+----------------------------------------
+
+TITLE: Refactoring RxJS concat() Operator with Scheduler - Deprecated Version
+DESCRIPTION: Shows the deprecated way of using concat() operator with a scheduler argument.
+
+LANGUAGE: typescript
+CODE:
+import { concat, of, asyncScheduler } from 'rxjs';
+
+concat(of('hello '), of('World'), asyncScheduler).subscribe((x) => console.log(x));
+
+----------------------------------------
+
+TITLE: Refactoring RxJS concat() Operator with Scheduler - New Approach
+DESCRIPTION: Demonstrates the recommended way to refactor concat() with scheduler using scheduled() and concatAll() operators.
+
+LANGUAGE: typescript
+CODE:
+import { scheduled, of, asyncScheduler, concatAll } from 'rxjs';
+
+scheduled([of('hello '), of('World')], asyncScheduler)
+  .pipe(concatAll())
+  .subscribe((x) => console.log(x));
+
+----------------------------------------
+
+TITLE: Refactoring RxJS combineLatest() Operator with Scheduler - Deprecated Version
+DESCRIPTION: Shows the deprecated way of using combineLatest() operator with a scheduler argument.
+
+LANGUAGE: typescript
+CODE:
+import { combineLatest, of, asyncScheduler } from 'rxjs';
+
+combineLatest(of('hello '), of('World'), asyncScheduler).subscribe(console.log);
+
+----------------------------------------
+
+TITLE: Refactoring RxJS combineLatest() Operator with Scheduler - New Approach
+DESCRIPTION: Demonstrates the recommended way to refactor combineLatest() with scheduler using scheduled() and combineLatestAll() operators.
+
+LANGUAGE: typescript
+CODE:
+import { scheduled, of, asyncScheduler, combineLatestAll } from 'rxjs';
+
+scheduled([of('hello '), of('World')], asyncScheduler)
+  .pipe(combineLatestAll())
+  .subscribe((x) => console.log(x));
+
+----------------------------------------
+
+TITLE: Replacing multicast with connectable
+DESCRIPTION: Demonstrates how to replace the multicast operator with the connectable function when using a subject factory.
+
+LANGUAGE: typescript
+CODE:
+import { timer, multicast, Subject, ConnectableObservable } from 'rxjs';
+
+// deprecated
+const tick$ = timer(1_000).pipe(
+  multicast(() => new Subject())
+) as ConnectableObservable<number>;
+
+LANGUAGE: typescript
+CODE:
+import { connectable, timer, Subject } from 'rxjs';
+
+// suggested refactor
+const tick$ = connectable(timer(1_000), {
+  connector: () => new Subject()
+});
+
+----------------------------------------
+
+TITLE: Refactoring forkJoin with Array Arguments in TypeScript
+DESCRIPTION: This snippet demonstrates how to refactor the deprecated direct parameter passing style of forkJoin to the new recommended array or object syntax. It shows examples with Observable streams of odd and even numbers.
+
+LANGUAGE: typescript
+CODE:
+import {forkJoin, from} from 'rxjs';
+
+const odd$ = from([1,3,5]);
+const even$ = from([2,4,6]);
+
+// deprecated
+forkJoin(odd$, even$);
+// suggested change
+forkJoin([odd$, even$]);
+// or
+forkJoin({odd: odd$, even: even$})
+
+----------------------------------------
+
+TITLE: Migrating ResultSelector to Map Operator in RxJS
+DESCRIPTION: Demonstrates how to refactor code that uses the deprecated resultSelector parameter to use the map operator instead. Shows both the deprecated approach and the recommended solution using interval and fromEvent observables.
+
+LANGUAGE: typescript
+CODE:
+import { fromEvent, switchMap, interval, map } from 'rxjs';
+
+// deprecated
+fromEvent(document, 'click').pipe(
+  switchMap((x) => interval(1000), (_, x) => x + 1)
+);
+// suggested change
+fromEvent(document, 'click').pipe(
+  switchMap((x) => interval(1000).pipe(map((x) => x + 1)))
+);
+
+----------------------------------------
+
+TITLE: Building and Serving RxJS Documentation Locally
+DESCRIPTION: Commands to build the RxJS documentation project and serve it locally using a development server with file watching and automatic reloading.
+
+LANGUAGE: bash
+CODE:
+yarn build
+npm start
+yarn serve-and-sync
+
+----------------------------------------
+
+TITLE: Configuring Error Handling in RxJS
+DESCRIPTION: Example showing how to configure unhandled error behavior in RxJS v7 to maintain backwards compatibility with console.warn behavior.
+
+LANGUAGE: typescript
+CODE:
+import { config } from 'rxjs';
+config.onUnhandledError = (err) => console.warn(err);
+
+----------------------------------------
+
+TITLE: ReplaySubject with Scheduled Emissions
+DESCRIPTION: Updated pattern for scheduling ReplaySubject emissions using observeOn operator instead of constructor parameter.
+
+LANGUAGE: typescript
+CODE:
+new ReplaySubject(2, 3000).pipe(observeOn(asap))
+
+----------------------------------------
+
+TITLE: Installing Dependencies and Running Dgeni in RxJS Documentation Project
+DESCRIPTION: Commands to install project dependencies and run the Dgeni documentation generator for the RxJS documentation project.
+
+LANGUAGE: bash
+CODE:
+npm install
+yarn setup
+
+----------------------------------------
+
+TITLE: Testing and Linting RxJS Documentation Project
+DESCRIPTION: Commands for running unit tests, e2e tests, and linting the RxJS documentation project code and generated documentation.
+
+LANGUAGE: bash
+CODE:
+yarn lint
+npm test
+npm test -- --watch=false
+yarn e2e
+yarn docs-lint
+yarn docs-test
+
+----------------------------------------
+
+TITLE: Generating and Watching RxJS Documentation
+DESCRIPTION: Commands to generate the full RxJS documentation and watch for changes in source files for partial regeneration during development.
+
+LANGUAGE: bash
+CODE:
+yarn docs
+yarn docs-watch
+
+----------------------------------------
+
+TITLE: Running RxJS Documentation with ServiceWorker Locally
+DESCRIPTION: Commands to build the RxJS documentation project and serve it locally with ServiceWorker support for testing purposes.
+
+LANGUAGE: bash
+CODE:
+yarn build
+yarn http-server -- dist -p 4200
+
+----------------------------------------
+
+TITLE: Building and Running RxJS Documentation Docker Container
+DESCRIPTION: Commands to build a Docker image for the RxJS documentation project and run it as a container, exposing it on a specified host port.
+
+LANGUAGE: bash
+CODE:
+docker build -t rxjs-docs:6.4.1 .
+docker run -p <host-port>:4200 rxjs-docs:6.4.1
+
+----------------------------------------
+
+TITLE: Setting Up RxJS Documentation Development Environment
+DESCRIPTION: Commands to set up the RxJS documentation development environment, including installing dependencies, generating docs, and starting the development server.
+
+LANGUAGE: bash
+CODE:
+yarn setup
+yarn start
+
+----------------------------------------
+
+TITLE: Rebasing and force pushing changes
+DESCRIPTION: These commands rebase the current branch onto master and force push the changes to update the pull request.
+
+LANGUAGE: shell
+CODE:
+git rebase master -i
+git push -f
+
+----------------------------------------
+
+TITLE: Creating a new branch for changes in Git
+DESCRIPTION: This command creates a new Git branch named 'my-fix-branch' based on the master branch for making changes.
+
+LANGUAGE: shell
+CODE:
+git checkout -b my-fix-branch master
+
+----------------------------------------
+
+TITLE: Committing changes in Git
+DESCRIPTION: This command commits all staged changes with a descriptive commit message following the project's commit message guidelines.
+
+LANGUAGE: shell
+CODE:
+git commit -a
+
+----------------------------------------
+
+TITLE: Pushing changes to GitHub
+DESCRIPTION: This command pushes the local branch 'my-fix-branch' to the remote repository on GitHub.
+
+LANGUAGE: shell
+CODE:
+git push origin my-fix-branch
+
+----------------------------------------
+
+TITLE: Deleting remote branch on GitHub
+DESCRIPTION: This command deletes the remote branch 'my-fix-branch' on GitHub after the pull request is merged.
+
+LANGUAGE: shell
+CODE:
+git push origin --delete my-fix-branch
+
+----------------------------------------
+
+TITLE: Checking out master branch
+DESCRIPTION: This command checks out the master branch and discards any local changes.
+
+LANGUAGE: shell
+CODE:
+git checkout master -f
+
+----------------------------------------
+
+TITLE: Updating local master branch
+DESCRIPTION: This command updates the local master branch with the latest changes from the upstream repository.
+
+LANGUAGE: shell
+CODE:
+git pull --ff upstream master
+
+----------------------------------------
+
+TITLE: Deleting local branch
+DESCRIPTION: This command deletes the local 'my-fix-branch' after the changes have been merged.
+
+LANGUAGE: shell
+CODE:
+git branch -D my-fix-branch
+
+----------------------------------------
+
+TITLE: Running performance tests
+DESCRIPTION: These commands build the project and run the micro performance tests, optionally specifying a single test file.
+
+LANGUAGE: shell
+CODE:
+yarn build_all
+node perf/micro
+
+----------------------------------------
+
+TITLE: Installing and Testing RxJS Development Environment
+DESCRIPTION: Commands for setting up the RxJS development environment using Yarn workspaces. Includes steps for installation, running tests, and starting the documentation server.
+
+LANGUAGE: bash
+CODE:
+cd <repository-root>
+yarn install
+yarn workspace rxjs test
+yarn workspace rxjs.dev start
+
+----------------------------------------
+
+TITLE: Template Inheritance Structure for RxJS Documentation
+DESCRIPTION: Shows the hierarchical structure of documentation templates with base.template.html as the root template, followed by specialized templates for different API types like modules, classes, directives, etc. Each template can override specific blocks declared in parent templates.
+
+LANGUAGE: text
+CODE:
+- layout/base.template.html (base)\n  - module.template.html\n  - layout/api-base.template.html (jumpNav, jumpNavLinks, whatItDoes, infoBar, securityConsiderations,\n    deprecationNotes, howToUse, details)\n    - class.template.html\n      - directive.template.html\n      - enum.template.html\n    - var.template.html\n      - const.template.html\n      - let.template.html\n    - decorator.template.html\n    - function.template.html\n    - interface.template.html\n      - type-alias.template.html\n    - pipe.template.html
+
+----------------------------------------
+
+TITLE: Running Tests
+DESCRIPTION: Commands for running tests in watch mode, full test suite, and generating coverage reports.
+
+LANGUAGE: shell
+CODE:
+yarn test:watch
+yarn test
+yarn test:coverage
+yarn test:watch:coverage
+
+----------------------------------------
+
+TITLE: Development Watch Mode
+DESCRIPTION: Command to watch for changes in YAML tree or TypeScript scripts and automatically regenerate the JSON tree.
+
+LANGUAGE: shell
+CODE:
+yarn watch
+
+----------------------------------------
+
+TITLE: Loading Decision Tree Data Structure
+DESCRIPTION: Configuration overview showing the data flow from YAML source to JSON output used by the operator decision tree module. The YAML file in the apps/rxjs.dev/content directory is processed to generate the decision-tree-data.json which is served from the /generated/app endpoint.
+
+LANGUAGE: yaml
+CODE:
+# Source file path:
+apps/rxjs.dev/content/operator-decision-tree.yml
+
+LANGUAGE: json
+CODE:
+# Generated output path:
+/generated/app/decision-tree-data.json
+
+----------------------------------------
+
+TITLE: Installing and Building Decision Tree Generator
+DESCRIPTION: Commands for installing dependencies and building the project.
+
+LANGUAGE: shell
+CODE:
+npm i && yarn build
+
+----------------------------------------
+
+TITLE: Updating Observable Pipe Usage in TypeScript
+DESCRIPTION: Changes to the 'pipe' method in RxJS 7.x. Calls with 9 or more arguments now return Observable<unknown> instead of Observable<{}>.
+
+LANGUAGE: TypeScript
+CODE:
+// RxJS 6.x
+const result = source.pipe(
+  op1(),
+  op2(),
+  // ... more operators
+  op9()
+) as Observable<SomeType>;
+
+// RxJS 7.x
+const result = source.pipe(
+  op1(),
+  op2(),
+  // ... more operators
+  op9()
+) as Observable<unknown>;
+
+----------------------------------------
+
+TITLE: Using firstValueFrom and lastValueFrom in TypeScript
+DESCRIPTION: New utility functions to replace the deprecated toPromise() method for converting Observables to Promises.
+
+LANGUAGE: TypeScript
+CODE:
+import { firstValueFrom, lastValueFrom } from 'rxjs';
+
+// Get the first value
+const firstValue = await firstValueFrom(source$);
+
+// Get the last value
+const lastValue = await lastValueFrom(source$);
+
+// With default value
+const valueOrDefault = await firstValueFrom(source$, { defaultValue: 'default' });
+
+----------------------------------------
+
+TITLE: Using connectable for ConnectableObservable in TypeScript
+DESCRIPTION: The new connectable function replaces multicast and publish variants for creating ConnectableObservables.
+
+LANGUAGE: TypeScript
+CODE:
+import { connectable, Subject } from 'rxjs';
+
+const source$ = // some observable
+const subject = new Subject();
+const connectableObservable = connectable(source$, { connector: () => subject });
+
+----------------------------------------
+
+TITLE: Configuring Event Radius for Marble Testing
+DESCRIPTION: Sets the visual radius for events in marble diagram testing to 15 units.
+
+LANGUAGE: text
+CODE:
+[styles]
+event_radius = 15
+
+----------------------------------------
+
+TITLE: Marble Diagram with Delay Operator
+DESCRIPTION: Demonstrates the effect of a delay(20) operator on an Observable sequence showing events a, b, and c with a completion marker. The delay shifts all events by the specified time period.
+
+LANGUAGE: text
+CODE:
+---a--b--c---|
+
+> delay(20)
+
+-----a--b--c-|
+
+----------------------------------------
+
+TITLE: Configuring Visualization Style Parameters
+DESCRIPTION: Defines styling parameters for rendering RxJS operator visualizations, including event radius, operator height, and completion height dimensions.
+
+LANGUAGE: ini
+CODE:
+[styles]
+event_radius = 33
+operator_height = 60
+completion_height = 80
+
+----------------------------------------
+
+TITLE: RxJS WindowWhen ASCII Marble Diagram
+DESCRIPTION: ASCII marble diagram showing input stream and resulting windowed output streams using windowWhen operator. Demonstrates how the source stream is split into multiple windows based on timing.
+
+LANGUAGE: text
+CODE:
+---a---b---c---d---e---f---g---h---|
+
+-------------x|
+             -------------x|
+                          -------------x|
+
+> windowWhen()
+
+x = ---a---b---c-|
+
+y = --d---e---f---g|
+
+z = -g---h---|
+
+x------------y------------z--------|
+
+----------------------------------------
+
+TITLE: Illustrating bufferWhen Operator in RxJS Marble Diagram
+DESCRIPTION: A marble diagram representation of the bufferWhen operator in RxJS. It shows the input stream, closing notifier, and resulting output stream with buffered values.
+
+LANGUAGE: plaintext
+CODE:
+---a---b---c---d---e---f---g---h---|
+
+-------------s
+
+> bufferWhen()
+
+-------------x------------y--------(z|)
+x := [a, b, c]
+y := [d, e, f]
+z := [g, h]
+
+----------------------------------------
+
+TITLE: Visualizing RxJS Throttle Operation with Marble Diagram
+DESCRIPTION: ASCII marble diagram showing how throttle() operator processes an input stream. The diagram shows the input stream containing events 'a', 'x', 'y', 'b', 'c', 'z' and how throttle windows (indicated by 'i') filter these events to produce the output stream.
+
+LANGUAGE: text
+CODE:
+-a-xy-----b--x--cxyz-|
+
+ ----i
+
+          ----i
+
+                ----i
+
+> throttle()
+
+-a--------b-----c----|
+
+----------------------------------------
+
+TITLE: Visualizing RxJS audit() Operator with Marble Diagram
+DESCRIPTION: This marble diagram demonstrates how the audit() operator in RxJS works. It shows an input stream with various emissions, audit intervals, and the resulting output stream after applying the audit operator.
+
+LANGUAGE: text
+CODE:
+-a-xy-----b--x--cxyz-|
+
+ ----i
+
+          ----i
+
+                ----i
+
+> audit()
+
+-----y--------x-----z|
+
+----------------------------------------
+
+TITLE: Fix AsyncSubject completion timing in TypeScript
+DESCRIPTION: Fixed timing of AsyncSubject completion to properly emit value after it's already completed
+
+LANGUAGE: TypeScript
+CODE:
+// Fixed AsyncSubject completion handling
+AsyncSubject.prototype.complete = function() {
+  if (this.hasValue) {
+    this.destination.next(this.value);
+  }
+  this.destination.complete();
+};
+
+----------------------------------------
+
+TITLE: Update WebSocket handling for RxJS
+DESCRIPTION: Improved WebSocket connection cleanup and error handling
+
+LANGUAGE: TypeScript
+CODE:
+// Properly handle WebSocket cleanup
+WebSocketSubject.prototype._resetState = function() {
+  this.socket = null;
+  if (!this.source) {
+    this.destination = new ReplaySubject();
+  }
+  this.hasErrored = false;
+};
+
+----------------------------------------
+
+TITLE: Configuring Robots.txt for RxJS Project Website
+DESCRIPTION: This snippet configures the robots.txt file for the RxJS project website. It allows all web crawlers to access all URLs on the site and specifies the location of the sitemap XML file.
+
+LANGUAGE: plaintext
+CODE:
+# Allow all URLs (see http://www.robotstxt.org/robotstxt.html)
+User-agent: *
+Disallow:
+Sitemap: https://rxjs.dev/generated/sitemap.xml
+
+----------------------------------------
+
+TITLE: Configuring Robot Exclusion Rules for RxJS Project
+DESCRIPTION: This snippet defines robot exclusion rules that prevent all web crawlers from accessing any part of the RxJS project website. It specifies a wildcard user-agent and disallows access to the entire site.
+
+LANGUAGE: robotstxt
+CODE:
+# Disallow all URLs (see http://www.robotstxt.org/robotstxt.html)
+User-agent: *
+Disallow: /
+
+----------------------------------------
+
+TITLE: Blocking All Web Crawler Access in Robots.txt
+DESCRIPTION: Configures the robots.txt file to prevent all web crawlers (User-agent: *) from accessing any content on the site (Disallow: /). This is a restrictive configuration that blocks indexing of all paths.
+
+LANGUAGE: robotstxt
+CODE:
+User-agent: *
+Disallow: /
+
+----------------------------------------
+
+TITLE: Displaying RxJS 404 Error Page Layout
+DESCRIPTION: HTML structure for a 404 error page using flexbox layout with an RxJS-branded error image and error message. The template uses flex containers for responsive positioning of elements.
+
+LANGUAGE: html
+CODE:
+<div class="nf-container l-flex-wrap flex-center">
+    <img src="assets/images/support/rxjs-404.png" width="300" height="300"/>
+    <div class="nf-response l-flex-wrap">
+        <h1 class="no-toc">Page Not Found</h1>
+        <p>We're sorry. The page you are looking for cannot be found.</p>
+    </div>
+</div>
+
+----------------------------------------
+
+TITLE: Styling Black Lives Matter Support Page in CSS
+DESCRIPTION: CSS styles for creating a black background with white text, centered content, and custom font sizes for a Black Lives Matter support page. Includes responsive design elements for different screen sizes.
+
+LANGUAGE: CSS
+CODE:
+<style>
+    .blm-background {
+        background-color: black; 
+        color: white; 
+        display: flex; 
+        min-height: calc(100vh + 64px);
+        margin: -20px -50px;
+    }
+
+    .text-container.blm-container {
+        text-align: center;
+        line-height: inherit;
+        max-width: inherit;
+    }
+
+    .blm-text {
+        font-size: 2rem;
+        line-height: inherit
+    }
+
+    .blm-list-item {
+        margin: 10px 0
+    }
+</style>
+
+----------------------------------------
+
+TITLE: Structuring Black Lives Matter Support Page in HTML
+DESCRIPTION: HTML structure for a Black Lives Matter support page, including a title, solidarity message, educational resources list, and links to support organizations. Uses custom CSS classes for styling.
+
+LANGUAGE: HTML
+CODE:
+<article class="blm-background">
+  <div layout="row" layout-xs="column" class="home-row homepage-container">
+    <div class="text-container blm-container">
+      <h1 class="no-anchor no-toc" style="font-size: 3rem; line-height: inherit">BLACK LIVES MATTER</h1>
+      <p class="blm-text">
+        We stand in solidarity with the Black Lives Matter movement. We believe that technologists must not be silent in the fight to end racial inequality.      </p>
+      <p class="blm-text">
+        We ask you to stand with us and help educate your team members and those in your network on how to help dismantle a system that oppresses Black people. Find a list of starting resources here: 
+        <ul style="list-style-type: none; line-height: inherit; padding-inline-start: 0">
+          <li class="blm-list-item"><a class="blm-text" href="https://www.youtube.com/watch?v=-aCn72iXO9s">Let's get to the root of racial injustice by Megan Ming Francis</a></li>
+          <li class="blm-list-item"><a class="blm-text" href="http://www.changecadet.com/blog/2020/5/30/what-leaders-can-do-for-black-employees">What Leaders can do for Black Employees by Dr. Akilah Cadet</a></li>
+          <li class="blm-list-item"><a class="blm-text" href="https://blacktechpipeline.substack.com/p/hey-employers-do-black-lives-matter">Hey Employers: Do Black Lives Matter? by Pariss Athena</a></li>
+          <li class="blm-list-item"><a class="blm-text" href="https://safiyaunoble.com/">Algorithms of Oppression by Safiya Umoja Noble</a></li>
+          <li class="blm-list-item"><a class="blm-text" href="https://www.rageinsidethemachine.com/">Rage Inside The Machine by Robert Smith</a></li>
+          <li class="blm-list-item"><a class="blm-text" href="https://www.sarawb.com/">Technically Wrong by Sara Wachter-Boettcher</a></li>
+        </ul>
+      </p>
+      <p class="blm-text">
+        In solidarity, we ask you to consider financially supporting efforts such as <a class="blm-text" href="https://secure.actblue.com/donate/ms_blm_homepage_2019">Black Lives Matter</a>, 
+        <a class="blm-text" href="https://support.eji.org/give/153413/#!/donation/checkout">The Equal Justice Initiative</a> or local charity organizations.
+      </p>
+    </div>
+  </div>
+</article>

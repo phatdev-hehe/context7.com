@@ -1,0 +1,380 @@
+TITLE: Defining Serverless AI Endpoint in Python
+DESCRIPTION: This snippet demonstrates how to create a serverless AI endpoint using the Beam SDK. It defines a function decorated with @endpoint that will run on a remote A100-40 GPU in the cluster.
+
+LANGUAGE: python
+CODE:
+from beta9 import endpoint
+
+
+# This will run on a remote A100-40 in your cluster
+@endpoint(cpu=1, memory=128, gpu="A100-40")
+def square(i: int):
+    return i**2
+
+----------------------------------------
+
+TITLE: Defining and Using a Function with Beta9 Python SDK
+DESCRIPTION: This snippet demonstrates how to define a function using the Beta9 SDK decorator, and how to use it with parallel execution. The example defines a 'square' function that runs on a specified CPU and GPU, then uses it to square a list of numbers.
+
+LANGUAGE: python
+CODE:
+from beta9 import function
+
+@function(
+    cpu=0.25,
+    gpu="L4",
+)
+def square(i: int):
+    return i**2
+
+def main():
+    numbers = list(range(10))
+    squared = []
+
+    for result in square.map(numbers):
+        squared.append(result)
+
+    print("numbers:", numbers)
+    print("squared:", sorted(squared))
+
+if __name__ == "__main__":
+    main()
+
+----------------------------------------
+
+TITLE: Python Function with GPU Specification
+DESCRIPTION: Example Python code demonstrating how to define and execute a function on an H100 GPU worker pool using Beam's function decorator.
+
+LANGUAGE: python
+CODE:
+from beam import function
+
+@function(gpu="H100")
+def handler():
+    return {"message": "This is running on your worker pool!"}
+
+if __name__ == "__main__":
+    handler.remote()
+
+----------------------------------------
+
+TITLE: Deploying Beam Application via CLI
+DESCRIPTION: This bash snippet shows the command to deploy a Beam application using the CLI. It includes the deployment command and the resulting curl command to invoke the deployed endpoint.
+
+LANGUAGE: bash
+CODE:
+$ beta9 deploy app.py:square --name inference
+=> Building image
+=> Using cached image
+=> Deployed 🎉
+
+curl -X POST 'https://inference.beam.cloud/v1' \
+-H 'Authorization: Bearer [YOUR_AUTH_TOKEN]' \
+-H 'Content-Type: application/json' \
+-d '{}'
+
+----------------------------------------
+
+TITLE: Creating Worker Pool in Beam CLI
+DESCRIPTION: Command to create a new worker pool with specific GPU requirements using the Beam CLI. This example creates a pool named 'my-h100-pool' with A100 GPU type and a default count of 1 GPU per worker.
+
+LANGUAGE: sh
+CODE:
+beam pool create --name my-h100-pool --gpu-type A100 --default-gpu-count 1
+
+----------------------------------------
+
+TITLE: Connecting Bare-Metal Server to Beam Cluster
+DESCRIPTION: This bash snippet demonstrates how to create a machine in the Beam cluster and shows the resulting command to set up a node on a bare-metal server.
+
+LANGUAGE: bash
+CODE:
+$ beta9 machine create --pool lambda-a100-40
+
+=> Created machine with ID: '9541cbd2'. Use the following command to set up the node:
+
+#!/bin/bash
+sudo curl -L -o agent https://release.beam.cloud/agent/agent && \
+sudo chmod +x agent && \
+sudo ./agent --token "AUTH_TOKEN" \
+  --machine-id "9541cbd2" \
+  --tailscale-url "" \
+  --tailscale-auth "AUTH_TOKEN" \
+  --pool-name "lambda-a100-40" \
+  --provider-name "lambda"
+
+----------------------------------------
+
+TITLE: Entity Relationship Diagram Using Mermaid
+DESCRIPTION: Defines the database schema for Beam project showing entity relationships, attributes, and data types. The schema includes tables for workspace management, token handling, volume storage, deployment tracking, task execution, stub configuration, and object storage. Each entity contains timestamps and proper foreign key relationships.
+
+LANGUAGE: mermaid
+CODE:
+erDiagram
+
+    WORKSPACE {
+        varchar name
+        uint id PK
+        varchar external_id
+        datetime created_at
+        datetime updated_at
+    }
+
+    TOKEN {
+        uint id PK
+        varchar external_id
+        varchar key
+        datetime created_at
+        datetime updated_at
+        bool active
+        bool resuable
+        uint workspace_id FK
+    }
+
+    VOLUME {
+        uint id PK
+        varchar external_id
+        varchar name
+        datetime created_at
+        uint workspace_id FK
+    }
+
+    DEPLOYMENT {
+        uint id PK
+        varchar external_id
+        uint version
+        enum status
+        datetime created_at
+        datetime updated_at
+        uint stub_id FK
+        uint workspace_id FK
+    }
+
+    TASK {
+        uint id PK
+        varchar external_id
+        datetime created_at
+        datetime started_at
+        bool ended_at
+        uint stub_id FK
+        uint workspace_id FK
+    }
+
+    STUB {
+        uint id PK
+        varchar external_id
+        varchar name
+        enum type
+        JSON config
+        uint object_id FK
+        uint workspace_id FK
+        datetime created_at
+        datetime updated_at
+    }
+
+    OBJECT {
+        uint id PK
+        varchar external_id
+        varchar hash
+        int64 size
+        datetime created_at
+        uint workspace_id FK
+    }
+
+    WORKSPACE ||--o{ TOKEN : " "
+    WORKSPACE ||--o{ VOLUME : " "
+    WORKSPACE ||--o{ DEPLOYMENT : " "
+    WORKSPACE ||--o{ TASK : " "
+    WORKSPACE ||--o{ OBJECT : " "
+    OBJECT ||--|| STUB : " "
+    TASK ||--|| STUB : " "
+    DEPLOYMENT ||--|| STUB : " "
+
+----------------------------------------
+
+TITLE: Creating Machine in Worker Pool
+DESCRIPTION: Command to create a new machine in an existing worker pool using Beam CLI. The command returns a setup script containing necessary configuration tokens and commands for agent installation.
+
+LANGUAGE: sh
+CODE:
+beam machine create --pool my-h100-pool
+
+----------------------------------------
+
+TITLE: Listing Machines in Beam Cluster
+DESCRIPTION: This bash snippet shows how to list the machines in a Beam cluster using the CLI, displaying details such as CPU, memory, GPU, status, and pool for each machine.
+
+LANGUAGE: bash
+CODE:
+$ beta9 machine list
+
+| ID       | CPU     | Memory     | GPU     | Status     | Pool        |
+|----------|---------|------------|---------|------------|-------------|
+| edc9c2d2 | 30,000m | 222.16 GiB | A10G    | registered | lambda-a10g |
+| d87ad026 | 30,000m | 216.25 GiB | A100-40 | registered | gcp-a100-40 |
+
+----------------------------------------
+
+TITLE: Listing Available Machines
+DESCRIPTION: Command to list all registered machines in the Beam inventory, showing details like ID, CPU, Memory, GPU, Status, and Pool assignment.
+
+LANGUAGE: sh
+CODE:
+beam machine list
+
+----------------------------------------
+
+TITLE: Python Package Dependencies List
+DESCRIPTION: Specifies required Python packages and their versions for the beam project. Includes web frameworks, HTTP clients, serialization libraries, and system utilities. Each line follows the format package==version.
+
+LANGUAGE: plaintext
+CODE:
+fastapi==0.109.0
+gunicorn==22.0.0
+uvicorn==0.29.0
+requests==2.32.2
+packaging==21.3
+MarkupSafe==2.0.0
+websockets==11.0.3
+pydantic==2.5.3
+betterproto-beta9==2.0.0b7
+grpcio==1.60.0
+httpx==0.24.1
+bson==0.5.10
+psutil==5.9.6
+cloudpickle==3.0.0
+rich==13.7.0
+watchdog==4.0.0
+six==1.16.0
+
+----------------------------------------
+
+TITLE: Specifying pathspec Package Version
+DESCRIPTION: Defines a requirement for the pathspec package, pinned to version 0.12.1. This package provides pattern matching and handling for file paths.
+
+LANGUAGE: plaintext
+CODE:
+pathspec==0.12.1
+
+----------------------------------------
+
+TITLE: Launching fly app for JuiceFS S3 Gateway deployment
+DESCRIPTION: This command launches a fly app, modifying the fly.toml file in-place. It sets the organization, app name, and other configuration options without deploying immediately.
+
+LANGUAGE: shell
+CODE:
+fly launch --org my-org --name my-deployment --no-deploy --copy-config --yes
+
+----------------------------------------
+
+TITLE: Deploying and scaling JuiceFS S3 Gateway on fly.io
+DESCRIPTION: This set of commands imports secrets, deploys the app, and scales it to 1 instance in a specific region. It uses the previously created .env file for secrets.
+
+LANGUAGE: shell
+CODE:
+cat .env | fly secrets import
+fly deploy
+fly scale count 1 --max-per-region=1 --region=iad
+
+----------------------------------------
+
+TITLE: Creating environment variables for JuiceFS S3 Gateway deployment on fly.io
+DESCRIPTION: This shell script creates a .env file with necessary secrets for deploying JuiceFS S3 Gateway. It includes variables for Tailscale, JuiceFS configuration, and MinIO credentials.
+
+LANGUAGE: shell
+CODE:
+cat <<'EOF' | tee > .env
+TAILSCALE_AUTHKEY="my-tailscale-authkey"
+JUICEFS_NAME="my-filesystem"
+JUICEFS_REDIS_URI="rediss://username:password@hostname:6379/0"
+JUICEFS_BUCKET="https://fly.storage.tigris.dev/my-bucket-name"
+JUICEFS_ACCESS_KEY="my-access-key"
+JUICEFS_SECRET_KEY="my-secret-key"
+MINIO_ROOT_USER="my-username"
+MINIO_ROOT_PASSWORD="my-password"
+EOF
+
+----------------------------------------
+
+TITLE: Setting Up Local DNS for Beam Development
+DESCRIPTION: This bash snippet provides commands to set up local DNS using dnsmasq for Beam development. It's required for using external file services and optional for subdomain middleware.
+
+LANGUAGE: bash
+CODE:
+brew install dnsmasq
+echo 'address=/cluster.local/127.0.0.1' >> /opt/homebrew/etc/dnsmasq.conf
+sudo bash -c 'mkdir -p /etc/resolver'
+sudo bash -c 'echo "nameserver 127.0.0.1" > /etc/resolver/cluster.local'
+sudo brew services start dnsmasq
+
+----------------------------------------
+
+TITLE: Initializing and Applying Terraform for Beta9 Deployment
+DESCRIPTION: Initializes the Terraform working directory and applies the configuration to deploy Beta9 on Crusoe Cloud.
+
+LANGUAGE: sh
+CODE:
+terraform init
+terraform apply
+
+----------------------------------------
+
+TITLE: Creating Terraform Variables File for Beta9 Deployment
+DESCRIPTION: Creates a terraform.tfvars file to specify the SSH key path for the Beta9 deployment on Crusoe Cloud.
+
+LANGUAGE: hcl
+CODE:
+ssh_key_path  = "~/.ssh/id_crusoecloud.pub"
+
+----------------------------------------
+
+TITLE: Configuring Tailscale with Environment Variables in Markdown
+DESCRIPTION: This snippet outlines the requirements for setting up Tailscale using a secret .env file. It specifies that a .tailscale.env file containing environment variables for Tailscale configuration should be created in the same directory before applying the configuration.
+
+LANGUAGE: markdown
+CODE:
+# tailscale
+
+This requires a secret .env file named `.tailscale.env`. This should contain environment variables used to configure tailscale.
+
+Write the file to this directory before applying.
+
+----------------------------------------
+
+TITLE: Generating Documentation Markdown
+DESCRIPTION: Commands to generate markdown documentation, with an optional command to copy the output directly to clipboard on macOS systems.
+
+LANGUAGE: shell
+CODE:
+# Generates markdown
+./bin/docgen.py
+
+# Generates markdown and copies to your clipboard (on macOS)
+./bin/docgen.py | pbcopy
+
+----------------------------------------
+
+TITLE: Deleting JuiceFS S3 Gateway deployment on fly.io
+DESCRIPTION: This command destroys the fly app deployment, removing all associated resources. It requires confirmation and specifies the deployment name.
+
+LANGUAGE: shell
+CODE:
+fly app destroy --yes my-deployment
+
+----------------------------------------
+
+TITLE: Monitoring Beta9 Setup Logs via SSH
+DESCRIPTION: Tails the user-data log file on the remote instance to monitor the Beta9 setup process.
+
+LANGUAGE: sh
+CODE:
+ssh -i ~/.ssh/id_crusoecloud ubuntu@<instance-ip> 'tail -n+1 -f /var/log/user-data.log'
+
+----------------------------------------
+
+TITLE: Installing Dependencies with Poetry
+DESCRIPTION: Command to install all project dependencies including development dependencies using Poetry package manager.
+
+LANGUAGE: shell
+CODE:
+poetry install

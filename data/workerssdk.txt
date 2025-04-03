@@ -1,0 +1,5327 @@
+TITLE: Integration Test Example for Wrangler's unstable_dev API
+DESCRIPTION: Code example demonstrating how to use Wrangler's unstable_dev API for integration testing. This allows users to test their workers using just Wrangler and a test framework without having to provide their own fetcher.
+
+LANGUAGE: javascript
+CODE:
+describe("worker", async () => {
+  const worker = await wrangler.unstable_dev("src/index.ts");
+
+  const resp = await worker.fetch();
+
+  expect(resp).not.toBe(undefined);
+  if (resp) {
+    const text = await resp.text();
+    expect(text).toMatchInlineSnapshot(`"Hello World!"`);
+  }
+
+  worker.stop();
+}
+
+----------------------------------------
+
+TITLE: Creating and Using Miniflare Instance in JavaScript
+DESCRIPTION: Example of initializing a Miniflare instance to simulate a Cloudflare Worker, sending a request to it, and properly disposing of resources when done. Shows the basic workflow from creation to cleanup.
+
+LANGUAGE: javascript
+CODE:
+import { Miniflare } from "miniflare";
+
+// Create a new Miniflare instance, starting a workerd server
+const mf = new Miniflare({
+	script: `addEventListener("fetch", (event) => {
+    event.respondWith(new Response("Hello Miniflare!"));
+  })`,
+});
+
+// Send a request to the workerd server, the host is ignored
+const response = await mf.dispatchFetch("http://localhost:8787/");
+console.log(await response.text()); // Hello Miniflare!
+
+// Cleanup Miniflare, shutting down the workerd server
+await mf.dispose();
+
+----------------------------------------
+
+TITLE: Explaining Worker Files Structure in Miniflare 3
+DESCRIPTION: This markdown text describes the organization of Miniflare 3 Workers code, specifying that files with *.worker.ts extension are type-checked using Cloudflare Workers types instead of Node.js types. It also mentions shared dependencies between Workers and Node.js components.
+
+LANGUAGE: markdown
+CODE:
+# Miniflare 3 Workers
+
+This directory contains code for Workers used internally by Miniflare 3. Files
+ending in `*.worker.ts` will be type-checked under
+`@cloudflare/workers-types/experimental`, instead of `@types/node`.
+
+It also contains dependencies (i.e. header/binding names, other constants and
+types) shared between Workers and the Node.js components of Miniflare. These
+must type check under both typing environments.
+
+----------------------------------------
+
+TITLE: Implementing Wrapped Bindings with Miniflare in WorkersSDK
+DESCRIPTION: Comprehensive example demonstrating how to use wrapped bindings to create custom binding implementations. This example shows a key-value store implementation with a main worker that uses the binding and a supporting worker that implements the binding functionality.
+
+LANGUAGE: typescript
+CODE:
+import { Miniflare } from "miniflare";
+const store = new Map<string, string>();
+const mf = new Miniflare({
+  workers: [
+    {
+      wrappedBindings: {
+        MINI_KV: {
+          scriptName: "mini-kv", // Use Worker named `mini-kv` for implementation
+          bindings: { NAMESPACE: "ns" }, // Override `NAMESPACE` inner binding
+        },
+      },
+      modules: true,
+      script: `export default {
+        async fetch(request, env, ctx) {
+          // Example usage of wrapped binding
+          await env.MINI_KV.set("key", "value");
+          return new Response(await env.MINI_KV.get("key"));
+        }
+      }`,
+    },
+    {
+      name: "mini-kv",
+      serviceBindings: {
+        // Function-valued service binding for accessing Node.js state
+        async STORE(request) {
+          const { pathname } = new URL(request.url);
+          const key = pathname.substring(1);
+          if (request.method === "GET") {
+            const value = store.get(key);
+            const status = value === undefined ? 404 : 200;
+            return new Response(value ?? null, { status });
+          } else if (request.method === "PUT") {
+            const value = await request.text();
+            store.set(key, value);
+            return new Response(null, { status: 204 });
+          } else if (request.method === "DELETE") {
+            store.delete(key);
+            return new Response(null, { status: 204 });
+          } else {
+            return new Response(null, { status: 405 });
+          }
+        },
+      },
+      modules: true,
+      script: `
+      // Implementation of binding
+      class MiniKV {
+        constructor(env) {
+          this.STORE = env.STORE;
+          this.baseURL = "http://x/" + (env.NAMESPACE ?? "") + ":";
+        }
+        async get(key) {
+          const res = await this.STORE.fetch(this.baseURL + key);
+          return res.status === 404 ? null : await res.text();
+        }
+        async set(key, body) {
+          await this.STORE.fetch(this.baseURL + key, { method: "PUT", body });
+        }
+        async delete(key) {
+          await this.STORE.fetch(this.baseURL + key, { method: "DELETE" });
+        }
+      }
+
+      // env has the type { STORE: Fetcher, NAMESPACE?: string }
+      export default function (env) {
+        return new MiniKV(env);
+      }
+      `,
+    },
+  ],
+});
+
+----------------------------------------
+
+TITLE: Using Hyperdrive Binding with getPlatformProxy in JavaScript
+DESCRIPTION: Example JavaScript code demonstrating how to use a Hyperdrive binding with getPlatformProxy to connect to a Postgres database in a Workers environment. The binding returns a no-op/passthrough that can be used inside Node.js.
+
+LANGUAGE: javascript
+CODE:
+// index.mjs
+
+import postgres from "postgres";
+import { getPlatformProxy } from "wrangler";
+
+const { env, dispose } = await getPlatformProxy();
+
+try {
+	const sql = postgres(
+		// Note: connectionString points to `postgres://user:pass@127.0.0.1:1234/db` not to the actual hyperdrive
+		//       connection string, for more details see the explanation below
+		env.MY_HYPERDRIVE.connectionString
+	);
+	const results = await sql`SELECT * FROM pg_tables`;
+	await sql.end();
+} catch (e) {
+	console.error(e);
+}
+
+await dispose();
+
+----------------------------------------
+
+TITLE: Configuring Workers Bindings in wrangler.toml
+DESCRIPTION: Example TOML configuration showing how to set up various Cloudflare Workers bindings including browser rendering, AI, Email Send, Vectorize, Hyperdrive, and mTLS certificates in wrangler.toml.
+
+LANGUAGE: toml
+CODE:
+[browser]
+binding = "BROWSER"
+
+[ai]
+binding = "AI"
+
+[[send_email]]
+name = "SEND_EMAIL"
+
+[[vectorize]]
+binding = "VECTORIZE"
+index_name = "VECTORIZE_NAME"
+
+[[hyperdrive]]
+binding = "HYPERDRIVE"
+id = "HYPERDRIVE_ID"
+
+[[mtls_certificates]]
+binding = "MTLS"
+certificate_id = "MTLS_CERTIFICATE_ID"
+
+----------------------------------------
+
+TITLE: Configuring WASM Modules in wrangler.toml for Service-Worker Format
+DESCRIPTION: Configuration example for defining WASM modules in wrangler.toml that will be available as global variables in service-worker format workers. This allows referencing WASM modules by path that will then be accessible in your code.
+
+LANGUAGE: toml
+CODE:
+[wasm_modules]
+MYWASM = "./path/to/my-wasm.wasm"
+
+----------------------------------------
+
+TITLE: Setting Up and Populating Miniflare Storage (KV, R2, D1) for Cloudflare Workers
+DESCRIPTION: This script initializes Miniflare with three different storage mechanisms (KV Namespace, R2 Bucket, and D1 Database), populates each with sample data, and properly cleans up resources. It configures persistent storage locations for each mechanism and demonstrates basic data operations.
+
+LANGUAGE: javascript
+CODE:
+import path from "node:path";
+import url from "node:url";
+import { Miniflare } from "miniflare";
+
+const __filename = url.fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
+const mf = new Miniflare({
+	script: "",
+	modules: true,
+
+	kvPersist: path.join(__dirname, "kv"),
+	kvNamespaces: ["NAMESPACE"],
+
+	r2Persist: path.join(__dirname, "r2"),
+	r2Buckets: ["BUCKET"],
+
+	d1Persist: path.join(__dirname, "d1"),
+	d1Databases: ["DATABASE"],
+});
+
+const kvNamespace = await mf.getKVNamespace("NAMESPACE");
+await kvNamespace.put("key", "value");
+
+const r2Bucket = await mf.getR2Bucket("BUCKET");
+await r2Bucket.put("key", "value");
+
+const d1Database = await mf.getD1Database("DATABASE");
+await d1Database.exec(
+	"CREATE TABLE entries (key TEXT PRIMARY KEY, value TEXT);"
+);
+await d1Database
+	.prepare("INSERT INTO entries (key, value) VALUES (?1, ?2)")
+	.bind("a", "1")
+	.run();
+
+await mf.dispose();
+
+----------------------------------------
+
+TITLE: Configuring D1 Database Binding for Durable Objects in TOML
+DESCRIPTION: This code snippet demonstrates how to configure a D1 database binding in a wrangler.toml file, enabling access to D1 from Durable Objects. The binding makes the database available via env.DB in both Workers and Durable Objects.
+
+LANGUAGE: toml
+CODE:
+[[d1_databases]]
+binding = "DB" # i.e. available in your Worker on env.DB
+database_name = "my-database-name"
+database_id = "UUID-GOES-HERE"
+preview_database_id = "UUID-GOES-HERE"
+
+----------------------------------------
+
+TITLE: Using Service Bindings in JavaScript Worker
+DESCRIPTION: Example JavaScript code showing how to use a service binding from within a worker. The code demonstrates calling another worker through the environment binding created in the configuration.
+
+LANGUAGE: javascript
+CODE:
+export default {
+	fetch(req, env, ctx) {
+		return env.MYWORKER.fetch(new Request("http://domain/some-path"));
+	},
+};
+
+----------------------------------------
+
+TITLE: Example TypeScript Worker with AI Binding
+DESCRIPTION: TypeScript example showing how to use the AI binding in a Cloudflare Worker. The script demonstrates importing the Ai class and running a model to generate content.
+
+LANGUAGE: typescript
+CODE:
+import Ai from "@cloudflare/ai"
+
+export default {
+    async fetch(request: Request, env: Env): Promise<Response> {
+        const ai = new Ai(env.AI);
+
+        const story = await ai.run({
+            model: 'llama-2',
+            input: {
+                prompt: 'Tell me a story about the future of the Cloudflare dev platform'
+            }
+        });
+
+    return new Response(JSON.stringify(story));
+    },
+};
+
+export interface Env {
+    AI: any;
+}
+
+----------------------------------------
+
+TITLE: WebAssembly Support in Wrangler Pages Functions
+DESCRIPTION: Information about adding WebAssembly module import support in Pages Functions and Pages Functions Advanced Mode. This enables developers to import wasm modules within Functions or _worker.js files, with proper bundling support.
+
+LANGUAGE: markdown
+CODE:
+- [#2624](https://github.com/cloudflare/workers-sdk/pull/2624) [`882bf592`](https://github.com/cloudflare/workers-sdk/commit/882bf592fa3a16a8a020808f70ef936bc7f87209) Thanks [@CarmenPopoviciu](https://github.com/CarmenPopoviciu)! - Add wasm support in `wrangler pages publish`
+
+  Currently it is not possible to import `wasm` modules in either Pages
+  Functions or Pages Advanced Mode projects.
+
+  This commit caries out work to address the aforementioned issue by
+  enabling `wasm` module imports in `wrangler pages publish`. As a result,
+  Pages users can now import their `wasm` modules withing their Functions
+  or `_worker.js` files, and `wrangler pages publish` will correctly
+  bundle everything and serve these "external" modules.
+
+----------------------------------------
+
+TITLE: Configuring Vite with React and Cloudflare Plugins
+DESCRIPTION: Vite configuration that includes both the React plugin and Cloudflare plugin. This enables React development with HMR while also providing Workers runtime features.
+
+LANGUAGE: typescript
+CODE:
+// vite.config.ts
+
+import { defineConfig } from "vite";
+import react from "@vitejs/plugin-react";
+import { cloudflare } from "@cloudflare/vite-plugin";
+
+export default defineConfig({
+  plugins: [react(), cloudflare()],
+});
+
+----------------------------------------
+
+TITLE: Implementing Multi-Worker Testing with unstable_dev API
+DESCRIPTION: Example demonstrating how to test interactions between multiple workers using wrangler's unstable_dev API. The code shows setting up parent and child workers, making requests between them, and validating responses.
+
+LANGUAGE: javascript
+CODE:
+import { unstable_dev } from "wrangler";
+
+describe("multi-worker testing", () => {
+	let childWorker;
+	let parentWorker;
+
+	beforeAll(async () => {
+		childWorker = await unstable_dev(
+			"src/child-worker.js",
+			{ config: "src/child-wrangler.toml" },
+			{ disableExperimentalWarning: true }
+		);
+		parentWorker = await unstable_dev(
+			"src/parent-worker.js",
+			{ config: "src/parent-wrangler.toml" },
+			{ disableExperimentalWarning: true }
+		);
+	});
+
+	afterAll(async () => {
+		await childWorker.stop();
+		await parentWorker.stop();
+	});
+
+	it("childWorker should return Hello World itself", async () => {
+		const resp = await childWorker.fetch();
+		if (resp) {
+			const text = await resp.text();
+			expect(text).toMatchInlineSnapshot(`"Hello World!"`);
+		}
+	});
+
+	it("parentWorker should return Hello World by invoking the child worker", async () => {
+		const resp = await parentWorker.fetch();
+		if (resp) {
+			const parsedResp = await resp.text();
+			expect(parsedResp).toEqual("Parent worker sees: Hello World!");
+		}
+	});
+});
+
+----------------------------------------
+
+TITLE: Configuring Rules for Non-JS Modules in Wrangler
+DESCRIPTION: Example configuration for specifying transport rules for non-JS modules, enabling inclusion of Markdown files as text files in a Worker project. This uses the top-level 'rules' configuration field in wrangler.toml.
+
+LANGUAGE: toml
+CODE:
+[[rules]]
+{type = "Text", globs = ["**/*.md"]}
+
+----------------------------------------
+
+TITLE: API Worker Implementation with Assets Integration
+DESCRIPTION: Worker code that handles both API requests and static assets serving. It detects requests to the API path and returns JSON, while passing other requests to the assets handler for SPA routing.
+
+LANGUAGE: typescript
+CODE:
+// api/index.ts
+
+interface Env {
+  ASSETS: Fetcher;
+}
+
+export default {
+  fetch(request, env) {
+    const url = new URL(request.url);
+
+    if (url.pathname.startsWith("/api/")) {
+      return Response.json({
+        name: "Cloudflare",
+      });
+    }
+
+    return env.ASSETS.fetch(request);
+  },
+} satisfies ExportedHandler<Env>;
+
+----------------------------------------
+
+TITLE: Installing Cloudflare Workers Projects with Package Managers
+DESCRIPTION: Command line instructions for starting a new Cloudflare Workers project using npm, pnpm, or yarn package managers. This creates a new project using the Cloudflare project templates.
+
+LANGUAGE: bash
+CODE:
+npm create cloudflare@latest
+# or
+pnpm create cloudflare@latest
+# or
+yarn create cloudflare@latest
+
+----------------------------------------
+
+TITLE: TypeScript Interface Generated from Worker Bindings
+DESCRIPTION: Example of TypeScript interface generated by wrangler types command from the Workers bindings configuration. This shows how various Cloudflare services are typed in a Worker's environment.
+
+LANGUAGE: typescript
+CODE:
+interface Env {
+	SEND_EMAIL: SendEmail;
+	VECTORIZE: VectorizeIndex;
+	HYPERDRIVE: Hyperdrive;
+	MTLS: Fetcher;
+	BROWSER: Fetcher;
+	AI: Fetcher;
+}
+
+----------------------------------------
+
+TITLE: Initializing a new Cloudflare Worker project with wrangler
+DESCRIPTION: Command to quickly create a new Cloudflare Worker project with default settings. The -y flag accepts all defaults without prompting for input.
+
+LANGUAGE: bash
+CODE:
+npx wrangler init my-worker -y
+
+----------------------------------------
+
+TITLE: Simple Worker Entry File Implementation
+DESCRIPTION: A basic Worker implementation that returns a response indicating the user agent. This demonstrates the structure of a Worker entry file that exports a default object with a fetch handler.
+
+LANGUAGE: typescript
+CODE:
+// src/index.ts
+
+export default {
+  fetch() {
+    return new Response(`Running in ${navigator.userAgent}!`);
+  },
+};
+
+----------------------------------------
+
+TITLE: Configuring Cloudflare Workers in wrangler.toml
+DESCRIPTION: Example wrangler.toml configuration file showing various settings for deploying a Worker to Cloudflare. This demonstrates the configuration structure used for Workers projects.
+
+LANGUAGE: toml
+CODE:
+[env.staging]
+name = "hello-world-staging"
+route = "staging.example.com/*"
+workers_dev = true
+
+----------------------------------------
+
+TITLE: Defining Default Module Rules in WorkersSDK Configuration
+DESCRIPTION: Example of default module rules used for identifying module types when automatic module location is enabled with 'modules: true'. These rules determine how files are treated based on their extensions.
+
+LANGUAGE: javascript
+CODE:
+[
+  { type: "ESModule", include: ["**/*.mjs"] },
+  { type: "CommonJS", include: ["**/*.js", "**/*.cjs"] },
+]
+
+----------------------------------------
+
+TITLE: Environment Detection Example with Node Fallback in TypeScript
+DESCRIPTION: This code demonstrates a function that uses conditional logic to provide cross-platform compatibility between Node.js and Cloudflare Workers environments. It detects the environment using the navigator.userAgent and chooses the appropriate implementation for generating random bytes.
+
+LANGUAGE: typescript
+CODE:
+export function randomBytes(length: number) {
+	if (navigator.userAgent !== "Cloudflare-Workers") {
+		return new Uint8Array(require("node:crypto").randomBytes(length));
+	} else {
+		return crypto.getRandomValues(new Uint8Array(length));
+	}
+}
+
+----------------------------------------
+
+TITLE: Using getBindingsProxy in Node.js
+DESCRIPTION: Example of using the getBindingsProxy utility in a Node.js script to interact with a KV namespace defined in wrangler.toml. The code demonstrates initialization, usage, and proper disposal of binding proxies.
+
+LANGUAGE: js
+CODE:
+import { getBindingsProxy } from "wrangler";
+
+const { bindings, dispose } = await getBindingsProxy();
+
+try {
+	const myKv = bindings.MY_KV;
+	const kvValue = await myKv.get("my-kv-key");
+
+	console.log(`KV Value = ${kvValue}`);
+} finally {
+	await dispose();
+}
+
+----------------------------------------
+
+TITLE: Using serveSinglePageApp Helper for Single Page Applications
+DESCRIPTION: Example demonstrating how to use the serveSinglePageApp helper function to handle routing for single-page applications like React or Vue.js. This function maps all requests to the root index.html file.
+
+LANGUAGE: javascript
+CODE:
+import { getAssetFromKV, serveSinglePageApp } from '@cloudflare/kv-asset-handler'
+...
+let asset = await getAssetFromKV(event, { mapRequestToAsset: serveSinglePageApp })
+
+----------------------------------------
+
+TITLE: Demonstrating Service Bindings with Named Entrypoints in Miniflare
+DESCRIPTION: This code snippet demonstrates how to use named entrypoints with service bindings in Miniflare. It shows the configuration of two workers where one worker accesses different entrypoints of itself and another worker through service bindings. The example includes RPC and named HTTP entrypoints.
+
+LANGUAGE: typescript
+CODE:
+import { kCurrentWorker, Miniflare } from "miniflare";
+
+const mf = new Miniflare({
+	workers: [
+		{
+			name: "a",
+			serviceBindings: {
+				A_RPC_SERVICE: { name: kCurrentWorker, entrypoint: "RpcEntrypoint" },
+				A_NAMED_SERVICE: { name: kCurrentWorker, entrypoint: "namedEntrypoint" },
+				B_NAMED_SERVICE: { name: "b", entrypoint: "anotherNamedEntrypoint" },
+			},
+			compatibilityFlags: ["rpc"],
+			modules: true,
+			script: `
+			import { WorkerEntrypoint } from "cloudflare:workers";
+
+			export class RpcEntrypoint extends WorkerEntrypoint {
+				ping() { return "a:rpc:pong"; }
+			}
+
+			export const namedEntrypoint = {
+				fetch(request, env, ctx) { return new Response("a:named:pong"); }
+			};
+
+			...
+			`,
+		},
+		{
+			name: "b",
+			modules: true,
+			script: `
+			export const anotherNamedEntrypoint = {
+				fetch(request, env, ctx) { return new Response("b:named:pong"); }
+			};
+			`,
+		},
+	],
+});
+
+----------------------------------------
+
+TITLE: Configuring Service Bindings in TOML for Worker A
+DESCRIPTION: Configuration example for Worker A with a service binding to Worker B, demonstrating how to set up service bindings in wrangler.toml.
+
+LANGUAGE: toml
+CODE:
+name = 'A'
+
+[[services]]
+binding = 'Bee'
+service = 'B'
+
+----------------------------------------
+
+TITLE: Configuring Module Rules in wrangler.toml
+DESCRIPTION: Example configuration for including additional modules in a Wrangler project, showing how to use the find_additional_modules option with rules to specify which file types should be included.
+
+LANGUAGE: toml
+CODE:
+name = "my-worker"
+main = "src/index.js"
+
+find_additional_modules = true
+rules = [
+  { type = "ESModule", globs = ["*.js"]}
+]
+
+----------------------------------------
+
+TITLE: Configuring Service Bindings in TOML
+DESCRIPTION: Example configuration for service bindings in wrangler.toml, which allows worker-to-worker communication. The binding defines a relationship to an existing worker named 'my-worker' with an optional environment specification.
+
+LANGUAGE: toml
+CODE:
+[[services]]
+binding = "MYWORKER"
+service = "my-worker"
+environment = "production" # optional, defaults to the worker's `default_environment` for now
+
+----------------------------------------
+
+TITLE: Using getAssetFromKV with ES Modules in Cloudflare Workers
+DESCRIPTION: Example of using the getAssetFromKV function with ES Modules format in a Cloudflare Worker. It demonstrates error handling for different types of errors that might be thrown.
+
+LANGUAGE: javascript
+CODE:
+import manifestJSON from "__STATIC_CONTENT_MANIFEST";
+import {
+	getAssetFromKV,
+	MethodNotAllowedError,
+	NotFoundError,
+} from "@cloudflare/kv-asset-handler";
+
+const assetManifest = JSON.parse(manifestJSON);
+
+export default {
+	async fetch(request, env, ctx) {
+		if (request.url.includes("/docs")) {
+			try {
+				return await getAssetFromKV(
+					{
+						request,
+						waitUntil(promise) {
+							return ctx.waitUntil(promise);
+						},
+					},
+					{
+						ASSET_NAMESPACE: env.__STATIC_CONTENT,
+						ASSET_MANIFEST: assetManifest,
+					}
+				);
+			} catch (e) {
+				if (e instanceof NotFoundError) {
+					// ...
+				} else if (e instanceof MethodNotAllowedError) {
+					// ...
+				} else {
+					return new Response("An unexpected error occurred", { status: 500 });
+				}
+			}
+		} else return fetch(request);
+	},
+};
+
+----------------------------------------
+
+TITLE: Configuring Cloudflare Vite Plugin in TypeScript
+DESCRIPTION: Basic configuration for integrating the Cloudflare plugin into a Vite project. This setup enables deploying applications as Workers with Workers Assets.
+
+LANGUAGE: typescript
+CODE:
+// vite.config.ts
+
+import { defineConfig } from "vite";
+import { cloudflare } from "@cloudflare/vite-plugin";
+
+export default defineConfig({
+  plugins: [cloudflare()],
+});
+
+----------------------------------------
+
+TITLE: Configuring Experimental Headers and Redirects Support in Cloudflare Vite Plugin
+DESCRIPTION: Example configuration for enabling experimental support for Workers Assets metafiles (_headers and _redirects) in the Cloudflare Vite plugin during development mode.
+
+LANGUAGE: typescript
+CODE:
+cloudflare({
+	// ...
+	experimental: { headersAndRedirectsDevModeSupport: true },
+}),
+
+----------------------------------------
+
+TITLE: Using getAssetFromKV with ES Modules in Workers
+DESCRIPTION: Example of how to use getAssetFromKV in a Workers script with ES Modules. This demonstrates importing the manifest, parsing it, and using it with the KV asset handler while providing the proper environment context.
+
+LANGUAGE: javascript
+CODE:
+import manifestJSON from "__STATIC_CONTENT_MANIFEST";
+const manifest = JSON.parse(manifestJSON);
+
+export default {
+  fetch(request, env, ctx) {
+    return await getAssetFromKV(
+      {
+        request,
+        waitUntil(promise) {
+          return ctx.waitUntil(promise);
+        },
+      },
+      {
+        ASSET_NAMESPACE: env.ASSET_NAMESPACE,
+        ASSET_MANIFEST: manifest,
+      }
+    );
+    // ...
+  },
+};
+
+----------------------------------------
+
+TITLE: Importing WebAssembly Module in Pages Functions
+DESCRIPTION: This example shows how to import a WebAssembly module in Cloudflare Pages Functions. It demonstrates importing a .wasm file and using it within an onRequest handler to generate a response based on the exported WebAssembly function.
+
+LANGUAGE: javascript
+CODE:
+import hello from "./hello.wasm"
+
+export async function onRequest() {
+	const module = await WebAssembly.instantiate(hello);
+	return new Response(module.exports.hello);
+}
+
+----------------------------------------
+
+TITLE: Defining JSON Bindings in TOML
+DESCRIPTION: Example of how to use JSON bindings in the vars section of wrangler.toml to provide string, numeric, and complex object values to your Worker.
+
+LANGUAGE: toml
+CODE:
+[vars]
+text = "plain ol' string"
+count = 1
+complex = { enabled = true, id = 123 }
+
+----------------------------------------
+
+TITLE: Default Ruleset Configuration for Wrangler
+DESCRIPTION: The default ruleset configuration in Wrangler for handling different file types. This configuration automatically processes text files, binary data, and WebAssembly modules with appropriate handlers.
+
+LANGUAGE: javascript
+CODE:
+{ type: "Text", globs: ["**/*.txt", "**/*.html"] },
+{ type: "Data", globs: ["**/*.bin"] },
+{ type: "CompiledWasm", globs: ["**/*.wasm"] },
+
+----------------------------------------
+
+TITLE: Implementing passThroughOnException Handler in Pages Functions
+DESCRIPTION: This code snippet demonstrates how to use the passThroughOnException() handler in Pages Functions to serve static assets when an error occurs, rather than showing an error page.
+
+LANGUAGE: typescript
+CODE:
+export const onRequest = ({ passThroughOnException }) => {
+	passThroughOnException();
+
+	x; // Would ordinarily throw an error, but instead, static assets are served.
+};
+
+----------------------------------------
+
+TITLE: Worker with Multiple Exported Entrypoints
+DESCRIPTION: TypeScript code demonstrating a Worker with multiple named entrypoints. It shows a Worker with a class-based entrypoint, an object-based entrypoint, and a default export, each providing a different response.
+
+LANGUAGE: typescript
+CODE:
+import { WorkerEntrypoint } from "cloudflare:workers";
+
+export class EntrypointA extends WorkerEntrypoint {
+	fetch(request) {
+		return new Response("Hello from entrypoint A!");
+	}
+}
+
+export const entrypointB: ExportedHandler = {
+	fetch(request, env, ctx) {
+		return new Response("Hello from entrypoint B!");
+	},
+};
+
+export default <ExportedHandler>{
+	fetch(request, env, ctx) {
+		return new Response("Hello from the default entrypoint!");
+	},
+};
+
+----------------------------------------
+
+TITLE: Configuring Multiple Environments in wrangler.toml
+DESCRIPTION: Example of defining variables in wrangler.toml for different environments (dev and production), showing how the variables can have different values per environment.
+
+LANGUAGE: toml
+CODE:
+[vars]
+MY_VAR = "dev value"
+
+[env.production.vars]
+MY_VAR = "prod value"
+
+----------------------------------------
+
+TITLE: Configuring Miniflare Inspector Proxy in JavaScript
+DESCRIPTION: Example demonstrating how to set up a Miniflare instance with inspector proxy for debugging. The configuration enables the inspector for specific workers (worker-a and worker-c), making them accessible through WebSocket connections at specific endpoints.
+
+LANGUAGE: javascript
+CODE:
+import { Miniflare } from "miniflare";
+
+const mf = new Miniflare({
+	// the inspector proxy will be accessible through port 9229
+	inspectorPort: 9229,
+	workers: [
+		{
+			name: "worker-a",
+			scriptPath: "./worker-a.js",
+			// enable the inspector proxy for worker-a
+			unsafeInspectorProxy: true,
+		},
+		{
+			name: "worker-b",
+			scriptPath: "./worker-b.js",
+			// worker-b is not going to be proxied
+		},
+		{
+			name: "worker-c",
+			scriptPath: "./worker-c.js",
+			// enable the inspector proxy for worker-c
+			unsafeInspectorProxy: true,
+		},
+	],
+});
+
+----------------------------------------
+
+TITLE: Configuring Routes with Pattern and Zone ID in Cloudflare Workers
+DESCRIPTION: Example of the new route configuration format that allows specifying a pattern along with an optional zone_id. This enables explicitly passing a zone_id to the API when needed for certain scenarios.
+
+LANGUAGE: javascript
+CODE:
+{pattern: string, zone_id: string}
+
+----------------------------------------
+
+TITLE: Setting up a Mock NPM Registry in Vitest Global Setup (TypeScript)
+DESCRIPTION: This code example demonstrates how to use the startMockNpmRegistry function in a Vitest global setup file to create a mock NPM registry, publish local packages, and set up a test project that installs the locally published packages.
+
+LANGUAGE: typescript
+CODE:
+export default async function ({ provide }: GlobalSetupContext) {
+	const stop = await startMockNpmRegistry("@cloudflare/vitest-pool-workers");
+
+	// Create temporary directory
+	const projectPath = await createTestProject();
+	execSync("pnpm install", { cwd: projectPath, stdio: "ignore" });
+
+	provide("tmpPoolInstallationPath", projectPath);
+
+
+----------------------------------------
+
+TITLE: Making Authenticated API Calls in Wrangler (TypeScript)
+DESCRIPTION: Demonstrates how to make authenticated API calls using the fetchResult utility. Shows pattern for defining API response types and making POST requests with JSON payloads.
+
+LANGUAGE: typescript
+CODE:
+type UploadResponse = {
+	jwt?: string;
+};
+
+const res = await fetchResult<UploadResponse>(
+	`/accounts/${accountId}/workers/assets/upload`,
+	{
+		method: "POST",
+		headers: {
+			"Content-Type": "application/json",
+		},
+		body: payload,
+	}
+);
+
+----------------------------------------
+
+TITLE: Configuring R2 Bucket Bindings with Jurisdiction in TOML
+DESCRIPTION: Configuration example for wrangler.toml showing how to specify a jurisdiction for R2 bucket bindings in Workers, which is necessary to access buckets belonging to specific jurisdictions.
+
+LANGUAGE: toml
+CODE:
+[[r2_buckets]]
+bindings = [
+  { binding = "MY_BUCKET", bucket_name = "<YOUR_BUCKET_NAME>", jurisdiction = "<JURISDICTION>" }
+]
+
+----------------------------------------
+
+TITLE: Registering Commands in Wrangler Registry (TypeScript)
+DESCRIPTION: Shows how to register commands and namespaces in the Wrangler command registry. This process links the command definitions to specific command strings that the CLI will recognize.
+
+LANGUAGE: typescript
+CODE:
+import { kvKeyNamespace, kvKeyPutCommand, kvNamespace } from "./kv";
+
+// ...
+
+registry.define([
+	{ command: "wrangler kv", definition: kvNamespace },
+	{ command: "wrangler kv key", definition: kvKeyNamespace },
+	{ command: "wrangler kv key put", definition: kvKeyPutCommand },
+	// ...other kv commands here
+]);
+registry.registerNamespace("kv");
+
+----------------------------------------
+
+TITLE: Custom Request Mapping Example for KV Asset Handler
+DESCRIPTION: Example of customizing the mapRequestToAsset function to modify the request path before asset lookup. This example strips '/docs' from URLs before looking up assets in KV.
+
+LANGUAGE: javascript
+CODE:
+import { getAssetFromKV, mapRequestToAsset } from '@cloudflare/kv-asset-handler'
+...
+const customKeyModifier = request => {
+  let url = request.url
+  //custom key mapping optional
+  url = url.replace('/docs', '').replace(/^\/+/, '')
+  return mapRequestToAsset(new Request(url, request))
+}
+let asset = await getAssetFromKV(event, { mapRequestToAsset: customKeyModifier })
+
+----------------------------------------
+
+TITLE: Configuring Version Metadata Binding in TOML
+DESCRIPTION: Example configuration for the new version_metadata binding in wrangler.toml, which replaces the deprecated unsafe metadata deployment binding.
+
+LANGUAGE: toml
+CODE:
+[version_metadata]
+binding = "CF_VERSION_METADATA"
+
+----------------------------------------
+
+TITLE: Installing Miniflare with npm
+DESCRIPTION: Command for installing Miniflare as a development dependency in a Node.js project.
+
+LANGUAGE: shell
+CODE:
+$ npm install miniflare --save-dev
+
+----------------------------------------
+
+TITLE: Configuring Observability Logs Settings in Wrangler TOML
+DESCRIPTION: Configuration example for controlling logs settings in wrangler.toml. This allows developers to enable/disable logs as an independent dataset and control invocation logs separately.
+
+LANGUAGE: toml
+CODE:
+[observability.logs]
+enabled = true
+invocation_logs = false
+
+----------------------------------------
+
+TITLE: Creating R2 Storage Schema in SQL
+DESCRIPTION: SQL schema definition for Miniflare's R2 implementation, containing three tables: _mf_objects for storing object metadata, _mf_multipart_uploads for tracking multipart upload state, and _mf_multipart_parts for storing individual parts of multipart uploads.
+
+LANGUAGE: sql
+CODE:
+-- Object in R2 bucket. Multipart objects are composed of multiple parts,
+-- and are only added to this table once completed.
+CREATE TABLE IF NOT EXISTS _mf_objects (
+  key TEXT PRIMARY KEY,
+  blob_id TEXT,                    -- null if multipart
+  version TEXT NOT NULL,
+  size INTEGER NOT NULL,           -- total size of object (all parts) in bytes
+  etag TEXT NOT NULL,              -- hex MD5 hash if not multipart
+  uploaded INTEGER NOT NULL,       -- milliseconds since unix epoch
+  checksums TEXT NOT NULL,         -- JSON-serialised `R2StringChecksums` (workers-types)
+  http_metadata TEXT NOT NULL,     -- JSON-serialised `R2HTTPMetadata` (workers-types)
+  custom_metadata TEXT NOT NULL    -- JSON-serialised user-defined metadata
+);
+
+-- In-progress, completed, or aborted multipart upload. Stores current state,
+-- and metadata passed to `createMultipartUpload()`.
+CREATE TABLE IF NOT EXISTS _mf_multipart_uploads (
+  upload_id TEXT PRIMARY KEY,
+  key TEXT NOT NULL,
+  http_metadata TEXT NOT NULL,     -- JSON-serialised `R2HTTPMetadata` (workers-types)
+  custom_metadata TEXT NOT NULL,   -- JSON-serialised user-defined metadata
+  state TINYINT DEFAULT 0 NOT NULL -- 0 = IN_PROGRES, 1 = COMPLETED, 2 = ABORTED
+  -- NOTE: we need to keep completed/aborted uploads around for referential
+  -- integrity, and because error messages are different when attempting to
+  -- upload parts to them
+);
+
+-- Parts belonging to a multipart object/upload. Created when calling
+-- `R2MultipartUpload#uploadPart()`.
+CREATE TABLE IF NOT EXISTS _mf_multipart_parts (
+  upload_id TEXT NOT NULL REFERENCES _mf_multipart_uploads(upload_id),
+  part_number INTEGER NOT NULL,
+  blob_id TEXT NOT NULL,
+  size INTEGER NOT NULL,           -- NOTE: used to identify which parts to read for range requests
+  etag TEXT NOT NULL,              -- NOTE: multipart part ETag's are not MD5 checksums
+  checksum_md5 TEXT NOT NULL,      -- NOTE: used in construction of final object's ETag
+  object_key TEXT REFERENCES _mf_objects(key) DEFERRABLE INITIALLY DEFERRED,
+  PRIMARY KEY (upload_id, part_number)
+);
+
+----------------------------------------
+
+TITLE: Using unstable_dev in Remote Mode for End-to-End Testing
+DESCRIPTION: Example code showing how to use unstable_dev in remote mode to perform end-to-end tests against workers in production. This requires CLOUDFLARE_API_TOKEN and potentially CLOUDFLARE_ACCOUNT_ID to be configured in your environment.
+
+LANGUAGE: javascript
+CODE:
+await unstable_dev("src/index.ts", {
+	local: false,
+});
+
+----------------------------------------
+
+TITLE: Configuring Smart Placement in Wrangler TOML
+DESCRIPTION: Example configuration for enabling Smart Placement in a Wrangler project. Smart Placement can be configured by adding a placement object with mode set to 'smart' in the wrangler.toml file.
+
+LANGUAGE: toml
+CODE:
+[placement]
+mode = "smart"
+
+----------------------------------------
+
+TITLE: Configuring Constellation Bindings in TOML
+DESCRIPTION: Example configuration for Constellation bindings in the wrangler.toml file. This allows Workers to interact with uploaded machine learning models through the Constellation service.
+
+LANGUAGE: toml
+CODE:
+[[constellation]]
+binding = 'AI'
+project_id = '9d478427-dea6-4988-9b16-f6f8888d974c'
+
+----------------------------------------
+
+TITLE: Analytics Engine Binding Configuration in TOML
+DESCRIPTION: Example configuration for adding Analytics Engine bindings in wrangler.toml, specifying a binding name and dataset.
+
+LANGUAGE: toml
+CODE:
+analytics_engine_datasets = [
+    { binding = "ANALYTICS", dataset = "my_dataset" }
+]
+
+----------------------------------------
+
+TITLE: Testing Worker with Query Parameters using unstable_dev
+DESCRIPTION: Test case demonstrating how to use unstable_dev to test a Worker that processes query parameters. This shows the fixed behavior where query parameters are now properly preserved.
+
+LANGUAGE: javascript
+CODE:
+const worker = await unstable_dev("script.js");
+const res = await worker.fetch("http://worker?name=Walshy");
+const text = await res.text();
+expect(text).toBe("Hello, Walshy");
+
+----------------------------------------
+
+TITLE: Using getPlatformProxy with Assets Binding in JavaScript
+DESCRIPTION: Example demonstrating how to use getPlatformProxy with an assets binding configuration to fetch files from the assets directory.
+
+LANGUAGE: json
+CODE:
+// wrangler.json
+{
+	"name": "my-worker",
+	"assets": {
+		"directory": "./public/",
+		"binding": "ASSETS"
+	},
+	"vars": {
+		"MY_VAR": "my-var"
+	}
+}
+
+LANGUAGE: javascript
+CODE:
+import { getPlatformProxy } from "wrangler";
+
+const { env, dispose } = await getPlatformProxy();
+
+if (env.ASSETS) {
+	const text = await (
+		await env.ASSETS.fetch("http://0.0.0.0/file.txt")
+	).text();
+	console.log(text); // logs the content of file.txt
+}
+
+await dispose();
+
+----------------------------------------
+
+TITLE: Displaying Deployment Information with wrangler deployments view
+DESCRIPTION: Example output of the 'wrangler deployments view' command, which shows detailed information about a specific deployment including bindings and usage model information. This helps debug bad deployments.
+
+LANGUAGE: typescript
+CODE:
+Deployment ID: 07d7143d-0284-427e-ba22-2d5e6e91b479
+Created on:    2023-03-02T21:05:15.622446Z
+Author:        jspspike@gmail.com
+Source:        Upload from Wrangler 🤠
+------------------------------------------------------------
+Author ID:          e5a3ca86e08fb0940d3a05691310bb42
+Usage Model:        bundled
+Handlers:           fetch
+Compatibility Date: 2022-10-03
+--------------------------bindings--------------------------
+[[r2_buckets]]
+binding = "MY_BUCKET"
+bucket_name = "testr2"
+
+[[kv_namespaces]]
+id = "79300c6d17eb4180a07270f450efe53f"
+binding = "yeee"
+
+----------------------------------------
+
+TITLE: Defining Service Bindings With Named Entrypoints in TOML Configuration
+DESCRIPTION: TOML configuration snippet showing how to set up a service binding to a specific named entrypoint of a Worker. This allows binding to exports other than the default export using the 'entrypoint' property.
+
+LANGUAGE: toml
+CODE:
+[[services]]
+binding = "SERVICE"
+service = "bound"
+entrypoint = "EntrypointA"
+
+----------------------------------------
+
+TITLE: Example AI Binding Configuration in wrangler.toml
+DESCRIPTION: Configuration example for setting up an AI binding in wrangler.toml that will be used to interact with the AI project.
+
+LANGUAGE: toml
+CODE:
+name = "ai-worker"
+main = "src/index.ts"
+
+[ai]
+binding = "AI"
+
+----------------------------------------
+
+TITLE: Demonstrating Pages Proxying Redirects Format
+DESCRIPTION: Shows the format for setting up 200 status proxying redirects in a Pages _redirects file, where requests to a pattern like /users/:id will be internally routed to /users/[id].html while maintaining the original URL in the browser.
+
+LANGUAGE: plaintext
+CODE:
+/users/:id /users/[id] 200
+
+----------------------------------------
+
+TITLE: Executing Scheduled Worker Test with Wrangler Dev
+DESCRIPTION: Example showing how to test scheduled workers using wrangler dev in remote mode by passing the --test-scheduled flag and triggering the scheduled event through a dedicated route.
+
+LANGUAGE: shell
+CODE:
+$ npx wrangler dev index.js --test-scheduled
+
+$ curl http://localhost:8787/__scheduled
+
+----------------------------------------
+
+TITLE: ESBuild Version Update
+DESCRIPTION: Fix to update ESBuild to version 0.16.3, addressing a hanging issue in the previous 0.15.13 release and avoiding breaking changes that would require refactoring.
+
+LANGUAGE: markdown
+CODE:
+- [#2592](https://github.com/cloudflare/wrangler2/pull/2592) [`dd66618b`](https://github.com/cloudflare/wrangler2/commit/dd66618b2cc63a89424f471f6153be9518f1f087) Thanks [@rozenmd](https://github.com/rozenmd)! - fix: bump esbuild to 0.16.3 (fixes a bug in esbuild's 0.15.13 release that would cause it to hang, is the latest release before a major breaking change that requires us to refactor)
+
+----------------------------------------
+
+TITLE: Configuring Workflow Bindings in TOML Configuration
+DESCRIPTION: Example of how to configure a Workflow binding in the wrangler.toml file. This connects a Worker to a named workflow with a specific class implementation.
+
+LANGUAGE: toml
+CODE:
+[[workflows]]
+binding = "WORKFLOW"
+name = "my-workflow"
+class_name = "MyDemoWorkflow"
+
+----------------------------------------
+
+TITLE: Executing D1 SQL Queries with JSON Output in Wrangler
+DESCRIPTION: Example of the new 'd1 execute --json' command, which provides a clean JSON output when executing SQL queries against D1 databases, facilitating integration with other tools.
+
+LANGUAGE: bash
+CODE:
+rozenmd@cflaptop test1 % npx wrangler d1 execute test --command="select * from customers" --json
+[
+  {
+    "results": [
+      {
+        "CustomerID": 1,
+        "CompanyName": "Alfreds Futterkiste",
+        "ContactName": "Maria Anders"
+      },
+      {
+        "CustomerID": 4,
+        "CompanyName": "Around the Horn",
+        "ContactName": "Thomas Hardy"
+      },
+      {
+        "CustomerID": 11,
+        "CompanyName": "Bs Beverages",
+        "ContactName": "Victoria Ashworth"
+      },
+      {
+        "CustomerID": 13,
+        "CompanyName": "Bs Beverages",
+        "ContactName": "Random Name"
+      }
+    ],
+    "success": true,
+    "meta": {
+      "duration": 1.662519000004977,
+      "last_row_id": null,
+      "changes": null,
+      "served_by": "primary-xxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx.db3",
+      "internal_stats": null
+    }
+  }
+]
+
+----------------------------------------
+
+TITLE: Using the D1 Insights Command for Query Analysis
+DESCRIPTION: Examples of how to use the new experimental wrangler d1 insights command to analyze database query performance with different sorting and time period options.
+
+LANGUAGE: bash
+CODE:
+npx wrangler d1 insights northwind --sortBy reads --timePeriod 7d
+
+LANGUAGE: bash
+CODE:
+npx wrangler d1 insights northwind --sortBy writes --timePeriod 31d
+
+LANGUAGE: bash
+CODE:
+npx wrangler d1 insights northwind --sortBy count
+
+----------------------------------------
+
+TITLE: Configuring Pipelines Binding in Wrangler Configuration
+DESCRIPTION: Example of using the new [[pipelines]] binding configuration in wrangler.toml that allows sending events to a specified pipeline.
+
+LANGUAGE: toml
+CODE:
+[[pipelines]]
+binding = "MY_PIPELINE"
+pipeline = "my-pipeline"
+
+----------------------------------------
+
+TITLE: Importing WASM Files in JavaScript
+DESCRIPTION: Example of importing a WebAssembly file that isn't explicitly exported from a module. The Workers SDK now supports more node-like import resolution for packages without declared exports.
+
+LANGUAGE: javascript
+CODE:
+import JPEG_DEC_WASM from "@jsquash/jpeg/codec/dec/mozjpeg_dec.wasm";
+
+----------------------------------------
+
+TITLE: Configuring Worker in TOML Format
+DESCRIPTION: Example of a worker configuration using the TOML format in wrangler.toml, showing basic settings like name, main entry point, and compatibility date.
+
+LANGUAGE: toml
+CODE:
+name = "worker-ts"
+main = "src/index.ts"
+compatibility_date = "2023-05-04"
+
+----------------------------------------
+
+TITLE: Binding a Worker to a Dynamic Dispatch Namespace in TOML Configuration
+DESCRIPTION: Code snippet showing how to bind a worker to a dynamic dispatch namespace in the wrangler.toml configuration file. This allows binding workers to namespaces that may contain other workers, which is useful for Workers for Platforms functionality.
+
+LANGUAGE: toml
+CODE:
+[[worker_namespaces]]
+binding = 'dispatcher' # available as env.dispatcher in your worker
+namespace = 'namespace-name' # the name of the namespace being bound
+
+----------------------------------------
+
+TITLE: Importing WASM Modules with --no-bundle in Wrangler
+DESCRIPTION: Example showing how to import a WASM module in a Worker with the --no-bundle flag. This allows modules to be loaded at runtime on Cloudflare's Edge rather than being bundled.
+
+LANGUAGE: javascript
+CODE:
+// index.js
+import wasm from './example.wasm'
+
+export default {
+  async fetch() {
+    await WebAssembly.instantiate(wasm, ...)
+    ...
+  }
+}
+
+----------------------------------------
+
+TITLE: Using Environment Option with getPlatformProxy
+DESCRIPTION: Example of using the new environment option with getPlatformProxy to target specific environments like production.
+
+LANGUAGE: javascript
+CODE:
+const { env } = await getPlatformProxy({
+	environment: "production",
+});
+
+----------------------------------------
+
+TITLE: Displaying D1 Error Response in JSON Format
+DESCRIPTION: Example of how D1 errors are now properly formatted as JSON when using the --json flag with wrangler d1 execute. This shows the error structure for an invalid SQL query.
+
+LANGUAGE: json
+CODE:
+{
+	"error": {
+		"text": "A request to the Cloudflare API (/accounts/xxxx/d1/database/xxxxxxx/query) failed.",
+		"notes": [
+			{
+				"text": "no such column: asdf at offset 7 [code: 7500]"
+			}
+		],
+		"kind": "error",
+		"name": "APIError",
+		"code": 7500
+	}
+}
+
+----------------------------------------
+
+TITLE: Defining Error Payload Interface in TypeScript
+DESCRIPTION: Defines the TypeScript interface for the error payload that must be sent to the format-errors worker. It includes the error details with optional stack trace, cause, and request metadata.
+
+LANGUAGE: typescript
+CODE:
+export interface JsonError {
+	message?: string;
+	name?: string;
+	stack?: string;
+	cause?: JsonError;
+}
+export interface Payload {
+	url?: string;
+	method?: string;
+	headers?: Record<string, string>;
+	error?: JsonError;
+}
+
+----------------------------------------
+
+TITLE: Defining Module Alias in TOML Configuration
+DESCRIPTION: Example of replacing node-fetch with a custom fetch implementation in wrangler.toml configuration using the alias property.
+
+LANGUAGE: toml
+CODE:
+# ...
+[alias]
+"node-fetch": "./fetch-nolyfill"
+
+----------------------------------------
+
+TITLE: Setting Main Entry Point in Wrangler.toml
+DESCRIPTION: Example of using the top-level 'main' field in wrangler.toml to define an entry point for a Worker. This replaces the deprecated build.upload.main configuration pattern.
+
+LANGUAGE: toml
+CODE:
+main = "src/chat.mjs"
+
+----------------------------------------
+
+TITLE: Testing Live Worker Modifications with WranglerE2ETestHelper
+DESCRIPTION: Example test that verifies Wrangler can watch and rebuild a Worker when source files change. Uses runLongLived() to start a Wrangler process that continues running during the test.
+
+LANGUAGE: typescript
+CODE:
+it(`can modify worker during ${cmd}`, async () => {
+	const helper = new WranglerE2ETestHelper();
+	await helper.seed({
+		"wrangler.toml": dedent`
+			name = "worker"
+			main = "src/index.ts"
+			compatibility_date = "2023-01-01"
+			compatibility_flags = ["nodejs_compat"]
+
+			[vars]
+			KEY = "value"
+		`,
+		"src/index.ts": dedent`
+			export default {
+				fetch(request) {
+					return new Response("Hello World!")
+				}
+			}`,
+		"package.json": dedent`
+			{
+				"name": "worker",
+				"version": "0.0.0",
+				"private": true
+			}
+		`,
+	});
+	const worker = helper.runLongLived(cmd);
+
+	const { url } = await worker.waitForReady();
+
+	await expect(fetch(url).then((r) => r.text())).resolves.toMatchSnapshot();
+
+	await helper.seed({
+		"src/index.ts": dedent`
+			export default {
+				fetch(request, env) {
+					return new Response("Updated Worker! " + env.KEY)
+				}
+			}
+		`,
+	});
+
+	await worker.waitForReload();
+
+	await expect(fetchText(url)).resolves.toMatchSnapshot();
+});
+
+----------------------------------------
+
+TITLE: Handling Uppercase Hotkeys in Wrangler Dev
+DESCRIPTION: Fix to support uppercase hotkeys during wrangler dev execution by accepting uppercase input during interactive development.
+
+LANGUAGE: typescript
+CODE:
+// Previously only lowercase hotkeys were supported
+// Now both uppercase and lowercase hotkeys are accepted during `wrangler dev`
+
+----------------------------------------
+
+TITLE: Initializing Miniflare with Python Module Support in JavaScript
+DESCRIPTION: Example showing how to construct a MiniFlare instance with a Python module using the new Python support feature. The code demonstrates how to configure a Python module with JavaScript interoperability.
+
+LANGUAGE: javascript
+CODE:
+const mf = new Miniflare({
+	modules: [
+		{
+			type: "PythonModule",
+			path: "index",
+			contents:
+				"from js import Response;\ndef fetch(request):\n  return Response.new('hello')",
+		},
+	],
+	compatibilityFlags: ["experimental"],
+});
+
+----------------------------------------
+
+TITLE: Generating TypeScript Module Declarations for CompiledWasm Files
+DESCRIPTION: TypeScript declaration for WebAssembly modules. When using custom module rules with the CompiledWasm type, this declaration makes modules of type *.wasm available as WebAssembly.Module instances.
+
+LANGUAGE: typescript
+CODE:
+declare module "**/*.wasm" {
+	const value: WebAssembly.Module;
+	export default value;
+}
+
+----------------------------------------
+
+TITLE: Generated TypeScript Interface for Environment Variables
+DESCRIPTION: Example of the TypeScript interface generated by 'wrangler types' for environment variables, showing how the type is incorrectly restricted to only the dev value.
+
+LANGUAGE: typescript
+CODE:
+interface Env {
+	MY_VAR: "dev value";
+}
+
+----------------------------------------
+
+TITLE: Testing Worker Version Uploads with WranglerE2ETestHelper
+DESCRIPTION: Example test that demonstrates creating and deploying a Worker, then uploading a versioned deployment. Uses the helper class to seed test files and run Wrangler commands.
+
+LANGUAGE: typescript
+CODE:
+describe("uploading Worker versions", () => {
+	const workerName = generateResourceName();
+	const helper = new WranglerE2ETestHelper();
+
+	beforeAll(async () => {
+		await helper.seed({
+			"wrangler.toml": dedent`
+				name = "${workerName}"
+				main = "src/index.ts"
+				compatibility_date = "2023-01-01"
+			`,
+			"src/index.ts": dedent`
+				export default {
+					fetch(request) {
+						return new Response("Hello World!")
+					}
+				}
+			`,
+			"package.json": dedent`
+				{
+					"name": "${workerName}",
+					"version": "0.0.0",
+					"private": true
+				}
+			`,
+		});
+	});
+	it("deploy worker", async () => {
+		await helper.run("wrangler deploy");
+	});
+	it("upload a version", async () => {
+		const upload = await helper.run(
+			`wrangler versions upload --message "Upload via e2e test" --tag "e2e-upload"  --x-versions`
+		);
+		// Check the output looks correct
+		expect(normalize(upload.stdout)).toMatchInlineSnapshot(`
+			"Total Upload: xx KiB / gzip: xx KiB
+			Uploaded tmp-e2e-worker-00000000-0000-0000-0000-000000000000 (TIMINGS)
+			Worker Version ID: 00000000-0000-0000-0000-000000000000
+			To deploy this version to production traffic use the command wrangler versions deploy --experimental-versions
+			Changes to non-versioned settings (config properties 'logpush' or 'tail_consumers') take effect after your next deployment using the command wrangler versions deploy --experimental-versions
+			Changes to triggers (routes, custom domains, cron schedules, etc) must be applied with the command wrangler triggers deploy --experimental-versions"
+	`);
+	});
+});
+
+----------------------------------------
+
+TITLE: User-Defined Wrangler.toml Configuration
+DESCRIPTION: Example of a user's wrangler.toml configuration file that specifies a Worker's name, entry point, and KV namespace binding.
+
+LANGUAGE: toml
+CODE:
+name = "my-worker"
+main = "src/index.ts"
+[[kv_namespaces]]
+binding = "<BINDING_NAME1>"
+id = "<NAMESPACE_ID1>"
+
+----------------------------------------
+
+TITLE: Worker Script with Imported Dependencies
+DESCRIPTION: Example of a Worker script that imports dependencies which will be detected and watched for changes in Pages dev mode.
+
+LANGUAGE: javascript
+CODE:
+import { graham } from "./graham-the-dog";
+export default {
+	fetch(request, env) {
+		return new Response(graham)
+	}
+}
+
+----------------------------------------
+
+TITLE: Generating TypeScript Module Declarations for Text Files
+DESCRIPTION: TypeScript declaration for text files. When using custom module rules with the Text type, this declaration makes modules of type *.text available as string instances.
+
+LANGUAGE: typescript
+CODE:
+declare module "**/*.text" {
+	const value: string;
+	export default value;
+}
+
+----------------------------------------
+
+TITLE: Basic wrangler.toml Configuration
+DESCRIPTION: Minimal configuration example for a Wrangler project, specifying only the worker name and the main entry point file.
+
+LANGUAGE: toml
+CODE:
+name = "my-worker"
+main = "src/index.js
+
+----------------------------------------
+
+TITLE: Generating Self-Signed Certificate for HTTPS in Miniflare
+DESCRIPTION: Shell command for generating a self-signed SSL certificate to use with Miniflare's HTTPS server option, followed by a JavaScript example of configuring Miniflare to use the certificate.
+
+LANGUAGE: shell
+CODE:
+$ openssl req -newkey rsa:2048 -nodes -keyout key.pem -x509 -days 365 -out cert.pem
+
+LANGUAGE: javascript
+CODE:
+new Miniflare({
+	httpsKeyPath: "key.pem",
+	httpsCertPath: "cert.pem",
+});
+
+----------------------------------------
+
+TITLE: Wrangler Deployment Configuration Redirect
+DESCRIPTION: Example of the config.json file that redirects Wrangler to the generated wrangler.json in the dist directory for deployment commands.
+
+LANGUAGE: json
+CODE:
+{
+	"configPath": "../../dist/wrangler.json"
+}
+
+----------------------------------------
+
+TITLE: Configuring Vite with Cloudflare Plugin
+DESCRIPTION: Basic Vite configuration file that includes the Cloudflare plugin. This enables integration between Vite and the Workers runtime during development and build processes.
+
+LANGUAGE: typescript
+CODE:
+// vite.config.ts
+
+import { defineConfig } from "vite";
+import { cloudflare } from "@cloudflare/vite-plugin";
+
+export default defineConfig({
+  plugins: [cloudflare()],
+});
+
+----------------------------------------
+
+TITLE: WebAssembly Support in Pages Functions Build
+DESCRIPTION: Enhancement to enable WebAssembly module imports in wrangler pages functions build, allowing Pages users to import wasm modules within their Functions or _worker.js files with proper bundling support.
+
+LANGUAGE: markdown
+CODE:
+* [#2685](https://github.com/cloudflare/workers-sdk/pull/2685) [`2b1177ad`](https://github.com/cloudflare/workers-sdk/commit/2b1177ad524b33a4364bc6bed58c3e0b4c59775e) Thanks [@CarmenPopoviciu](https://github.com/CarmenPopoviciu)! - You can now import Wasm modules in Pages Functions and Pages Functions Advanced Mode (`_worker.js`).
+  This change specifically enables `wasm` module imports in `wrangler pages functions build`.
+  As a result, Pages users can now import their `wasm` modules within their Functions or
+  `_worker.js` files, and `wrangler pages functions build` will correctly bundle everything
+  and output the expected result file.
+
+----------------------------------------
+
+TITLE: Configuring Worker in JSON Format
+DESCRIPTION: Equivalent worker configuration using the JSON format in wrangler.json, demonstrating the same settings as the TOML example but with JSON syntax.
+
+LANGUAGE: json
+CODE:
+{
+	"name": "worker-ts",
+	"main": "src/index.ts",
+	"compatibility_date": "2023-05-04"
+}
+
+----------------------------------------
+
+TITLE: Using unstable_dev with Experimental Options in JavaScript (Updated Pattern)
+DESCRIPTION: Example showing the new pattern for using unstable_dev with experimental options after the breaking change that moves experimental options under a dedicated object.
+
+LANGUAGE: javascript
+CODE:
+worker = await unstable_dev("src/index.js", {
+  experimental: { disableExperimentalWarning: true },
+});
+
+----------------------------------------
+
+TITLE: Implementing a Workflow Entrypoint in TypeScript
+DESCRIPTION: Example of how to create a Workflow entrypoint class in TypeScript that extends the WorkflowEntrypoint class from the Cloudflare Workers API.
+
+LANGUAGE: typescript
+CODE:
+import { WorkflowEntrypoint } from "cloudflare:workers";
+
+export class MyDemoWorkflow extends WorkflowEntrypoint<Env, Params> {...}
+
+----------------------------------------
+
+TITLE: Initializing Worker Development Environment with unstable_dev
+DESCRIPTION: Code snippet demonstrating how to initialize a Worker development environment using the unstable_dev function. This is used for testing and local development of Workers.
+
+LANGUAGE: javascript
+CODE:
+const worker = await unstable_dev("src/index.ts", {
+  experimental: { disableExperimentalWarning: true }
+});
+
+----------------------------------------
+
+TITLE: Workerd Exports Condition Support
+DESCRIPTION: Enhancement to prefer the workerd exports condition when bundling, enabling the development of isomorphic libraries with runtime-specific implementations through the standard conditional exports mechanism.
+
+LANGUAGE: markdown
+CODE:
+- [#2629](https://github.com/cloudflare/workers-sdk/pull/2629) [`151733e5`](https://github.com/cloudflare/workers-sdk/commit/151733e5d98e95f363b548f9959c2baf418eb7b5) Thanks [@mrbbot](https://github.com/mrbbot)! - Prefer the `workerd` `exports` condition when bundling.
+
+  This can be used to build isomorphic libraries that have different implementations depending on the JavaScript runtime they're running in.
+  When bundling, Wrangler will try to load the [`workerd` key](https://runtime-keys.proposal.wintercg.org/#workerd).
+  This is the [standard key](https://runtime-keys.proposal.wintercg.org/#workerd) for the Cloudflare Workers runtime.
+  Learn more about the [conditional `exports` field here](https://nodejs.org/api/packages.html#conditional-exports).
+
+----------------------------------------
+
+TITLE: Implementing Dynamic Import with Wildcard Patterns in JavaScript
+DESCRIPTION: Example of dynamic imports in JavaScript that will bundle all matching files according to the pattern. This demonstrates the enhanced bundling behavior in Wrangler v4 with esbuild 0.24.2.
+
+LANGUAGE: javascript
+CODE:
+// src/index.js
+export default {
+	async fetch() {
+		const url = new URL(request.url);
+		const name = url.pathname;
+		const value = (await import("." + name)).default;
+		return new Response(value);
+	},
+};
+
+----------------------------------------
+
+TITLE: Previous Pattern for unstable_dev with Experimental Options in JavaScript
+DESCRIPTION: Example showing the old pattern for using unstable_dev with experimental options before the breaking change.
+
+LANGUAGE: javascript
+CODE:
+worker = await unstable_dev(
+	"src/index.js",
+	{},
+	{ disableExperimentalWarning: true }
+);
+
+----------------------------------------
+
+TITLE: Displaying Cloudflare Pipeline Configuration
+DESCRIPTION: Command to show the configuration details of an existing Cloudflare Pipeline.
+
+LANGUAGE: bash
+CODE:
+wrangler pipelines show my-pipeline
+
+----------------------------------------
+
+TITLE: Basic Wrangler Configuration for Workers
+DESCRIPTION: A minimal wrangler.toml configuration for a Cloudflare Worker project. Specifies the project name, compatibility date, and the main entry file for the Worker.
+
+LANGUAGE: toml
+CODE:
+# wrangler.toml
+
+name = "cloudflare-vite-quick-start"
+compatibility_date = "2024-12-30"
+main = "./src/index.ts"
+
+----------------------------------------
+
+TITLE: Importing Functions in Pages Development Environment
+DESCRIPTION: Example of importing dependencies in a Pages Function file, demonstrating how file watching works in Pages projects. Changes to the imported dependency will now trigger reloads in the development environment.
+
+LANGUAGE: typescript
+CODE:
+import { ADD } from "../math/add";
+
+export async function onRequest() {
+	return new Response(`${ADD} is fun!`);
+}
+
+----------------------------------------
+
+TITLE: Using wrangler pages dev with script path and proxy command
+DESCRIPTION: Command example for using wrangler pages dev with a custom script path and proxy command, which was fixed in a recent update.
+
+LANGUAGE: bash
+CODE:
+wrangler pages dev --script-path=<my script path> -- <proxy command>
+
+----------------------------------------
+
+TITLE: Using Static Imports with Explicit Route Handling in Workers
+DESCRIPTION: A recommended approach for importing modules in Workers that explicitly defines which routes serve which modules, providing better control over access to files.
+
+LANGUAGE: javascript
+CODE:
+// src/index.js
+import one from "./one.js";
+import two from "./two.js";
+
+export default {
+	async fetch() {
+		const name = new URL(request.url).pathname;
+		switch (name) {
+			case "/one.js":
+				return new Response(one);
+			case "/two.js":
+				return new Response(two);
+			default:
+				return new Response("Not found", { status: 404 });
+		}
+	},
+};
+
+----------------------------------------
+
+TITLE: Dependency Update Table for Workerd and Workers-Types Packages
+DESCRIPTION: A markdown table displaying version updates for the workerd and @cloudflare/workers-types dependencies in the miniflare package.
+
+LANGUAGE: markdown
+CODE:
+| Dependency                | From          | To            |
+| ------------------------- | ------------- | ------------- |
+| workerd                   | 1.20250204.0  | 1.20250214.0  |
+| @cloudflare/workers-types | ^4.20250204.0 | ^4.20250214.0 |
+
+----------------------------------------
+
+TITLE: Adding Unsafe Bindings Configuration in TOML
+DESCRIPTION: Example of how to use the new [[unsafe.bindings]] configuration in wrangler.toml to enable experimental features that aren't officially supported by wrangler yet.
+
+LANGUAGE: toml
+CODE:
+[[unsafe.bindings]]
+name = "SomeService"
+type = "service"
+service = "some-service"
+environment = "staging"
+
+[[unsafe.bindings]]
+name = "SomeOtherService"
+type = "service"
+service = "some-other-service"
+environment = "qa"
+
+----------------------------------------
+
+TITLE: D1 database info command with JSON output
+DESCRIPTION: Example of using the d1 info command with JSON output format to get structured database information.
+
+LANGUAGE: bash
+CODE:
+npx wrangler d1 info northwind --json
+
+----------------------------------------
+
+TITLE: Dependency Update Table from January 2024
+DESCRIPTION: A markdown table showing dependency updates for the miniflare package with workerd and @cloudflare/workers-types version changes.
+
+LANGUAGE: markdown
+CODE:
+| Dependency                | From          | To            |
+| ------------------------- | ------------- | ------------- |
+| workerd                   | 1.20250124.0  | 1.20250129.0  |
+| @cloudflare/workers-types | ^4.20250121.0 | ^4.20250129.0 |
+
+----------------------------------------
+
+TITLE: Setting Local Workerd Path with Environment Variable in Shell
+DESCRIPTION: Example of how to override the workerd binary being used by Miniflare with a local build by setting the MINIFLARE_WORKERD_PATH environment variable to point to a custom workerd binary location.
+
+LANGUAGE: shell
+CODE:
+$ export MINIFLARE_WORKERD_PATH="<WORKERD_REPO_DIR>/bazel-bin/src/workerd/server/workerd"
+
+----------------------------------------
+
+TITLE: Dependency Update Table for Late January 2024
+DESCRIPTION: A markdown table showing version updates for the workerd and @cloudflare/workers-types dependencies in the miniflare package.
+
+LANGUAGE: markdown
+CODE:
+| Dependency                | From          | To            |
+| ------------------------- | ------------- | ------------- |
+| workerd                   | 1.20241230.0  | 1.20250124.0  |
+| @cloudflare/workers-types | ^4.20241230.0 | ^4.20250121.0 |
+
+----------------------------------------
+
+TITLE: Creating a Basic Worker Script
+DESCRIPTION: Simple example of a Worker script that returns a greeting. This demonstrates the basic structure of a Cloudflare Worker function.
+
+LANGUAGE: javascript
+CODE:
+export default {
+  fetch() {
+    return new Response("Hello World!");
+  }
+};
+
+----------------------------------------
+
+TITLE: Exporting Default Entrypoint in Worker-C
+DESCRIPTION: Code snippet demonstrating how to export a default class that extends WorkerEntrypoint in a Worker with assets. This pattern uses class inheritance for the Worker implementation.
+
+LANGUAGE: javascript
+CODE:
+export default class extends WorkerEntrypoint {
+	async fetch(){}
+}
+
+----------------------------------------
+
+TITLE: Using Wrapped Bindings with Magic Proxy in Miniflare
+DESCRIPTION: Example showing how to use wrapped bindings with Miniflare's magic proxy, where one worker can expose functionality to another worker through bindings.
+
+LANGUAGE: typescript
+CODE:
+import { Miniflare } from "miniflare";
+
+const mf = new Miniflare({
+	workers: [
+		{
+			wrappedBindings: {
+				Greeter: {
+					scriptName: "impl",
+				},
+			},
+			modules: true,
+			script: `export default { fetch(){ return new Response(''); } }`,
+		},
+		{
+			modules: true,
+			name: "impl",
+			script: `
+				class Greeter {
+					sayHello(name) {
+						return "Hello " + name;
+					}
+				}
+
+				export default function (env) {
+					return new Greeter();
+				}
+			`,
+		},
+	],
+});
+
+const { Greeter } = await mf.getBindings();
+
+console.log(Greeter.sayHello("world")); // <--- prints 'Hello world'
+
+await mf.dispose();
+
+----------------------------------------
+
+TITLE: Creating Self-Referencing Service Bindings with kCurrentWorker
+DESCRIPTION: Demonstrates how to create a service binding that references the current worker using the kCurrentWorker symbol. This allows for recursive API calls within the same worker.
+
+LANGUAGE: javascript
+CODE:
+import { kCurrentWorker, Miniflare } from "miniflare";
+
+const mf = new Miniflare({
+	serviceBindings: {
+		SELF: kCurrentWorker,
+	},
+	modules: true,
+	script: `export default {
+      fetch(request, env, ctx) {
+        const { pathname } = new URL(request.url);
+        if (pathname === "/recurse") {
+          return env.SELF.fetch("http://placeholder");
+        }
+        return new Response("body");
+      }
+    }`,
+});
+
+const response = await mf.dispatchFetch("http://placeholder/recurse");
+console.log(await response.text()); // body
+
+----------------------------------------
+
+TITLE: Defining Cloudflare Environments in Wrangler TOML Configuration
+DESCRIPTION: Example of a Wrangler configuration file with multiple Cloudflare environments. This demonstrates how to define different environment variables for development, staging, and production environments.
+
+LANGUAGE: toml
+CODE:
+# wrangler.toml
+
+name = "my-worker"
+compatibility_date = "2024-12-30"
+main = "./src/index.ts"
+
+vars = { MY_VAR = "Top-level var" }
+
+[env.staging]
+vars = { MY_VAR = "Staging var" }
+
+[env.production]
+vars = { MY_VAR = "Production var" }
+
+----------------------------------------
+
+TITLE: Configuring ES Modules Rule in Wrangler TOML
+DESCRIPTION: TOML configuration that specifies all JavaScript files should be treated as ES modules when using --no-bundle. This allows Wrangler to properly handle additional JavaScript modules.
+
+LANGUAGE: toml
+CODE:
+rules = [
+  { type = "ESModule", globs = ["**/*.js"]},
+]
+
+----------------------------------------
+
+TITLE: Pages Publish No-Bundle Flag Fix
+DESCRIPTION: Bug fix ensuring that the --no-bundle flag is correctly recognized when using the wrangler pages publish command, providing better control over the bundling process.
+
+LANGUAGE: markdown
+CODE:
+- [#2609](https://github.com/cloudflare/workers-sdk/pull/2609) [`58ac8a78`](https://github.com/cloudflare/workers-sdk/commit/58ac8a783b95c2c884781e5c8af675fe8036644b) Thanks [@dario-piotrowicz](https://github.com/dario-piotrowicz)! - fix: make sure that the pages publish --no-bundle flag is correctly recognized
+
+----------------------------------------
+
+TITLE: Creating a Worker Configuration Object
+DESCRIPTION: Example of a configuration object for a Worker environment. This shows the various options available when configuring a Worker instance.
+
+LANGUAGE: javascript
+CODE:
+const worker = await unstable_dev("src/index.ts", {
+  config: "wrangler.toml",
+  experimental: { disableExperimentalWarning: true },
+  env: "staging",
+  ip: "0.0.0.0",
+  port: 8080,
+  inspectorPort: 9229,
+  localProtocol: "https",
+  compatibilityDate: "2023-10-25",
+  compatibilityFlags: ["nodejs_compat"],
+  vars: { API_KEY: "1234" },
+  kv: [
+    {
+      binding: "KV",
+      id: "xxxx",
+      preview_id: "xxxx"
+    }
+  ],
+  durableObjects: {
+    DO: {
+      className: "DurableObjectClass"
+    }
+  },
+  r2: [
+    {
+      binding: "R2",
+      bucket_name: "example"
+    }
+  ],
+  d1Databases: [
+    {
+      binding: "DB",
+      database_name: "example-db",
+      database_id: "xxxx"
+    }
+  ],
+  services: [
+    {
+      binding: "SERVICE",
+      service: "example-service",
+      environment: "production"
+    }
+  ],
+  queueConsumers: [
+    {
+      binding: "QUEUE",
+      queue: "example-queue"
+    }
+  ],
+  logLevel: "debug",
+  minify: true,
+  persist: true,
+  persistTo: "./worker-storage",
+  sourceMap: true,
+  watch: false,
+  routes: ["example.com/*"],
+  tsconfig: "tsconfig.json",
+  define: {
+    "process.env.API_URL": JSON.stringify("https://api.example.com")
+  },
+  additionalModules: [{
+    type: "Text",
+    name: "text.txt",
+    content: "hello!"
+  }],
+  bundle: true,
+  assets: {
+    "favicon.ico": "./favicon.ico"
+  },
+  crons: ["0 * * * *"],
+  tail_workers: false,
+  testScheduled: true,
+  onReload: async () => {
+    console.log("reload");
+  }
+});
+
+----------------------------------------
+
+TITLE: Using Service Binding with Miniflare Instance
+DESCRIPTION: Demonstrates how to access the Miniflare instance inside a service binding handler function. The instance is passed as the second parameter to the handler.
+
+LANGUAGE: javascript
+CODE:
+import assert from "node:assert";
+import { Miniflare, Response } from "miniflare";
+
+const mf = new Miniflare({
+	serviceBindings: {
+		SERVICE(request, instance) {
+			assert(instance === mf);
+			return new Response();
+		},
+	},
+});
+
+----------------------------------------
+
+TITLE: Sending HTTP Request to a Worker Using fetch
+DESCRIPTION: Example of sending an HTTP request to a Worker using the fetch API. This demonstrates how to interact with a deployed Worker through HTTP.
+
+LANGUAGE: javascript
+CODE:
+const resp = await worker.fetch();
+
+----------------------------------------
+
+TITLE: Configuring Variables in TOML for Wrangler Types Generation
+DESCRIPTION: Sample TOML configuration showing how to set up variables for different environments that will be used with the wrangler types command.
+
+LANGUAGE: toml
+CODE:
+[vars]
+MY_VARIABLE = "production_value"
+MY_NUMBERS = [1, 2, 3]
+
+[env.staging.vars]
+MY_VARIABLE = "staging_value"
+MY_NUMBERS = [7, 8, 9]
+
+----------------------------------------
+
+TITLE: D1 Preview Database SQL Execution
+DESCRIPTION: Fix to enable running SQL against preview databases, enhancing the development workflow with D1 databases by allowing SQL execution in preview environments.
+
+LANGUAGE: markdown
+CODE:
+- [#2715](https://github.com/cloudflare/workers-sdk/pull/2715) [`e33294b0`](https://github.com/cloudflare/workers-sdk/commit/e33294b07ced96707cad9d71feb768b4ac435f76) Thanks [@rozenmd](https://github.com/rozenmd)! - fix: make it possible to run SQL against preview databases
+
+----------------------------------------
+
+TITLE: Importing Workers SDK Modules in JavaScript
+DESCRIPTION: Example showing how to import specific modules from the Workers SDK. This demonstrates the modular approach the SDK takes for different functionality.
+
+LANGUAGE: javascript
+CODE:
+import { unstable_dev } from "wrangler";
+
+----------------------------------------
+
+TITLE: Using Relative Paths Outside Working Directory in Miniflare
+DESCRIPTION: Shows how to configure Miniflare to use script paths that are outside of the current working directory by setting an appropriate modulesRoot.
+
+LANGUAGE: javascript
+CODE:
+const mf = new Miniflare({
+	modules: true,
+	modulesRoot: "..",
+	scriptPath: "../worker.mjs",
+});
+
+----------------------------------------
+
+TITLE: Importing and Using Cloudflare unenv-preset in TypeScript
+DESCRIPTION: This code demonstrates how to import the Cloudflare preset from the unenv-preset package, define an environment using unenv's defineEnv function, and extract the resulting environment variables. The preset enables Node.js compatibility in Cloudflare Workers environments.
+
+LANGUAGE: typescript
+CODE:
+import { cloudflare } from "@cloudflare/unenv-preset";
+import { defineEnv } from "unenv";
+
+const { env } = defineEnv({
+	presets: [cloudflare],
+});
+
+const { alias, inject, external, polyfill } = env;
+
+----------------------------------------
+
+TITLE: Configuring Custom Root Paths in Miniflare
+DESCRIPTION: Shows how to set custom root paths for file resolution in Miniflare. Paths can be configured at both global and worker-specific levels, with worker-level paths resolving relative to global paths.
+
+LANGUAGE: javascript
+CODE:
+import { Miniflare } from "miniflare";
+
+const mf1 = new Miniflare({
+	scriptPath: "index.mjs",
+});
+
+const mf2 = new Miniflare({
+	rootPath: "a/b",
+	scriptPath: "c/index.mjs",
+});
+
+const mf3 = new Miniflare({
+	rootPath: "/a/b",
+	workers: [
+		{
+			name: "1",
+			rootPath: "c",
+			scriptPath: "index.mjs",
+		},
+		{
+			name: "2",
+			scriptPath: "index.mjs",
+		},
+	],
+});
+
+----------------------------------------
+
+TITLE: TypeScript Config Generation Update
+DESCRIPTION: Fix to update the generated TypeScript configuration, changing jest to vitest types to reflect the current testing framework used in the ecosystem.
+
+LANGUAGE: markdown
+CODE:
+- [#2652](https://github.com/cloudflare/wrangler2/pull/2652) [`2efd4537`](https://github.com/cloudflare/wrangler2/commit/2efd4537cb141e88fe9a674c2fd093b40a3c9d63) Thanks [@mrkldshv](https://github.com/mrkldshv)! - fix: change `jest` to `vitest` types in generated TypeScript config
+
+----------------------------------------
+
+TITLE: Worker with Static Imports Instead of Dynamic
+DESCRIPTION: Alternative approach that uses static imports and a switch statement instead of dynamic imports, providing more explicit control over which modules are included and served.
+
+LANGUAGE: javascript
+CODE:
+// src/index.js
+import one from "./one.js";
+import two from "./two.js";
+
+export default {
+	async fetch() {
+		const name = new URL(request.url).pathname;
+		switch (name) {
+			case "/one.js":
+				return new Response(one);
+			case "/two.js":
+				return new Response(two);
+			default:
+				return new Response("Not found", { status: 404 });
+		}
+	},
+};
+
+----------------------------------------
+
+TITLE: Configuring Routes with Pattern and Zone Name in Cloudflare Workers
+DESCRIPTION: Example of route configuration format that allows specifying a pattern along with an optional zone_name. This is particularly useful when using SSL for SaaS in Cloudflare.
+
+LANGUAGE: javascript
+CODE:
+{pattern: string, zone_name: string}
+
+----------------------------------------
+
+TITLE: Wrangler Configuration with Recursive Module Inclusion
+DESCRIPTION: Configuration that includes all JavaScript files recursively in any subdirectory, using the double asterisk glob pattern for comprehensive module inclusion.
+
+LANGUAGE: toml
+CODE:
+rules = [
+  { type = "ESModule", globs = ["**/*.js"]}
+]
+
+----------------------------------------
+
+TITLE: Setting ASSET_NAMESPACE with Service Worker Format in KV Asset Handler
+DESCRIPTION: Example showing how to pass the ASSET_NAMESPACE parameter when using Service Worker format with getAssetFromKV function.
+
+LANGUAGE: javascript
+CODE:
+return getAssetFromKV(event, { ASSET_NAMESPACE: MY_NAMESPACE })
+
+----------------------------------------
+
+TITLE: D1 Local Migrations Authentication Fix
+DESCRIPTION: Fix to remove the login requirement when running d1 migrations list --local, streamlining the local development workflow for D1 databases.
+
+LANGUAGE: markdown
+CODE:
+* [#2657](https://github.com/cloudflare/wrangler2/pull/2657) [`8d21b2ea`](https://github.com/cloudflare/wrangler2/commit/8d21b2eae4ca5b3eb96c19cbb5c95b470e69942e) Thanks [@rozenmd](https://github.com/rozenmd)! - fix: remove the need to login when running `d1 migrations list --local`
+
+----------------------------------------
+
+TITLE: Module Examples for Dynamic Imports
+DESCRIPTION: Example modules that might be dynamically imported in a Cloudflare Worker. These represent files that would be included based on the URL path in the dynamic import example.
+
+LANGUAGE: javascript
+CODE:
+// src/one.js
+export default "one";
+
+LANGUAGE: javascript
+CODE:
+// src/two.js
+export default "two";
+
+LANGUAGE: javascript
+CODE:
+// src/hidden/secret.js
+export default "do not share this secret";
+
+----------------------------------------
+
+TITLE: Creating KV Database Schema in SQLite
+DESCRIPTION: SQL schema used by the KV simulator in Miniflare. It creates a table '_mf_entries' to store key-value pairs with blob references, expiration times, and metadata.
+
+LANGUAGE: sql
+CODE:
+-- Key/value entry
+CREATE TABLE IF NOT EXISTS _mf_entries (
+  key TEXT PRIMARY KEY,
+  blob_id TEXT NOT NULL,  -- Blob ID stored in `BlobStore`
+  expiration INTEGER,     -- Milliseconds since unix epoch
+  metadata TEXT           -- JSON encoded metadata blob
+);
+
+----------------------------------------
+
+TITLE: Enabling Telemetry via CLI Command
+DESCRIPTION: Command to re-enable Create-Cloudflare telemetry data collection after it has been disabled. This allows users to opt back into sharing usage data.
+
+LANGUAGE: sh
+CODE:
+npm create cloudflare telemetry enable
+
+----------------------------------------
+
+TITLE: Using getBindingsProxy Context Example in TypeScript
+DESCRIPTION: This code demonstrates how to use the new 'ctx' field from getBindingsProxy to mock the production ExecutionContext object, allowing developers to use methods like waitUntil during local development and testing.
+
+LANGUAGE: typescript
+CODE:
+const { ctx } = await getBindingsProxy();
+ctx.waitUntil(myPromise);
+
+----------------------------------------
+
+TITLE: Displaying D1 Database List with JSON Output in Wrangler
+DESCRIPTION: Example of using the newly implemented 'd1 list --json' command to get a clean JSON output of D1 databases for easier piping into other commands.
+
+LANGUAGE: bash
+CODE:
+rozenmd@cflaptop test % npx wrangler d1 list --json
+[
+  {
+    "uuid": "xxxxxx-xxxx-xxxx-xxxx-xxxxxx",
+    "name": "test"
+  },
+  {
+    "uuid": "xxxxxx-xxxx-xxxx-xxxx-xxxxxx",
+    "name": "test2"
+  },
+  {
+    "uuid": "xxxxxx-xxxx-xxxx-xxxx-xxxxxx",
+    "name": "test3"
+  },
+]
+
+----------------------------------------
+
+TITLE: Example Telemetry Event Format in JSON
+DESCRIPTION: This snippet shows the JSON structure of a sample telemetry event sent to Cloudflare. It includes fields such as event name, device ID, timestamp, and various properties like platform, version, and command arguments.
+
+LANGUAGE: json
+CODE:
+{
+	"event": "c3 session started",
+	"deviceId": "9fd5d422-99a1-4c7d-9666-ca3637927fa6",
+	"timestamp": 1726760778899,
+	"properties": {
+		"amplitude_session_id": 1726760778800,
+		"amplitude_event_id": 0,
+		"platform": "Mac OS",
+		"c3Version": "2.34.5",
+		"isFirstUsage": false,
+		"packageManager": "npm",
+		"args": {
+			"_": [],
+			"auto-update": false,
+			"autoUpdate": false,
+			"experimental": false,
+			"open": true,
+			"$0": "create-cloudflare",
+			"additionalArgs": []
+		}
+	}
+}
+
+----------------------------------------
+
+TITLE: VS Code Launch Configuration for Wrangler Debugging
+DESCRIPTION: JSON configuration for Visual Studio Code's launch.json file to enable breakpoint debugging with Wrangler. This setup allows attaching to Wrangler's debug port.
+
+LANGUAGE: json
+CODE:
+{
+	"configurations": [
+		{
+			"name": "Wrangler",
+			"type": "node",
+			"request": "attach",
+			"port": 9229,
+			"cwd": "/",
+			"resolveSourceMapLocations": null,
+			"attachExistingChildren": false,
+			"autoAttachChildProcesses": false
+		}
+	]
+}
+
+----------------------------------------
+
+TITLE: Running Cloudflare Workers Development Server
+DESCRIPTION: Command to start a local development server for the Cloudflare Workers API. This allows you to test your API endpoints locally before deployment.
+
+LANGUAGE: bash
+CODE:
+wrangler dev
+
+----------------------------------------
+
+TITLE: Handling Functions Returning Functions with Magic Proxy in Miniflare
+DESCRIPTION: Example code demonstrating the fixed functionality that allows the magic proxy to handle functions that return functions, enabling more complex binding patterns.
+
+LANGUAGE: javascript
+CODE:
+const mf = new Miniflare(/* ... */);
+
+const { functionsFactory } = await mf.getBindings<Env>();
+const fn = functionsFactory.getFunction();
+const functionResult = fn();
+
+----------------------------------------
+
+TITLE: Replacing Node-Fetch with Undici
+DESCRIPTION: Migration from node-fetch to undici for HTTP requests, aligning with Node's future standard fetch implementation while reducing dependency pollution.
+
+LANGUAGE: typescript
+CODE:
+// Changed from using node-fetch
+// import fetch from 'node-fetch';
+
+// Changed to using undici
+// import { fetch } from 'undici';
+
+----------------------------------------
+
+TITLE: Configuring ASSET_MANIFEST in Service Worker Format
+DESCRIPTION: Example showing how to configure a custom ASSET_MANIFEST in Service Worker format for Cloudflare Workers Sites. This demonstrates creating a simple asset manifest object and passing it to getAssetFromKV.
+
+LANGUAGE: javascript
+CODE:
+let assetManifest = { "index.html": "index.special.html" }
+return getAssetFromKV(event, { ASSET_MANIFEST: assetManifest })
+
+----------------------------------------
+
+TITLE: Implementing Service Binding Request Forwarding in Worker A
+DESCRIPTION: JavaScript example showing how Worker A forwards requests to Worker B through a service binding.
+
+LANGUAGE: javascript
+CODE:
+export default {
+	fetch(req, env) {
+		return env.Bee.fetch(req);
+	},
+};
+
+----------------------------------------
+
+TITLE: Wrangler Configuration for Single-Page Applications
+DESCRIPTION: Wrangler configuration suitable for React SPAs, specifying the project name, compatibility date, and assets configuration. The 'not_found_handling' setting enables SPA routing by serving index.html for 404s.
+
+LANGUAGE: toml
+CODE:
+# wrangler.toml
+
+name = "cloudflare-vite-tutorial"
+compatibility_date = "2024-12-30"
+assets = { not_found_handling = "single-page-application" }
+
+----------------------------------------
+
+TITLE: Configuring CommonJS Modules Rule in Wrangler TOML
+DESCRIPTION: TOML configuration that tells Wrangler to treat all .cjs files as CommonJS modules when using --no-bundle. This ensures proper handling of CommonJS modules in Workers.
+
+LANGUAGE: toml
+CODE:
+rules = [
+  { type = "CommonJS", globs = ["**/*.cjs"]},
+]
+
+----------------------------------------
+
+TITLE: Running compound shell commands for custom builds
+DESCRIPTION: Example of a compound shell command for building Rust workers with worker-build. This is now supported by wrangler by using shell execution for custom build commands.
+
+LANGUAGE: shell
+CODE:
+cargo install -q worker-build && worker-build --release
+
+----------------------------------------
+
+TITLE: Installing Cloudflare Dependencies for an Existing Project
+DESCRIPTION: Command to add Cloudflare-specific dependencies to an existing Vite project. This installs the Cloudflare Vite plugin and wrangler for deployment.
+
+LANGUAGE: shell
+CODE:
+npm install @cloudflare/vite-plugin wrangler --save-dev
+
+----------------------------------------
+
+TITLE: Converting ESBuild Import Format
+DESCRIPTION: Updated the ESBuild import statement format from default import to namespace import to accommodate ESBuild version 0.14.14 changes.
+
+LANGUAGE: typescript
+CODE:
+// Changed from
+import esbuild from "esbuild";
+
+// Changed to
+import * as esbuild from "esbuild";
+
+----------------------------------------
+
+TITLE: Basic Package.json Configuration for Cloudflare Vite Projects
+DESCRIPTION: A minimal package.json configuration for Cloudflare Vite projects. The configuration includes scripts for development, building, and previewing the application, with 'type' set to 'module' to enable ES modules by default.
+
+LANGUAGE: json
+CODE:
+{
+  "name": "cloudflare-vite-quick-start",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview"
+  }
+}
+
+----------------------------------------
+
+TITLE: Dynamic Import Patterns in JavaScript with esbuild 0.24.2
+DESCRIPTION: Example of different dynamic import patterns in JavaScript and how they're handled by esbuild 0.24.2 in Wrangler v4. Some patterns will bundle all matching files while others won't.
+
+LANGUAGE: javascript
+CODE:
+const json1 = await import("./data/" + kind + ".json");
+
+const json2 = await import(`./data/${kind}.json`);
+
+const path = "./data/" + kind + ".js";
+const json2 = await import(path);
+
+----------------------------------------
+
+TITLE: Generated Directory Structure with Configuration Redirection
+DESCRIPTION: Example file structure showing generated distribution files, deployment configuration, and the configuration redirect file used to instruct Wrangler where to find the deployment config.
+
+LANGUAGE: plaintext
+CODE:
+- dist
+  - index.js
+	- wrangler.json
+- .wrangler
+  - deploy
+	  - config.json
+
+----------------------------------------
+
+TITLE: Building VSCode for Web for Production
+DESCRIPTION: Commands for preparing and building VSCode for Web for production deployment after completing the initial setup steps.
+
+LANGUAGE: bash
+CODE:
+pnpm run custom:build
+
+----------------------------------------
+
+TITLE: Wrangler Configuration with Assets and API Worker
+DESCRIPTION: Extended wrangler configuration that adds an API Worker alongside static assets. This enables both frontend serving and API functionality in one project.
+
+LANGUAGE: toml
+CODE:
+# wrangler.toml
+
+name = "cloudflare-vite-tutorial"
+compatibility_date = "2024-12-30"
+assets = { not_found_handling = "single-page-application", binding = "ASSETS" }
+main = "./api/index.ts"
+
+----------------------------------------
+
+TITLE: Passing Source Context to Formatted Error Page
+DESCRIPTION: Example code showing how to pass source files to the error page via iframe communication. Uses MessageChannel to establish communication between the parent window and the iframe containing the error page.
+
+LANGUAGE: typescript
+CODE:
+const encoder = new TextEncoder();
+const channel = new MessageChannel();
+
+iframeEl.addEventListener("load", () => {
+	iframeEl.contentWindow?.postMessage("PORT", "*", [channel.port2]);
+});
+
+channel.port1.onmessage = (data) => {
+	if (data.type === "RequestSources") {
+		const message = {
+			type: "SourcesLoaded",
+			body: {
+				files: [
+					{
+						path: "index.js",
+						contents: encoder.encode("console.log('hi')"),
+					},
+				],
+				internalLines: 0,
+			},
+		};
+		channel.port1.postMessage(
+			message,
+			message.body.files.map((f) => f.contents.buffer)
+		);
+	}
+};
+
+----------------------------------------
+
+TITLE: ESLint Configuration to Prevent Dynamic Imports
+DESCRIPTION: An ESLint configuration that prevents dynamic imports with non-literal arguments to avoid potential security issues or unintended file inclusion in workers.
+
+LANGUAGE: javascript
+CODE:
+// eslint.config.js
+export default [
+	{
+		rules: {
+			"no-restricted-syntax": [
+				"error",
+				{
+					selector: "ImportExpression[argument.type!='Literal']",
+					message:
+						"Dynamic imports with non-literal arguments are not allowed.",
+				},
+			],
+		},
+	},
+];
+
+----------------------------------------
+
+TITLE: Improved TypeScript Interface with Union Types for Multi-Environment Variables
+DESCRIPTION: The improved TypeScript interface generated after the fix, showing how the variable types are now unions of all possible values across environments.
+
+LANGUAGE: typescript
+CODE:
+interface Env {
+	MY_VAR: "dev value" | "prod value";
+}
+
+----------------------------------------
+
+TITLE: Running Tests for Workers Assets Fixture
+DESCRIPTION: Command to execute the test suite for the Workers assets with user worker test fixture using npm.
+
+LANGUAGE: shell
+CODE:
+npm run test
+
+----------------------------------------
+
+TITLE: React Component with API Integration
+DESCRIPTION: React component that demonstrates calling the Worker API and handling the response. The component includes buttons for incrementing a counter and fetching data from the API, showing how to maintain client state while interacting with the Worker.
+
+LANGUAGE: tsx
+CODE:
+// src/App.tsx
+
+import { useState } from "react";
+import reactLogo from "./assets/react.svg";
+import viteLogo from "/vite.svg";
+import "./App.css";
+
+function App() {
+  const [count, setCount] = useState(0);
+  const [name, setName] = useState("unknown");
+
+  return (
+    <>
+      <div>
+        <a href="https://vite.dev" target="_blank">
+          <img src={viteLogo} className="logo" alt="Vite logo" />
+        </a>
+        <a href="https://react.dev" target="_blank">
+          <img src={reactLogo} className="logo react" alt="React logo" />
+        </a>
+      </div>
+      <h1>Vite + React</h1>
+      <div className="card">
+        <button
+          onClick={() => setCount((count) => count + 1)}
+          aria-label="increment"
+        >
+          count is {count}
+        </button>
+        <p>
+          Edit <code>src/App.tsx</code> and save to test HMR
+        </p>
+      </div>
+      <div className="card">
+        <button
+          onClick={() => {
+            fetch("/api/")
+              .then((res) => res.json() as Promise<{ name: string }>)
+              .then((data) => setName(data.name));
+          }}
+          aria-label="get name"
+        >
+          Name from API is: {name}
+        </button>
+        <p>
+          Edit <code>api/index.ts</code> to change the name
+        </p>
+      </div>
+      <p className="read-the-docs">
+        Click on the Vite and React logos to learn more
+      </p>
+    </>
+  );
+}
+
+export default App;
+
+----------------------------------------
+
+TITLE: Starting a Development Session for Workers with Assets Only
+DESCRIPTION: Command to initiate a development environment for the Cloudflare Workers project using Wrangler CLI.
+
+LANGUAGE: bash
+CODE:
+wrangler dev
+
+----------------------------------------
+
+TITLE: Conflicting Module Rules Example in Wrangler TOML
+DESCRIPTION: TOML configuration demonstrating overlapping module rules that would cause a warning. When multiple rules match the same file, Wrangler uses the first match and logs a warning.
+
+LANGUAGE: toml
+CODE:
+rules = [
+  { type = "CommonJS", globs = ["dep.js"]},
+  { type = "ESModule", globs = ["dep.js"]}
+]
+
+----------------------------------------
+
+TITLE: Creating a Cloudflare Pipeline with Wrangler CLI
+DESCRIPTION: Example command for creating a new Cloudflare Pipeline using the wrangler CLI, specifying R2 bucket and access credentials.
+
+LANGUAGE: bash
+CODE:
+wrangler pipelines create my-pipeline --r2 MY_BUCKET --access-key-id "my-key" --secret-access-key "my-secret"
+
+----------------------------------------
+
+TITLE: Running All Tests
+DESCRIPTION: Bash command for running the test suite for the entire project. This executes tests in CI mode to verify all Workers and their bindings function correctly.
+
+LANGUAGE: bash
+CODE:
+npm run test:ci
+
+----------------------------------------
+
+TITLE: Using R2 Bucket Operations with Jurisdiction Flags in Bash
+DESCRIPTION: Examples of using the new -J flag with wrangler r2 commands to specify a jurisdiction (such as EU) when interacting with R2 buckets and objects.
+
+LANGUAGE: bash
+CODE:
+# List all of the buckets in the EU jurisdiction
+wrangler r2 bucket list -J eu
+# Downloads the object 'myfile.txt' from the bucket 'mybucket' in EU jurisdiction
+wrangler r2 object get mybucket/myfile.txt -J eu
+
+----------------------------------------
+
+TITLE: Running Individual Worker Dev Sessions
+DESCRIPTION: Bash commands for starting a dev session for an individual Worker using wrangler. This allows developers to test each Worker separately during development.
+
+LANGUAGE: bash
+CODE:
+cd <worker_directory>
+wrangler dev
+
+----------------------------------------
+
+TITLE: D1 Database Middleware Fix
+DESCRIPTION: Fix for the internal middleware system to allow concurrent usage of D1 databases and the --test-scheduled flag, improving the developer experience when testing scheduled events with database access.
+
+LANGUAGE: markdown
+CODE:
+* [#2683](https://github.com/cloudflare/workers-sdk/pull/2683) [`68a2a19e`](https://github.com/cloudflare/workers-sdk/commit/68a2a19ec962aeeb34059e1e98d088e021048739) Thanks [@mrbbot](https://github.com/mrbbot)! - Fix internal middleware system to allow D1 databases and `--test-scheduled` to be used together
+
+----------------------------------------
+
+TITLE: Using stdin with Secret Bulk Upload in Bash
+DESCRIPTION: Examples of using stdin with wrangler secret:bulk command to provide secrets via different input methods including piping files, echo strings, and file redirection.
+
+LANGUAGE: bash
+CODE:
+# Example of piping in a file
+> cat ./my-file.json | wrangler secret:bulk
+
+# Example of piping in a string
+> echo '{"key":"value"}' | wrangler secret:bulk
+
+# Example of redirecting input from a file
+> wrangler secret:bulk < ./my-file.json
+
+----------------------------------------
+
+TITLE: Specifying bcrypt Dependency for Python Project
+DESCRIPTION: This line specifies the bcrypt Python package dependency with version 4.0.1. The bcrypt library provides hashing functionality for passwords in Python applications. This exact version constraint ensures consistent builds and deployment across different environments.
+
+LANGUAGE: plaintext
+CODE:
+bcrypt==4.0.1
+
+----------------------------------------
+
+TITLE: Wrangler Configuration Redirect JSON File
+DESCRIPTION: Example of a config.json file that redirects Wrangler to a generated configuration file, used by build tools and frameworks to provide deploy-specific configuration.
+
+LANGUAGE: json
+CODE:
+{ "configPath": "../../path/to/wrangler.json" }
+
+----------------------------------------
+
+TITLE: Publishing Pages Worker.js WASM app to Cloudflare
+DESCRIPTION: Commands to navigate to the test fixture directory and deploy the static assets to Cloudflare Pages. Requires a Cloudflare account to deploy to the .pages.dev domain.
+
+LANGUAGE: bash
+CODE:
+# cd into the test fixture folder
+cd fixtures/pages-workerjs-wasm-app
+
+# Deploy the directory of static assets as a Pages deployment
+npm run publish
+
+----------------------------------------
+
+TITLE: Implementing D1 Time Travel Commands in Wrangler CLI
+DESCRIPTION: This code snippet shows the implementation of time travel commands for experimental D1 databases in Wrangler. It provides functionality to restore, fork, or copy a database at a specific point in time using the 'info' and 'restore' subcommands.
+
+LANGUAGE: shell
+CODE:
+wrangler d1 time-travel info <database>     Retrieve information about a database at a specific point-in-time using Time Travel.
+Options:
+      --timestamp  accepts a Unix (seconds from epoch) or RFC3339 timestamp (e.g. 2023-07-13T08:46:42.228Z) to retrieve a bookmark for  [string]
+      --json       return output as clean JSON  [boolean] [default: false]
+
+wrangler d1 time-travel restore <database>  Restore a database back to a specific point-in-time.
+Options:
+      --bookmark   Bookmark to use for time travel  [string]
+      --timestamp  accepts a Unix (seconds from epoch) or RFC3339 timestamp (e.g. 2023-07-13T08:46:42.228Z) to retrieve a bookmark for  [string]
+      --json       return output as clean JSON  [boolean] [default: false]
+
+----------------------------------------
+
+TITLE: Simple JavaScript Module Exports
+DESCRIPTION: Examples of basic JavaScript modules that export string values, which can be dynamically imported in the main worker script.
+
+LANGUAGE: javascript
+CODE:
+// src/one.js
+export default "one";
+
+// src/two.js
+export default "two";
+
+// src/hidden/secret.js
+export default "do not share this secret";
+
+----------------------------------------
+
+TITLE: Setting up development environment for Pages Worker.js WASM app
+DESCRIPTION: Commands to navigate to the test fixture directory and start the development server for local testing of the Pages project with WebAssembly modules.
+
+LANGUAGE: bash
+CODE:
+# cd into the test fixture folder
+cd fixtures/pages-workerjs-wasm-app
+
+# start dev server
+npm run dev
+
+----------------------------------------
+
+TITLE: Generated Wrangler JSON Configuration
+DESCRIPTION: Example of a generated wrangler.json file in the dist directory that contains the deployment configuration with the compiled entry point and inherited KV namespaces.
+
+LANGUAGE: json
+CODE:
+{
+	"name": "my-worker",
+	"main": "./index.js",
+	"kv_namespaces": [
+		{ "binding": "<BINDING_NAME1>", "id": "<NAMESPACE_ID1>" }
+	]
+}
+
+----------------------------------------
+
+TITLE: Running Tests for Pages Project
+DESCRIPTION: Commands to navigate to the test fixture directory and execute the test suite for the Pages project.
+
+LANGUAGE: bash
+CODE:
+# cd into the test fixture folder
+cd fixtures/pages-workerjs-with-routes-app
+
+# Run tests
+npm run test
+
+----------------------------------------
+
+TITLE: D1 Preview Database Error Handling
+DESCRIPTION: Improved error handling when preview_database_id is omitted, replacing thrown errors with warning messages for a better developer experience.
+
+LANGUAGE: markdown
+CODE:
+* [#2696](https://github.com/cloudflare/workers-sdk/pull/2696) [`4bc78470`](https://github.com/cloudflare/workers-sdk/commit/4bc784706193e24b7a92a19c0ac76eaa7ddcb1c6) Thanks [@rozenmd](https://github.com/rozenmd)! - fix: don't throw an error when omitting preview_database_id, warn instead
+
+----------------------------------------
+
+TITLE: Using RPC with Magic Proxy in Miniflare
+DESCRIPTION: Example demonstrating how to use Remote Procedure Calls (RPC) with Miniflare's magic proxy, allowing one worker to call methods on another worker through service bindings.
+
+LANGUAGE: typescript
+CODE:
+import { Miniflare } from "miniflare";
+
+const mf = new Miniflare({
+	workers: [
+		{
+			modules: true,
+			script: `export default { fetch() { return new Response(''); } }`,
+			serviceBindings: {
+				SUM: {
+					name: "sum-worker",
+					entrypoint: "SumEntrypoint",
+				},
+			},
+		},
+		{
+			modules: true,
+			name: "sum-worker",
+			script: `
+				import { WorkerEntrypoint } from 'cloudflare:workers';
+
+				export default { fetch() { return new Response(''); } }
+
+				export class SumEntrypoint extends WorkerEntrypoint {
+					sum(args) {
+						return args.reduce((a, b) => a + b);
+					}
+				}
+			`,
+		},
+	],
+});
+
+const { SUM } = await mf.getBindings();
+
+const numbers = [1, 2, 3];
+
+console.log(`The sum of ${numbers.join(", ")} is ${await SUM.sum(numbers)}`); // <--- prints 'The sum of 1, 2, 3 is 6'
+
+await mf.dispose();
+
+----------------------------------------
+
+TITLE: Successful Deployment Message Example
+DESCRIPTION: Example of the success message displayed after a successful Pages deployment, showing the deployment URL format.
+
+LANGUAGE: bash
+CODE:
+✨ Deployment complete! Take a peek over at https:/<hash>.<PROJECT_NAME>.pages.dev
+
+----------------------------------------
+
+TITLE: Deploying to Test Environment
+DESCRIPTION: Command to deploy changes to the playground preview worker to the test environment.
+
+LANGUAGE: bash
+CODE:
+pnpm run deploy:testing
+
+----------------------------------------
+
+TITLE: Deploying Pages Project with Wrangler
+DESCRIPTION: Commands to navigate to the test fixture directory and deploy static assets to Cloudflare Pages using Wrangler CLI tool.
+
+LANGUAGE: bash
+CODE:
+# cd into the test fixture folder
+cd fixtures/pages-workerjs-with-routes-app
+
+# Deploy the directory of static assets as a Pages deployment
+npx wrangler pages deploy public
+
+----------------------------------------
+
+TITLE: Setting D1 KV Namespace in TOML Configuration
+DESCRIPTION: Example configuration of a KV namespace binding in a wrangler.toml file, defining a binding named MY_KV with an associated ID.
+
+LANGUAGE: toml
+CODE:
+[[kv_namespaces]]
+binding = "MY_KV"
+id = "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+
+----------------------------------------
+
+TITLE: Accessing CF Object in Miniflare
+DESCRIPTION: Demonstrates how to access the CF object that contains information like country and colo from a Miniflare instance using the getCf method.
+
+LANGUAGE: typescript
+CODE:
+import { Miniflare } from "miniflare";
+
+const mf = new Miniflare({ ... });
+
+const cf = await mf.getCf();
+
+console.log(`country = ${cf.country} ; colo = ${cf.colo}`); // logs 'country = GB ; colo = LHR'
+
+----------------------------------------
+
+TITLE: Creating a Basic Cloudflare Worker in JavaScript
+DESCRIPTION: This code defines a simple Cloudflare Worker that responds to any request with a 200 OK status and the text 'Hello World!'. The export default expression provides the main entry point for the worker's request handling.
+
+LANGUAGE: javascript
+CODE:
+export default {
+  async fetch(request) {
+    return new Response("Hello World!");
+  },
+};
+
+----------------------------------------
+
+TITLE: Building the Workers Playground Package
+DESCRIPTION: Command to build the Workers Playground package, generating files in the dist directory for deployment to Cloudflare Pages.
+
+LANGUAGE: bash
+CODE:
+pnpm -F workers-playground build
+
+----------------------------------------
+
+TITLE: Deployment Success Message Example
+DESCRIPTION: Example of the success message displayed after a successful deployment, showing the automatically generated URL for the deployed Pages site.
+
+LANGUAGE: bash
+CODE:
+✨ Deployment complete! Take a peek over at https:/<hash>.<PROJECT_NAME>.pages.dev
+
+----------------------------------------
+
+TITLE: Using R2 Storage Classes in Wrangler CLI
+DESCRIPTION: Example commands showing how to specify storage classes with the new '-s' flag when creating buckets, updating bucket storage classes, and uploading objects to R2 storage.
+
+LANGUAGE: bash
+CODE:
+wrangler r2 bucket create ia-bucket -s InfrequentAccess
+wrangler r2 bucket update storage-class my-bucket -s InfrequentAccess
+wrangler r2 object put bucket/ia-object -s InfrequentAccess --file foo
+
+----------------------------------------
+
+TITLE: TypeScript Configuration for Worker Code
+DESCRIPTION: TypeScript configuration specific to Worker code. This extends the Node configuration and includes Workers types for proper type checking and IntelliSense support.
+
+LANGUAGE: jsonc
+CODE:
+// tsconfig.worker.json
+
+{
+  "extends": "./tsconfig.node.json",
+  "compilerOptions": {
+    "tsBuildInfoFile": "./node_modules/.tmp/tsconfig.worker.tsbuildinfo",
+    "types": ["@cloudflare/workers-types/2023-07-01", "vite/client"],
+  },
+  "include": ["api"],
+}
+
+----------------------------------------
+
+TITLE: Successful Deployment Output Example in Bash
+DESCRIPTION: Example of the success message displayed when a Cloudflare Pages deployment completes, showing the URL format for accessing the deployed site.
+
+LANGUAGE: bash
+CODE:
+✨ Deployment complete! Take a peek over at https:/<hash>.<PROJECT_NAME>.pages.dev
+
+----------------------------------------
+
+TITLE: Referencing the Cloudflare Workflows Shared Package in Markdown
+DESCRIPTION: A markdown code block showing the package name for the Cloudflare Workflows shared utilities. This package powers internal features of Cloudflare Workflows and is used in workers-sdk and Wrangler.
+
+LANGUAGE: markdown
+CODE:
+# `@cloudflare/workflows-shared`
+
+----------------------------------------
+
+TITLE: Conflicting module rules example in wrangler.toml
+DESCRIPTION: Example of overlapping module rules that would cause a warning. When multiple rules match the same file, Wrangler uses the first match and logs a warning about duplicate classifications.
+
+LANGUAGE: toml
+CODE:
+rules = [
+  { type = "CommonJS", globs = ["dep.js"]},
+  { type = "ESModule", globs = ["dep.js"]}
+]
+
+----------------------------------------
+
+TITLE: Using Service Bindings with Wrangler Pages Dev
+DESCRIPTION: Command example showing how to use the --service flag to provide service bindings in wrangler pages dev. This allows binding to another worker that is running locally with wrangler dev.
+
+LANGUAGE: bash
+CODE:
+wrangler pages ./publicDir --service MY_SERVICE=worker-a
+
+----------------------------------------
+
+TITLE: Main TypeScript Configuration with Project References
+DESCRIPTION: Root TypeScript configuration that uses project references to link different parts of the application. This separates client, node, and worker configurations.
+
+LANGUAGE: jsonc
+CODE:
+// tsconfig.json
+
+{
+  "files": [],
+  "references": [
+    { "path": "./tsconfig.app.json" },
+    { "path": "./tsconfig.node.json" },
+    { "path": "./tsconfig.worker.json" },
+  ],
+}
+
+----------------------------------------
+
+TITLE: Configuring CommonJS modules in wrangler.toml
+DESCRIPTION: TOML configuration for specifying CommonJS modules when using --no-bundle. This rule tells Wrangler to treat all .cjs files as CommonJS modules.
+
+LANGUAGE: toml
+CODE:
+rules = [
+  { type = "CommonJS", globs = ["**/*.cjs"]},
+]
+
+----------------------------------------
+
+TITLE: Displaying Pipeline Command Options in Markdown
+DESCRIPTION: Shows the new option format for 'wrangler pipelines create' and 'wrangler pipelines update' commands, specifically adding CORS origin allowlist support for HTTP endpoints.
+
+LANGUAGE: markdown
+CODE:
+```
+--cors-origins           CORS origin allowlist for HTTP endpoint (use * for any origin)  [array]
+```
+
+----------------------------------------
+
+TITLE: Adding Upstream Remote Repository
+DESCRIPTION: Commands to add the original cloudflare/workers-sdk repository as the upstream remote and verify the remote configuration shows both origin and upstream.
+
+LANGUAGE: shell
+CODE:
+git remote add upstream https://github.com/cloudflare/workers-sdk
+git remote -v
+origin	https://github.com/<your-github-username>/workers-sdk (fetch)
+origin	https://github.com/<your-github-username>/workers-sdk (push)
+upstream	https://github.com/cloudflare/workers-sdk (fetch)
+upstream	https://github.com/cloudflare/workers-sdk (push)
+
+----------------------------------------
+
+TITLE: Using wrangler pages dev with D1 database binding
+DESCRIPTION: Command showing how to set a D1 database ID when using wrangler pages dev by providing an optional ID suffix to the argument.
+
+LANGUAGE: bash
+CODE:
+--d1 BINDING_NAME=database-id
+
+----------------------------------------
+
+TITLE: Creating a New Vite Project with React TypeScript Template
+DESCRIPTION: Command to scaffold a new Vite project using the React TypeScript template. This sets up the base structure for a React application that will be deployed as a Worker.
+
+LANGUAGE: shell
+CODE:
+npm create vite@latest cloudflare-vite-tutorial -- --template react-ts
+
+----------------------------------------
+
+TITLE: Updating Local Repository from Upstream
+DESCRIPTION: Commands to keep your local main branch up to date with the latest changes from the upstream repository by pulling from upstream main.
+
+LANGUAGE: shell
+CODE:
+git switch main
+git pull upstream main
+From https://github.com/cloudflare/workers-sdk
+* branch            main       -> FETCH_HEAD
+Already up to date.
+
+----------------------------------------
+
+TITLE: Mixed Module Types Configuration in Wrangler TOML
+DESCRIPTION: Advanced TOML configuration for projects mixing ES and CommonJS modules. This example sets specific file patterns for each module type, allowing for flexible module configuration.
+
+LANGUAGE: toml
+CODE:
+rules = [
+  { type = "CommonJS", globs = ["nested/say-hello.js", "**/*.cjs"]},
+  { type = "ESModule", globs = ["**/*.mjs"]}
+]
+
+----------------------------------------
+
+TITLE: Creating and Pushing Branches for Cloudflare Employees
+DESCRIPTION: Commands for Cloudflare employees to create new branches directly in the cloned repository and push them to the main repository.
+
+LANGUAGE: shell
+CODE:
+git checkout -b <new-branch-name>
+git push origin <new-branch-name>
+
+----------------------------------------
+
+TITLE: Configuring Text Blobs in Wrangler
+DESCRIPTION: Example of using text_blobs configuration in wrangler.toml to include external file content as a global variable in service-worker format Workers. This allows including static text content without bundling.
+
+LANGUAGE: toml
+CODE:
+[text_blobs]
+MYTEXT = "./path/to/my-text.file"
+
+----------------------------------------
+
+TITLE: Wildcard Imports Pattern 1 in JavaScript
+DESCRIPTION: Example of a dynamic import with string concatenation that will bundle all files matching the pattern. This pattern is now supported by the updated esbuild.
+
+LANGUAGE: javascript
+CODE:
+const json1 = await import("./data/" + kind + ".json");
+
+----------------------------------------
+
+TITLE: Running Formatting Checks
+DESCRIPTION: Command to run Prettier formatting checks on the codebase to ensure consistent code formatting.
+
+LANGUAGE: shell
+CODE:
+pnpm run check:format
+
+----------------------------------------
+
+TITLE: Creating Command Structure in Wrangler CLI (TypeScript)
+DESCRIPTION: Demonstrates how to create namespaces and commands in the Wrangler CLI using the createNamespace and createCommand utilities. Shows the structure for defining a KV namespace and a key-put command with its arguments and handler function.
+
+LANGUAGE: typescript
+CODE:
+import { createCommand, createNamespace } from "../core/create-command";
+import { createKVNamespace } from "./helpers";
+
+// Namespaces are the prefix before the subcommand
+// eg "wrangler kv" in "wrangler kv put"
+// eg "wrangler kv key" in "wrangler kv key put"
+export const kvNamespace = createNamespace({
+	metadata: {
+		description: "Commands for interacting with Workers KV",
+		status: "stable",
+	},
+});
+
+// Every level of namespaces must be defined
+// eg "wrangler kv key" in "wrangler kv key put"
+export const kvKeyNamespace = createKVNamespace({
+	metadata: {
+		description: "Commands for interacting with Workers KV data",
+		status: "stable",
+	},
+});
+
+// Define the command args, implementation and metadata
+export const kvKeyPutCommand = createCommand({
+	metadata: {
+		description: "Put a key-value pair into a Workers KV namespace",
+		status: "stable",
+	},
+	args: {
+		key: {
+			type: "string",
+			description: "The key to put into the KV namespace",
+			demandOption: true,
+		},
+		value: {
+			type: "string",
+			description: "The value to put into the KV namespace",
+			demandOption: true,
+		},
+		"namespace-id": {
+			type: "string",
+			description: "The namespace to put the key-value pair into",
+		},
+	},
+	// the positionalArgs defines which of the args are positional and in what order
+	positionalArgs: ["key", "value"],
+	handler(args, ctx) {
+		// implementation here
+	},
+});
+
+----------------------------------------
+
+TITLE: Running Tests After Rebasing
+DESCRIPTION: Commands to install any new dependencies after rebasing on main and then run tests for all workspaces.
+
+LANGUAGE: shell
+CODE:
+pnpm i
+pnpm run test
+
+----------------------------------------
+
+TITLE: Environment Variables File for Secret Bulk Upload
+DESCRIPTION: Example of a .dev.vars file containing environment variables that can be uploaded as secrets using the wrangler secret bulk command.
+
+LANGUAGE: env
+CODE:
+//.dev.vars
+KEY=VALUE
+KEY_2=VALUE
+
+----------------------------------------
+
+TITLE: Example Worker with Dynamic Imports
+DESCRIPTION: This code demonstrates a Cloudflare Worker that uses dynamic imports to serve different content based on URL paths. With the new esbuild, this pattern will bundle all files matching the import pattern.
+
+LANGUAGE: javascript
+CODE:
+// src/index.js
+export default {
+	async fetch() {
+		const url = new URL(request.url);
+		const name = url.pathname;
+		const value = (await import("." + name)).default;
+		return new Response(value);
+	},
+};
+
+----------------------------------------
+
+TITLE: Creating a New Branch in Git
+DESCRIPTION: Command to create a new branch based off the main branch for implementing changes.
+
+LANGUAGE: sh
+CODE:
+git checkout -b <new-branch-name> main
+
+----------------------------------------
+
+TITLE: Disabling Wrangler Telemetry Globally
+DESCRIPTION: Command to disable telemetry collection for Wrangler CLI across all projects. This prevents Wrangler from sending usage data to Cloudflare.
+
+LANGUAGE: sh
+CODE:
+npx wrangler telemetry disable
+
+----------------------------------------
+
+TITLE: Creating a Changeset
+DESCRIPTION: Command to create a changeset to document changes for version control and changelog generation.
+
+LANGUAGE: sh
+CODE:
+pnpm changeset
+
+----------------------------------------
+
+TITLE: Build Tool Command Example
+DESCRIPTION: Example of running a custom build tool that might read the wrangler.toml configuration to find the entry point for building a Worker.
+
+LANGUAGE: bash
+CODE:
+> my-tool build
+
+----------------------------------------
+
+TITLE: Installing Cloudflare Workers SDK with npm
+DESCRIPTION: Command to install the Workers SDK using npm. This is the first step in setting up a new Workers project.
+
+LANGUAGE: bash
+CODE:
+npm create cloudflare@latest
+
+----------------------------------------
+
+TITLE: Adding Changeset File to Commit
+DESCRIPTION: Command to add the generated changeset files to the current git commit.
+
+LANGUAGE: sh
+CODE:
+git add ./changeset/*.md
+
+----------------------------------------
+
+TITLE: Viewing Wrangler Telemetry Data with Debug Logging
+DESCRIPTION: Shows how to enable debug logging to view telemetry data being collected by Wrangler. This command sets the WRANGLER_LOG environment variable to debug level when deploying with Wrangler.
+
+LANGUAGE: sh
+CODE:
+WRANGLER_LOG=debug npx wrangler deploy
+
+----------------------------------------
+
+TITLE: Formatting Success Messages with Binding Information in Shell
+DESCRIPTION: Template for displaying success messages when creating resources that require bindings, including next steps for integration with Workers.
+
+LANGUAGE: sh
+CODE:
+🌀 Creating ___ with title "___"
+✨ Success. *Add details of success and what the user can now do*
+📣 *Optional announcement*
+
+To start interacting with this ___ from a Worker, *If additional steps required, such as obtaining account ID from dash, add them here* \(then\) open your Worker's config file and add the following binding configuration:
+
+[[array]]
+binding = "<VARIABLE_NAME>"
+name = "___"
+id = "___"
+
+----------------------------------------
+
+TITLE: Using Service Bindings with Named Entrypoints in Pages Dev
+DESCRIPTION: Shell command showing how to bind to a named entrypoint when using 'wrangler pages dev', utilizing the '#' character syntax to specify a non-default entrypoint.
+
+LANGUAGE: shell
+CODE:
+$ wrangler pages dev --service=SERVICE=bound#EntrypointA
+
+----------------------------------------
+
+TITLE: Installing KV Asset Handler with npm
+DESCRIPTION: Command to install the kv-asset-handler package using npm in your project's directory.
+
+LANGUAGE: bash
+CODE:
+npm i @cloudflare/kv-asset-handler
+
+----------------------------------------
+
+TITLE: Formatting Command-Related Error Messages in Shell
+DESCRIPTION: Template for displaying error messages related to command usage, including error details, solutions, command syntax, and links for bug reporting.
+
+LANGUAGE: sh
+CODE:
+✘  ERROR  *API error code if applicable*: *Concise description of what the error is*:
+
+Error details:
+*Description of what caused the error*
+
+How to solve this error:
+*Direction on how to resolve the error*
+
+wrangler *example of full command user tried to run*
+
+*Description of the command's purpose*
+
+Positionals:
+  positional  *Positional description*.  [data-type] [required/optional]
+
+Options:
+  -o, --option  *Option description* [data type] [default: true/false]
+
+If you think this is a bug then please create an issue at https://github.com/cloudflare/workers-sdk/issues/new/choose
+
+🪵  Logs were written to <filepath>
+
+----------------------------------------
+
+TITLE: VS Code Debugging Configuration for Cloudflare Workers
+DESCRIPTION: Launch configuration for VS Code to enable breakpoint debugging with Cloudflare Workers. This JSON configuration allows attaching to worker processes via WebSocket connections for debugging.
+
+LANGUAGE: json
+CODE:
+{
+  "configurations": [
+    {
+      "name": "<NAME_OF_WORKER>",
+      "type": "node",
+      "request": "attach",
+      "websocketAddress": "ws://localhost:9229/<NAME_OF_WORKER>",
+      "resolveSourceMapLocations": null,
+      "attachExistingChildren": false,
+      "autoAttachChildProcesses": false,
+      "sourceMaps": true
+    }
+  ],
+  "compounds": [
+    {
+      "name": "Debug All Workers",
+      "configurations": ["<NAME_OF_WORKER>"],
+      "stopAll": true
+    }
+  ]
+}
+
+----------------------------------------
+
+TITLE: Formatting Yes/No Choice Prompts in Shell
+DESCRIPTION: Template for displaying simple yes/no choice prompts to users.
+
+LANGUAGE: sh
+CODE:
+*choice description* <y/n>
+#User inputs y or n#
+
+----------------------------------------
+
+TITLE: Configuring CPU Time Limits in TOML
+DESCRIPTION: Example configuration for setting CPU time limits via script metadata. This allows users to specify a CPU time limit of 20000 milliseconds for their Worker.
+
+LANGUAGE: toml
+CODE:
+[limits]
+cpu_ms = 20000
+
+----------------------------------------
+
+TITLE: Disabling ETag Cache Headers in KV Asset Handler
+DESCRIPTION: Example showing how to disable the ETag header generation in the KV asset handler by setting the bypassCache option to true. This prevents conditional requests and forces fresh asset retrieval.
+
+LANGUAGE: javascript
+CODE:
+/* Turn etags off */
+let cacheControl = {
+	bypassCache: true,
+};
+
+----------------------------------------
+
+TITLE: Formatting Written Value Prompts in Shell
+DESCRIPTION: Template for displaying prompts that require users to enter text values, including default values and response handling.
+
+LANGUAGE: sh
+CODE:
+wrangler <command>
+<prompt request>
+<defaut_value>
+
+#User enters value then presses enter#
+
+<response detailing what task/s have been performed and with what values where applicable OR continue to next prompt>
+
+----------------------------------------
+
+TITLE: Adding Environment Support for .dev.vars Files
+DESCRIPTION: Fixes a bug by passing the environment parameter to getBindings function to properly support reading environment-specific variable files in the format .dev.vars.{environment}. This addresses issue #5641.
+
+LANGUAGE: typescript
+CODE:
+Fix: pass env to getBindings to support reading `.dev.vars.{environment}`
+
+https://github.com/cloudflare/workers-sdk/pull/5612 added support for selecting the environment of config used, but it missed passing it to the code that reads `.dev.vars.{environment}`
+
+Closes #5641
+
+----------------------------------------
+
+TITLE: Formatting Zod Error for Object Union Schema with Colored Output
+DESCRIPTION: Tests how formatZodError formats complex validation errors with ANSI color codes for enhanced readability, highlighting different error types and alternative paths.
+
+LANGUAGE: typescript
+CODE:
+[2m{[22m
+  [2mkey: [22m[33mfalse[39m[2m,[22m
+[31m       ^ Expected string, received boolean[39m
+  [2mobjects: [[22m
+    [2m/* [0] */ [22m[33mfalse[39m[2m,[22m
+[31m              ^ Expected object, received boolean[39m
+    [2m/* [1] */ {[22m
+      [2ma: [22m[90mundefined[39m[2m,[22m
+[33m         ^1 Required *or*[39m
+      [2mb: [22m[90mundefined[39m[2m,[22m
+[33m         ^1 Required *or*[39m
+      [2mc: [22m[90mundefined[39m[2m,[22m
+[33m         ^1 Required[39m
+    [2m},[22m
+    [2m/* [2] */ {[22m
+      [2ma: [22m[90mundefined[39m[2m,[22m
+[36m         ^2 Required *or*[39m
+      [2mb: [22m[90mundefined[39m[2m,[22m
+[36m         ^2 Required *or*[39m
+      [2mc: [22m[90mundefined[39m[2m,[22m
+[36m         ^2 Required[39m
+    [2m},[22m
+    [2m/* [3] */ {[22m
+      [2ma: [22m[90mundefined[39m[2m,[22m
+[34m         ^3 Required *or*[39m
+      [2mb: [22m[90mundefined[39m[2m,[22m
+[34m         ^3 Required *or*[39m
+      [2mc: [22m[90mundefined[39m[2m,[22m
+[34m         ^3 Required[39m
+    [2m},[22m
+    [2m/* [4] */ {[22m
+      [2ma: [22m[90mundefined[39m[2m,[22m
+[35m         ^4 Required *or*[39m
+      [2mb: [22m[90mundefined[39m[2m,[22m
+[35m         ^4 Required *or*[39m
+      [2mc: [22m[90mundefined[39m[2m,[22m
+[35m         ^4 Required[39m
+    [2m},[22m
+    [2m/* [5] */ {[22m
+      [2ma: [22m[90mundefined[39m[2m,[22m
+[32m         ^5 Required *or*[39m
+      [2mb: [22m[90mundefined[39m[2m,[22m
+[32m         ^5 Required *or*[39m
+      [2mc: [22m[90mundefined[39m[2m,[22m
+[32m         ^5 Required[39m
+    [2m},[22m
+    [2m/* [6] */ {[22m
+      [2ma: [22m[90mundefined[39m[2m,[22m
+[33m         ^6 Required *or*[39m
+      [2mb: [22m[90mundefined[39m[2m,[22m
+[33m         ^6 Required *or*[39m
+      [2mc: [22m[90mundefined[39m[2m,[22m
+[33m         ^6 Required[39m
+    [2m},[22m
+    [2m/* [7] */ {[22m
+      [2ma: [22m[90mundefined[39m[2m,[22m
+[36m         ^7 Required *or*[39m
+      [2mb: [22m[90mundefined[39m[2m,[22m
+[36m         ^7 Required *or*[39m
+      [2mc: [22m[90mundefined[39m[2m,[22m
+[36m         ^7 Required[39m
+    [2m},[22m
+  [2m],[22m
+[2m}[22m
+
+----------------------------------------
+
+TITLE: Generating TypeScript Module Declarations for Data Files
+DESCRIPTION: TypeScript declaration for data files. When using custom module rules with the Data type, this declaration makes modules of type *.webp available as ArrayBuffer instances.
+
+LANGUAGE: typescript
+CODE:
+declare module "**/*.webp" {
+	const value: ArrayBuffer;
+	export default value;
+}
+
+----------------------------------------
+
+TITLE: Using getAssetFromKV with Service Worker Syntax in Cloudflare Workers
+DESCRIPTION: Example of using the getAssetFromKV function with traditional Service Worker syntax in a Cloudflare Worker, including event handling and error catching.
+
+LANGUAGE: javascript
+CODE:
+import {
+	getAssetFromKV,
+	MethodNotAllowedError,
+	NotFoundError,
+} from "@cloudflare/kv-asset-handler";
+
+addEventListener("fetch", (event) => {
+	event.respondWith(handleEvent(event));
+});
+
+async function handleEvent(event) {
+	if (event.request.url.includes("/docs")) {
+		try {
+			return await getAssetFromKV(event);
+		} catch (e) {
+			if (e instanceof NotFoundError) {
+				// ...
+			} else if (e instanceof MethodNotAllowedError) {
+				// ...
+			} else {
+				return new Response("An unexpected error occurred", { status: 500 });
+			}
+		}
+	} else return fetch(event.request);
+}
+
+----------------------------------------
+
+TITLE: Formatting Zod Error for Tuple Union Schema
+DESCRIPTION: Tests how formatZodError formats validation errors for arrays/tuples against union schema types, showing indexed positions and alternative validation paths.
+
+LANGUAGE: typescript
+CODE:
+{
+  tuples: [
+    /* [0] */ false,
+              ^ Expected array, received boolean
+    /* [1] */ { a: 1 },
+              ^ Expected array, received object
+    /* [2] */ [],
+              ^ Array must contain at least 2 element(s)
+                Array must contain at least 3 element(s)
+    /* [3] */ [
+      ...,
+      /* [1] */ '3',
+                ^ Expected number, received string
+    ],
+    /* [4] */ [
+      /* [0] */ 4,
+                ^1 Expected string, received number
+                   Expected boolean, received number *or*
+      /* [1] */ 5,
+                ^1 Expected boolean, received number *or*
+      /* [2] */ 6,
+                ^1 Expected boolean, received number
+    ],
+    /* [5] */ [
+      /* [0] */ true,
+                ^2 Expected string, received boolean *or*
+      /* [1] */ 7,
+                ^2 Expected boolean, received number
+      ...,
+    ],
+  ],
+}
+
+----------------------------------------
+
+TITLE: Defining defineWorkersConfig with Overload Signatures for Type Compatibility
+DESCRIPTION: Fixes type definition of defineWorkersConfig to work with vitest/config's mergeConfig function by using function overloads. This resolves a type mismatch that prevented proper integration with Vitest.
+
+LANGUAGE: typescript
+CODE:
+fix: define `defineWorkersConfig` using overload signatures
+
+The type definition of `defineWorkersConfig` doesn't work with `mergeConfig` of `vitest/config` because of type mismatch.
+This function should be an overload function like `defineConfig`
+
+----------------------------------------
+
+TITLE: Formatting Zod Error for Intersection Schema
+DESCRIPTION: Tests how formatZodError formats errors when a value fails to satisfy multiple schemas in an intersection, showing all validation failures.
+
+LANGUAGE: typescript
+CODE:
+false
+^ Expected number, received boolean
+  Invalid literal value, expected 2
+
+----------------------------------------
+
+TITLE: Expanded Module Rules for Nested Files in wrangler.toml
+DESCRIPTION: Configuration example showing how to include all JavaScript files, including those in subdirectories, by using double-asterisk glob pattern in the rules configuration.
+
+LANGUAGE: toml
+CODE:
+rules = [
+  { type = "ESModule", globs = ["**/*.js"]}
+]
+
+----------------------------------------
+
+TITLE: Configuring ASSET_MANIFEST in ES Module Format
+DESCRIPTION: Example showing how to import and configure the ASSET_MANIFEST in ES Module format for Cloudflare Workers Sites. The manifest maps request paths to content-hashed keys, with this example demonstrating how to parse and modify the manifest before passing it to getAssetFromKV.
+
+LANGUAGE: javascript
+CODE:
+import manifestJSON from '__STATIC_CONTENT_MANIFEST'
+let manifest = JSON.parse(manifestJSON)
+manifest['index.html'] = 'index.special.html'
+
+return getAssetFromKV(
+	{
+		request,
+		waitUntil(promise) {
+			return ctx.waitUntil(promise)
+		},
+	},
+	{
+		ASSET_MANIFEST: manifest,
+		// ...
+	},
+)
+
+----------------------------------------
+
+TITLE: Formatting Zod Error for Discriminated Union with Invalid Discriminator
+DESCRIPTION: Tests how formatZodError formats an error when the discriminator field contains an invalid value not defined in the schema.
+
+LANGUAGE: typescript
+CODE:
+{
+  type: 'c',
+        ^ Invalid discriminator value. Expected 'a' | 'b'
+}
+
+----------------------------------------
+
+TITLE: Vitest Dependency Pre-bundling Configuration for Workers SDK
+DESCRIPTION: Configuration example for Vitest showing how to enable dependency pre-bundling to resolve module import issues, particularly with ES Modules in the Workers environment.
+
+LANGUAGE: typescript
+CODE:
+import { defineWorkersConfig } from "@cloudflare/vitest-pool-workers/config";
+
+export default defineWorkersConfig({
+	test: {
+		deps: {
+			optimizer: {
+				ssr: {
+					enabled: true,
+					include: ["your-package-name"],
+				},
+			},
+		},
+		poolOptions: {
+			workers: {
+				// ...
+			},
+		},
+	},
+});
+
+----------------------------------------
+
+TITLE: Formatting Zod Error for Discriminated Union Schema
+DESCRIPTION: Tests how formatZodError formats errors for a discriminated union schema when a property value is of the wrong type.
+
+LANGUAGE: typescript
+CODE:
+{
+  ...,
+  a: false,
+     ^ Expected number, received boolean
+}
+
+----------------------------------------
+
+TITLE: Using Module Aliases in Wrangler CLI
+DESCRIPTION: Command line example for specifying module aliases when using wrangler dev or deploy commands.
+
+LANGUAGE: bash
+CODE:
+npx wrangler dev --alias node-fetch:./fetch-nolyfill
+
+----------------------------------------
+
+TITLE: Documenting Solarflare Theme Changelog in Markdown
+DESCRIPTION: A markdown changelog document tracking version updates for the solarflare-theme package, including commit references, PR numbers, and descriptions of changes made in each version.
+
+LANGUAGE: markdown
+CODE:
+# solarflare-theme
+
+## 0.0.4
+
+### Patch Changes
+
+- [`07613d3`](https://github.com/cloudflare/workers-sdk/commit/07613d3b231779466ca2528ce07385552ec73501) Thanks [@penalosa](https://github.com/penalosa)! - Trigger release after testing release process
+
+## 0.0.3
+
+### Patch Changes
+
+- [`6d31db7`](https://github.com/cloudflare/workers-sdk/commit/6d31db7097b49645854a4e8cbfb066c497a3e7b8) Thanks [@penalosa](https://github.com/penalosa)! - trigger fake release
+
+## 0.0.2
+
+### Patch Changes
+
+- [#3142](https://github.com/cloudflare/workers-sdk/pull/3142) [`7e580718`](https://github.com/cloudflare/workers-sdk/commit/7e580718dad6853714b812e0cdcd970ac22338e1) Thanks [@JacobMGEvans](https://github.com/JacobMGEvans)! - Adjusted the text color inside formatted curly brackets. Color was #eeffff is now #62676A which is uniform with the rest of the light theme.
+
+----------------------------------------
+
+TITLE: Formatting Zod Error for Union Schema
+DESCRIPTION: Tests how formatZodError formats errors when a value fails all possible types in a union schema, showing multiple validation failures.
+
+LANGUAGE: typescript
+CODE:
+'a'
+^ Expected boolean, received string
+  Invalid literal value, expected 1
+
+----------------------------------------
+
+TITLE: Vitest Debugging Command for Workers SDK
+DESCRIPTION: Command to run Vitest with debugging enabled on port 9229 and without file parallelism, allowing for step-through debugging of tests.
+
+LANGUAGE: bash
+CODE:
+vitest --inspect=9229 --no-file-parallelism
+
+----------------------------------------
+
+TITLE: Formatting Zod Error for Array Schema with Invalid Array Items
+DESCRIPTION: Tests how formatZodError formats validation errors for specific elements within an array, indicating the index position of each invalid item.
+
+LANGUAGE: typescript
+CODE:
+[
+  ...,
+  /* [2] */ '3',
+            ^ Expected number, received string
+  ...,
+  /* [5] */ false,
+            ^ Expected number, received boolean
+]
+
+----------------------------------------
+
+TITLE: Command Example for Adding Secrets in Non-Interactive Mode
+DESCRIPTION: Example command showing how to pipe a secret value into the wrangler secret put command for non-interactive usage. This requires the user to be logged in and have either a single account or a specified account_id.
+
+LANGUAGE: bash
+CODE:
+cat my-secret.txt | wrangler secret put secret-key --name worker-name
+
+----------------------------------------
+
+TITLE: ESLint Configuration to Restrict Dynamic Imports
+DESCRIPTION: ESLint configuration that prevents dynamic imports with non-literal arguments, helping to avoid potential security issues with wildcard imports in workers.
+
+LANGUAGE: javascript
+CODE:
+// eslint.config.js
+export default [
+	{
+		rules: {
+			"no-restricted-syntax": [
+				"error",
+				{
+					selector: "ImportExpression[argument.type!='Literal']",
+					message:
+						"Dynamic imports with non-literal arguments are not allowed.",
+				},
+			],
+		},
+	},
+];
+
+----------------------------------------
+
+TITLE: Formatting Zod Error for Array Schema with Primitive Input
+DESCRIPTION: Tests how formatZodError formats the error when a number primitive is provided to a schema expecting an array.
+
+LANGUAGE: typescript
+CODE:
+1
+^ Expected array, received number
+
+----------------------------------------
+
+TITLE: Wildcard Imports Pattern 2 in JavaScript
+DESCRIPTION: Example of a dynamic import using template literals that will bundle all files matching the pattern. Similar to Pattern 1 but using template strings.
+
+LANGUAGE: javascript
+CODE:
+const json2 = await import(`./data/${kind}.json`);
+
+----------------------------------------
+
+TITLE: Formatting Zod Error for Primitive Schema with Object Input
+DESCRIPTION: Tests how formatZodError formats the error when an object is provided to a schema expecting a string primitive.
+
+LANGUAGE: typescript
+CODE:
+{ a: 1, b: [Object] }
+^ Expected string, received object
+
+----------------------------------------
+
+TITLE: D1 database info command usage
+DESCRIPTION: Example showing how to use the d1 info command to get information about a D1 database, including size and state.
+
+LANGUAGE: bash
+CODE:
+npx wrangler d1 info northwind
+
+----------------------------------------
+
+TITLE: Improving runInDurableObject Type Definition for RPC Method Support
+DESCRIPTION: Fixes incorrect type usage in runInDurableObject function to properly support RPC methods. This change updates the type definition to correctly infer stub types for Durable Object RPC methods.
+
+LANGUAGE: typescript
+CODE:
+fix: improve `runInDurableObject` type
+
+[#5975](https://github.com/cloudflare/workers-sdk/pull/5975) updated the type for `runInDurableObject` to infer the stub's type correctly for RPC methods, however it used the wrong `DurableObjects` type. This PR fixes the type used to properly support RPC methods.
+
+----------------------------------------
+
+TITLE: Describing Pipeline Request Handler Worker in Markdown
+DESCRIPTION: A markdown document explaining the purpose of a Worker that sends HTTP request details to a Pipeline, including a table of test files and their descriptions.
+
+LANGUAGE: markdown
+CODE:
+# 🚰 pipelines
+
+This Worker implements endpoint that send details of the incoming HTTP request to a Pipeline.
+
+| Test                                                                                  | Overview                                                          |
+| ------------------------------------------------------------------------------------- | ----------------------------------------------------------------- |
+| [pipeline-send-integration-self.test.ts](test/pipeline-send-integration-self.test.ts) | Integration tests for endpoints using `SELF`                      |
+| [pipeline-send-unit.test.ts](test/pipeline-send-unit.test.ts)                         | Unit tests calling `worker.fetch()` directly mocking the Pipeline |
+
+----------------------------------------
+
+TITLE: Using Import Attributes in JavaScript
+DESCRIPTION: Example of how to use import attributes with the 'type' property to specify the module type as 'json'. This feature was added in esbuild 0.19.3.
+
+LANGUAGE: javascript
+CODE:
+import stuff from './stuff.json' with { type: 'json' }
+
+----------------------------------------
+
+TITLE: Formatting Zod Error for Object Schema with Unrecognized Keys
+DESCRIPTION: Tests how formatZodError formats the error when an object contains properties not defined in the schema.
+
+LANGUAGE: typescript
+CODE:
+{ a: 1, b: 2 }
+^ Unrecognized key(s) in object: 'b'
+
+----------------------------------------
+
+TITLE: Basic Wrangler Configuration
+DESCRIPTION: Basic configuration for a Cloudflare Worker in wrangler.toml, specifying the name and main file without additional module configuration.
+
+LANGUAGE: toml
+CODE:
+name = "my-worker"
+main = "src/index.js
+
+----------------------------------------
+
+TITLE: Setting Up VSCode for Web Development Environment
+DESCRIPTION: Commands for installing dependencies, setting up the development environment, and running the development server for VSCode web integration with workers-sdk.
+
+LANGUAGE: bash
+CODE:
+pnpm install
+pnpm run setup
+pnpm run dev
+
+----------------------------------------
+
+TITLE: Default Cache Control Configuration for KV Asset Handler
+DESCRIPTION: Default cacheControl configuration object used by getAssetFromKV function, controlling browser cache TTL, edge cache TTL and cache bypass behavior.
+
+LANGUAGE: javascript
+CODE:
+let cacheControl = {
+	browserTTL: null, // do not set cache control ttl on responses
+	edgeTTL: 2 * 60 * 60 * 24, // 2 days
+	bypassCache: false, // do not bypass Cloudflare's cache
+};
+
+----------------------------------------
+
+TITLE: Wrangler Configuration with Additional Modules
+DESCRIPTION: Enhanced wrangler.toml configuration that includes additional modules for the worker, specifically JavaScript files in the src directory.
+
+LANGUAGE: toml
+CODE:
+name = "my-worker"
+main = "src/index.js
+
+find_additional_modules = true
+rules = [
+  { type = "ESModule", globs = ["*.js"]}
+]
+
+----------------------------------------
+
+TITLE: Setting ASSET_NAMESPACE with ES Module Format in KV Asset Handler
+DESCRIPTION: Example showing how to pass the ASSET_NAMESPACE parameter when using ES Module format with getAssetFromKV function.
+
+LANGUAGE: javascript
+CODE:
+return getAssetFromKV(
+	{
+		request,
+		waitUntil(promise) {
+			return ctx.waitUntil(promise)
+		},
+	},
+	{
+		ASSET_NAMESPACE: env.__STATIC_CONTENT,
+	},
+)
+
+----------------------------------------
+
+TITLE: Formatting Zod Error for Array Schema with Length Constraint
+DESCRIPTION: Tests how formatZodError formats an error when an array exceeds the maximum allowed length defined in the schema.
+
+LANGUAGE: typescript
+CODE:
+[ 1, 2, 3, 4, 5 ]
+^ Array must contain at most 3 element(s)
+
+----------------------------------------
+
+TITLE: Enabling Wrangler Telemetry Globally
+DESCRIPTION: Command to re-enable telemetry collection for Wrangler CLI across all projects after it has been disabled.
+
+LANGUAGE: sh
+CODE:
+npx wrangler telemetry enable
+
+----------------------------------------
+
+TITLE: Customizing Default Document Configuration in getAssetFromKV
+DESCRIPTION: Example of how to customize the defaultDocument option in getAssetFromKV function. This allows projects to use document names other than the default index.html as the landing page for a directory path.
+
+LANGUAGE: javascript
+CODE:
+return getAssetFromKV(event, {
+  defaultDocument: "index.shtm",
+});
+
+----------------------------------------
+
+TITLE: Formatting Zod Error for Large Data Values
+DESCRIPTION: Tests how formatZodError formats errors when dealing with large data structures, demonstrating how large arrays are displayed in the error output.
+
+LANGUAGE: typescript
+CODE:
+{
+  a: {
+    b: [
+          0,  1,  2,  3,  4,  5,  6,  7,  8,  9, 10,
+         11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21,
+         22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32,
+         33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43,
+         44, 45, 46, 47, 48, 49
+       ],
+       ^ Expected string, received array
+  },
+}
+
+----------------------------------------
+
+TITLE: Checking Wrangler Telemetry Status
+DESCRIPTION: Command to check the current status of telemetry collection for Wrangler CLI, showing whether it's enabled or disabled.
+
+LANGUAGE: sh
+CODE:
+npx wrangler telemetry status
+
+----------------------------------------
+
+TITLE: Stopping a Worker Development Instance
+DESCRIPTION: Command to stop a running Worker development instance. This is typically used after testing is complete to clean up resources.
+
+LANGUAGE: javascript
+CODE:
+await worker.stop();
+
+----------------------------------------
+
+TITLE: Specifying NumPy Dependency in Python
+DESCRIPTION: This line indicates the NumPy library as a dependency or import requirement for the project. NumPy is a fundamental package for scientific computing with Python, providing support for arrays, matrices, and mathematical functions.
+
+LANGUAGE: python
+CODE:
+numpy
+
+----------------------------------------
+
+TITLE: Checking Remote Repository Configuration
+DESCRIPTION: Command to verify the remote repositories that have been configured for the local git repository, showing the origin remote pointing to your fork.
+
+LANGUAGE: shell
+CODE:
+git remote -v
+origin	https://github.com/<your-github-username>/workers-sdk (fetch)
+origin	https://github.com/<your-github-username>/workers-sdk (push)
+
+----------------------------------------
+
+TITLE: Exporting Named Entrypoint in Worker-D
+DESCRIPTION: Code snippet showing how to export a named class that extends WorkerEntrypoint. This pattern allows referencing a specific entrypoint by name in service bindings.
+
+LANGUAGE: javascript
+CODE:
+export class EntrypointD extends WokrerEntrypoint {}
+
+----------------------------------------
+
+TITLE: Creating a Custom Fetch Implementation
+DESCRIPTION: Example of a simple module that exports the standard fetch function as a replacement for node-fetch.
+
+LANGUAGE: typescript
+CODE:
+export default fetch; // all this does is export the standard fetch function`
+
+----------------------------------------
+
+TITLE: Running Linting Checks
+DESCRIPTION: Command to run ESLint checks on the codebase to ensure code quality and consistency.
+
+LANGUAGE: shell
+CODE:
+pnpm run check:lint
+
+----------------------------------------
+
+TITLE: Configuring Dependency Pre-Bundling in Vitest for Workers SDK
+DESCRIPTION: This snippet demonstrates how to configure Vitest to pre-bundle dependencies that might cause module resolution issues. It uses the defineWorkersConfig function to enable SSR optimization for specific packages that need to be converted from CommonJS/UMD to ESM.
+
+LANGUAGE: typescript
+CODE:
+import { defineWorkersConfig } from "@cloudflare/vitest-pool-workers/config";
+
+export default defineWorkersConfig({
+	test: {
+		deps: {
+			optimizer: {
+				ssr: {
+					enabled: true,
+					include: ["your-package-name"],
+				},
+			},
+		},
+		poolOptions: {
+			workers: {
+				// ...
+			},
+		},
+	},
+});
+
+----------------------------------------
+
+TITLE: Deleting a Cloudflare Pipeline
+DESCRIPTION: Command to delete an existing Cloudflare Pipeline.
+
+LANGUAGE: bash
+CODE:
+wrangler pipelines delete my-pipline
+
+----------------------------------------
+
+TITLE: Running Tests for a Specific Workspace
+DESCRIPTION: Command to run tests for a specific workspace in the monorepo, using wrangler as an example.
+
+LANGUAGE: shell
+CODE:
+pnpm run test --filter wrangler
+
+----------------------------------------
+
+TITLE: Installing Workers AI Testing Dependencies
+DESCRIPTION: The package @cloudflare/vitest-pool-workers@^0.8.1 is required to use AI and Vectorize bindings with Vitest for testing Cloudflare Workers.
+
+LANGUAGE: markdown
+CODE:
+@cloudflare/vitest-pool-workers@^0.8.1
+
+----------------------------------------
+
+TITLE: Building D1 Worker Fixture with Wrangler CLI
+DESCRIPTION: Shell commands to rebuild the worker.dist.mjs file for D1 testing. The process uses Wrangler 3.2.0 to publish with dry-run and specifies the output directory. After generation, the file is moved to its final location.
+
+LANGUAGE: shell
+CODE:
+$ npx wrangler@3.2.0 publish --config test/fixtures/d1/wrangler.toml --dry-run --outdir dist
+$ mv test/fixtures/d1/dist/worker.js test/fixtures/d1/worker.dist.mjs
+
+----------------------------------------
+
+TITLE: Running Tests in Watch Mode
+DESCRIPTION: Command to run tests in watch mode for a specific workspace, which will re-run tests when files change and use a single process with increased timeout for debugging.
+
+LANGUAGE: shell
+CODE:
+pnpm run --filter wrangler test:watch
+
+----------------------------------------
+
+TITLE: Running tests for Pages project with config file
+DESCRIPTION: Commands to navigate to the test fixture directory and execute the test suite to verify that the wrangler.toml configuration is properly applied.
+
+LANGUAGE: bash
+CODE:
+# cd into the test fixture folder
+cd fixtures/pages-workerjs-with-config-file-app
+
+# Run tests
+npm run test
+
+----------------------------------------
+
+TITLE: Dependency Update Table for December 2023
+DESCRIPTION: A markdown table showing version changes for workerd and @cloudflare/workers-types dependencies in the miniflare package.
+
+LANGUAGE: markdown
+CODE:
+| Dependency                | From          | To            |
+| ------------------------- | ------------- | ------------- |
+| workerd                   | 1.20241218.0  | 1.20241230.0  |
+| @cloudflare/workers-types | ^4.20241218.0 | ^4.20241230.0 |
+
+----------------------------------------
+
+TITLE: Updating Main Branch from Upstream in Git
+DESCRIPTION: Commands to ensure your local main branch is up to date with the upstream repository before creating a new branch for changes.
+
+LANGUAGE: sh
+CODE:
+git switch main
+git pull upstream main
+
+----------------------------------------
+
+TITLE: Running Tests for Cloudflare Pages Project in Bash
+DESCRIPTION: Commands to navigate to the test fixture directory and run test scripts. These tests verify that the worker script takes precedence over the functions directory.
+
+LANGUAGE: bash
+CODE:
+# cd into the test fixture folder
+cd fixtures/pages-workerjs-and-functions-app
+
+# Run tests
+npm run test
+
+----------------------------------------
+
+TITLE: Dependency Update Table Showing Version Changes
+DESCRIPTION: A markdown table showing updated dependency versions for the miniflare package, including workerd and @cloudflare/workers-types packages.
+
+LANGUAGE: markdown
+CODE:
+| Dependency                | From          | To            |
+| ------------------------- | ------------- | ------------- |
+| workerd                   | 1.20250214.0  | 1.20250224.0  |
+| @cloudflare/workers-types | ^4.20250214.0 | ^4.20250224.0 |
+
+----------------------------------------
+
+TITLE: Configuring Vitest for Fixture Tests
+DESCRIPTION: Example TypeScript configuration for setting up a fixture test with Vitest, merging the project-specific config with shared configuration.
+
+LANGUAGE: ts
+CODE:
+import { defineProject, mergeConfig } from "vitest/config";
+import configShared from "../../vitest.shared";
+
+export default mergeConfig(
+  configShared,
+  defineProject({
+    test: {
+      // config overrides
+    }
+  })
+});
+
+----------------------------------------
+
+TITLE: Running Tests for Pages Functions with Routes App
+DESCRIPTION: Commands to navigate to the test fixture directory and execute the test suite for the Pages Functions with Routes App project.
+
+LANGUAGE: bash
+CODE:
+# cd into the test fixture folder
+cd fixtures/pages-functions-with-routes-app
+
+# Run tests
+npm run test
+
+----------------------------------------
+
+TITLE: Running E2E Tests with PNPM and Turbo
+DESCRIPTION: Command to run end-to-end tests for the Cloudflare Vite plugin using PNPM and Turbo from the monorepo root. This ensures all required dependencies are built before the tests are executed.
+
+LANGUAGE: sh
+CODE:
+pnpm test:e2e -F @cloudflare/vite-plugin
+
+----------------------------------------
+
+TITLE: Cloning Repository for Cloudflare Employees
+DESCRIPTION: Instructions for Cloudflare employees to clone the main repository directly without forking, which allows pushing branches directly to the upstream repository.
+
+LANGUAGE: shell
+CODE:
+git clone https://github.com/cloudflare/workers-sdk.git
+cd workers-sdk
+
+----------------------------------------
+
+TITLE: Publishing Pages Functions Wasm App to Cloudflare Pages in Bash
+DESCRIPTION: Commands to navigate to the project directory and deploy the static assets to Cloudflare Pages. Requires a Cloudflare account for deployment.
+
+LANGUAGE: bash
+CODE:
+# cd into the test fixture folder
+cd fixtures/pages-functions-wasm-app
+
+# Deploy the directory of static assets as a Pages deployment
+npm run publish
+
+----------------------------------------
+
+TITLE: Running Local Development Server
+DESCRIPTION: Command to start the local Vite server for the playground frontend, with API calls going to the testing playground-preview-worker.
+
+LANGUAGE: bash
+CODE:
+pnpm run dev
+
+----------------------------------------
+
+TITLE: Running a Specific Workspace
+DESCRIPTION: Command to run a distributable for a specific workspace in the monorepo, using wrangler as an example.
+
+LANGUAGE: shell
+CODE:
+pnpm run --filter wrangler start
+
+----------------------------------------
+
+TITLE: Setting up Local Development Environment for Pages Functions Wasm App in Bash
+DESCRIPTION: Commands to navigate to the test fixture directory and start the development server for local testing and development.
+
+LANGUAGE: bash
+CODE:
+# cd into the test fixture folder
+cd fixtures/pages-functions-wasm-app
+
+# start dev server
+npm run dev
+
+----------------------------------------
+
+TITLE: Implementing Simple Response Handler in Worker B
+DESCRIPTION: JavaScript implementation for Worker B that returns a simple "Hello World" response to fetch events.
+
+LANGUAGE: javascript
+CODE:
+export default {
+	fetch(req, env) {
+		return new Response("Hello World");
+	},
+};
+
+----------------------------------------
+
+TITLE: Building a Specific Workspace
+DESCRIPTION: Command to build a distributable for a specific workspace in the monorepo, using wrangler as an example.
+
+LANGUAGE: shell
+CODE:
+pnpm run build --filter wrangler
+
+----------------------------------------
+
+TITLE: Configuring ES modules in wrangler.toml
+DESCRIPTION: TOML configuration for specifying JavaScript files as ES modules when using --no-bundle. This rule tells Wrangler to treat all .js files as ES modules.
+
+LANGUAGE: toml
+CODE:
+rules = [
+  { type = "ESModule", globs = ["**/*.js"]},
+]
+
+----------------------------------------
+
+TITLE: Basic TOML Configuration for Worker B
+DESCRIPTION: Simple configuration file for Worker B defining just the worker name.
+
+LANGUAGE: toml
+CODE:
+name = 'B'
+
+----------------------------------------
+
+TITLE: Running All Code Checks
+DESCRIPTION: Command to run all code checks (type checking, formatting, linting, and testing) across all workspaces in the repository.
+
+LANGUAGE: shell
+CODE:
+pnpm run check
+
+----------------------------------------
+
+TITLE: Running End-to-End Tests Locally
+DESCRIPTION: Command to run end-to-end tests locally using Wrangler with required authentication environment variables.
+
+LANGUAGE: sh
+CODE:
+WRANGLER="node ~/path/to/workers-sdk/packages/wrangler/wrangler-dist/cli.js" CLOUDFLARE_ACCOUNT_ID=$CLOUDFLARE_TESTING_ACCOUNT_ID CLOUDFLARE_API_TOKEN=$CLOUDFLARE_TESTING_API_TOKEN pnpm run test:e2e
+
+----------------------------------------
+
+TITLE: Installing Cloudflare Vite Plugin Dependencies
+DESCRIPTION: Command to install the necessary dependencies for a Cloudflare Vite project. This includes Vite itself, the Cloudflare Vite plugin, and wrangler for deployment.
+
+LANGUAGE: shell
+CODE:
+npm install vite @cloudflare/vite-plugin wrangler --save-dev
+
+----------------------------------------
+
+TITLE: Defining Basic Wrangler Command Syntax in Shell
+DESCRIPTION: Demonstrates the object-verb order for Wrangler commands, showing the recommended pattern for command structure.
+
+LANGUAGE: sh
+CODE:
+wrangler <object / noun> <verb>
+
+----------------------------------------
+
+TITLE: Pushing Branch to Origin Fork
+DESCRIPTION: Command to push your local branch changes to your fork of the repository on GitHub.
+
+LANGUAGE: sh
+CODE:
+git push -u origin <new-branch-name>
+
+----------------------------------------
+
+TITLE: Showing Pipeline Command Flags Renaming in Markdown Table
+DESCRIPTION: Displays a markdown table showing the renamed parameters for wrangler pipelines commands, where previous parameter names are mapped to their new counterparts for better clarity and consistency.
+
+LANGUAGE: markdown
+CODE:
+| Previous Name     | New Name              |
+| ----------------- | --------------------- |
+| access-key-id     | r2-access-key-id      |
+| secret-access-key | r2-secret-access-key  |
+| transform         | transform-worker      |
+| r2                | r2-bucket             |
+| prefix            | r2-prefix             |
+| binding           | enable-worker-binding |
+| http              | enable-http           |
+| authentication    | require-http-auth     |
+| filename          | file-template         |
+| filepath          | partition-template    |
+
+----------------------------------------
+
+TITLE: Formatting Wrangler Subcommands in Shell
+DESCRIPTION: Shows how subcommands should follow the main command with proper spacing and argument structure.
+
+LANGUAGE: sh
+CODE:
+wrangler <command> <subcommand> <arg> --<option>`
+
+----------------------------------------
+
+TITLE: Formatting Code with Prettier
+DESCRIPTION: Command to run Prettier to automatically format the entire codebase according to project standards.
+
+LANGUAGE: shell
+CODE:
+pnpm run prettify
+
+----------------------------------------
+
+TITLE: Enabling Debug Logging for Mock NPM Registry
+DESCRIPTION: This environment variable configuration shows how to enable additional debug logging for the mock-npm-registry by setting the NODE_DEBUG environment variable.
+
+LANGUAGE: env
+CODE:
+NODE_DEBUG=mock-npm-registry
+
+----------------------------------------
+
+TITLE: Formatting General Success Messages in Shell
+DESCRIPTION: Template for displaying general success messages, including current status, completion details, and next steps for the user.
+
+LANGUAGE: sh
+CODE:
+🌀 *Action verb* *Object*. *details of what is currently happening if necessary*
+🚧 *Updated additional details of the current status if necessary*
+✨ Success. *Add details of and what the user can now do*
+📣 *Announcement*
+
+*Description of what the next steps the user can take to be successful. If there are predictable happy paths following a success state, make those paths clear to the user here.*
+
+----------------------------------------
+
+TITLE: Installing Project Dependencies
+DESCRIPTION: Command to install all dependencies for the project using pnpm, which is required for this monorepo workspace setup.
+
+LANGUAGE: shell
+CODE:
+cd workers-sdk
+pnpm install
+
+----------------------------------------
+
+TITLE: Setting Cloudflare API Token in .dev.vars File
+DESCRIPTION: Example of setting environment variables in a .dev.vars file for local development. This shows how to configure authentication tokens and other sensitive information.
+
+LANGUAGE: plaintext
+CODE:
+CLOUDFLARE_API_TOKEN=your-api-token-here
+
+----------------------------------------
+
+TITLE: Formatting General Error Messages in Shell
+DESCRIPTION: Template for displaying general error messages, including error details, solutions, documentation links, and a prompt for error reporting.
+
+LANGUAGE: sh
+CODE:
+✘  ERROR  *Error code if applicable*: *Concise description of what the error is*
+
+Error details:
+*description of what caused the error*
+
+How to solve this error:
+*direction on how to resolve the error*
+
+--------------------
+To learn more about ___, read our documentation at https://developers.cloudflare.com/*productname*
+
+If you think this is a bug then please create an issue at https://github.com/cloudflare/workers-sdk/issues/new/choose
+--------------------
+
+√ Would you like to report this error to Cloudflare? <y/n>
+
+#User inputs y or n#
+
+🪵  Logs were written to <filepath>
+
+----------------------------------------
+
+TITLE: Installing Cloudflare Workers Types for TypeScript
+DESCRIPTION: Command to install TypeScript type definitions for Cloudflare Workers. This provides type checking and autocompletion for Workers-specific APIs.
+
+LANGUAGE: shell
+CODE:
+npm install @cloudflare/workers-types --save-dev
+
+----------------------------------------
+
+TITLE: C Source Code for WebAssembly Module
+DESCRIPTION: The C source code used to generate the wasm-example.wasm WebAssembly file. It exports a simple add function that takes two 32-bit integers and returns their sum.
+
+LANGUAGE: c
+CODE:
+#include <stdint.h>
+
+int32_t add(int32_t a, int32_t b) {
+    return a + b;
+}
+
+----------------------------------------
+
+TITLE: Dependency Update Table for Mid-December 2023
+DESCRIPTION: A markdown table showing version updates for workerd and @cloudflare/workers-types dependencies in the miniflare package.
+
+LANGUAGE: markdown
+CODE:
+| Dependency                | From          | To            |
+| ------------------------- | ------------- | ------------- |
+| workerd                   | 1.20241205.0  | 1.20241218.0  |
+| @cloudflare/workers-types | ^4.20241205.0 | ^4.20241218.0 |
+
+----------------------------------------
+
+TITLE: Gitignore Configuration for Wrangler Projects
+DESCRIPTION: Entries to add to .gitignore for Cloudflare Workers projects. This excludes temporary Wrangler files and environment variables from version control.
+
+LANGUAGE: gitignore
+CODE:
+.wrangler
+.dev.vars
+
+----------------------------------------
+
+TITLE: Package Description in Markdown
+DESCRIPTION: A README file that explains the purpose of the interactive-dev-tests package, which is to test interactive wrangler dev sessions running in a pseudo-TTY environment. It highlights that these tests cover different behaviors than the non-interactive tests found in other fixtures.
+
+LANGUAGE: markdown
+CODE:
+# `interactive-dev-tests`
+
+This package contains tests for interactive `wrangler dev` sessions running in a pseudo-TTY. These have slightly different behaviour to non-interactive sessions tested by other fixtures.
+
+----------------------------------------
+
+TITLE: Dependency Update Table for Miniflare Package
+DESCRIPTION: A markdown table showing version changes for dependencies in the miniflare package, updating workerd and @cloudflare/workers-types.
+
+LANGUAGE: markdown
+CODE:
+| Dependency                | From          | To            |
+| ------------------------- | ------------- | ------------- |
+| workerd                   | 1.20250129.0  | 1.20250204.0  |
+| @cloudflare/workers-types | ^4.20250129.0 | ^4.20250204.0 |
+
+----------------------------------------
+
+TITLE: Configuring Worker Environment for Vitest Tests in TypeScript
+DESCRIPTION: This example shows how to configure a specific environment (production) for Workers tests using defineWorkersConfig. This allows tests to pick up bindings and variables that are scoped to specific environments.
+
+LANGUAGE: typescript
+CODE:
+import { defineWorkersConfig } from "@cloudflare/vitest-pool-workers/config";
+
+export default defineWorkersConfig({
+	test: {
+		poolOptions: {
+			workers: {
+				wrangler: {
+					configPath: "./wrangler.toml",
+					environment: "production",
+				},
+			},
+		},
+	},
+});
+
+----------------------------------------
+
+TITLE: Mixed module type configuration in wrangler.toml
+DESCRIPTION: Advanced TOML configuration for projects with mixed module types. This example configures specific file patterns for both ES modules and CommonJS modules with overlapping rule definitions.
+
+LANGUAGE: toml
+CODE:
+rules = [
+  { type = "CommonJS", globs = ["nested/say-hello.js", "**/*.cjs"]},
+  { type = "ESModule", globs = ["**/*.mjs"]}
+]
+
+----------------------------------------
+
+TITLE: Non-Bundling Dynamic Import in JavaScript
+DESCRIPTION: Example of a dynamic import pattern that will NOT bundle matching files. The import path is stored in a variable first, which prevents esbuild from including matches at build time.
+
+LANGUAGE: javascript
+CODE:
+const path = "./data/" + kind + ".js";
+const json2 = await import(path);
+
+----------------------------------------
+
+TITLE: Running Tests for Pages Functions with Config File
+DESCRIPTION: Commands to navigate to the test fixture folder and run the tests using npm run test, which will verify the functionality of the Pages Functions with config file setup.
+
+LANGUAGE: bash
+CODE:
+# cd into the test fixture folder
+cd fixtures/pages-functions-with-config-file-app
+
+# Run tests
+npm run test
+
+----------------------------------------
+
+TITLE: Fixed Worker with Non-Wildcard Dynamic Import
+DESCRIPTION: Modified version of the worker that avoids the wildcard import pattern by using a variable for the module path, preventing automatic inclusion of all matching files.
+
+LANGUAGE: javascript
+CODE:
+// src/index.js
+export default {
+	async fetch() {
+		const name = new URL(request.url).pathname;
+		const moduleName = "./" + name;
+		const value = (await import(moduleName)).default;
+		return new Response(value);
+	},
+};
+
+----------------------------------------
+
+TITLE: Deploying Pages Functions with Routes App to Cloudflare
+DESCRIPTION: Commands to navigate to the test fixture directory and deploy static assets to Cloudflare Pages using Wrangler CLI. Requires a Cloudflare account to deploy to .pages.dev domain.
+
+LANGUAGE: bash
+CODE:
+# cd into the test fixture folder
+cd fixtures/pages-functions-with-routes-app
+
+# Deploy the directory of static assets as a Pages deployment
+npx wrangler pages deploy public
+
+----------------------------------------
+
+TITLE: Deploying Cloudflare Pages Project with Wrangler in Bash
+DESCRIPTION: Commands to navigate to the test fixture directory and deploy static assets to Cloudflare Pages using Wrangler CLI. Requires a Cloudflare account to deploy to the .pages.dev domain.
+
+LANGUAGE: bash
+CODE:
+# cd into the test fixture folder
+cd fixtures/pages-workerjs-and-functions-app
+
+# Deploy the directory of static assets as a Pages deployment
+npx wrangler pages deploy public
+
+----------------------------------------
+
+TITLE: Setting up local development environment for Pages project with config file
+DESCRIPTION: Commands to navigate to the test fixture directory and start a local development server using wrangler pages dev. This demonstrates how wrangler reads configuration from the wrangler.toml file.
+
+LANGUAGE: bash
+CODE:
+# cd into the test fixture folder
+cd fixtures/pages-workerjs-with-config-file-app
+
+# Start local dev server
+npx wrangler pages dev
+
+----------------------------------------
+
+TITLE: Disabling Telemetry via Environment Variable
+DESCRIPTION: Command to disable Create-Cloudflare telemetry by setting an environment variable. This provides an alternative method to opt out of data collection.
+
+LANGUAGE: sh
+CODE:
+export CREATE_CLOUDFLARE_TELEMETRY_DISABLED=1
+
+----------------------------------------
+
+TITLE: Project Structure and Description in Markdown
+DESCRIPTION: Markdown documentation explaining the basics-integration-auxiliary project structure. It describes how the Worker-under-test runs in a separate isolate as an auxiliary Worker, creating an environment closer to production but requiring pre-compilation of TypeScript code.
+
+LANGUAGE: markdown
+CODE:
+# ⚠️ basics-integration-auxiliary
+
+This Worker contains basic `fetch` and `scheduled` handlers. Instead of running the Worker-under-test in the same Worker as the test runner, this example defines the Worker-under-test as an _auxiliary_ Worker. This means the Worker runs in a separate isolate to the test runner, with a different global scope. The Worker-under-test runs in an environment closer to production, but Vite transformations and hot-module-reloading aren't applied to the Worker—you must compile your TypeScript to JavaScript beforehand. This is done in [global-setup.ts](global-setup.ts). Note auxiliary workers cannot be configured from `wrangler.toml` files—you must use Miniflare `WorkerOptions`.
+
+| Test                                                                                      | Overview                           |
+| ----------------------------------------------------------------------------------------- | ---------------------------------- |
+| [fetch-integration-auxiliary.test.ts](test/fetch-integration-auxiliary.test.ts)           | Basic `fetch` integration test     |
+| [scheduled-integration-auxiliary.test.ts](test%2Fscheduled-integration-auxiliary.test.ts) | Basic `scheduled` integration test |
+
+----------------------------------------
+
+TITLE: Enabling Telemetry Debug Mode
+DESCRIPTION: Command to enable debug mode for Create-Cloudflare telemetry, which displays the data being collected during usage. This helps users understand exactly what information is being sent to Cloudflare.
+
+LANGUAGE: sh
+CODE:
+CREATE_CLOUDFLARE_TELEMETRY_DEBUG=1 npm create cloudflare
+
+----------------------------------------
+
+TITLE: Demonstrating Testing Approaches for Cloudflare Workers
+DESCRIPTION: A markdown table outlining different testing strategies for Cloudflare Workers, including fetch and scheduled handlers. It references test files implementing both integration tests using the SELF helper from cloudflare:test module and unit tests that call handler functions directly.
+
+LANGUAGE: markdown
+CODE:
+| Test                                                                          | Overview                                              |
+| ----------------------------------------------------------------------------- | ----------------------------------------------------- |
+| [fetch-integration-self.test.ts](test/fetch-integration-self.test.ts)         | Basic `fetch` integration test using `SELF`           |
+| [fetch-unit.test.ts](test/fetch-unit.test.ts)                                 | Basic unit test calling `worker.fetch()` directly     |
+| [scheduled-integration-self.test.ts](test/scheduled-integration-self.test.ts) | Basic `scheduled` integration test using `SELF`       |
+| [scheduled-unit.test.ts](test/scheduled-unit.test.ts)                         | Basic unit test calling `worker.scheduled()` directly |
+
+----------------------------------------
+
+TITLE: Running Next.js Development Server with Various Package Managers
+DESCRIPTION: Commands to start the Next.js development server using different package managers (npm, yarn, pnpm, or bun).
+
+LANGUAGE: bash
+CODE:
+npm run dev
+# or
+yarn dev
+# or
+pnpm dev
+# or
+bun dev
+
+----------------------------------------
+
+TITLE: Project Structure Overview in Markdown
+DESCRIPTION: Describes the multi-Worker architecture with three services: api-service (public entry point), auth-service (JWT handling), and database-service (KV namespace operations). The markdown includes details about service routing and test mocking.
+
+LANGUAGE: markdown
+CODE:
+# 🔌 multiple-workers
+
+This example uses multiple Workers:
+
+- `api-service`: entrypoint to the project, forwards requests on to other services as needed
+- `auth-service`: handles signing and verifying JWTs
+- `database-service`: handles reading/writing values from a KV namespace
+
+In a real project, only the `api-service` would be publicly routable. The `auth-service` sends request to an external endpoint to login and sign JWTs. This endpoint is mocked in tests using the `outboundService` Miniflare option. The `database-service` assumes the user has been authenticated and allows reads/writes to any key.
+
+| Test                                            | Overview                       |
+| ----------------------------------------------- | ------------------------------ |
+| [integration.test.ts](test/integration.test.ts) | Integration tests using `SELF` |
+
+----------------------------------------
+
+TITLE: KV Example Configuration in JavaScript/TypeScript
+DESCRIPTION: A commented code snippet showing where to uncomment KV namespace binding-related code in the application to enable the KV example functionality.
+
+LANGUAGE: typescript
+CODE:
+// KV Example:
+
+----------------------------------------
+
+TITLE: Exporting Default Object in Worker-B
+DESCRIPTION: Code snippet showing how to export a default object in a Worker with assets. This pattern exposes a simple object with a fetch method.
+
+LANGUAGE: javascript
+CODE:
+export default {
+	async fetch() {}
+}
+
+----------------------------------------
+
+TITLE: Configuring KV Namespace in wrangler.jsonc
+DESCRIPTION: JSON configuration line to add to wrangler.jsonc file for setting up a KV namespace binding with a placeholder ID.
+
+LANGUAGE: json
+CODE:
+"kv_namespaces": [{ "binding": "MY_KV_NAMESPACE", "id": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx" }],
+
+----------------------------------------
+
+TITLE: Starting a Development Session with Wrangler
+DESCRIPTION: Command for starting a local development environment using Wrangler CLI for the Workers Assets test fixture.
+
+LANGUAGE: bash
+CODE:
+wrangler dev
+
+----------------------------------------
+
+TITLE: Deploying Cloudflare Workers API
+DESCRIPTION: Command to deploy the API to Cloudflare Workers production environment. This publishes your API to the Cloudflare Workers platform.
+
+LANGUAGE: bash
+CODE:
+wrangler deploy
+
+----------------------------------------
+
+TITLE: Running Tests for Workers Assets Project
+DESCRIPTION: Command for executing the test suite for the Workers Assets with User Worker test fixture.
+
+LANGUAGE: bash
+CODE:
+npm run test
+
+----------------------------------------
+
+TITLE: Running Development Server with Wrangler for Workers SPA
+DESCRIPTION: Command to start a local development server using Wrangler CLI for the Workers Assets SPA test fixture.
+
+LANGUAGE: bash
+CODE:
+wrangler dev
+
+----------------------------------------
+
+TITLE: Running Tests for Workers Assets SPA Project
+DESCRIPTION: Command to execute the test suite for the Workers Assets with SPA test fixture using npm.
+
+LANGUAGE: bash
+CODE:
+npm run test
+
+----------------------------------------
+
+TITLE: Cloning the Repository for External Contributors
+DESCRIPTION: Instructions for external contributors to clone their forked repository to their local machine. This sets up the repository with the proper remote configuration for contributing.
+
+LANGUAGE: shell
+CODE:
+git clone https://github.com/<your-github-username>/workers-sdk
+cd workers-sdk
+
+----------------------------------------
+
+TITLE: Disabling Telemetry via CLI Command
+DESCRIPTION: Command to disable Create-Cloudflare telemetry data collection using the npm create command. This allows users to opt out of sharing usage data with Cloudflare.
+
+LANGUAGE: sh
+CODE:
+npm create cloudflare telemetry disable
+
+----------------------------------------
+
+TITLE: Running Type Checking
+DESCRIPTION: Command to run TypeScript type checking on all the code in the repository to catch type errors.
+
+LANGUAGE: shell
+CODE:
+pnpm run check:type
+
+----------------------------------------
+
+TITLE: Checking Telemetry Status via CLI Command
+DESCRIPTION: Command to check the current status of Create-Cloudflare telemetry. This allows users to verify whether data collection is currently enabled or disabled.
+
+LANGUAGE: sh
+CODE:
+npm create cloudflare telemetry status
+
+----------------------------------------
+
+TITLE: Staging and Committing Files in Git
+DESCRIPTION: Commands to stage files for inclusion in a git commit and create the commit.
+
+LANGUAGE: sh
+CODE:
+git add <paths-to-changes-files>
+git commit
+
+----------------------------------------
+
+TITLE: Running CloudFlare Type Generation with Package Managers
+DESCRIPTION: Commands to run the cf-typegen script using different package managers (npm, yarn, pnpm, or bun) to update the env.d.ts file with Cloudflare binding types.
+
+LANGUAGE: bash
+CODE:
+npm run cf-typegen
+# or
+yarn cf-typegen
+# or
+pnpm cf-typegen
+# or
+bun cf-typegen
+
+----------------------------------------
+
+TITLE: Running Specific End-to-End Tests with Bail Option
+DESCRIPTION: Command to run specific end-to-end tests with the bail option to limit test failures output.
+
+LANGUAGE: sh
+CODE:
+WRANGLER="node ~/path/to/workers-sdk/packages/wrangler/wrangler-dist/cli.js" CLOUDFLARE_ACCOUNT_ID=$CLOUDFLARE_TESTING_ACCOUNT_ID CLOUDFLARE_API_TOKEN=$CLOUDFLARE_TESTING_API_TOKEN pnpm run test:e2e [file-pattern] --bail=1
+
+----------------------------------------
+
+TITLE: Installing Project Dependencies
+DESCRIPTION: Command to install all required Node.js dependencies for the project as defined in the package.json file.
+
+LANGUAGE: bash
+CODE:
+npm install
+
+----------------------------------------
+
+TITLE: Triggering a Hotfix Release Workflow
+DESCRIPTION: Instructions for manually triggering a hotfix release using GitHub Actions workflow. The process involves setting the distribution tag to 'latest' or optionally 'hotfix' for verification.
+
+LANGUAGE: markdown
+CODE:
+- Manually trigger a hotfix release from that PR using the ["Release a hotfix"](https://github.com/cloudflare/workers-sdk/actions/workflows/hotfix-release.yml) GitHub action.
+  - Make sure you set the dist-tag to `latest`
+  - Optionally, you can first publish it to the `hotfix` dist-tag on NPM in order to verify the release.
+
+----------------------------------------
+
+TITLE: Setting up Python virtual environment with uv for Workers SDK
+DESCRIPTION: Instructions for creating and synchronizing a Python virtual environment using the uv package manager to enable type hints and autocomplete for a Python Workers project. This requires having uv installed beforehand.
+
+LANGUAGE: bash
+CODE:
+uv venv
+uv sync
+
+----------------------------------------
+
+TITLE: Importing WASM modules with --no-bundle in Workers
+DESCRIPTION: Example of importing a WASM file that will work with the --no-bundle flag, demonstrating how binary modules can be imported and instantiated at runtime on Cloudflare's Edge.
+
+LANGUAGE: javascript
+CODE:
+// index.js
+import wasm from './example.wasm'
+
+export default {
+  async fetch() {
+    await WebAssembly.instantiate(wasm, ...)
+    ...
+  }
+}
+
+----------------------------------------
+
+TITLE: Creating Patches for VSCode
+DESCRIPTION: Commands for making changes to the VSCode codebase and creating patches that can be applied within the workers-sdk project.
+
+LANGUAGE: bash
+CODE:
+git commit -m "YOUR MESSAGE" --no-verify
+git format-patch -o ../../packages/quick-edit/patches base
+
+----------------------------------------
+
+TITLE: Running Tests for Pages Functions Wasm App in Bash
+DESCRIPTION: Commands to navigate to the test fixture directory and execute the test suite for the application.
+
+LANGUAGE: bash
+CODE:
+# cd into the test fixture folder
+cd fixtures/pages-functions-wasm-app
+
+# Run tests
+npm run test
+
+----------------------------------------
+
+TITLE: Formatting Zod Error for Primitive Schema with Primitive Input
+DESCRIPTION: Tests how formatZodError handles validation when a boolean is provided instead of the expected number type.
+
+LANGUAGE: typescript
+CODE:
+false
+^ Expected number, received boolean
+
+----------------------------------------
+
+TITLE: Running tests for Pages Worker.js WASM app
+DESCRIPTION: Commands to navigate to the test fixture directory and execute the test suite for the Pages project with WebAssembly modules.
+
+LANGUAGE: bash
+CODE:
+# cd into the test fixture folder
+cd fixtures/pages-workerjs-wasm-app
+
+# Run tests
+npm run test
+
+----------------------------------------
+
+TITLE: Formatting Zod Error with Custom Error Messages
+DESCRIPTION: Tests how formatZodError formats errors with multi-line custom error messages defined in the schema validation.
+
+LANGUAGE: typescript
+CODE:
+{
+  a: Symbol(kOoh),
+     ^ Custom message
+       with multiple
+       lines
+}
+
+----------------------------------------
+
+TITLE: Starting a Development Session with Wrangler
+DESCRIPTION: Command to start a development session for the Workers assets test fixture using the Wrangler CLI tool.
+
+LANGUAGE: shell
+CODE:
+wrangler dev
+
+----------------------------------------
+
+TITLE: Formatting Zod Error for Object Schema with Primitive Input
+DESCRIPTION: Tests how formatZodError formats the error when a boolean primitive is provided to a schema expecting an object.
+
+LANGUAGE: typescript
+CODE:
+true
+^ Expected object, received boolean
+
+----------------------------------------
+
+TITLE: Displaying ASCII Art Logo for 'WAA'
+DESCRIPTION: A decorative ASCII art banner showing the letters 'WAA' formed by basic text characters within box outlines. Each letter is contained in its own framed section to create a stylized logo.
+
+LANGUAGE: plaintext
+CODE:
+ .----------------.  .----------------.  .----------------.
+| .--------------. || .--------------. || .--------------. |
+| |  ____  ____  | || |      __      | || |  ____  ____  | |
+| | |_  _||_  _| | || |     /  \     | || | |_  _||_  _| | |
+| |   \ \  / /   | || |    / /\ \    | || |   \ \  / /   | |
+| |    \ \/ /    | || |   / ____ \   | || |    \ \/ /    | |
+| |    _|  |_    | || | _/ /    \ \_ | || |    _|  |_    | |
+| |   |______|   | || ||____|  |____|| || |   |______|   | |
+| |              | || |              | || |              | |
+| '--------------' || '--------------' || '--------------' |
+ '----------------'  '----------------'  '----------------'
+
+----------------------------------------
+
+TITLE: Formatting Zod Error for Object Schema with Invalid Object Properties
+DESCRIPTION: Tests how formatZodError formats multiple validation errors within an object, including type mismatches and missing required fields.
+
+LANGUAGE: typescript
+CODE:
+{
+  ...,
+  b: '2',
+     ^ Expected number, received string
+  ...,
+  g: '7',
+     ^ Expected boolean, received string
+  f: undefined,
+     ^ Required
+}
+
+----------------------------------------
+
+TITLE: Running Tests for Workers with Assets Only Project
+DESCRIPTION: Command to execute the test suite for the Cloudflare Workers with Assets Only project using npm.
+
+LANGUAGE: bash
+CODE:
+npm run test
+
+----------------------------------------
+
+TITLE: Formatting Zod Error for Deeply Nested Schema
+DESCRIPTION: Tests how formatZodError handles validation errors in complex nested structures with objects, arrays, and various types of properties.
+
+LANGUAGE: typescript
+CODE:
+{
+  a: '1',
+     ^ Expected number, received string
+  b: {
+    c: 2,
+       ^ Expected string, received number
+    d: [
+      ...,
+      /* [1] */ {
+        e: 42,
+           ^ Expected boolean, received number
+      },
+      /* [2] */ false,
+                ^ Expected object, received boolean
+      /* [3] */ {
+        e: undefined,
+           ^ Required
+      },
+    ],
+    f: [Function: f],
+       ^ Expected array, received function
+  },
+  g: undefined,
+     ^ Required
+}
+
+----------------------------------------
+
+TITLE: WAW ASCII Art Logo for Workers SDK
+DESCRIPTION: An ASCII art representation of the letters 'W', 'A', and 'W' arranged in decorated boxes, likely representing a logo or visual identifier for the Workers SDK project.
+
+LANGUAGE: plaintext
+CODE:
+ .----------------.  .----------------.  .-----------------.
+| .--------------. || .--------------. || .--------------. |
+| |  ____  ____  | || |      __      | || |  ____  ____  | |
+| | |_  _||_  _| | || |     /  \     | || | |_  _||_  _| | |
+| |   \ \  / /   | || |    / /\ \    | || |   \ \  / /   | |
+| |    \ \/ /    | || |   / ____ \   | || |    \ \/ /    | |
+| |    _|  |_    | || | _/ /    \ \_ | || |    _|  |_    | |
+| |   |______|   | || ||____|  |____|| || |   |______|   | |
+| |              | || |              | || |              | |
+| '--------------' || '--------------' || '--------------' |
+ '----------------'  '----------------'  '----------------'
+
+----------------------------------------
+
+TITLE: Configuring ESLint Parser Options for TypeScript in Vite
+DESCRIPTION: This snippet shows how to configure the top-level parserOptions property in ESLint to enable type-aware linting rules. It specifies TypeScript configuration files for the project and sets the root directory.
+
+LANGUAGE: javascript
+CODE:
+export default tseslint.config({
+	languageOptions: {
+		// other options...
+		parserOptions: {
+			project: ["./tsconfig.node.json", "./tsconfig.app.json"],
+			tsconfigRootDir: import.meta.dirname,
+		},
+	},
+});
