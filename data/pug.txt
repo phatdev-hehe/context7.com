@@ -1,0 +1,759 @@
+TITLE: Pug JavaScript API Usage Example
+DESCRIPTION: Demonstrates the JavaScript API for Pug, including methods for compiling, rendering, and rendering from files with options and local variables.
+
+LANGUAGE: javascript
+CODE:
+var pug = require('pug');
+
+// compile
+var fn = pug.compile('string of pug', options);
+var html = fn(locals);
+
+// render
+var html = pug.render('string of pug', merge(options, locals));
+
+// renderFile
+var html = pug.renderFile('filename.pug', merge(options, locals));
+
+----------------------------------------
+
+TITLE: Basic Pug Template Syntax Example
+DESCRIPTION: A basic example of Pug template syntax showing various features including doctype declaration, HTML attributes, conditional rendering, and multiline text. This demonstrates the whitespace-sensitive nature of Pug.
+
+LANGUAGE: pug
+CODE:
+doctype html
+html(lang="en")
+  head
+    title= pageTitle
+    script(type='text/javascript').
+      if (foo) bar(1 + 5)
+  body
+    h1 Pug - node template engine
+    #container.col
+      if youAreUsingPug
+        p You are amazing
+      else
+        p Get on it!
+      p.
+        Pug is a terse and simple templating language with a
+        strong focus on performance and powerful features.
+
+----------------------------------------
+
+TITLE: Complete Pug Template to JavaScript Function Conversion Example
+DESCRIPTION: Shows a complete workflow for converting a Pug template into a JavaScript function, using pug-lexer, pug-parser, pug-runtime/wrap, and pug-code-gen. The example demonstrates generating and executing a function that renders a simple paragraph element.
+
+LANGUAGE: javascript
+CODE:
+var lex = require('pug-lexer');
+var parse = require('pug-parser');
+var wrap = require('pug-runtime/wrap');
+var generateCode = require('pug-code-gen');
+
+var funcStr = generateCode(parse(lex('p Hello world!')), {
+  compileDebug: false,
+  pretty: true,
+  inlineRuntimeFunctions: false,
+  templateName: 'helloWorld'
+});
+//=> 'function helloWorld(locals) { ... }'
+
+var func = wrap(funcStr, 'helloWorld');
+func();
+//=> '\n<p>Hello world!</p>'
+
+----------------------------------------
+
+TITLE: Installing Pug Package via npm
+DESCRIPTION: Command for installing the Pug template engine as a dependency in a JavaScript project using npm.
+
+LANGUAGE: bash
+CODE:
+$ npm install pug
+
+----------------------------------------
+
+TITLE: Basic Pug Template Syntax Example
+DESCRIPTION: Demonstrates the syntax of Pug templates with variables, conditionals, and multiline content, showcasing its whitespace-sensitive nature.
+
+LANGUAGE: pug
+CODE:
+doctype html
+html(lang="en")
+  head
+    title= pageTitle
+    script(type='text/javascript').
+      if (foo) bar(1 + 5);
+  body
+    h1 Pug - node template engine
+    #container.col
+      if youAreUsingPug
+        p You are amazing
+      else
+        p Get on it!
+      p.
+        Pug is a terse and simple templating language with a
+        strong focus on performance and powerful features.
+
+----------------------------------------
+
+TITLE: Pug API Usage in JavaScript
+DESCRIPTION: Examples of using Pug's API in JavaScript for compiling and rendering templates. Shows three methods: compile, render, and renderFile, each with different use cases.
+
+LANGUAGE: javascript
+CODE:
+var pug = require('pug');
+
+// compile
+var fn = pug.compile('string of pug', options);
+var html = fn(locals);
+
+// render
+var html = pug.render('string of pug', merge(options, locals));
+
+// renderFile
+var html = pug.renderFile('filename.pug', merge(options, locals));
+
+----------------------------------------
+
+TITLE: Converting Pug Tokens to AST with parse() Function
+DESCRIPTION: Demonstrates how to use the parse() function to convert Pug tokens to an abstract syntax tree. The example shows a complete workflow from lexical analysis to parsing with appropriate options.
+
+LANGUAGE: javascript
+CODE:
+var lex = require('pug-lexer');
+
+var filename = 'my-file.pug';
+var src = 'div(data-foo="bar")';
+var tokens = lex(src, {filename});
+
+var ast = parse(tokens, {filename, src});
+
+console.log(JSON.stringify(ast, null, '  '))
+
+----------------------------------------
+
+TITLE: Manual Pug Template Loading in JavaScript
+DESCRIPTION: Demonstrates how to manually load a Pug template file, using separate steps for reading the file, lexing, parsing, and loading dependencies. Includes a custom resolve function to log file requests.
+
+LANGUAGE: javascript
+CODE:
+var fs = require('fs');
+var lex = require('pug-lexer');
+var parse = require('pug-parser');
+var load = require('pug-load');
+
+// you can do everything very manually
+
+var str = fs.readFileSync('bar.pug', 'utf8');
+var ast = load(parse(lex(str, 'bar.pug'), 'bar.pug'), {
+  lex: lex,
+  parse: parse,
+  resolve: function (filename, source, options) {
+    console.log('"' + filename + '" file requested from "' + source + '".');
+    return load.resolve(filename, source, options);
+  }
+});
+
+// or you can do all that in just two steps
+
+var str = fs.readFileSync('bar.pug', 'utf8');
+var ast = load.string(str, 'bar.pug', {
+  lex: lex,
+  parse: parse,
+  resolve: function (filename, source, options) {
+    console.log('"' + filename + '" file requested from "' + source + '".');
+    return load.resolve(filename, source, options);
+  }
+});
+
+// or you can do all that in only one step
+
+var ast = load.file('bar.pug', {
+  lex: lex,
+  parse: parse,
+  resolve: function (filename, source, options) {
+    console.log('"' + filename + '" file requested from "' + source + '".');
+    return load.resolve(filename, source, options);
+  }
+});
+
+----------------------------------------
+
+TITLE: Testing Browser-Compiled Pug Templates in Node.js
+DESCRIPTION: Demonstrates how to use pug-runtime/wrap to make runtime functions available when testing browser-compiled code in Node.js. The example shows compiling templates with the externalRuntime option and wrapping them for execution.
+
+LANGUAGE: javascript
+CODE:
+var pug = require('pug');
+var wrap = require('pug-runtime/wrap');
+
+var pugSrc = 'p= content';
+// By default compileClient automatically embeds the needed runtime functions,
+// rendering this module useless.
+var compiledCode = pug.compileClient(pugSrc, {
+  externalRuntime: true
+});
+//=> 'function template (locals) { ... pug.escape() ... }'
+
+var templateFunc = wrap(compiledCode);
+templateFunc({content: 'Hey!'});
+//=> '<p>Hey!</p>'
+
+// Change template function name to 'heyTemplate'
+compiledCode = pug.compileClient(pugSrc, {
+  externalRuntime: true,
+  name: 'heyTemplate'
+});
+//=> 'function heyTemplate (locals) { ... }'
+
+templateFunc = wrap(compiledCode, 'heyTemplate');
+templateFunc({content: 'Hey!'});
+//=> '<p>Hey!</p>'
+
+----------------------------------------
+
+TITLE: Installing Pug Command Line Interface
+DESCRIPTION: Commands for installing the Pug CLI globally using npm and accessing its help documentation.
+
+LANGUAGE: bash
+CODE:
+$ npm install pug-cli -g
+
+LANGUAGE: bash
+CODE:
+$ pug --help
+
+----------------------------------------
+
+TITLE: Complete Example of Using pug-attrs for HTML and Object Output
+DESCRIPTION: A comprehensive example showing how to use pug-attrs to compile attributes to both HTML and object formats. Demonstrates attribute definition, compilation options, and execution of the compiled code.
+
+LANGUAGE: javascript
+CODE:
+var compileAttrs = require('pug-attrs');
+var pugRuntime = require('pug-runtime');
+
+function getBaz () { return 'baz<>'; }
+
+var attrs = [
+  {name: 'foo',  val: '"bar"',    mustEscape: true },
+  {name: 'baz',  val: 'getBaz()', mustEscape: true },
+  {name: 'quux', val: true,       mustEscape: false}
+];
+var result, finalResult;
+
+// HTML MODE
+result = compileAttrs(attrs, {
+  terse:   true,
+  format:  'html',
+  runtime: function (name) { return 'pugRuntime.' + name; }
+});
+//=> '" foo=\"bar\"" + pugRuntime.attr("baz", getBaz(), true, true) + " quux"'
+
+finalResult = Function('pugRuntime, getBaz',
+  'return (' + result + ');'
+);
+finalResult(pugRuntime, getBaz);
+// => ' foo="bar" baz="baz&lt;&gt;" quux'
+
+// OBJECT MODE
+result = compileAttrs(attrs, {
+  terse:   true,
+  format:  'object',
+  runtime: function (name) { return 'pugRuntime.' + name; }
+});
+//=> '{"foo": "bar","baz": pugRuntime.escape(getBaz()),"quux": true}'
+
+finalResult = Function('pugRuntime, getBaz',
+  'return (' + result + ');'
+);
+finalResult(pugRuntime, getBaz);
+//=> { foo: 'bar', baz: 'baz&lt;&gt;', quux: true }
+
+----------------------------------------
+
+TITLE: Using pug-strip-comments with Different Comment Stripping Options
+DESCRIPTION: This snippet demonstrates how to use pug-strip-comments to remove different types of comments from a Pug token stream. It shows stripping unbuffered comments (default behavior), stripping only buffered comments, and stripping both types of comments.
+
+LANGUAGE: javascript
+CODE:
+var lex = require('pug-lexer');
+var stripComments = require('pug-strip-comments');
+
+var tokens = lex('//- unbuffered\n// buffered');
+// [ { type: 'comment', line: 1, val: ' unbuffered', buffer: false },
+//   { type: 'newline', line: 2 },
+//   { type: 'comment', line: 2, val: ' buffered', buffer: true },
+//   { type: 'eos', line: 2 } ]
+
+// Only strip unbuffered comments (default)
+stripComments(tokens, { filename: 'pug' });
+// [ { type: 'newline', line: 2 },
+//   { type: 'comment', line: 2, val: ' buffered', buffer: true },
+//   { type: 'eos', line: 2 } ]
+
+// Only strip buffered comments (when you want to play a joke on your coworkers)
+stripComments(tokens, { filename: 'pug', stripUnbuffered: false, stripBuffered: true });
+// [ { type: 'comment', line: 1, val: ' unbuffered', buffer: false },
+//   { type: 'newline', line: 2 },
+//   { type: 'eos', line: 2 } ]
+
+// Strip both (if you want Pug VERY clean)
+stripComments(tokens, { filename: 'pug', stripBuffered: true });
+// [ { type: 'newline', line: 2 },
+//   { type: 'eos', line: 2 } ]
+
+----------------------------------------
+
+TITLE: Lexing a Pug template and displaying the tokens
+DESCRIPTION: Demonstrates how to use the lex function to convert a Pug template string into tokens and then display the result as formatted JSON. The example includes the filename option for error handling.
+
+LANGUAGE: javascript
+CODE:
+console.log(JSON.stringify(lex('div(data-foo="bar")', {filename: 'my-file.pug'}), null, '  '))
+
+----------------------------------------
+
+TITLE: Compiling Pug Templates for Client-Side Use
+DESCRIPTION: Command line instruction for pre-compiling Pug templates to JavaScript for browser use, optimizing for client-side performance.
+
+LANGUAGE: bash
+CODE:
+$ pug --client --no-debug filename.pug
+
+----------------------------------------
+
+TITLE: Flattening Nested Blocks in Pug AST
+DESCRIPTION: Example demonstrating how to flatten nested Block structures in a Pug AST. This code uses the 'after' handler to process innermost blocks first, replacing each Block with its child nodes.
+
+LANGUAGE: javascript
+CODE:
+var ast = {
+  type: 'Block',
+  nodes: [
+    { type: 'Text', val: 'a' },
+    {
+      type: 'Block',
+      nodes: [
+        { type: 'Text', val: 'b' },
+        {
+          type: 'Block',
+          nodes: [ { type: 'Text', val: 'c' } ]
+        },
+        { type: 'Text', val: 'd' }
+      ]
+    },
+    { type: 'Text', val: 'e' }
+  ]
+};
+
+var dest = {
+  type: 'Block',
+  nodes: [
+    { type: 'Text', val: 'a' },
+    { type: 'Text', val: 'b' },
+    { type: 'Text', val: 'c' },
+    { type: 'Text', val: 'd' },
+    { type: 'Text', val: 'e' }
+  ]
+};
+
+// We need to use `after` handler instead of `before`
+// handler because we want to flatten the innermost
+// blocks first before proceeding onto outer blocks.
+
+ast = walk(ast, null, function after(node, replace) {
+  if (node.type === 'Block' && replace.arrayAllowed) {
+    // Replace the block with its contents
+    replace(node.nodes);
+  }
+});
+
+assert.deepEqual(dest, ast);
+
+----------------------------------------
+
+TITLE: Creating and Using a Pug Error Object in JavaScript
+DESCRIPTION: Demonstrates how to create a Pug error object with detailed context information including filename, line number, and source code. The example shows the structure of the resulting error object with formatted message for better readability.
+
+LANGUAGE: javascript
+CODE:
+var error = require('pug-error');
+
+var err = error('MY_CODE', 'My message', {line: 3, filename: 'myfile', src: 'foo\nbar\nbaz\nbash\nbing'});
+// { code: 'PUG:MY_CODE',
+//   msg: 'My message',
+//   line: 3,
+//   column: undefined,
+//   filename: 'myfile',
+//   src: 'foo\nbar\nbaz\nbash\nbing',
+//   message: 'myfile:3\n    1| foo\n    2| bar\n  > 3| baz\n    4| bash\n    5| bing\n\nMy message' }
+
+throw err;
+
+----------------------------------------
+
+TITLE: Building Inline Runtime Functions in JavaScript
+DESCRIPTION: Shows how to build a string containing specific runtime functions that can be inlined within compiled templates. This approach creates a function string that can be executed in different contexts.
+
+LANGUAGE: javascript
+CODE:
+var build = require('pug-runtime/build');
+var src = build(['attr']);
+
+var attr = Function('', src + ';return pug_attr;')();
+assert(attr('foo', 'bar', true, true) === ' foo="bar"');
+
+----------------------------------------
+
+TITLE: Converting Strong Elements to Text in Pug AST
+DESCRIPTION: Example showing how to transform all simple <strong> elements into text nodes. This code identifies <strong> tags with a single child and replaces them with their text content.
+
+LANGUAGE: javascript
+CODE:
+var source = 'p abc #[strong NO]\nstrong on its own line';
+var dest = 'p abc #[| NO]\n| on its own line';
+
+var ast = parse(lex(source));
+
+ast = walk(ast, function before(node, replace) {
+  // Find all <strong> tags
+  if (node.type === 'Tag' && node.name === 'strong') {
+    var children = node.block.nodes;
+
+    // Make sure that the Tag only has one child -- the text
+    if (children.length === 1 && children[0].type === 'Text') {
+      // Replace the Tag with the Text
+      replace({ type: 'Text', val: children[0].val, line: node.line });
+    }
+  }
+}, {
+  includeDependencies: true
+});
+
+assert.deepEqual(parse(lex(dest)), ast);
+
+----------------------------------------
+
+TITLE: Changing Text Node Content in Pug AST
+DESCRIPTION: Example demonstrating how to modify the content of all Text nodes in a Pug AST. This code parses a simple class with text and changes all text nodes to 'bar'.
+
+LANGUAGE: javascript
+CODE:
+var lex = require('pug-lexer');
+var parse = require('pug-parser');
+
+// Changing content of all Text nodes
+// ==================================
+
+var source = '.my-class foo';
+var dest = '.my-class bar';
+
+var ast = parse(lex(source));
+
+ast = walk(ast, function before(node, replace) {
+  if (node.type === 'Text') {
+    node.val = 'bar';
+
+    // Alternatively, you can replace the entire node
+    // rather than just the text.
+    // replace({ type: 'Text', val: 'bar', line: node.line });
+  }
+}, {
+  includeDependencies: true
+});
+
+assert.deepEqual(parse(lex(dest)), ast);
+
+----------------------------------------
+
+TITLE: Example AST Output for Parsed Pug Markup
+DESCRIPTION: Shows the JSON representation of an abstract syntax tree (AST) generated from parsing a simple Pug div element with an attribute. Illustrates the structure of the AST object with its nested nodes and properties.
+
+LANGUAGE: json
+CODE:
+{
+  "type": "Block",
+  "nodes": [
+    {
+      "type": "Tag",
+      "name": "div",
+      "selfClosing": false,
+      "block": {
+        "type": "Block",
+        "nodes": [],
+        "line": 1,
+        "filename": "my-file.pug"
+      },
+      "attrs": [
+        {
+          "name": "data-foo",
+          "val": "\"bar\"",
+          "line": 1,
+          "column": 5,
+          "filename": "my-file.pug",
+          "mustEscape": true
+        }
+      ],
+      "attributeBlocks": [],
+      "isInline": false,
+      "line": 1,
+      "column": 1,
+      "filename": "my-file.pug"
+    }
+  ],
+  "line": 0,
+  "filename": "my-file.pug"
+}
+
+----------------------------------------
+
+TITLE: Example output of pug-lexer token structure
+DESCRIPTION: Shows the JSON output format produced by pug-lexer when parsing a simple div element with an attribute. The tokens include type, line number, and other properties specific to each token type.
+
+LANGUAGE: json
+CODE:
+[
+  {
+    "type": "tag",
+    "line": 1,
+    "val": "div",
+    "selfClosing": false
+  },
+  {
+    "type": "attrs",
+    "line": 1,
+    "attrs": [
+      {
+        "name": "data-foo",
+        "val": "\"bar\"",
+        "escaped": true
+      }
+    ]
+  },
+  {
+    "type": "eos",
+    "line": 1
+  }
+]
+
+----------------------------------------
+
+TITLE: Compiled HTML Output from Pug Template
+DESCRIPTION: The resulting HTML output generated from the Pug template example. Shows how the concise Pug syntax is transformed into standard HTML markup.
+
+LANGUAGE: html
+CODE:
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <title>Pug</title>
+    <script type="text/javascript">
+      if (foo) bar(1 + 5)
+    </script>
+  </head>
+  <body>
+    <h1>Pug - node template engine</h1>
+    <div id="container" class="col">
+      <p>You are amazing</p>
+      <p>Pug is a terse and simple templating language with a strong focus on performance and powerful features.</p>
+    </div>
+  </body>
+</html>
+
+----------------------------------------
+
+TITLE: Generated HTML from Pug Template
+DESCRIPTION: The HTML output generated by Pug after processing the template example above, showing how Pug's concise syntax translates to standard HTML.
+
+LANGUAGE: html
+CODE:
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <title>Pug</title>
+    <script type="text/javascript">
+      if (foo) bar(1 + 5);
+    </script>
+  </head>
+  <body>
+    <h1>Pug - node template engine</h1>
+    <div id="container" class="col">
+      <p>You are amazing</p>
+      <p>
+        Pug is a terse and simple templating language with a strong focus on
+        performance and powerful features.
+      </p>
+    </div>
+  </body>
+</html>
+
+----------------------------------------
+
+TITLE: Running Tests for Pug Project
+DESCRIPTION: Command to execute the test suite for the Pug project. This should be run after installing dependencies to verify that the project is functioning correctly.
+
+LANGUAGE: bash
+CODE:
+npm test
+
+----------------------------------------
+
+TITLE: Installing Dependencies for Pug Project
+DESCRIPTION: Command to install all required dependencies for the Pug project. This must be run before executing tests to ensure all necessary packages are available.
+
+LANGUAGE: bash
+CODE:
+npm install
+
+----------------------------------------
+
+TITLE: Accessing Runtime Methods Directly in JavaScript
+DESCRIPTION: Demonstrates how to use pug-runtime methods directly. The example shows using the 'attr' method to generate an HTML attribute, which is useful when working with known values at compile time.
+
+LANGUAGE: javascript
+CODE:
+var runtime = require('pug-runtime');
+
+assert(runtime.attr('foo', 'bar', true, true) === ' foo="bar"');
+
+----------------------------------------
+
+TITLE: Basic Usage of pug-attrs Module
+DESCRIPTION: Demonstrates how to require and use the pug-attrs module in a JavaScript application.
+
+LANGUAGE: javascript
+CODE:
+var compileAttrs = require('pug-attrs');
+
+----------------------------------------
+
+TITLE: Basic Usage of pug-code-gen Module
+DESCRIPTION: Demonstrates how to require and use the pug-code-gen module to generate JavaScript function strings from Pug AST.
+
+LANGUAGE: javascript
+CODE:
+var generateCode = require('pug-code-gen');
+
+----------------------------------------
+
+TITLE: Importing the Pug Parser Module in JavaScript
+DESCRIPTION: Shows how to import the pug-parser module in a JavaScript file. This is the basic requirement for using the parser functionality.
+
+LANGUAGE: javascript
+CODE:
+var parse = require('pug-parser');
+
+----------------------------------------
+
+TITLE: Importing pug-lexer in JavaScript
+DESCRIPTION: Shows how to import the pug-lexer module in a JavaScript application. This is the basic setup required before using the lexer functionality.
+
+LANGUAGE: javascript
+CODE:
+var lex = require('pug-lexer');
+
+----------------------------------------
+
+TITLE: Installing Pug via npm
+DESCRIPTION: Command to install the Pug template engine package via npm. This is used for programmatic usage of Pug in Node.js applications.
+
+LANGUAGE: bash
+CODE:
+$ npm install pug
+
+----------------------------------------
+
+TITLE: Installing Pug Command Line Interface
+DESCRIPTION: Commands to install the Pug CLI globally and display help information. This allows users to compile Pug templates from the command line.
+
+LANGUAGE: bash
+CODE:
+$ npm install pug-cli -g
+
+LANGUAGE: bash
+CODE:
+$ pug --help
+
+----------------------------------------
+
+TITLE: Importing Pug-Walk in JavaScript
+DESCRIPTION: Basic import statement for the pug-walk module in a Node.js application.
+
+LANGUAGE: javascript
+CODE:
+var walk = require('pug-walk');
+
+----------------------------------------
+
+TITLE: Importing the pug-error Module in JavaScript
+DESCRIPTION: Shows how to import the pug-error module in a JavaScript file using CommonJS require syntax.
+
+LANGUAGE: javascript
+CODE:
+var error = require('pug-error');
+
+----------------------------------------
+
+TITLE: Importing and Using Pug-Linker in JavaScript
+DESCRIPTION: This snippet demonstrates how to require the pug-linker module in a Node.js application. It shows the basic import statement needed to access the linking functionality.
+
+LANGUAGE: javascript
+CODE:
+var link = require('pug-linker');
+
+----------------------------------------
+
+TITLE: Basic pug-load Require Example in JavaScript
+DESCRIPTION: Shows how to require the pug-load module in a JavaScript application.
+
+LANGUAGE: javascript
+CODE:
+var load = require('pug-load');
+
+----------------------------------------
+
+TITLE: Requiring pug-filters in JavaScript
+DESCRIPTION: Code example showing how to require the pug-filters module in a Node.js application. This is the basic setup needed before using any of the module's functionality.
+
+LANGUAGE: javascript
+CODE:
+var filters = require('pug-filters');
+
+----------------------------------------
+
+TITLE: Creating HTML Header Element in Pug
+DESCRIPTION: A simple HTML header element with an ID attribute of 'myHeader' and text content of 'Hello World!'.
+
+LANGUAGE: HTML
+CODE:
+<h1 id="myHeader">Hello World!</h1>
+
+----------------------------------------
+
+TITLE: Running Pug Examples with Node.js
+DESCRIPTION: Simple command showing how to run a Pug example file using Node.js from the command line.
+
+LANGUAGE: bash
+CODE:
+node attributes.js
+
+----------------------------------------
+
+TITLE: Displaying Pug Project Backers with HTML Links and Images
+DESCRIPTION: HTML code that displays a grid of backers' avatars with links to their websites. Each link opens in a new tab and shows the backer's avatar image from OpenCollective.
+
+LANGUAGE: html
+CODE:
+<a href="https://opencollective.com/pug/backer/0/website" target="_blank"><img src="https://opencollective.com/pug/backer/0/avatar.svg"></a>
+
+----------------------------------------
+
+TITLE: Displaying Pug Project Sponsors with HTML Links and Images
+DESCRIPTION: HTML code that displays a grid of sponsors' avatars with links to their websites. Each link opens in a new tab and shows the sponsor's avatar image from OpenCollective.
+
+LANGUAGE: html
+CODE:
+<a href="https://opencollective.com/pug/sponsor/0/website" target="_blank"><img src="https://opencollective.com/pug/sponsor/0/avatar.svg"></a>

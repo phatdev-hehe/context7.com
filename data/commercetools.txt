@@ -1,0 +1,614 @@
+TITLE: Creating a Query Endpoint in RAML Resource Definition
+DESCRIPTION: Defines a GET endpoint for querying resources, including pagination, filtering, and sorting capabilities. This example shows how to structure a Cart resource with proper annotations and security scopes.
+
+LANGUAGE: raml
+CODE:
+type:
+  baseDomain:
+    resourceType: Cart
+    resourceQueryType: CartPagedQueryResponse
+    resourceDraft: CartDraft
+    whereExample: 'customerEmail = "john.doe@example.com"'
+    sortExample: createdAt asc
+(updateable): Cart
+(deleteable): Cart
+(createable): CartDraft
+description: A shopping cart holds product variants and can be ordered.
+get:
+  securedBy: [oauth_2_0: { scopes: ['view_orders:{projectKey}'] }]
+  queryParameters:
+    customerId?:
+      type: string
+  responses:
+    200:
+      body:
+        application/json:
+          example: !include ../examples/carts.example.json
+
+----------------------------------------
+
+TITLE: Creating a POST Endpoint for Resource Creation in RAML
+DESCRIPTION: Defines a POST endpoint for creating new resources, including request body validation and response examples. This example shows the Order resource creation from a Cart with appropriate security scopes.
+
+LANGUAGE: raml
+CODE:
+type:
+  baseDomain:
+    resourceType: Order
+    resourceQueryType: OrderPagedQueryResponse
+    resourceDraft: OrderFromCartDraft
+    whereExample: 'customerEmail = "john.doe@example.com"'
+    sortExample: createdAt asc
+(updateable): Order
+(deleteable): Order
+(createable): OrderFromCartDraft
+description:
+  An order can be created from a order, usually after a checkout process has
+  been completed.
+post:
+  securedBy: [oauth_2_0: { scopes: ['manage_orders:{projectKey}'] }]
+  is:
+    - conflicting
+  description: |
+    Creates an order from a Cart.
+    The cart must have a shipping address set before creating an order.
+    When using the Platform TaxMode, the shipping address is used for tax calculation.
+  body:
+    application/json:
+      example: !include ../examples/order-create.example.json
+  responses:
+    201:
+      body:
+        application/json:
+          example: !include ../examples/order.example.json
+
+----------------------------------------
+
+TITLE: Creating an Update Endpoint with ID Parameter in RAML
+DESCRIPTION: Defines a resource update endpoint with ID parameter and POST method for updates. This example demonstrates how to structure a Cart update endpoint with proper methodName annotation and resource type references.
+
+LANGUAGE: raml
+CODE:
+/{ID}:
+  (methodName): withId
+  type:
+    baseResource:
+      uriParameterName: ID
+      resourceType: Cart
+      resourceUpdateType: CartUpdate
+  post:
+    securedBy: [oauth_2_0: { scopes: ['manage_orders:{projectKey}'] }]
+    body:
+      application/json:
+        example: !include ../examples/cart-update.example.json
+    responses:
+      200:
+        body:
+          application/json:
+            example: !include ../examples/cart.example.json
+
+----------------------------------------
+
+TITLE: Implementing Polymorphic Type Inheritance with Discriminators in RAML
+DESCRIPTION: This RAML snippet demonstrates both correct and incorrect implementations of polymorphic type inheritance. The 'Foo' type correctly defines a discriminator property 'type', allowing 'SubFoo' to inherit from it with a specific discriminator value. In contrast, 'InvalidBar' lacks a discriminator but has subtypes 'SubBar' and 'SubBar2', which violates the PolymorphicSubtypesRule.
+
+LANGUAGE: raml
+CODE:
+types:
+  Foo:
+    type: object
+    discriminator: type
+    properties:
+      type: string
+  SubFoo:
+    discriminatorValue: sub
+    type: Foo
+  InvalidBar:
+    type: object
+    description: InvalidBar
+    properties:
+      name: string
+  SubBar:
+    description: SubBar
+    type: InvalidBar
+  SubBar2:
+    type: InvalidBar
+
+----------------------------------------
+
+TITLE: Defining an API Method in RAML for Commercetools
+DESCRIPTION: Example of creating a new method for an endpoint in RAML, which includes the methodName annotation, baseResource definition, and HTTP method response. This specific example shows how to define a password token endpoint with GET method.
+
+LANGUAGE: raml
+CODE:
+/password-token={passwordToken}:
+  (methodName): withPasswordToken
+  type:
+    baseResource:
+      uriParameterName: passwordToken
+      resourceType: Customer
+  get:
+    displayName: Get customer by password verification token
+    securedBy: [oauth_2_0: { scopes: ['view_customers:{projectKey}'] }]
+    responses:
+      200:
+        body:
+          application/json:
+            example: !include ../examples/customer.example.json
+
+----------------------------------------
+
+TITLE: Defining and Using Traits in RAML API
+DESCRIPTION: Example showing the process of creating and using traits in RAML. This demonstrates how to create a price-selecting trait, define it in the main API file, and apply it to a resource.
+
+LANGUAGE: raml
+CODE:
+traits:
+  priceSelecting: !include traits/price-selecting.raml
+
+----------------------------------------
+
+TITLE: Setting baseUri in RAML API Definition
+DESCRIPTION: Demonstrates how to set the baseUri in the api.raml file with region parameters. This establishes the base URL for the API with region-specific variations.
+
+LANGUAGE: raml
+CODE:
+baseUri: https://api.{region}.commercetools.com  // This is the general baseUri
+baseUriParameters:
+  region:
+    type: string
+    enum:             // here below are listed all of the regions available
+      - us-east-2.aws
+      - europe-west1.gcp
+
+----------------------------------------
+
+TITLE: Adding New Resource Definition to API Entry Point
+DESCRIPTION: Shows how to include a resource definition in the main api.raml file. This links the main API definition to the specific resource implementation file.
+
+LANGUAGE: raml
+CODE:
+/stores: !include resources/stores.raml
+
+----------------------------------------
+
+TITLE: OAuth Security Scheme Definition in RAML
+DESCRIPTION: Example of security scheme settings in the securitySchemes folder where authorization URIs and scopes are defined. This is typically modified when introducing new scopes or changing authorization endpoints.
+
+LANGUAGE: raml
+CODE:
+settings:
+  authorizationUri: https://auth.europe-west1.gcp.commercetools.com/oauth/token
+  accessTokenUri: https://auth.europe-west1.gcp.commercetools.com/oauth/token
+  authorizationGrants: [client_credentials]
+  scopes:
+    - 'manage_project:{projectKey}'
+    - 'manage_products:{projectKey}'
+    - 'view_products:{projectKey}'
+
+----------------------------------------
+
+TITLE: Applying Traits to Resources in RAML
+DESCRIPTION: Example showing how to apply previously defined traits to resources in a RAML specification, allowing for reuse of common API patterns.
+
+LANGUAGE: raml
+CODE:
+get:
+  is:
+    - priceSelecting
+
+----------------------------------------
+
+TITLE: Creating a Delete Endpoint with Key Parameter in RAML
+DESCRIPTION: Defines a resource deletion endpoint with Key parameter and DELETE method. This example shows how to implement a Cart deletion endpoint with data erasure trait and proper security scopes.
+
+LANGUAGE: raml
+CODE:
+/key={key}:
+  (methodName): withKey
+  type:
+    baseResource:
+      uriParameterName: key
+      resourceType: Cart
+      resourceUpdateType: CartUpdate
+  delete:
+    is:
+      - dataErasure
+    securedBy: [oauth_2_0: { scopes: ['manage_orders:{projectKey}'] }]
+    responses:
+      200:
+        body:
+          application/json:
+            example: !include ../examples/cart.example.json
+
+----------------------------------------
+
+TITLE: Creating a Message Type in RAML for Commercetools
+DESCRIPTION: Example of defining a new message type in the Commercetools API. This snippet shows how to create a CategoryCreatedMessage that extends the base Message type with category-specific properties.
+
+LANGUAGE: raml
+CODE:
+#%RAML 1.0 DataType
+(package): Message
+type: Message
+displayName: CategoryCreatedMessage
+discriminatorValue: CategoryCreated
+properties:
+  category:
+    type: Category
+
+----------------------------------------
+
+TITLE: Adding Scopes to Resource HTTP Methods
+DESCRIPTION: RAML example showing how to add authorization scopes to HTTP methods in a resource definition file.
+
+LANGUAGE: raml
+CODE:
+get:
+  securedBy:
+    [
+      oauth_2_0:
+        {
+          scopes:
+            [
+              'manage_project:{projectKey}',
+              'view_products:{projectKey}',
+              'view_categories:{projectKey}',
+            ],
+        },
+
+----------------------------------------
+
+TITLE: Adding Scopes to Security Schemes
+DESCRIPTION: RAML example showing how to add scopes to OAuth 2.0 security scheme definitions.
+
+LANGUAGE: raml
+CODE:
+settings:
+  authorizationUri: https://auth.europe-west1.gcp.commercetools.com/oauth/token
+  accessTokenUri: https://auth.europe-west1.gcp.commercetools.com/oauth/token
+  authorizationGrants: [client_credentials]
+  scopes:
+    - 'manage_project:{projectKey}'
+    - 'manage_products:{projectKey}'
+    - 'view_products:{projectKey}'
+    - 'manage_orders:{projectKey}'
+
+----------------------------------------
+
+TITLE: Defining CartDiscount Update Action in RAML
+DESCRIPTION: Example of an update action definition in a RAML file, showing the structure for defining version and actions properties for a cart discount resource.
+
+LANGUAGE: raml
+CODE:
+properties:
+  version:
+    type: number
+    format: int64
+  actions:
+    type: array
+    items: CartDiscountUpdateAction
+
+----------------------------------------
+
+TITLE: Defining Update Actions in RAML Types
+DESCRIPTION: Example showing how to define a specific update action for the CartDiscount resource, including package, type, discriminator value, and properties.
+
+LANGUAGE: raml
+CODE:
+(package): CartDiscount
+type: CartDiscountUpdateAction
+displayName: CartDiscountChangeNameAction
+discriminatorValue: changeName
+example: !include ../../../examples/CartDiscount/CartDiscountChangeNameAction.json
+properties:
+  name:
+    type: LocalizedString
+    description: ''
+
+----------------------------------------
+
+TITLE: Defining Common Type in RAML
+DESCRIPTION: Example of defining a common type (LocalizedString) in the common folder, showing how map-like structures are represented in RAML.
+
+LANGUAGE: raml
+CODE:
+(package): Common
+displayName: LocalizedString
+type: object
+(asMap):
+  key: string
+  value: string
+properties:
+  /^[a-z]{2}(-[A-Z]{2})?$/:
+    type: string
+
+----------------------------------------
+
+TITLE: Adding Custom Field to RAML Type Definition
+DESCRIPTION: RAML snippet for adding a custom field to a resource or object. The custom field is defined as optional with type 'CustomFields' for read models and 'CustomFieldsDraft' for write models.
+
+LANGUAGE: raml
+CODE:
+  custom?:
+    type: CustomFields
+    description: Custom Fields of this <object>.
+
+----------------------------------------
+
+TITLE: Defining SetCustomField Update Action
+DESCRIPTION: RAML definition for the update action that sets a custom field on a resource. The action includes the field name and value properties, with the value being optional.
+
+LANGUAGE: raml
+CODE:
+#%RAML 1.0 DataType
+(package): <Resource>
+type: <Resource>UpdateAction
+displayName: <Resource>Set<embeddedObject>CustomFieldAction
+discriminatorValue: <id for the update action>
+example: !include ../../../examples/<Resource>/<Resource>Set<embeddedObject>CustomFieldAction.json
+properties:
+  name:
+    type: string
+  value?:
+    type: CustomFieldValue
+
+----------------------------------------
+
+TITLE: Defining SetCustomType Update Action
+DESCRIPTION: RAML definition for the update action that sets a custom type on a resource. The action includes optional type reference and fields properties.
+
+LANGUAGE: raml
+CODE:
+#%RAML 1.0 DataType
+(package): <Resource>
+type: <Resource>UpdateAction
+displayName: <Resource>Set<embeddedObject>CustomTypeAction
+discriminatorValue: <id for the update action>
+example: !include ../../../examples/<Resource>/<Resource>Set<embeddedObject>CustomTypeAction.json
+properties:
+  type?:
+    type: TypeResourceIdentifier
+  fields?:
+    type: FieldContainer
+
+----------------------------------------
+
+TITLE: Using Annotations in RAML Definitions
+DESCRIPTION: Examples of using various annotations in RAML API specifications, showing both direct and namespaced usage.
+
+LANGUAGE: raml
+CODE:
+  (placeholderParam):
+
+  (markDeprecated): true
+
+----------------------------------------
+
+TITLE: Using Annotations with Namespaces
+DESCRIPTION: Example showing how to use annotations with namespaces in RAML specifications, after importing annotation types.
+
+LANGUAGE: raml
+CODE:
+uses:
+  annotations: annotationTypes/annotations.raml
+  postman: annotationTypes/postman.raml
+
+----------------------------------------
+
+TITLE: Using the Identifier Annotation
+DESCRIPTION: RAML example showing how to use the identifier annotation to specify a field as the main identifier.
+
+LANGUAGE: raml
+CODE:
+  id:
+    (identifier): true
+    type: string
+
+----------------------------------------
+
+TITLE: Using the ElementIdentifier Annotation
+DESCRIPTION: RAML example showing how to use both identifier and elementIdentifier annotations when the key field is not the ID.
+
+LANGUAGE: raml
+CODE:
+  name:
+    (identifier): true
+    (elementIdentifier): true
+    type: string
+    description: ''
+
+----------------------------------------
+
+TITLE: Using the PlaceholderParam Annotation
+DESCRIPTION: RAML example showing how to use the placeholderParam annotation for query parameters with regex patterns.
+
+LANGUAGE: raml
+CODE:
+queryParameters:
+  /text\.[a-z]{2}(-[A-Z]{2})?/:
+    (placeholderParam):
+      paramName: text
+      template: text.<locale>
+      placeholder: locale
+
+----------------------------------------
+
+TITLE: Using AsMap Annotation for REGEX Properties
+DESCRIPTION: RAML example showing how to use the asMap annotation for key-value mapping of properties with regex patterns.
+
+LANGUAGE: raml
+CODE:
+(asMap):
+  key: string
+  value: string
+properties:
+  /^[a-z]{2}(-[A-Z]{2})?$/:
+    type: string
+
+----------------------------------------
+
+TITLE: Using markDeprecated Annotation in RAML
+DESCRIPTION: Example showing how to add the markDeprecated annotation to deprecate endpoints, methods, and parameters in RAML. This annotation informs customers that certain elements are deprecated and replacements exist.
+
+LANGUAGE: raml
+CODE:
+(markDeprecated): true   // this annotation on top is to deprecate the whole endpoint
+/attributes:
+  (markDeprecated): true
+  post:
+    (markDeprecated): true
+    body:
+      application/json:
+        type: missing-data.MissingAttributesSearchRequest
+    responses:
+      202:
+        body:
+          application/json:
+            type: common.TaskToken
+            example: !include ../examples/missing-data-token.json
+  /status:
+    (markDeprecated): true
+    /{taskId}:
+      (markDeprecated): true
+      (methodName): withTaskId
+      uriParameters:
+        taskId:
+        type: string
+      get:
+        (markDeprecated): true
+        responses:
+          200:
+            body:
+              application/json:
+                type: missing-data.MissingDataTaskStatus
+                example: !include ../examples/missing-data-response.json
+
+----------------------------------------
+
+TITLE: Using Beta Annotation in RAML
+DESCRIPTION: Example showing how to use the beta annotation to indicate that a feature or property is in beta phase.
+
+LANGUAGE: raml
+CODE:
+  lastModifiedBy?:
+    type: LastModifiedBy
+    (beta): true
+
+----------------------------------------
+
+TITLE: Creating a Message Payload in RAML for Commercetools
+DESCRIPTION: Example of defining a message payload type for category creation events. The payload extends the MessagePayload base type and includes the category object that was created.
+
+LANGUAGE: raml
+CODE:
+#%RAML 1.0 DataType
+(package): Message
+type: MessagePayload
+displayName: CategoryCreatedMessagePayload
+discriminatorValue: CategoryCreated
+properties:
+  category:
+    type: Category
+
+----------------------------------------
+
+TITLE: Example JSON for SetCustomField Action
+DESCRIPTION: JSON example for the setCustomField update action, which sets a specific custom field to a string value.
+
+LANGUAGE: json
+CODE:
+{
+  "action": "setCustomField",
+  "name": "ExampleStringTypeField",
+  "value": "TextString"
+}
+
+----------------------------------------
+
+TITLE: Example JSON for SetCustomType Action
+DESCRIPTION: JSON example for the setCustomType update action, which sets a custom type by ID and includes field values.
+
+LANGUAGE: json
+CODE:
+{
+  "action": "setCustomType",
+  "type": {
+    "id": "{{type-id}}",
+    "typeId": "type"
+  },
+  "fields": {
+    "exampleStringTypeField": "TextString"
+  }
+}
+
+----------------------------------------
+
+TITLE: Example JSON for Custom Field on Resource
+DESCRIPTION: JSON example showing how custom fields are represented in a resource, with a type reference and field values.
+
+LANGUAGE: json
+CODE:
+  "custom": {
+    "type": {
+      "typeId": "type",
+      "id": "3ae9bcca-df23-443e-bd22-0c592f9694fa"
+    },
+    "fields": {
+      "offer_name": "SuperMax"
+    }
+  }
+
+----------------------------------------
+
+TITLE: Adding Resource Type ID to Enumeration
+DESCRIPTION: YAML example showing how to add a resource type ID to the ResourceTypeId enumeration, along with descriptive documentation.
+
+LANGUAGE: raml
+CODE:
+enum:
+  - <resourceTypeID_1>
+  - <resourceTypeID_2>
+(enumDescriptions):
+  <resourceTypeID_1>: |
+    [<Resource>](ctp:api:type:<Resource>)
+  <resourceTypeID_2>: |
+    [<Object>](ctp:api:type:Object) on [<Resource>](ctp:api:type:<Resource>)
+
+----------------------------------------
+
+TITLE: Generating Postman Collection Locally with Yarn
+DESCRIPTION: Commands to generate a Postman Collection from the commercetools-docs repository locally using Yarn. If the initial command fails, users should run the install command first and then retry the generation command.
+
+LANGUAGE: bash
+CODE:
+yarn run generate-postman
+
+LANGUAGE: bash
+CODE:
+yarn install
+
+yarn run generate-postman
+
+----------------------------------------
+
+TITLE: Defining Float Properties in RAML
+DESCRIPTION: Demonstrates how to properly define float number types in RAML specifications for proper parsing by the RAML transformer. Float properties are defined simply using the number type.
+
+LANGUAGE: raml
+CODE:
+properties:
+  floatProperty?: number
+
+----------------------------------------
+
+TITLE: Defining Integer Properties in RAML
+DESCRIPTION: Shows the convention for defining integer number types in RAML specifications. Integers require explicit type declaration with format specification for proper parsing.
+
+LANGUAGE: raml
+CODE:
+properties:
+  integerProperty:
+    description: integer description
+    type: integer
+    format: int64
