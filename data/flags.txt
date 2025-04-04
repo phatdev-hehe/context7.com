@@ -1,0 +1,567 @@
+TITLE: Defining a Feature Flag in Next.js
+DESCRIPTION: TypeScript code showing how to create a feature flag using the Flags SDK. The example defines a boolean flag with a key and a decide function that determines the flag's value.
+
+LANGUAGE: ts
+CODE:
+// app/flags.tsx
+import { flag } from 'flags/next';
+
+export const exampleFlag = flag<boolean>({
+  key: 'example-flag',
+  decide() {
+    return true;
+  },
+});
+
+----------------------------------------
+
+TITLE: Using a Feature Flag in Next.js Server Component
+DESCRIPTION: Example of implementing a feature flag in a Next.js React Server Component. This shows how to import and await the flag's value to conditionally render content based on the flag state.
+
+LANGUAGE: tsx
+CODE:
+// app/page.tsx
+import { exampleFlag } from './flags';
+
+export default async function Page() {
+  const example = await exampleFlag();
+  return <div>{example ? 'Flag is on' : 'Flag is off'}</div>;
+}
+
+----------------------------------------
+
+TITLE: Using a Feature Flag in a Next.js React Server Component
+DESCRIPTION: React TypeScript code demonstrating how to use a feature flag in a Next.js page component. The component imports the flag, awaits its value, and conditionally renders content based on the flag state.
+
+LANGUAGE: tsx
+CODE:
+// app/page.tsx
+import { exampleFlag } from './flags';
+
+export default async function Page() {
+  const example = await exampleFlag();
+  return <div>{example ? 'Flag is on' : 'Flag is off'}</div>;
+}
+
+----------------------------------------
+
+TITLE: Defining a Feature Flag in TypeScript
+DESCRIPTION: Example of creating a feature flag in TypeScript using the Flags SDK. This defines a boolean flag with a key and a decision function that determines the flag's value.
+
+LANGUAGE: ts
+CODE:
+// app/flags.tsx
+import { flag } from 'flags/next';
+
+export const exampleFlag = flag<boolean>({
+  key: 'example-flag',
+  decide() {
+    return true;
+  },
+});
+
+----------------------------------------
+
+TITLE: Implementation Example with LaunchDarkly Flag
+DESCRIPTION: Complete example showing how to use the LaunchDarkly adapter with the Flags SDK, including user identification and flag configuration.
+
+LANGUAGE: typescript
+CODE:
+import { flag, dedupe } from 'flags/next';
+import { ldAdapter, type LDContext } from '@flags-sdk/launchdarkly';
+
+const identify = dedupe(async (): Promise<LDContext> => {
+  return {
+    key: 'user_123',
+  };
+});
+
+export const showBanner = flag<boolean, LDContext>({
+  key: 'show-banner',
+  identify,
+  adapter: ldAdapter.variation(),
+});
+
+----------------------------------------
+
+TITLE: Implementing a Feature Flag with Statsig Provider
+DESCRIPTION: Complete example showing how to create a feature flag using the Flags SDK with the Statsig adapter's featureGate method. The example creates a boolean flag for a marketing gate feature.
+
+LANGUAGE: typescript
+CODE:
+import { flag } from 'flags/next';
+import { statsigAdapter } from '@flags-sdk/statsig';
+
+export const marketingGate = flag<boolean>({
+  key: 'marketing_gate',
+  adapter: statsigAdapter.featureGate((config) => config.value),
+});
+
+----------------------------------------
+
+TITLE: Merging Provider Data from Multiple Sources in TypeScript
+DESCRIPTION: Code example showing how to merge provider data from multiple feature flag sources, including code-defined flags and those from external providers like Statsig.
+
+LANGUAGE: typescript
+CODE:
+import { verifyAccess, mergeProviderData, type ApiData } from '@vercel/flags';
+import { getProviderData } from '@vercel/flags/next';
+import { NextResponse, type NextRequest } from 'next/server';
+import { getProviderData as getStatsigProviderData } from '@flags-sdk/statsig';
+import * as flagsA from '../../../../flags-a'; // your feature flags file(s)
+import * as flagsB from '../../../../flags-b'; // your feature flags file(s)
+
+export async function GET(request: NextRequest) {
+  const access = await verifyAccess(request.headers.get('Authorization'));
+  if (!access) return NextResponse.json(null, { status: 401 });
+
+  const providerData = await mergeProviderData([
+    // expose flags declared in code first
+    getProviderData({ ...flagsA, ...flagsB }),
+    // then enhance them with metadata from your flag provider
+    getStatsigProviderData({ consoleApiKey: '', projectId: '' }),
+  ]);
+
+  return NextResponse.json<ApiData>(providerData);
+}
+
+----------------------------------------
+
+TITLE: Dynamic Usage of Feature Flags in Next.js Pages Router
+DESCRIPTION: Example of using feature flags in Next.js Pages Router with getServerSideProps to dynamically determine flag values on the server side.
+
+LANGUAGE: typescript
+CODE:
+export async function getServerSideProps({ req }) {
+  const showFreeDeliveryBanner = await showFreeDeliveryBannerFlag(req);
+  return { props: { showFreeDeliveryBanner } };
+}
+
+----------------------------------------
+
+TITLE: Generating an Encryption Secret for Flags SDK
+DESCRIPTION: Node.js command to generate a secure random 32-byte base64url-encoded string for the FLAGS_SECRET environment variable. This secret is required for encryption of flag values.
+
+LANGUAGE: sh
+CODE:
+node -e "console.log(crypto.randomBytes(32).toString('base64url'))"
+
+----------------------------------------
+
+TITLE: Generating a Secret Key for Flags SDK
+DESCRIPTION: Node.js command to generate a random 32-byte base64url-encoded string for the FLAGS_SECRET environment variable. This secret is required for encryption and managing flag overrides.
+
+LANGUAGE: sh
+CODE:
+node -e "console.log(crypto.randomBytes(32).toString('base64url'))"
+
+----------------------------------------
+
+TITLE: Creating OpenFeature Adapter with Async Provider
+DESCRIPTION: Code to create an OpenFeature adapter instance with an asynchronous provider. This example shows how to pass an async initialization function that sets up the provider and returns the client.
+
+LANGUAGE: typescript
+CODE:
+import { createOpenFeatureAdapter } from '@flags-sdk/openfeature';
+
+// pass an init function, and return the client
+const openFeatureAdapter = createOpenFeatureAdapter(async () => {
+  const provider = new YourProviderOfChoice();
+  await OpenFeature.setProviderAndWait(provider);
+  return OpenFeature.getClient();
+});
+
+----------------------------------------
+
+TITLE: Creating a custom Edge Config adapter
+DESCRIPTION: Example of creating a custom Edge Config adapter that connects to a specific Edge Config and reads flags from a custom key. The teamSlug parameter enables linking to Edge Config in the Flags Explorer.
+
+LANGUAGE: typescript
+CODE:
+import { flag } from 'flags/next';
+import { createEdgeConfigAdapter } from '@flags-sdk/edge-config';
+
+const edgeConfigAdapter = createEdgeConfigAdapter(process.env.EDGE_CONFIG, {
+  teamSlug: 'your-team-slug',
+  edgeConfigItemKey: 'my-flags',
+});
+
+export const exampleFlag = flag({
+  key: 'example-flag',
+  adapter: edgeConfigAdapter(),
+});
+
+----------------------------------------
+
+TITLE: Creating Custom LaunchDarkly Adapter
+DESCRIPTION: Example of creating a custom LaunchDarkly adapter using the createLaunchDarklyAdapter function with specific configuration options.
+
+LANGUAGE: typescript
+CODE:
+import { createLaunchDarklyAdapter } from '@flags-sdk/launchdarkly';
+
+const adapter = createLaunchDarklyAdapter({
+  projectSlug: 'my-project',
+  ldClientSideKey: '612376f91b8f5713a58777a1',
+  edgeConfigConnectionString: process.env.EDGE_CONFIG,
+});
+
+----------------------------------------
+
+TITLE: Precomputed Feature Flags with Static Site Generation in Next.js
+DESCRIPTION: Implementation of precomputed feature flags in Next.js using getStaticPaths and getStaticProps, generating all possible flag permutations for static pages.
+
+LANGUAGE: typescript
+CODE:
+import { bannerFlags, showFreeDeliveryBannerFlag } from './flags';
+import type {
+  GetStaticPaths,
+  GetStaticProps,
+  InferGetStaticPropsType,
+} from 'next';
+import { unstable_generatePermutations as generatePermutations } from '@vercel/flags/next';
+
+export const getStaticPaths = (async () => {
+  const codes = await generatePermutations(bannerFlags);
+
+  return {
+    paths: codes.map((code) => ({ params: { code } })),
+    fallback: 'blocking',
+  };
+}) satisfies GetStaticPaths;
+
+export const getStaticProps = (async (context) => {
+  const showFreeDeliveryBanner = await showFreeDeliveryBannerFlag(
+    context.params!.code as string,
+    bannerFlags,
+  );
+
+  return { props: { showFreeDeliveryBanner } };
+}) satisfies GetStaticProps<{ showFreeDeliveryBanner: boolean }>;
+
+----------------------------------------
+
+TITLE: Using Dedupe Function for Request-Level Deduplication in Next.js
+DESCRIPTION: Example of using the dedupe function from @vercel/flags/next to ensure a function only runs once per request, useful for deduplicating work in feature flag decide functions.
+
+LANGUAGE: typescript
+CODE:
+import { dedupe } from '@vercel/flags/next';
+
+let i = 0;
+const runOnce = dedupe(async () => {
+  return i++;
+});
+
+await runOnce(); // returns 0
+await runOnce(); // still returns 0
+
+----------------------------------------
+
+TITLE: Generating and Managing Visitor IDs with Dedupe Function
+DESCRIPTION: Implementation of a visitor ID management system using the dedupe function to ensure consistent ID generation across multiple function calls within a request.
+
+LANGUAGE: typescript
+CODE:
+import { nanoid } from 'nanoid';
+import { cookies, headers } from 'next/headers';
+import { dedupe } from '@vercel/flags/next';
+
+/**
+ * Reads the visitor id from a cookie or returns a new visitor id
+ */
+export const getOrGenerateVisitorId = dedupe(
+  async (): Promise<{ value: string; fresh: boolean }> => {
+    const visitorIdCookie = (await cookies()).get('visitor-id')?.value;
+
+    return visitorIdCookie
+      ? { value: visitorIdCookie, fresh: false }
+      : { value: nanoid(), fresh: true };
+  },
+);
+
+----------------------------------------
+
+TITLE: Creating OpenFeature Adapter with Regular Provider
+DESCRIPTION: Code to create an OpenFeature adapter instance with a regular (synchronous) provider. This example demonstrates setting a provider and getting the client for the adapter.
+
+LANGUAGE: typescript
+CODE:
+import { createOpenFeatureAdapter } from '@flags-sdk/openfeature';
+
+OpenFeature.setProvider(new YourProviderOfChoice());
+const openFeatureAdapter = createOpenFeatureAdapter(OpenFeature.getClient());
+
+----------------------------------------
+
+TITLE: Using the default Edge Config adapter
+DESCRIPTION: Example of using the default edgeConfigAdapter which connects to the Edge Config available under the EDGE_CONFIG environment variable and reads flags from a key called 'flags'.
+
+LANGUAGE: typescript
+CODE:
+import { flag } from 'flags/next';
+import { edgeConfigAdapter } from '@flags-sdk/edge-config';
+
+export const exampleFlag = flag({
+  key: 'example-flag',
+  adapter: edgeConfigAdapter(),
+});
+
+----------------------------------------
+
+TITLE: Installing Flags SDK with npm
+DESCRIPTION: Command to install the Flags SDK package using npm. This is the first step in setting up feature flags in your Next.js or SvelteKit application.
+
+LANGUAGE: sh
+CODE:
+npm install flags
+
+----------------------------------------
+
+TITLE: Installing Flags SDK via npm
+DESCRIPTION: Command to install the Flags SDK package using npm. This is the first step in setting up feature flags in your Next.js or SvelteKit application.
+
+LANGUAGE: sh
+CODE:
+npm install flags
+
+----------------------------------------
+
+TITLE: Configuring LaunchDarkly Environment Variables
+DESCRIPTION: Required environment variables for configuring the LaunchDarkly adapter, including the client-side ID, project slug, and Edge Config connection string.
+
+LANGUAGE: sh
+CODE:
+export LAUNCHDARKLY_CLIENT_SIDE_ID="612376f91b8f5713a58777a1"
+export LAUNCHDARKLY_PROJECT_SLUG="my-project"
+# Provided by Vercel when connecting an Edge Config to the project
+export EDGE_CONFIG="https://edge-config.vercel.com/ecfg_abdc1234?token=xxx-xxx-xxx"
+
+----------------------------------------
+
+TITLE: Default Edge Config structure for flags
+DESCRIPTION: JSON structure showing the expected format in Edge Config when using the default adapter. The adapter reads flags from a key called 'flags'.
+
+LANGUAGE: json
+CODE:
+{
+  "flags": {
+    "example-flag": true
+  }
+}
+
+----------------------------------------
+
+TITLE: Custom Edge Config structure for flags
+DESCRIPTION: JSON structure showing the expected format in Edge Config when using a custom adapter with a specified edgeConfigItemKey of 'my-flags'.
+
+LANGUAGE: json
+CODE:
+{
+  "my-flags": {
+    "example-flag": true
+  }
+}
+
+----------------------------------------
+
+TITLE: Importing LaunchDarkly Adapter
+DESCRIPTION: Example of importing the default LaunchDarkly adapter instance from the package.
+
+LANGUAGE: typescript
+CODE:
+import { ldAdapter } from '@flags-sdk/launchdarkly';
+
+----------------------------------------
+
+TITLE: Importing Statsig Adapter in TypeScript
+DESCRIPTION: Code snippet showing how to import the default Statsig adapter instance from the @flags-sdk/statsig package.
+
+LANGUAGE: typescript
+CODE:
+import { statsigAdapter } from '@flags-sdk/statsig';
+
+----------------------------------------
+
+TITLE: Running Next.js Development Server with Different Package Managers
+DESCRIPTION: Commands to start the Next.js development server using npm, yarn, pnpm, or bun. After running these commands, the application will be available at http://localhost:3000.
+
+LANGUAGE: bash
+CODE:
+npm run dev
+# or
+yarn dev
+# or
+pnpm dev
+# or
+bun dev
+
+----------------------------------------
+
+TITLE: Installing LaunchDarkly Provider Package
+DESCRIPTION: Command to install the LaunchDarkly provider package for Flags SDK using npm.
+
+LANGUAGE: bash
+CODE:
+npm i @flags-sdk/launchdarkly
+
+----------------------------------------
+
+TITLE: Installing Flags SDK OpenFeature Adapter and Dependencies
+DESCRIPTION: Command to install the Flags SDK OpenFeature adapter and its peer dependency using npm. This installs both the @flags-sdk/openfeature module and the required @openfeature/server-sdk.
+
+LANGUAGE: sh
+CODE:
+npm i @flags-sdk/openfeature @openfeature/server-sdk
+
+----------------------------------------
+
+TITLE: Installing @flags-sdk/edge-config package
+DESCRIPTION: Command to install the @flags-sdk/edge-config npm package which provides Edge Config integration for feature flags.
+
+LANGUAGE: bash
+CODE:
+npm install @flags-sdk/edge-config
+
+----------------------------------------
+
+TITLE: Installing Statsig Provider for Flags SDK
+DESCRIPTION: Command to install the Statsig provider package for the Flags SDK using pnpm package manager.
+
+LANGUAGE: bash
+CODE:
+pnpm i @flags-sdk/statsig
+
+----------------------------------------
+
+TITLE: Creating New SvelteKit Projects in Bash
+DESCRIPTION: Commands for initializing a new SvelteKit project either in the current directory or in a specified folder. Uses npm create svelte@latest to set up the project structure.
+
+LANGUAGE: bash
+CODE:
+# create a new project in the current directory
+npm create svelte@latest
+
+# create a new project in my-app
+npm create svelte@latest my-app
+
+----------------------------------------
+
+TITLE: Starting a SvelteKit Development Server in Bash
+DESCRIPTION: Commands to start a development server after project dependencies are installed. Includes an option to automatically open the app in a browser tab.
+
+LANGUAGE: bash
+CODE:
+npm run dev
+
+# or start the server and open the app in a new browser tab
+npm run dev -- --open
+
+----------------------------------------
+
+TITLE: Building a SvelteKit Project for Production in Bash
+DESCRIPTION: Command to create a production-ready build of a SvelteKit application. The build can be previewed before deployment.
+
+LANGUAGE: bash
+CODE:
+npm run build
+
+----------------------------------------
+
+TITLE: Creating a New Svelte Project with npm
+DESCRIPTION: Commands for creating a new Svelte project using npm. The first command creates a project in the current directory, while the second creates a project in a specified directory.
+
+LANGUAGE: bash
+CODE:
+# create a new project in the current directory
+npm create svelte@latest
+
+# create a new project in my-app
+npm create svelte@latest my-app
+
+----------------------------------------
+
+TITLE: Starting a Svelte Development Server
+DESCRIPTION: Commands for starting the development server after creating a project and installing dependencies. The second command also opens the app in a new browser tab.
+
+LANGUAGE: bash
+CODE:
+npm run dev
+
+# or start the server and open the app in a new browser tab
+npm run dev -- --open
+
+----------------------------------------
+
+TITLE: Building a Svelte Project for Production
+DESCRIPTION: Command for creating a production-ready version of the Svelte application.
+
+LANGUAGE: bash
+CODE:
+npm run build
+
+----------------------------------------
+
+TITLE: Changelog Entry for @flags-sdk/happykit Initial Release
+DESCRIPTION: Markdown changelog entry documenting version 0.1.0 of the @flags-sdk/happykit package. This entry notes that the package was initialized under commit reference 3c66284.
+
+LANGUAGE: markdown
+CODE:
+# @flags-sdk/happykit
+
+## 0.1.0
+
+### Minor Changes
+
+- 3c66284: initialize
+
+----------------------------------------
+
+TITLE: Documenting version 0.1.1 changes in Next.js 14 using Markdown
+DESCRIPTION: A changelog entry in Markdown format detailing dependency updates for next-14 version 0.1.1. The entry indicates that @vercel/flags was updated to version 2.7.0, referencing commits fb50709 and 87503b6.
+
+LANGUAGE: markdown
+CODE:
+# next-14
+
+## 0.1.1
+
+### Patch Changes
+
+- Updated dependencies [fb50709]
+- Updated dependencies [87503b6]
+  - @vercel/flags@2.7.0
+
+----------------------------------------
+
+TITLE: Displaying Changelog for next-13 Package Version 0.1.1
+DESCRIPTION: A markdown changelog entry documenting the patch version 0.1.1 of the next-13 package, which includes updates to the @vercel/flags dependency which was bumped to version 2.7.0.
+
+LANGUAGE: markdown
+CODE:
+# next-13
+
+## 0.1.1
+
+### Patch Changes
+
+- Updated dependencies [fb50709]
+- Updated dependencies [87503b6]
+  - @vercel/flags@2.7.0
+
+----------------------------------------
+
+TITLE: Changelog Entry for next-15 Package Version 0.1.1
+DESCRIPTION: The changelog documents the patch changes for version 0.1.1 of the next-15 package, specifically noting the update of the @vercel/flags dependency to version 2.7.0, which was triggered by changes with commit hashes fb50709 and 87503b6.
+
+LANGUAGE: markdown
+CODE:
+# next-15
+
+## 0.1.1
+
+### Patch Changes
+
+- Updated dependencies [fb50709]
+- Updated dependencies [87503b6]
+  - @vercel/flags@2.7.0

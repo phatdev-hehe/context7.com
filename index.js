@@ -1,31 +1,39 @@
 import { delay } from "es-toolkit";
 import { sort } from "fast-sort";
+import { formatNumber } from "intl-number-helper";
 import json2md from "json2md";
 import fs from "node:fs";
 
-const f = async (input, { responseType = "json", delayMs = 3000 } = {}) => {
+const path = "data";
+
+const fetchData = async (
+  input,
+  { responseType = "json", delayMs = 3000 } = {}
+) => {
   await delay(delayMs);
 
   return await (await fetch(`https://context7.com/${input}`))[responseType]();
 };
 
 (async () => {
-  const projects = sort(await f("api/projects")).asc(
+  const projects = sort(await fetchData("api/projects")).asc(
     ({ settings }) => settings.title
   );
 
   fs.writeFileSync(
     "readme.md",
     json2md({
+      img: { source: "favicon.ico" },
       table: {
         headers: ["#", "NAME", "TOKENS", "SNIPPETS", "UPDATE", "STATE"],
         rows: projects.map(({ settings, version }, index) => [
           index + 1,
-          `<a href='data/${settings.project}.txt'>${settings.title}</a>`,
-          version.totalTokens,
-          version.totalSnippets,
+          `<a href='${path}/${settings.project}.txt'>${settings.title}</a>`,
+          formatNumber(version.totalTokens),
+          formatNumber(version.totalSnippets),
           version.lastUpdate,
           `<img src='${
+            // https://github.com/upstash/context7?tab=readme-ov-file#project-states
             {
               finalized: "icons/completed-icon.svg",
               initial: "icons/processing-icon.svg",
@@ -37,17 +45,17 @@ const f = async (input, { responseType = "json", delayMs = 3000 } = {}) => {
     })
   );
 
-  fs.rmSync("data", {
+  fs.rmSync(path, {
     recursive: true,
     force: true,
   });
 
-  fs.mkdirSync("data");
+  fs.mkdirSync(path);
 
-  for (const { settings } of projects) {
+  for (const { settings } of projects)
     fs.writeFileSync(
-      `data/${settings.project}.txt`,
-      await f(
+      `${path}/${settings.project}.txt`,
+      await fetchData(
         `${settings.project}/llm.txt?tokens=999999999999999999999999999999999`,
         {
           responseType: "text",
@@ -55,5 +63,4 @@ const f = async (input, { responseType = "json", delayMs = 3000 } = {}) => {
         }
       )
     );
-  }
 })();

@@ -1,0 +1,1230 @@
+TITLE: Installing JStack using CLI
+DESCRIPTION: Command to create a new JStack application using the CLI tool, which automatically sets up a project following best practices and modern Next.js patterns.
+
+LANGUAGE: bash
+CODE:
+npx create-jstack-app@latest
+
+----------------------------------------
+
+TITLE: Creating a JStack AppRouter with Feature Routers
+DESCRIPTION: Demonstrates how to create a JStack appRouter by first creating a base API with global configuration and then merging it with feature-specific routers.
+
+LANGUAGE: typescript
+CODE:
+import { j } from "./jstack"
+import { postRouter } from "./routers/post-router"
+
+// 1️⃣ Creating the base API with global configuration
+const api = j
+  .router()
+  .basePath("/api")
+  .use(j.defaults.cors)
+  .onError(j.defaults.errorHandler)
+
+// 2️⃣ Merging with feature routers
+const appRouter = j.mergeRouters(api, {
+  post: postRouter,
+})
+
+export type AppRouter = typeof appRouter
+export default appRouter
+
+----------------------------------------
+
+TITLE: Creating a Type-Safe API Client in TypeScript with JStack
+DESCRIPTION: Sets up a type-safe API client by importing the AppRouter type from the server and configuring the baseUrl. The getBaseUrl function determines the appropriate URL based on the deployment environment.
+
+LANGUAGE: typescript
+CODE:
+import { createClient } from "jstack"
+import type { AppRouter } from "@/server"
+
+export const client = createClient<AppRouter>({
+  baseUrl: `${getBaseUrl()}/api`,
+})
+
+function getBaseUrl() {
+  // 👇 Adjust for wherever you deploy
+  if (process.env.VERCEL_URL) return `https://${process.env.VERCEL_URL}`
+  return `http://localhost:3000`
+}
+
+----------------------------------------
+
+TITLE: Adding Input Validation to Procedures
+DESCRIPTION: Shows how to implement input validation for procedures using Zod schema validation, ensuring type safety and runtime validation.
+
+LANGUAGE: typescript
+CODE:
+import { z } from "zod"
+import { j, publicProcedure } from "../jstack"
+
+export const postRouter = j.router({
+  create: publicProcedure
+    .input(z.object({ title: z.string() }))
+    .post(({ c, ctx, input }) => {
+      // 👇 Guaranteed to exist & automatically typed
+      const { title } = input
+
+      return c.json({ message: `Created post: "${title}"` })
+    }),
+})
+
+----------------------------------------
+
+TITLE: Implementing Authentication Middleware in JStack
+DESCRIPTION: Shows how to create an authentication middleware that verifies user authentication and attaches user data to the context object for use in protected procedures.
+
+LANGUAGE: typescript
+CODE:
+import { HTTPException } from "hono/http-exception"
+import { jstack } from "jstack"
+
+interface Env {
+  Bindings: { DATABASE_URL: string }
+}
+
+export const j = jstack.init<Env>()
+
+const authMiddleware = j.middleware(async ({ c, next }) => {
+  // Mocked user authentication check...
+  const isAuthenticated = true
+
+  if (!isAuthenticated) {
+    throw new HTTPException(401, {
+      message: "Unauthorized, sign in to continue.",
+    })
+  }
+
+  // 👇 Attach user to `ctx` object
+  return await next({ user: { name: "John Doe" } })
+})
+
+/**
+ * Public (unauthenticated) procedures
+ * This is the base piece you use to build new procedures.
+ */
+export const publicProcedure = j.procedure
+export const privateProcedure = publicProcedure.use(authMiddleware)
+
+----------------------------------------
+
+TITLE: Creating a Feature Router in JStack
+DESCRIPTION: Demonstrates how to create a router for a specific feature (posts). The router contains a procedure that returns JSON data when called.
+
+LANGUAGE: typescript
+CODE:
+import { j, publicProcedure } from "../jstack"
+
+export const postRouter = j.router({
+  recent: publicProcedure.get(({ c }) => {
+    return c.json({ title: "first post" })
+  }),
+})
+
+----------------------------------------
+
+TITLE: Implementing a Chat WebSocket Router with Validation
+DESCRIPTION: Complete example of a chat router using WebSockets in JStack. It implements Zod validation for incoming and outgoing messages and demonstrates handling connections and broadcasting messages to rooms.
+
+LANGUAGE: typescript
+CODE:
+import { z } from "zod"
+import { j } from "jstack"
+
+const chatValidator = z.object({
+  message: z.object({
+    roomId: z.string(),
+    message: z.string(),
+    author: z.string(),
+  }),
+})
+
+export const chatRouter = j.router({
+  chat: j.procedure
+    .incoming(chatValidator)
+    .outgoing(chatValidator)
+    .ws(({ c, io, ctx }) => ({
+      async onConnect({ socket }) {
+        socket.on("message", async (message) => {
+          // Optional: Implement message persistence
+          // Example: await db.messages.create({ data: message })
+
+          // Broadcast the message to all clients in the room
+          await io.to(message.roomId).emit("message", message)
+        })
+      },
+    })),
+})
+
+----------------------------------------
+
+TITLE: Dynamically Loading Routers in JStack
+DESCRIPTION: This example demonstrates how to dynamically load routers in JStack using the dynamic() function. This approach reduces initial bundle size and improves cold starts by only loading router modules when needed, which is particularly beneficial when scaling to many routers.
+
+LANGUAGE: typescript
+CODE:
+import { j } from "./jstack"
+import { dynamic } from "jstack"
+
+const api = j
+  .router()
+  .basePath("/api")
+  .use(j.defaults.cors)
+  .onError(j.defaults.errorHandler)
+
+const appRouter = j.mergeRouters(api, {
+  users: dynamic(() => import("./routers/user-router")),
+  posts: dynamic(() => import("./routers/post-router")),
+})
+
+export type AppRouter = typeof appRouter
+export default appRouter
+
+----------------------------------------
+
+TITLE: Initializing JStack with Type-Safe Environment Variables
+DESCRIPTION: This snippet demonstrates how to initialize JStack with fully type-safe environment variables by defining an interface for environment bindings and initializing JStack with that type parameter.
+
+LANGUAGE: typescript
+CODE:
+import { jstack } from "jstack"
+
+interface Env {
+  Bindings: { DATABASE_URL: string }
+}
+
+export const j = jstack.init<Env>()
+
+/**
+ * Public (unauthenticated) procedures
+ * This is the base part you use to create new procedures.
+ */
+export const publicProcedure = j.procedure
+
+----------------------------------------
+
+TITLE: Creating Authenticated Procedures with Middleware in JStack
+DESCRIPTION: Shows how to implement authentication middleware and create a procedure that only authenticated users can access, with error handling for unauthorized requests.
+
+LANGUAGE: typescript
+CODE:
+import { HTTPException } from "hono/http-exception"
+import { jstack } from "jstack"
+
+interface Env {
+  Bindings: { DATABASE_URL: string }
+}
+
+export const j = jstack.init<Env>()
+
+const authMiddleware = j.middleware(async ({ c, next }) => {
+  // Mocked user authentication check...
+  const isAuthenticated = true
+
+  if (!isAuthenticated) {
+    throw new HTTPException(401, {
+      message: "Unauthorized, sign in to continue.",
+    })
+  }
+
+  // 👇 Attach user to `ctx` object
+  await next({ user: { id: "123", name: "John Doe" } })
+})
+
+/**
+ * Public (unauthenticated) procedures
+ * This is the base part you use to create new procedures.
+ */
+export const publicProcedure = j.procedure
+export const privateProcedure = publicProcedure.use(authMiddleware)
+
+----------------------------------------
+
+TITLE: Adding Procedures to a JStack Router
+DESCRIPTION: Demonstrates how to add HTTP procedures (endpoints) to a JStack router. Includes examples of GET and POST methods using publicProcedure with context handling.
+
+LANGUAGE: typescript
+CODE:
+import { j, publicProcedure } from "../jstack"
+
+export const postRouter = j.router({
+  list: publicProcedure.get(({ c }) => {
+    return c.json({ posts: [] })
+  }),
+
+  create: publicProcedure.post(({ c }) => {
+    return c.json({ success: true })
+  }),
+})
+
+----------------------------------------
+
+TITLE: Creating Basic Middleware in JStack
+DESCRIPTION: Demonstrates the fundamental structure of middleware in JStack, showing the pattern where code runs before a handler and passes data to the next middleware or handler in the chain.
+
+LANGUAGE: typescript
+CODE:
+const myMiddleware = j.middleware(async ({ c, next }) => {
+  // 1️⃣ Code that runs before the handler
+  // ...
+
+  // 2️⃣ Pass data to the next middleware/handler
+  return await next({ customData: "value" })
+})
+
+----------------------------------------
+
+TITLE: Integrating WebSockets in a React Client Component
+DESCRIPTION: Client-side integration of JStack WebSockets in a React component. This example demonstrates connecting to a WebSocket, listening for incoming events with useWebSocket hook, and emitting events to the server.
+
+LANGUAGE: tsx
+CODE:
+"use client"
+
+import { client } from "@/lib/client"
+import { useWebSocket } from "jstack/client"
+
+/**
+ * Connect socket above component to avoid mixing
+ * component & connection lifecycle
+ */
+const socket = client.post.chat.$ws()
+
+export default function Page() {
+  // 👇 Listening for incoming real-time events
+  useWebSocket(socket, {
+    message: ({ roomId, author, message }) => {
+      console.log({ roomId, author, message })
+    },
+  })
+
+  return (
+    <button
+      onClick={() => {
+        // 👇 Send an event to the server
+        socket.emit("message", {
+          author: "John Doe",
+          message: "Hello world",
+          roomId: "general",
+        })
+      }}
+    >
+      Emit Chat Message
+    </button>
+  )
+}
+
+----------------------------------------
+
+TITLE: Configuring CORS in JStack API
+DESCRIPTION: Shows how to implement CORS (Cross-Origin Resource Sharing) in a JStack API using the default CORS middleware.
+
+LANGUAGE: typescript
+CODE:
+import { InferRouterInputs, InferRouterOutputs } from "jstack"
+import { j } from "./jstack"
+import { postRouter } from "./routers/post-router"
+
+const api = j
+  .router()
+  .basePath("/api")
+  .use(j.defaults.cors)
+  .onError(j.defaults.errorHandler)
+
+----------------------------------------
+
+TITLE: Initializing Public Procedures in JStack
+DESCRIPTION: Demonstrates how to initialize JStack and create a base public procedure that can be accessed by any user, authenticated or not.
+
+LANGUAGE: typescript
+CODE:
+import { jstack } from "jstack"
+
+interface Env {
+  Bindings: { DATABASE_URL: string }
+}
+
+export const j = jstack.init<Env>()
+
+/**
+ * Public (unauthenticated) procedures
+ * This is the base part you use to create new procedures.
+ */
+export const publicProcedure = j.procedure
+
+----------------------------------------
+
+TITLE: Making Type-Safe API Calls with JStack Client
+DESCRIPTION: Demonstrates basic usage of the JStack client to fetch data from a route with full type safety. TypeScript automatically knows the return type of the API call.
+
+LANGUAGE: tsx
+CODE:
+import { client } from "@/lib/client"
+
+const res = await client.post.recent.$get()
+const post = await res.json()
+// ^ TypeScript knows this route's return type
+
+----------------------------------------
+
+TITLE: Implementing GET Procedures in JStack
+DESCRIPTION: Shows how to create a GET procedure to retrieve data, illustrating the handler function structure with context, input, and response formatting.
+
+LANGUAGE: typescript
+CODE:
+import { j, publicProcedure } from "../jstack"
+
+export const postRouter = j.router({
+  recent: publicProcedure.get(({ c, ctx, input }) => {
+    const post = {
+      id: 1,
+      title: "My first post",
+    }
+
+    return c.json({ post })
+  }),
+})
+
+----------------------------------------
+
+TITLE: Implementing POST Procedures in JStack
+DESCRIPTION: Shows how to create a POST procedure for data modification operations, highlighting the handler structure similar to GET procedures.
+
+LANGUAGE: typescript
+CODE:
+import { j, publicProcedure } from "../jstack"
+
+export const postRouter = j.router({
+  create: publicProcedure.post(({ c, ctx, input }) => {
+    return c.json({ message: "Post created successfully!" })
+  }),
+})
+
+----------------------------------------
+
+TITLE: Implementing Custom Error Handling in JStack
+DESCRIPTION: Shows how to implement custom error handling logic in a JStack router instead of using the default error handler.
+
+LANGUAGE: typescript
+CODE:
+api.onError((err, c) => {
+  console.error(`${err}`)
+  return c.text("Custom Error Message", 500)
+})
+
+----------------------------------------
+
+TITLE: Chaining Multiple Middlewares in JStack
+DESCRIPTION: Shows how to chain multiple middleware functions using the .use() method to apply several layers of middleware to a procedure.
+
+LANGUAGE: typescript
+CODE:
+const enhancedProcedure = publicProcedure
+  .use(authMiddleware)
+  .use(loggingMiddleware)
+  .use(rateLimitMiddleware)
+
+----------------------------------------
+
+TITLE: Registering a Router with the Main Application Router
+DESCRIPTION: Shows how to integrate a feature-specific router with the main application router. The example configures base path, CORS, error handling, and merges routers.
+
+LANGUAGE: typescript
+CODE:
+import { j } from "./jstack"
+import { postRouter } from "./routers/post-router" 
+
+const api = j 
+  .router() 
+  .basePath("/api") 
+  .use(j.defaults.cors) 
+  .onError(j.defaults.errorHandler) 
+
+const appRouter = j.mergeRouters(api, {
+  post: postRouter, 
+})
+
+export type AppType = typeof appRouter
+
+export default appRouter
+
+----------------------------------------
+
+TITLE: Setting Up Next.js API Catch-All Route for JStack
+DESCRIPTION: Creates a catch-all API route in Next.js that handles all incoming requests using the configured JStack app router. Supports both GET and POST HTTP methods.
+
+LANGUAGE: typescript
+CODE:
+import appRouter from "@/server"
+import { handle } from "hono/vercel"
+
+export const GET = handle(appRouter.handler)
+export const POST = handle(appRouter.handler)
+
+----------------------------------------
+
+TITLE: Calling GET Procedures from Client
+DESCRIPTION: Demonstrates how to call a GET procedure from the client side using the client's $get method.
+
+LANGUAGE: typescript
+CODE:
+import { client } from "@/lib/client"
+
+const res = await client.post.recent.$get()
+
+----------------------------------------
+
+TITLE: Calling POST Procedures from Client
+DESCRIPTION: Demonstrates how to call a POST procedure from the client side using the client's $post method.
+
+LANGUAGE: typescript
+CODE:
+import { client } from "@/lib/client"
+
+const res = await client.post.create.$post()
+
+----------------------------------------
+
+TITLE: Using Type Inference with Dependent Middlewares in JStack
+DESCRIPTION: Demonstrates how to use the InferMiddlewareOutput utility for type inference when chaining middlewares that depend on each other, ensuring type safety across the middleware chain.
+
+LANGUAGE: typescript
+CODE:
+import { InferMiddlewareOutput, jstack } from "jstack"
+
+interface Env {
+  Bindings: { DATABASE_URL: string }
+}
+
+export const j = jstack.init<Env>()
+
+// 1️⃣ Auth middleware runs first
+const authMiddleware = j.middleware(async ({ c, next }) => {
+  return await next({ user: { name: "John Doe" } })
+})
+
+type AuthMiddlewareOutput = InferMiddlewareOutput<typeof authMiddleware>
+
+// 2️⃣ Logging middleware runs second
+const loggingMiddleware = j.middleware(async ({ c, ctx, next }) => {
+  const { user } = ctx as AuthMiddlewareOutput
+
+  const start = performance.now()
+  await next()
+  const end = performance.now()
+
+  console.log(`${user.name}'s request took ${end - start}ms`)
+})
+
+/**
+ * Public (unauthenticated) procedures
+ * This is the base piece you use to build new procedures.
+ */
+export const publicProcedure = j.procedure
+export const privateProcedure = publicProcedure
+  .use(authMiddleware)
+  .use(loggingMiddleware)
+
+----------------------------------------
+
+TITLE: Inferring Router Input and Output Types in JStack
+DESCRIPTION: Shows how to use type inference utilities to extract the input and output types from JStack router procedures for type safety.
+
+LANGUAGE: typescript
+CODE:
+import type { AppRouter } from "./jstack"
+import type { InferRouterInputs, InferRouterOutputs } from "jstack"
+
+type InferInput = InferRouterInputs<AppRouter>
+type InferOutput = InferRouterOutputs<AppRouter>
+
+// 👇 Usage: InferInput[<router>][<procedure>]
+type Input = InferInput["post"]["example"]
+type Output = InferOutput["post"]["example"]
+
+----------------------------------------
+
+TITLE: Implementing WebSocket Procedures in JStack
+DESCRIPTION: Demonstrates how to set up real-time bi-directional communication using WebSocket procedures, including incoming/outgoing event schemas and connection handlers.
+
+LANGUAGE: typescript
+CODE:
+import { j, publicProcedure } from "../jstack"
+import { z } from "zod"
+
+const incomingEvents = z.object({
+  like: z.object({ username: z.string(), postId: z.string() }),
+})
+
+const outgoingEvents = z.object({
+  like: z.object({ username: z.string() }),
+})
+
+export const postRouter = j.router({
+  likes: publicProcedure
+    .incoming(incomingEvents)
+    .outgoing(outgoingEvents)
+    .ws(({ c, ctx, io }) => {
+      return {
+        onConnect({ socket }) {
+          socket.on("like", ({ username, postId }) => {
+            console.log(`User "${username}" liked post with id "${postId}"`)
+
+            // 👇 Send event to all connected clients
+            io.to(postId).emit("like", { username })
+          })
+        },
+        onDisconnect({ socket }) {
+          console.log("User disconnected")
+        },
+        onError({ socket, error }) {
+          console.log("Socket error:", error)
+        },
+      }
+    }),
+})
+
+----------------------------------------
+
+TITLE: Dynamic Imports in JStack Procedures
+DESCRIPTION: This example shows how to implement dynamic imports within JStack procedures for code splitting at the procedure level. By dynamically importing heavy dependencies like PDF generators and data processors, the initial bundle size is reduced and cold start performance is improved.
+
+LANGUAGE: typescript
+CODE:
+import { j, publicProcedure } from "../jstack"
+
+export const userRouter = j.router({
+  generateReport: publicProcedure.get(async ({ c }) => {
+      // 👇 Dynamically import heavy dependencies
+      const { generatePDF } = await import("./utils/pdf-generator")
+      const { processData } = await import("./utils/data-processor")
+
+      const data = await processData(c.req.query())
+      const pdf = await generatePDF(data)
+
+      return c.json({ pdf })
+    })
+})
+
+----------------------------------------
+
+TITLE: Configuring JStack Client with Cloudflare Workers URL
+DESCRIPTION: Code for setting up the JStack client to connect to either a local development server or the production Cloudflare Workers deployment based on the environment.
+
+LANGUAGE: typescript
+CODE:
+import type { AppRouter } from "@/server"
+import { createClient } from "jstack"
+
+export const client = createClient<AppRouter>({
+  baseUrl: `${getBaseUrl()}/api`,
+})
+
+function getBaseUrl() {
+  // 👇 In production, use the production worker
+  if (process.env.NODE_ENV === "production") {
+    return "https://<YOUR_DEPLOYMENT>.workers.dev"
+  }
+
+  // 👇 Locally, use wrangler backend
+  return `http://localhost:8080`
+}
+
+----------------------------------------
+
+TITLE: JStack Recommended File Structure
+DESCRIPTION: The recommended file structure for organizing a JStack application, showing the main directories and files with their relationships.
+
+LANGUAGE: plaintext
+CODE:
+app/
+  └── server/
+      ├── jstack.ts        # Initialize JStack
+      ├── index.ts         # Main appRouter
+      └── routers/         # Router directory
+          ├── user-router.ts
+          ├── post-router.ts
+          └── ...
+
+----------------------------------------
+
+TITLE: Using Private Procedures in Router Definition
+DESCRIPTION: Demonstrates how to use a private procedure in a router definition to create an endpoint that requires authentication.
+
+LANGUAGE: typescript
+CODE:
+import { j, privateProcedure } from "../jstack"
+
+export const postRouter = j.router({
+  list: privateProcedure.get(({ c }) => {
+    return c.json({ posts: [] })
+  }),
+})
+
+----------------------------------------
+
+TITLE: Accessing Environment Variables in Node.js
+DESCRIPTION: This code shows how to access environment variables in Node.js environments, which works in both frontend and backend contexts.
+
+LANGUAGE: typescript
+CODE:
+// Works everywhere (frontend & backend)
+const DATABASE_URL = process.env.DATABASE_URL
+
+----------------------------------------
+
+TITLE: Configuring CORS in JStack Server for Cloudflare Workers
+DESCRIPTION: Server configuration code that includes CORS settings for a JStack application deployed to Cloudflare Workers, which helps prevent cross-origin resource sharing issues.
+
+LANGUAGE: typescript
+CODE:
+import { InferRouterInputs, InferRouterOutputs } from "jstack"
+import { postRouter } from "./routers/post-router"
+import { j } from "./jstack"
+
+const api = j
+  .router()
+  .basePath("/api")
+  .use(j.defaults.cors)
+  .onError(j.defaults.errorHandler)
+
+const appRouter = j.mergeRouters(api, {
+  post: postRouter,
+})
+
+export type AppRouter = typeof appRouter
+
+export default appRouter
+
+----------------------------------------
+
+TITLE: Configuring CORS Middleware in JStack Server
+DESCRIPTION: Server configuration that includes CORS middleware to prevent cross-origin issues when deploying to Vercel. The code shows how to set up a JStack router with default CORS handling and error handling.
+
+LANGUAGE: typescript
+CODE:
+import { InferRouterInputs, InferRouterOutputs } from "jstack"
+import { postRouter } from "./routers/post-router"
+import { j } from "./jstack"
+
+const api = j
+  .router()
+  .basePath("/api")
+  .use(j.defaults.cors)
+  .onError(j.defaults.errorHandler)
+
+const appRouter = j.mergeRouters(api, {
+  post: postRouter,
+})
+
+export type AppRouter = typeof appRouter
+
+export default appRouter
+
+----------------------------------------
+
+TITLE: Accessing Environment Variables in Cloudflare Workers Frontend
+DESCRIPTION: This code shows how to access environment variables in Cloudflare Workers for frontend components (both client and server components).
+
+LANGUAGE: typescript
+CODE:
+// Frontend (client & server components)
+const DATABASE_URL = process.env.DATABASE_URL
+
+----------------------------------------
+
+TITLE: Setting Environment Variables in Cloudflare Workers
+DESCRIPTION: Command to set environment variables (secrets) in Cloudflare Workers using the Wrangler CLI.
+
+LANGUAGE: bash
+CODE:
+wrangler secret put <KEY>
+
+----------------------------------------
+
+TITLE: Adapting Hono Middleware for JStack
+DESCRIPTION: Shows how to use Hono middleware within JStack using the fromHono adapter, enabling compatibility with the Hono middleware ecosystem.
+
+LANGUAGE: typescript
+CODE:
+import { j } from "./jstack"
+import { cors } from "hono/cors"
+
+const corsMiddleware = j.fromHono(cors())
+const procedureWithCors = publicProcedure.use(corsMiddleware)
+
+----------------------------------------
+
+TITLE: Setting Environment Variables for Cloudflare Workers
+DESCRIPTION: This snippet demonstrates how to define environment variables in a .dev.vars file for local development with Cloudflare Workers using wrangler.
+
+LANGUAGE: plaintext
+CODE:
+DATABASE_URL=your-database-url
+
+----------------------------------------
+
+TITLE: Deploying JStack Backend to Cloudflare Workers
+DESCRIPTION: Command to deploy a JStack backend application to Cloudflare Workers using the Wrangler CLI, targeting the server index file.
+
+LANGUAGE: bash
+CODE:
+wrangler deploy src/server/index.ts
+
+----------------------------------------
+
+TITLE: Setting Cloudflare Worker Environment Variables
+DESCRIPTION: Commands to set the required Upstash Redis environment variables in Cloudflare Workers using wrangler. These commands securely store the connection details needed for the WebSocket implementation.
+
+LANGUAGE: bash
+CODE:
+# Create UPSTASH_REDIS_REST_URL environment variable
+wrangler secret put UPSTASH_REDIS_REST_URL
+
+# Create UPSTASH_REDIS_REST_TOKEN environment variable
+wrangler secret put UPSTASH_REDIS_REST_TOKEN
+
+----------------------------------------
+
+TITLE: Configuring Base Path for JStack API
+DESCRIPTION: Demonstrates how to configure the base path for a JStack API to determine where the API is served from.
+
+LANGUAGE: typescript
+CODE:
+// 👇 Serve all routes under /api/*
+const api = j
+  .router()
+  .basePath("/api")
+  .use(j.defaults.cors)
+  .onError(j.defaults.errorHandler)
+
+----------------------------------------
+
+TITLE: Setting Environment Variables for Node.js Environments
+DESCRIPTION: This snippet shows how to define environment variables in a .env file for local development in Node.js environments like Vercel and Netlify.
+
+LANGUAGE: plaintext
+CODE:
+DATABASE_URL=your-database-url
+
+----------------------------------------
+
+TITLE: Accessing Environment Variables in Cloudflare Workers Backend
+DESCRIPTION: This snippet demonstrates how to access environment variables in Cloudflare Workers backend (API) using Hono adapter's env function within a JStack procedure.
+
+LANGUAGE: typescript
+CODE:
+// Backend (API)
+import { env } from "hono/adapter"
+import { j } from "jstack"
+
+export const postRouter = j.router({
+  recent: j.procedure.get(({ c }) => {
+    const { DATABASE_URL } = env(c)
+  }),
+})
+
+----------------------------------------
+
+TITLE: Defining a WebSocket Procedure in JStack
+DESCRIPTION: Basic structure for creating a WebSocket procedure in JStack that handles real-time connections. The procedure receives context objects including Hono context, application context, and an IO connection manager.
+
+LANGUAGE: typescript
+CODE:
+import { j } from "../jstack"
+
+export const postRouter = j.router({
+  chat: j.procedure.ws(({ c, io, ctx }) => ({
+    async onConnect({ socket }) {
+      // ...
+    },
+  })),
+})
+
+----------------------------------------
+
+TITLE: Setting Up Environment Variables for Upstash Redis
+DESCRIPTION: Configuration of environment variables needed for JStack WebSockets with Upstash Redis. This plaintext file contains placeholder values for UPSTASH_REDIS_REST_URL and UPSTASH_REDIS_REST_TOKEN.
+
+LANGUAGE: plaintext
+CODE:
+UPSTASH_REDIS_REST_URL=
+UPSTASH_REDIS_REST_TOKEN=
+
+----------------------------------------
+
+TITLE: Starting Cloudflare Wrangler for Development
+DESCRIPTION: Command to start the Cloudflare Wrangler development server for local testing of JStack WebSockets. This allows you to run the backend locally before deployment.
+
+LANGUAGE: bash
+CODE:
+wrangler dev
+
+----------------------------------------
+
+TITLE: Configuring JStack Client with WebSocket Backend URL
+DESCRIPTION: Client configuration for connecting to a JStack WebSocket backend. It sets the baseUrl to point to the Cloudflare Worker API endpoint for local development.
+
+LANGUAGE: typescript
+CODE:
+import type { AppRouter } from "@/server"
+import { createClient } from "jstack"
+
+export const client = createClient<AppRouter>({
+  // 👇 Point to Cloudflare Worker API
+  baseUrl: "http://localhost:8080/api",
+})
+
+----------------------------------------
+
+TITLE: Deploying JStack WebSockets to Cloudflare Workers
+DESCRIPTION: Command to deploy the JStack WebSocket backend to Cloudflare Workers using wrangler. This step is required because serverless functions on other platforms don't support long-lived connections.
+
+LANGUAGE: bash
+CODE:
+wrangler deploy src/server/index.ts
+
+----------------------------------------
+
+TITLE: Creating Dynamic Base URL for JStack Client
+DESCRIPTION: Enhanced client configuration that dynamically selects the appropriate backend URL based on the environment. It uses the production Cloudflare Worker URL in production and localhost for development.
+
+LANGUAGE: typescript
+CODE:
+import type { AppRouter } from "@/server"
+import { createClient } from "jstack"
+
+export const client = createClient<AppRouter>({
+  baseUrl: `${getBaseUrl()}/api`,
+})
+
+function getBaseUrl() {
+  // 👇 In production, use the production worker
+  if (process.env.NODE_ENV === "production") {
+    return "https://<YOUR_DEPLOYMENT>.workers.dev/api"
+  }
+
+  // 👇 Locally, use wrangler backend
+  return `http://localhost:8080`
+}
+
+----------------------------------------
+
+TITLE: Configuring Client URL for Vercel Deployment in TypeScript
+DESCRIPTION: Updates the client configuration to use the appropriate base URL depending on the environment. It uses window.location.origin for client-side, process.env.VERCEL_URL for production on Vercel, and falls back to localhost for development.
+
+LANGUAGE: typescript
+CODE:
+import type { AppRouter } from "@/server"
+import { createClient } from "jstack"
+
+export const client = createClient<AppRouter>({
+  baseUrl: `${getBaseUrl()}/api`,
+})
+
+function getBaseUrl() {
+  // 👇 Use browser URL if client-side
+  if (typeof window !== "undefined") {
+    return window.location.origin
+  }
+
+  // 👇 Use Vercel URL in production
+  if (process.env.VERCEL_URL) {
+    return `https://${process.env.VERCEL_URL}`
+  }
+
+  // 👇 Default to localhost
+  return `http://localhost:3000`
+}
+
+----------------------------------------
+
+TITLE: Adding Environment Variables via Vercel CLI
+DESCRIPTION: Command to add environment variables to a Vercel project using the Vercel CLI. This is an alternative to setting variables through the Vercel dashboard.
+
+LANGUAGE: bash
+CODE:
+vercel env add <KEY>
+
+----------------------------------------
+
+TITLE: Fetching Data with JStack's Type-Safe Client in Next.js
+DESCRIPTION: Demonstrates how to use JStack's type-safe client to fetch post data in a Next.js application. The response is automatically typed, providing type safety without requiring React Query hooks.
+
+LANGUAGE: tsx
+CODE:
+const res = await client.post.recent.$get()
+const post = await res.json()
+// ^ automatically type-safe: { post: Post }
+
+----------------------------------------
+
+TITLE: Deploying JStack Backend to Cloudflare Workers
+DESCRIPTION: Shows the command to deploy a JStack backend to Cloudflare Workers using Wrangler CLI. This deployment approach separates the backend from the frontend for better cost efficiency.
+
+LANGUAGE: bash
+CODE:
+npx wrangler deploy server/index.ts
+
+----------------------------------------
+
+TITLE: JStack Project Structure for Routers
+DESCRIPTION: A directory structure showing the organization of a JStack application with routers. The structure shows the main files and router directory containing feature-specific router files.
+
+LANGUAGE: plaintext
+CODE:
+app/
+  └── server/
+      ├── jstack.ts        # Initializing JStack
+      ├── index.ts         # Main appRouter
+      └── routers/         # Router directory
+          ├── user-router.ts
+          ├── post-router.ts
+          └── payment-router.ts
+
+----------------------------------------
+
+TITLE: Creating a Basic JStack Router
+DESCRIPTION: Shows how to create a simple router file in JStack. This is the basic structure for a router before adding any procedures to it.
+
+LANGUAGE: typescript
+CODE:
+import { j } from "../jstack"
+
+export const postRouter = j.router({
+  // Procedures go here...
+})
+
+----------------------------------------
+
+TITLE: JStack Router URL Structure Example
+DESCRIPTION: Shows the resulting URL structure for a procedure in a JStack router. The example illustrates how router name and procedure name are combined with the API base path.
+
+LANGUAGE: plaintext
+CODE:
+http://localhost:3000/api/post/list
+
+----------------------------------------
+
+TITLE: Displaying JStack File Structure
+DESCRIPTION: Shows the recommended file structure for a JStack application, highlighting where the main appRouter and routers should be placed.
+
+LANGUAGE: plaintext
+CODE:
+app/
+  └── server/
+      ├── jstack.ts        # Initialize JStack
+      ├── index.ts         # Main appRouter
+      └── routers/         # Router directory
+          ├── user-router.ts
+          ├── post-router.ts
+          └── ...
+
+----------------------------------------
+
+TITLE: Implementing Error Handling in JStack API
+DESCRIPTION: Shows how to configure error handling in a JStack router using the default error handler that provides standardized error responses.
+
+LANGUAGE: typescript
+CODE:
+import { j } from "../jstack"
+
+const api = j
+  .router()
+  .basePath("/api")
+  .use(j.defaults.cors)
+  .onError(j.defaults.errorHandler)
+
+----------------------------------------
+
+TITLE: Handling JStack API Errors in React Client Component
+DESCRIPTION: Demonstrates how to consume a JStack API and handle potential errors in a React client component using React Query.
+
+LANGUAGE: tsx
+CODE:
+"use client"
+
+import { useMutation } from "@tanstack/react-query"
+import { HTTPException } from "hono/http-exception"
+import { client } from "@/lib/client"
+
+export default function Page() {
+  const { mutate: createPost } = useMutation({
+    mutationFn: async () => {
+      const res = await client.post.create.$post()
+      return await res.json()
+    },
+    onError: (err: HTTPException) => {
+      console.log(err.message)
+    },
+  })
+
+  return <button onClick={() => createPost()}>Create Post</button>
+}
+
+----------------------------------------
+
+TITLE: Customizing CORS Settings in JStack
+DESCRIPTION: Demonstrates how to customize CORS settings in a JStack API using Hono's built-in CORS middleware, with special attention to required headers for JStack's superjson functionality.
+
+LANGUAGE: typescript
+CODE:
+import { cors } from "hono/cors"
+
+cors({
+  allowHeaders: ["x-is-superjson"],
+  exposeHeaders: ["x-is-superjson"],
+  origin: (origin) => origin, // default: allow any origin
+  credentials: true, // default: allow credentials
+})
+
+----------------------------------------
+
+TITLE: Installing Wrangler CLI for Cloudflare Workers
+DESCRIPTION: Command to install the Wrangler CLI globally using npm, which is required for deploying to Cloudflare Workers.
+
+LANGUAGE: bash
+CODE:
+npm install wrangler@latest -g
+
+----------------------------------------
+
+TITLE: Running Next.js Development Server
+DESCRIPTION: Command to start the Next.js development server on http://localhost:3000, which is sufficient for deployments to Vercel, Netlify, or similar platforms.
+
+LANGUAGE: bash
+CODE:
+npm run dev
+
+----------------------------------------
+
+TITLE: Running Frontend and Backend for Cloudflare Workers
+DESCRIPTION: Commands to run frontend and backend servers separately when developing for Cloudflare Workers. The frontend runs on port 3000 while the backend runs on port 8080.
+
+LANGUAGE: bash
+CODE:
+# Terminal 1: Frontend
+npm run dev     # Available on http://localhost:3000
+
+# Terminal 2: Backend
+wrangler dev    # Available on http://localhost:8080
+
+----------------------------------------
+
+TITLE: Configuring JStack Client for Backend Communication
+DESCRIPTION: TypeScript code to create a JStack client that points to the Cloudflare Worker backend running on a separate port. This configuration adjusts the baseUrl to connect to the backend API.
+
+LANGUAGE: typescript
+CODE:
+import type { AppRouter } from "@/server"
+import { createClient } from "jstack"
+
+export const client = createClient<AppRouter>({
+  // 👇 Add our port 8080 cloudflare URL
+  baseUrl: "http://localhost:8080/api",
+})
+
+----------------------------------------
+
+TITLE: Initializing JStack with Environment Type Safety
+DESCRIPTION: Creates a JStack instance with type-safe environment variables and exports the base public procedure. This serves as the foundation for creating new procedures and middleware.
+
+LANGUAGE: typescript
+CODE:
+import { jstack } from "jstack"
+
+interface Env {
+  Bindings: { DATABASE_URL: string }
+}
+
+export const j = jstack.init<Env>()
+
+/**
+ * Public (unauthenticated) procedures
+ * This is the base part you use to create new procedures.
+ */
+export const publicProcedure = j.procedure
+
+----------------------------------------
+
+TITLE: Configuring the JStack App Router
+DESCRIPTION: Sets up the main router for the application, configuring the base path, CORS, and error handling. This is the entry point for all API routes in the Next.js backend.
+
+LANGUAGE: typescript
+CODE:
+import { j } from "./jstack"
+
+/**
+ * This is your base API.
+ * Here, you can handle errors, not-found responses, cors and more.
+ */
+const api = j
+  .router()
+  .basePath("/api")
+  .use(j.defaults.cors)
+  .onError(j.defaults.errorHandler)
+
+/**
+ * This is the main router for your server.
+ * All routers in /server/routers should be added here manually.
+ */
+const appRouter = j.mergeRouters(api, {
+  // ...
+})
+
+export type AppRouter = typeof appRouter
+
+export default appRouter
+
+----------------------------------------
+
+TITLE: Connecting a Feature Router to the App Router
+DESCRIPTION: Shows how to connect a feature router to make it accessible through the main app router. This enables API requests to the router's procedures.
+
+LANGUAGE: typescript
+CODE:
+import { j } from "./jstack"
+import { postRouter } from "./routers/post-router"
+
+const api = j
+  .router()
+  .basePath("/api")
+  .use(j.defaults.cors)
+  .onError(j.defaults.errorHandler)
+
+const appRouter = j.mergeRouters(api, {
+  post: postRouter,
+})
+
+export type AppRouter = typeof appRouter
+export default appRouter
+
+----------------------------------------
+
+TITLE: Displaying JStack File Structure
+DESCRIPTION: Shows the recommended project structure for JStack applications, highlighting where procedures and routers should be organized.
+
+LANGUAGE: plaintext
+CODE:
+app/
+  └── server/
+      ├── jstack.ts        # Initialize JStack
+      ├── index.ts         # Main appRouter
+      └── routers/         # Router directory
+          ├── user-router.ts
+          ├── post-router.ts
+          └── payment-router.ts
+
+----------------------------------------
+
+TITLE: Calling Procedures with Validated Input
+DESCRIPTION: Demonstrates how to call a procedure with validated input from the client side, showing the type checking benefits of the validated schema.
+
+LANGUAGE: typescript
+CODE:
+import { client } from "@/lib/client"
+
+// ✅ Client knows that `title` is expected input
+await client.post.create.$post({ title: "My new post" })

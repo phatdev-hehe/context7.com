@@ -1,0 +1,576 @@
+TITLE: Implementing Protobuf Serialization in Temporal TypeScript SDK
+DESCRIPTION: This code demonstrates the current solution for protobuf integration with Temporal's TypeScript SDK. It shows how to generate and patch protobuf root files, create a custom payload converter, configure workers and clients to use protobufs, and implement workflow functions that use protobuf messages.
+
+LANGUAGE: typescript
+CODE:
+// json-module.js generated with:
+// pbjs -t json-module -w commonjs -o json-module.js *.proto
+
+// protos/root.js
+const { patchProtobufRoot } = require('@temporalio/common');
+const unpatchedRoot = require('./json-module');
+module.exports = patchProtobufRoot(unpatchedRoot);
+
+// root.d.ts generated with:
+// pbjs -t static-module *.proto | pbts -o root.d.ts -
+
+// src/payload-converter.ts
+import { DefaultPayloadConverterWithProtobufs } from '@temporalio/common/lib/protobufs';
+import root from '../protos/root';
+
+export const payloadConverter = new DefaultPayloadConverterWithProtobufs({ protobufRoot: root });
+
+// src/worker.ts
+const worker = Worker.create({ dataConverter: { payloadConverterPath: require.resolve('./payload-converter') }, ... });
+
+// src/client.ts
+import { foo } from '../protos/root';
+import { dataConverter } from './payload-converter';
+
+const client = new WorkflowClient(connection.service, {
+  dataConverter: { payloadConverterPath: require.resolve('./payload-converter') }
+});
+
+await client.start(protoWorkflow, {
+  args: [foo.bar.ProtoInput.create({ name: 'Proto', age: 1 })], // can't use `new foo.bar.ProtoInput()`
+  taskQueue: 'tutorial',
+  workflowId: 'my-business-id',
+});
+
+// src/workflows.ts
+import { foo } from '../protos/root';
+
+export async function protoWorkflow(input: foo.bar.ProtoInput): Promise<foo.bar.ProtoResult> {
+  return foo.bar.ProtoResult.create({ sentence: `Name is ${input.name}` });
+}
+
+----------------------------------------
+
+TITLE: Defining Data Converter Interfaces in TypeScript for Temporal
+DESCRIPTION: Interface definitions for the core data conversion components in Temporal. Includes DataConverter, PayloadConverter, FailureConverter, and PayloadCodec interfaces that handle data transformation between user code and the Temporal Server.
+
+LANGUAGE: typescript
+CODE:
+export interface DataConverter {
+  payloadConverterPath?: string;
+  failureConverterPath?: string;
+  payloadCodecs?: PayloadCodec[];
+}
+
+export interface PayloadConverter {
+  toPayload<T>(value: T): Payload | undefined;
+  fromPayload<T>(payload: Payload): T;
+}
+
+export interface FailureConverter {
+  errorToFailure(err: unknown): ProtoFailure;
+  failureToError(err: ProtoFailure): TemporalFailure;
+}
+
+export interface PayloadCodec {
+  encode(payloads: Payload[]): Promise<Payload[]>;
+  decode(payloads: Payload[]): Promise<Payload[]>;
+}
+
+----------------------------------------
+
+TITLE: Configuring Workflow Coverage with Worker Creation in TypeScript
+DESCRIPTION: This snippet shows how to instantiate WorkflowCoverage and configure a Worker to gather code coverage data for Workflows. It initializes a worker with augmented options to enable coverage tracking.
+
+LANGUAGE: typescript
+CODE:
+import { WorkflowCoverage } from '@temporalio/nyc-test-coverage';
+
+const workflowCoverage = new WorkflowCoverage();
+
+worker = await Worker.create(workflowCoverage.augmentWorkerOptions({
+  connection: nativeConnection,
+  taskQueue,
+  workflowsPath: require.resolve("./workflows"),
+}));
+
+----------------------------------------
+
+TITLE: Installing Project Dependencies for Temporal SDK
+DESCRIPTION: Shell commands for repository setup, including cloning the repository, initializing submodules, and installing dependencies.
+
+LANGUAGE: shell
+CODE:
+git clone https://github.com/temporalio/sdk-typescript.git
+cd sdk-typescript
+
+LANGUAGE: shell
+CODE:
+git submodule update --init --recursive
+
+LANGUAGE: shell
+CODE:
+npm ci
+
+----------------------------------------
+
+TITLE: Building the Temporal TypeScript SDK
+DESCRIPTION: Commands for building the SDK and resetting the environment when build fails.
+
+LANGUAGE: shell
+CODE:
+npm run build
+
+LANGUAGE: shell
+CODE:
+npx lerna clean -y && npm ci
+
+----------------------------------------
+
+TITLE: Development Commands for Temporal SDK
+DESCRIPTION: Common development commands used during Temporal SDK development, including build, test, and code quality tasks.
+
+LANGUAGE: shell
+CODE:
+npm run build
+npm run rebuild
+npm run build.watch
+npm run test
+npm run test.watch
+npm run format
+npm run lint
+npm run commitlint
+
+----------------------------------------
+
+TITLE: Implementing instanceof Check for Objects from Different VM Contexts in TypeScript
+DESCRIPTION: A workaround function to check if an object is an instance of a class when the object comes from a different VM context. This solves the issue where the standard instanceof operator doesn't work across VM boundaries.
+
+LANGUAGE: typescript
+CODE:
+function workflowInclusiveInstanceOf(instance: unknown, type: Function): boolean {
+  let proto = Object.getPrototypeOf(instance);
+  while (proto) {
+    if (proto.constructor?.toString() === type.toString()) return true;
+    proto = Object.getPrototypeOf(proto);
+  }
+  return false;
+}
+
+----------------------------------------
+
+TITLE: Configuring Workflow Coverage with Bundled Workflow Code
+DESCRIPTION: This snippet shows how to use WorkflowCoverage with bundled Workflow code by augmenting both bundle options and worker options. It first bundles the workflow code with coverage instrumentation, then creates a worker with the instrumented bundle.
+
+LANGUAGE: typescript
+CODE:
+const bundle = await bundleWorkflowCode(
+  workflowCoverage.augmentBundleOptions({
+    workflowsPath: require.resolve('./workflows'),
+  })
+);
+
+const worker = await Worker.create(
+  workflowCoverage.augmentWorkerOptionsWithBundle({
+    connection,
+    taskQueue,
+    workflowBundle: bundle,
+    activities,
+  })
+);
+
+----------------------------------------
+
+TITLE: Publishing the Temporal TypeScript SDK
+DESCRIPTION: Publishing workflow for Temporal SDK releases, including changelog generation, artifact handling, and package publishing.
+
+LANGUAGE: shell
+CODE:
+cargo install git-cliff
+
+LANGUAGE: shell
+CODE:
+# git-cliff --tag <new version> <current version>..HEAD | pbcopy
+git-cliff --tag 1.0.1 v1.0.0..HEAD | pbcopy
+
+LANGUAGE: shell
+CODE:
+#(\d{3})
+[#$1](https://github.com/temporalio/sdk-typescript/pull/$1)
+
+LANGUAGE: shell
+CODE:
+#!/bin/bash
+set -euo pipefail
+
+git clean -fdx
+npm ci
+npm run build
+
+mkdir -p packages/core-bridge/releases
+
+# in the next command, replace ~/gh/release-sdk-typescript with your dir
+for f in ~/Downloads/packages-*.zip; do mkdir "$HOME/Downloads/$(basename -s .zip $f)"; (cd "$HOME/Downloads/$(basename -s .zip $f)" && unzip $f && tar -xvzf @temporalio/core-bridge/core-bridge-*.tgz package/releases/ && cp -r package/releases/* ~/gh/release-sdk-typescript/packages/core-bridge/releases/); done
+
+----------------------------------------
+
+TITLE: Starting Local Development Server for Temporal Documentation
+DESCRIPTION: Command to start a local development server for the Temporal API documentation site. This server provides live reloading capabilities for most changes made to the documentation.
+
+LANGUAGE: console
+CODE:
+npm start
+
+----------------------------------------
+
+TITLE: Preparing and Publishing Packages
+DESCRIPTION: Creates a fix-deps branch, runs the prepublish script, commits changes, and publishes the packages using Lerna. Includes an option for pre-release versioning with the next tag.
+
+LANGUAGE: sh
+CODE:
+git checkout -B fix-deps
+node scripts/prepublish.mjs
+git commit -am 'Fix dependencies'
+npx lerna publish from-package # add `--dist-tag next` for pre-release versions
+git checkout -
+
+----------------------------------------
+
+TITLE: Versioning Packages with Lerna
+DESCRIPTION: Updates package versions using Lerna. The command supports major, minor, or patch updates and prompts for confirmation before proceeding.
+
+LANGUAGE: sh
+CODE:
+npx lerna version patch --force-publish='*' # or major|minor|etc, or leave out to be prompted. either way, you get a confirmation dialog.
+
+----------------------------------------
+
+TITLE: Building the Bridge for All Targets
+DESCRIPTION: Command to build the temporal_sdk_typescript_bridge for all configured target platforms, using specific compilers for Linux targets.
+
+LANGUAGE: bash
+CODE:
+CC_aarch64_unknown_linux_gnu=aarch64-unknown-linux-gnu-gcc CC_x86_64_unknown_linux_gnu=x86_64-unknown-linux-gnu-gcc npx lerna run --stream build-rust -- --target all
+
+----------------------------------------
+
+TITLE: Merging Workflow Coverage into nyc Global Coverage
+DESCRIPTION: This snippet demonstrates how to merge the collected Workflow code coverage data into nyc's global coverage object after tests are completed. It should be called in the test teardown phase.
+
+LANGUAGE: typescript
+CODE:
+after(() => {
+  workflowCoverage.mergeIntoGlobalCoverage();
+});
+
+----------------------------------------
+
+TITLE: Merging Workflow Coverage into Jest Global Coverage
+DESCRIPTION: This snippet demonstrates how to merge the collected Workflow code coverage data into Jest's global coverage object after tests are completed. It uses afterAll() instead of after() for Jest's test lifecycle.
+
+LANGUAGE: typescript
+CODE:
+afterAll(() => {
+  workflowCoverage.mergeIntoGlobalCoverage();
+});
+
+----------------------------------------
+
+TITLE: Updating NPM Dependencies for Temporal SDK
+DESCRIPTION: Scripts for maintaining NPM dependencies, including updating packages and identifying unused dependencies across the monorepo.
+
+LANGUAGE: shell
+CODE:
+for i in ./package.json packages/*/package.json ; do
+  (
+    cd "${i%%package.json}"
+    pwd
+    npm-check-updates -i
+  )
+done
+
+LANGUAGE: shell
+CODE:
+for i in ./package.json packages/*/package.json ; do
+  (
+    cd "${i%%package.json}"
+    pwd
+    npm-check
+  )
+done
+
+LANGUAGE: shell
+CODE:
+npm i -g npm-check npm-check-updates
+
+----------------------------------------
+
+TITLE: Running Local npm-init Test for Temporal SDK
+DESCRIPTION: Script to test the npm initialization process locally using Verdaccio, useful for CI test replication.
+
+LANGUAGE: shell
+CODE:
+rm -rf /tmp/registry
+npm ci
+npm run rebuild
+node scripts/publish-to-verdaccio.js --registry-dir /tmp/registry
+node scripts/init-from-verdaccio.js --registry-dir /tmp/registry --sample hello-world
+cd /tmp/registry/example
+npm run build
+node ~/path-to/sdk-typescript/scripts/test-example.js --work-dir /tmp/registry/example
+
+----------------------------------------
+
+TITLE: Checking Build Targets in Core-Bridge
+DESCRIPTION: Verifies all five build targets are present in the packages/core-bridge/releases/ directory before proceeding with the release.
+
+LANGUAGE: sh
+CODE:
+ls packages/core-bridge/releases/
+
+----------------------------------------
+
+TITLE: Configuring Cargo for Local Core Testing
+DESCRIPTION: Instructions for overriding SDK core dependencies in Cargo configuration to test local changes.
+
+LANGUAGE: toml
+CODE:
+# Create a .cargo/config.toml file and override the path to sdk-core and/or sdk-core-protos
+
+----------------------------------------
+
+TITLE: Installing Project Dependencies
+DESCRIPTION: Command to install the project's dependencies with npm, ensuring that foreground scripts are executed.
+
+LANGUAGE: bash
+CODE:
+NPM_CONFIG_FOREGROUND_SCRIPTS=true npm ci
+
+----------------------------------------
+
+TITLE: Installing @temporalio/cloud Package
+DESCRIPTION: NPM package reference for @temporalio/cloud with a badge showing the current version on npm. This package is part of Temporal's TypeScript SDK ecosystem.
+
+LANGUAGE: markdown
+CODE:
+# `@temporalio/cloud`
+
+[![NPM](https://img.shields.io/npm/v/@temporalio/cloud?style=for-the-badge)](https://www.npmjs.com/package/@temporalio/cloud)
+
+Part of [Temporal](https://temporal.io)'s [TypeScript SDK](https://docs.temporal.io/typescript/introduction/).
+
+- [API reference](https://typescript.temporal.io/api/namespaces/cloud)
+- [Sample projects](https://github.com/temporalio/samples-typescript)
+
+----------------------------------------
+
+TITLE: Package Reference in Markdown
+DESCRIPTION: A markdown header displaying the package name @temporalio/client with accompanying NPM badge and links to documentation resources.
+
+LANGUAGE: markdown
+CODE:
+# `@temporalio/client`
+
+[![NPM](https://img.shields.io/npm/v/@temporalio/client?style=for-the-badge)](https://www.npmjs.com/package/@temporalio/client)
+
+Part of [Temporal](https://temporal.io)'s [TypeScript SDK](https://docs.temporal.io/typescript/introduction/).
+
+- [Client docs](https://docs.temporal.io/typescript/clients)
+- [API reference](https://typescript.temporal.io/api/namespaces/client)
+- [Sample projects](https://github.com/temporalio/samples-typescript)
+
+----------------------------------------
+
+TITLE: Non-Working Namespace Access Example in Protobuf Integration
+DESCRIPTION: This code illustrates an approach that doesn't work due to namespaces being lost through the patchProtobufRoot() function. It shows the TypeScript error that occurs when trying to access nested namespaces from the root object.
+
+LANGUAGE: typescript
+CODE:
+import * as generatedRoot from '../protos/json-module';
+
+const patchProtobufRoot = <T>(x: T): T => x;
+const root = patchProtobufRoot(generatedRoot);
+
+function myWorkflowError(input: root.foo.bar.ProtoActivityInput) {
+  return input.name;
+}
+
+----------------------------------------
+
+TITLE: Merging Workflow Coverage with Bundled Code into Global Coverage
+DESCRIPTION: This snippet shows how to merge the collected Workflow code coverage data into the global coverage object when using bundled workflow code. It's identical to the regular merging process.
+
+LANGUAGE: typescript
+CODE:
+after(() => {
+  workflowCoverage.mergeIntoGlobalCoverage();
+});
+
+----------------------------------------
+
+TITLE: Updating and Testing Samples Repository
+DESCRIPTION: Updates the samples-typescript repository with the latest package versions and verifies that the release works with the samples.
+
+LANGUAGE: sh
+CODE:
+git checkout next
+git rebase origin/main
+git push
+
+LANGUAGE: sh
+CODE:
+cd /path/to/samples-typescript
+lerna exec -- npm update
+npm run build
+npm test
+
+----------------------------------------
+
+TITLE: Deprecating Old Package Versions
+DESCRIPTION: Deprecates older versions of the temporalio package with a message instructing users to install specific packages instead.
+
+LANGUAGE: sh
+CODE:
+npm deprecate temporalio@^1.0.0 "Instead of installing temporalio, we recommend directly installing our packages: npm remove temporalio; npm install @temporalio/client @temporalio/worker @temporalio/workflow @temporalio/activity"
+
+----------------------------------------
+
+TITLE: Configuring Cargo for Cross-Compilation
+DESCRIPTION: Command to copy the provided cargo configuration file for Windows and Linux build targets.
+
+LANGUAGE: bash
+CODE:
+cp etc/mac-cargo-config.toml ~/.cargo/config.toml
+
+----------------------------------------
+
+TITLE: Adding Rust Target for Windows x86_64 Architecture
+DESCRIPTION: Command to add Windows x86_64 GNU target to Rust for cross-compilation.
+
+LANGUAGE: bash
+CODE:
+rustup target add x86_64-pc-windows-gnu
+
+----------------------------------------
+
+TITLE: Adding Rust Target for Linux x86_64 Architecture
+DESCRIPTION: Command to add Linux x86_64 GNU target to Rust for cross-compilation.
+
+LANGUAGE: bash
+CODE:
+rustup target add x86_64-unknown-linux-gnu
+
+----------------------------------------
+
+TITLE: Adding Rust Target for Linux ARM64 Architecture
+DESCRIPTION: Command to add Linux aarch64 GNU target to Rust for cross-compilation.
+
+LANGUAGE: bash
+CODE:
+rustup target add aarch64-unknown-linux-gnu
+
+----------------------------------------
+
+TITLE: Adding Rust Target for ARM64 MacOS Architecture
+DESCRIPTION: Command to add aarch64-apple-darwin target to Rust for cross-compilation on Intel Macs.
+
+LANGUAGE: bash
+CODE:
+rustup target add aarch64-apple-darwin
+
+----------------------------------------
+
+TITLE: Adding Rust Target for x86_64 MacOS Architecture
+DESCRIPTION: Command to add x86_64-apple-darwin target to Rust for cross-compilation on M1 Macs.
+
+LANGUAGE: bash
+CODE:
+rustup target add x86_64-apple-darwin
+
+----------------------------------------
+
+TITLE: Installing MacOS Cross Toolchains via Homebrew
+DESCRIPTION: Command to add the messense/macos-cross-toolchains tap to Homebrew, which provides cross-compilation toolchains.
+
+LANGUAGE: bash
+CODE:
+brew tap messense/macos-cross-toolchains
+
+----------------------------------------
+
+TITLE: Installing Linux x86_64 Toolchain
+DESCRIPTION: Command to install the toolchain for compiling to Linux x86_64 targets.
+
+LANGUAGE: bash
+CODE:
+brew install x86_64-unknown-linux-gnu
+
+----------------------------------------
+
+TITLE: Installing Linux ARM64 Toolchain
+DESCRIPTION: Command to install the toolchain for compiling to Linux aarch64 targets.
+
+LANGUAGE: bash
+CODE:
+brew install aarch64-unknown-linux-gnu
+
+----------------------------------------
+
+TITLE: Installing Windows Toolchain on Intel Macs
+DESCRIPTION: Command to install MinGW-w64 on Intel Macs for compiling to Windows targets.
+
+LANGUAGE: bash
+CODE:
+brew install mingw-w64
+
+----------------------------------------
+
+TITLE: Installing Windows Toolchain on M1 Macs
+DESCRIPTION: Command to install MinGW-w64 on M1 Macs for compiling to Windows targets, using Rosetta.
+
+LANGUAGE: bash
+CODE:
+arch -x86_64 /usr/local/bin/brew install mingw-w64
+
+----------------------------------------
+
+TITLE: Setting up SSH Key for GitHub Authentication
+DESCRIPTION: Command to add GitHub's SSH key to known hosts when encountering authentication issues during submodule initialization.
+
+LANGUAGE: shell
+CODE:
+ssh-keyscan github.com >> ~/.ssh/known_hosts
+
+----------------------------------------
+
+TITLE: Removing Next Tags After Release
+DESCRIPTION: Removes the 'next' tag from pre-release versions after the stable version is released.
+
+LANGUAGE: sh
+CODE:
+npm dist-tag rm @temporalio/client next
+npm dist-tag rm @temporalio/worker next
+npm dist-tag rm @temporalio/workflow next
+npm dist-tag rm @temporalio/activity next
+npm dist-tag rm @temporalio/testing next
+npm dist-tag rm @temporalio/common next
+npm dist-tag rm @temporalio/proto next
+npm dist-tag rm @temporalio/interceptors-opentelemetry next
+npm dist-tag rm @temporalio/common/lib/internal-workflow next
+npm dist-tag rm @temporalio/common/lib/internal-non-workflow next
+npm dist-tag rm @temporalio/create next
+npm dist-tag rm temporalio next
+
+----------------------------------------
+
+TITLE: Post-Release Cleanup
+DESCRIPTION: Removes temporary files and directories created during the release process.
+
+LANGUAGE: sh
+CODE:
+rm -rf $HOME/Downloads/packages-*
+rm -rf packages/core-bridge/releases/*
+
+----------------------------------------
+
+TITLE: Installing Rosetta on M1 Macs
+DESCRIPTION: Command to install Rosetta on M1 Macs, which is required for running x86_64 applications.
+
+LANGUAGE: bash
+CODE:
+softwareupdate --install-rosetta

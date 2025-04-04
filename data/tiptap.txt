@@ -1,0 +1,1570 @@
+TITLE: React Editor Usage Example with Performance Optimizations in JSX
+DESCRIPTION: Example demonstrating the optimized React editor integration with performance controls. Shows how to use useEditor and useEditorState hooks with various optimization options like immediatelyRender and shouldRerenderOnTransaction.
+
+LANGUAGE: jsx
+CODE:
+const editor = useEditor({
+  /**
+   * This option gives us the control to enable the default behavior of rendering the editor immediately.
+   */
+  immediatelyRender: true,
+  /**
+   * This option gives us the control to disable the default behavior of re-rendering the editor on every transaction.
+   */
+  shouldRerenderOnTransaction: false,
+  extensions: [StarterKit],
+  content: `
+    <p>
+      A highly optimized editor that only re-renders when it's necessary.
+    </p>
+    `,
+});
+
+/**
+ * This hook allows us to select the editor state we want to use in our component.
+ */
+const currentEditorState = useEditorState({
+  /**
+   * The editor instance we want to use.
+   */
+  editor,
+  /**
+   * This selector allows us to select the data we want to use in our component.
+   * It is evaluated on every editor transaction and compared to it's previously returned value.
+   * You can return any data shape you want.
+   */
+  selector: (ctx) => ({
+    isBold: ctx.editor.isActive("bold"),
+    isItalic: ctx.editor.isActive("italic"),
+    isStrike: ctx.editor.isActive("strike"),
+  }),
+  /**
+   * This function allows us to customize the equality check for the selector.
+   * By default it is a `===` check.
+   */
+  equalityFn: (prev, next) => {
+    // A deep-equal function would probably be more maintainable here, but, we use a shallow one to show that it can be customized.
+    if (!next) {
+      return false;
+    }
+    return (
+      prev.isBold === next.isBold &&
+      prev.isItalic === next.isItalic &&
+      prev.isStrike === next.isStrike
+    );
+  },
+});
+
+----------------------------------------
+
+TITLE: React NodeView Performance Optimization
+DESCRIPTION: This significant update improves React NodeView performance by using useSyncExternalStore for synchronization and reducing re-renders through better portal management.
+
+LANGUAGE: markdown
+CODE:
+e31673d: This PR significantly improves the performance of React NodeViews in a couple of ways:
+
+- It now uses useSyncExternalStore to synchronize changes between React & the editor instance
+- It dramatically reduces the number of re-renders by re-using instances of React portals that have already been initialized and unaffected by the change made in the editor
+
+We were seeing performance problems with React NodeViews because a change to one of them would cause a re-render to all instances of node views. For an application that heavily relies on node views in React, this was quite expensive.
+This should dramatically cut down on the number of instances that have to re-render, and, making each of those re-renders much less costly.
+
+----------------------------------------
+
+TITLE: React 19 Compatibility Updates
+DESCRIPTION: Multiple changes to ensure compatibility with React 19, including adjustments to how refs work and using useLayoutEffect instead of useEffect for state management.
+
+LANGUAGE: markdown
+CODE:
+5eee480: React 19 changes how refs works, it will double mount them, all that we needed to do though was to use the JSX transform instead of createElement directly #5846
+
+LANGUAGE: markdown
+CODE:
+7619215: This changes useEditorState to use the useLayoutEffect hook instead of the useEffect hook, so that state that might render to the page can be committed in one pass instead of two.
+
+LANGUAGE: markdown
+CODE:
+7619215: Fixes an issue where the bubble and flaoting menus on blur would remount
+
+LANGUAGE: markdown
+CODE:
+7619215: React 19 is now allowed as a peer dep, we did not have to make any changes for React 19
+
+----------------------------------------
+
+TITLE: Shallow Options Diffing in TipTap Editor
+DESCRIPTION: This patch implements a shallow diffing mechanism between current and incoming editor options to determine if a state update is necessary. It uses referential equality for comparison, avoiding known problematic options like callbacks and extensions.
+
+LANGUAGE: markdown
+CODE:
+40b7d47: This does a shallow diff between the current options and the incoming ones to determine whether we should try to write the new options and incur a state update within the editor.
+
+It purposefully is not doing a full diff as several options are known to be problematic (callback handlers, extensions array, the content itself), so we rely on referential equality only to do this diffing which should be fairly fast since there are only about 10-15 options, and this diffs only the ones the user has actually attempted to set. Some options (e.g. editorProps, parseOptions, coreExtensionOptions) are an object that may need to be memoized by the user if they want to avoid unnecessary state updates.
+
+----------------------------------------
+
+TITLE: Adding isChangeOrigin Helper Method in Collaboration Extension
+DESCRIPTION: A commit that adds the isChangeOrigin helper method to the collaboration extension. This functionality appears to help identify the origin of changes in collaborative editing.
+
+LANGUAGE: markdown
+CODE:
+### Features
+
+- add isChangeOrigin helper method ([92b6c5b](https://github.com/ueberdosis/tiptap/commit/92b6c5bdcef4589acaa824c2fc599787c02c1832))
+
+----------------------------------------
+
+TITLE: Fixing TextAlign Functionality with Missing Heading Extension
+DESCRIPTION: Bug fix to address an issue where text alignment wasn't working when the heading extension was not added.
+
+LANGUAGE: JavaScript
+CODE:
+fix a bug where setting text align isn't working when heading extension is not added
+
+----------------------------------------
+
+TITLE: Adding Editor-is-Empty Class Functionality
+DESCRIPTION: Version 2.2.0 enhances the placeholder extension to allow the editor-is-empty class to be applied to any node, giving more flexibility for styling empty editor states.
+
+LANGUAGE: markdown
+CODE:
+- **placeholder:** allow editor-is-empty class on any node ([#4335](https://github.com/ueberdosis/tiptap/issues/4335)) ([ff929b1](https://github.com/ueberdosis/tiptap/commit/ff929b179de930619005a773bb4186ae2aa2ec58))
+
+----------------------------------------
+
+TITLE: Placeholder Enhancement for Complex Default Content
+DESCRIPTION: The placeholder feature was improved in version 2.5.0 to handle more complex default content, enhancing the editor's capability when working with placeholders.
+
+LANGUAGE: markdown
+CODE:
+- fb45149: Placeholders can now handle more complex default content
+
+----------------------------------------
+
+TITLE: useEditor and useEditorState Optimization
+DESCRIPTION: This patch optimizes the useEditor and useEditorState hooks to reduce the number of instances created while maintaining performance.
+
+LANGUAGE: markdown
+CODE:
+7c8889a: Optimize `useEditor` and `useEditorState` to reduce number of instances created while still being performant #5432
+
+The core of this change is two-fold:
+
+- have the effect run on every render (i.e. without a dep array)
+- schedule destruction of instances, but bail on the actual destruction if the instance was still mounted and a new instance had not been created yet
+
+It should plug a memory leak, where editor instances could be created but not cleaned up in strict mode.
+As well as fixing a bug where a re-render, with deps, was not applying new options that were set on `useEditor`.
+
+----------------------------------------
+
+TITLE: Adding allowBase64 Option to Image Extension
+DESCRIPTION: A feature commit that adds the allowBase64 option to the image extension, allowing base64-encoded images to be used.
+
+LANGUAGE: markdown
+CODE:
+### Features
+
+- add allowBase64 option to image extension ([a97a46f](https://github.com/ueberdosis/tiptap/commit/a97a46fc51c5a4b2f46be21fa6701b977eb415f7))
+
+----------------------------------------
+
+TITLE: Adding Priority Option to Tiptap Extensions
+DESCRIPTION: A feature enhancement that adds a priority option to extensions, allowing developers to control the order in which extensions are processed and applied within the Tiptap editor.
+
+LANGUAGE: markdown
+CODE:
+### Features
+
+- add priority option to extensions ([bb1ae65](https://github.com/ueberdosis/tiptap/commit/bb1ae659a463e97a7ada15af711347b5c004897a))
+
+----------------------------------------
+
+TITLE: Adding Support for Scoped Styles in Vue 3
+DESCRIPTION: A commit that adds support for scoped styles in the Vue 3 integration, fixing issue #1931.
+
+LANGUAGE: markdown
+CODE:
+### Bug Fixes
+
+- add support for scoped styles, fix [#1931](https://github.com/ueberdosis/tiptap/issues/1931) ([19840f3](https://github.com/ueberdosis/tiptap/commit/19840f3b258f5dbf8a7edff1a85f297871a5ac66))
+
+----------------------------------------
+
+TITLE: Fixing setParagraph Command in Tiptap Paragraph Extension
+DESCRIPTION: A bug fix that changes the implementation of the setParagraph command from using toggleNode to setNode, which provides more predictable behavior when converting content to paragraphs.
+
+LANGUAGE: markdown
+CODE:
+### Bug Fixes
+
+- use setNode instead of toggleNode for setParagraph command ([bcc1309](https://github.com/ueberdosis/tiptap/commit/bcc1309cd928d4dc5618fa998722f935975389f0))
+
+----------------------------------------
+
+TITLE: Adding resetAttributes Command in TextAlign Extension
+DESCRIPTION: Feature addition that introduces resetAttributes() command and deprecates resetNodeAttributes().
+
+LANGUAGE: JavaScript
+CODE:
+add resetAttributes() command, deprecate resetNodeAttributes()
+
+----------------------------------------
+
+TITLE: Adding Key and ShouldShow Options to Menus
+DESCRIPTION: A commit that adds key option and shouldShow option to menus, fixing multiple issues (#1480, #1043, #1268, #1503).
+
+LANGUAGE: markdown
+CODE:
+### Features
+
+- add key option and shouldShow option to menus (fix [#1480](https://github.com/ueberdosis/tiptap/issues/1480), fix [#1043](https://github.com/ueberdosis/tiptap/issues/1043), fix [#1268](https://github.com/ueberdosis/tiptap/issues/1268), fix [#1503](https://github.com/ueberdosis/tiptap/issues/1503)) ([9ba61c1](https://github.com/ueberdosis/tiptap/commit/9ba61c1582cee838f2214d00285773ace2fb229e))
+
+----------------------------------------
+
+TITLE: useEditor and EditorProvider Type Updates
+DESCRIPTION: This patch updates TypeScript types for useEditor and EditorProvider to prevent conflicts with the core Editor type.
+
+LANGUAGE: markdown
+CODE:
+c7fd0f8: Updates the typings to `useEditor` and `EditorProvider` to not conflict with the core Editor type
+
+----------------------------------------
+
+TITLE: ReactNodeViewRenderer Attribute Callback Support
+DESCRIPTION: This patch adds support for a callback function in ReactNodeViewRenderer that allows attributes of the wrapping element to be updated on each node view update.
+
+LANGUAGE: markdown
+CODE:
+4ff2a4e: ReactNodeViewRenderer now accepts a callback for attrs of the wrapping element to be updated on each node view update
+
+----------------------------------------
+
+TITLE: Fix for isNodeEmpty Function
+DESCRIPTION: Version 2.5.7 addresses an issue with the isNodeEmpty function where it incorrectly compared node attributes, causing it to find mismatches on actually empty nodes. This improvement helps placeholders correctly identify empty content.
+
+LANGUAGE: markdown
+CODE:
+- b012471: This addresses an issue with `isNodeEmpty` function where it was also comparing node attributes and finding mismatches on actually empty nodes. This helps placeholders find empty content correctly
+
+----------------------------------------
+
+TITLE: useEditorState Default Equality Function Update
+DESCRIPTION: This patch changes useEditorState to use deep equality comparison as the default for its equalityFn option.
+
+LANGUAGE: markdown
+CODE:
+c99627d: `useEditorState` now defaults to using a deep equal comparison for it's `equalityFn` option, which makes it more convenient to use
+
+----------------------------------------
+
+TITLE: Table Rendering Bugfix for cellMinWidth Enforcement
+DESCRIPTION: Patch that enforces cellMinWidth even on columns not resized by the user, addressing issue #5435.
+
+LANGUAGE: markdown
+CODE:
+- 7619215: enforce cellMinWidth even on column not resized by the user, fixes #5435
+
+----------------------------------------
+
+TITLE: Table Column Width Fix in v2.9.0
+DESCRIPTION: This change resolved an issue with tables not properly respecting column widths with multiple values, fixing resizable columns when the first row has a colspan.
+
+LANGUAGE: markdown
+CODE:
+- 21df331: Tables now properly respect colwidths with multiple values, fixing resizeable columns when the first row has a colspan
+
+----------------------------------------
+
+TITLE: Fixing Image Input Rule on Paste
+DESCRIPTION: A bug fix commit that prevents image input rule from triggering on paste operations, fixing issue #2518.
+
+LANGUAGE: markdown
+CODE:
+### Bug Fixes
+
+- don't trigger image input rule on paste, fix [#2518](https://github.com/ueberdosis/tiptap/issues/2518) ([ecf270c](https://github.com/ueberdosis/tiptap/commit/ecf270c9e7b5848767e5380a37db622f9d8ab85e))
+
+----------------------------------------
+
+TITLE: Fixing Plugin Order for Collaboration Extension
+DESCRIPTION: A bugfix that addresses issue #1973 by fixing the plugin order for the collaboration extension. This ensures proper functionality when multiple plugins interact.
+
+LANGUAGE: markdown
+CODE:
+### Bug Fixes
+
+- fix plugin order for collab, fix [#1973](https://github.com/ueberdosis/tiptap/issues/1973) ([2b16c2e](https://github.com/ueberdosis/tiptap/commit/2b16c2ea9633529657debff3cdbc74ff3a26b985))
+
+----------------------------------------
+
+TITLE: useEditor Dependency Array Instance Cleanup
+DESCRIPTION: This patch ensures that when using a dependency array with useEditor, previous instances are properly destroyed to avoid ghost instances.
+
+LANGUAGE: markdown
+CODE:
+42dc27a: Fix, if using a deps array destroy the previous instance to avoid ghost instances
+
+----------------------------------------
+
+TITLE: Bug Fix: Retrieving Awareness States After Reconnect in Tiptap Collaboration
+DESCRIPTION: A bug fix implementation that ensures awareness states are properly retrieved after a connection is reestablished in the collaboration cursor extension.
+
+LANGUAGE: markdown
+CODE:
+- retrieve awareness states after reconnect ([12d9942](https://github.com/ueberdosis/tiptap/commit/12d994275c0a4afa2344805e16998690a1c45a4d))
+
+----------------------------------------
+
+TITLE: Using ShallowRef for Editor in Vue 3
+DESCRIPTION: A commit that improves performance by using shallowRef for the Editor instance in Vue 3 integration, referenced as issue #1804.
+
+LANGUAGE: markdown
+CODE:
+### Bug Fixes
+
+- use shallowRef on Editor ([#1804](https://github.com/ueberdosis/tiptap/issues/1804)) ([46701fd](https://github.com/ueberdosis/tiptap/commit/46701fde666b925e80f6796a45f928e671bee92d))
+
+----------------------------------------
+
+TITLE: Adding JSDoc Documentation
+DESCRIPTION: Version 2.4.0 adds JSDoc documentation to the codebase, improving code readability and developer experience.
+
+LANGUAGE: markdown
+CODE:
+- added jsdocs ([#4356](https://github.com/ueberdosis/tiptap/issues/4356)) ([b941eea](https://github.com/ueberdosis/tiptap/commit/b941eea6daba09d48a5d18ccc1b9a1d84b2249dd))
+
+----------------------------------------
+
+TITLE: Editor Instance Cleanup Bug Fix
+DESCRIPTION: This patch fixes a bug where an editor could be instantiated but not properly destroyed, causing issues with multiple active plugin instances.
+
+LANGUAGE: markdown
+CODE:
+99d7820: Resolve a bug an editor could be instantiated but not destroyed. This was causing issues with multiple instances of plugins still being active and interfering with each other
+
+----------------------------------------
+
+TITLE: Keep Splittable Marks in setHardBreak Feature
+DESCRIPTION: A feature enhancement from version 2.0.0-beta.17 that modifies setHardBreak to keep splittable marks by default, addressing issue #1934.
+
+LANGUAGE: markdown
+CODE:
+### Features
+
+- setHardBreak now keeps splittable marks by default, fix [#1934](https://github.com/ueberdosis/tiptap/issues/1934) ([377bbb1](https://github.com/ueberdosis/tiptap/commit/377bbb177d30923a0aa2a80654cc5cf87384dcf3))
+
+----------------------------------------
+
+TITLE: Adding updateAttributes Command in TextAlign Extension
+DESCRIPTION: Feature addition that introduces updateAttributes() command and deprecates updateNodeAttributes(), addressing issue #254.
+
+LANGUAGE: JavaScript
+CODE:
+add updateAttributes() command, deprecate updateNodeAttributes(), fix #254
+
+----------------------------------------
+
+TITLE: Adding Warning for Collaboration and History Extension Conflict
+DESCRIPTION: A bugfix that adds a warning message when using both collaboration and history extensions together, as they may cause conflicts in document state management.
+
+LANGUAGE: markdown
+CODE:
+### Bug Fixes
+
+- add warn message when using collab and history extension together ([bf50af4](https://github.com/ueberdosis/tiptap/commit/bf50af4cf68cd883069cacabacc8deb2d07aca2a))
+
+----------------------------------------
+
+TITLE: Bug Fix: Removing Code Block at Start of Document
+DESCRIPTION: A bug fix that addresses issue #262, which involves removing a code block when it is at the start of a document. This fix was included in version 2.0.0-beta.3.
+
+LANGUAGE: markdown
+CODE:
+remove codeblock when at start of document, fix [#262](https://github.com/ueberdosis/tiptap/issues/262) ([92f6ea2](https://github.com/ueberdosis/tiptap/commit/92f6ea25cc7623d0bd34f5a2342be6f5aae951aa))
+
+----------------------------------------
+
+TITLE: Adding StarterKit Extension in TipTap
+DESCRIPTION: Code commit that adds the StarterKit extension to the TipTap editor framework. This extends the editor's functionality with a set of common features.
+
+LANGUAGE: markdown
+CODE:
+### Features
+
+- add StarterKit extension ([21384fc](https://github.com/ueberdosis/tiptap/commit/21384fc7a66dd7d1e3849be52ae4ab9adc26cf4e))
+
+----------------------------------------
+
+TITLE: Bug fix for merging attributes when clicking task checkbox
+DESCRIPTION: Fixes attribute merging when clicking a task checkbox (issue #2422).
+
+LANGUAGE: markdown
+CODE:
+### Bug Fixes
+
+- merge attrributes correctly when clicking task checkbox, fix [#2422](https://github.com/ueberdosis/tiptap/issues/2422) ([fe27843](https://github.com/ueberdosis/tiptap/commit/fe27843e80af2d48350a4b05438ea9212ec0bba4))
+
+----------------------------------------
+
+TITLE: Fixing Node Views Update in TipTap Vue 3
+DESCRIPTION: A commit that fixes issues with updating node views in the TipTap Vue 3 integration, referenced as issue #1656.
+
+LANGUAGE: markdown
+CODE:
+### Bug Fixes
+
+- fix updating node views, fix [#1656](https://github.com/ueberdosis/tiptap/issues/1656) ([d7f6e0c](https://github.com/ueberdosis/tiptap/commit/d7f6e0ce3f99381d3822cde5ab1c484ed13a4c20))
+
+----------------------------------------
+
+TITLE: Integrating Input and Paste Rules into Core
+DESCRIPTION: A feature commit that integrates input rules and paste rules into the core of the Tiptap editor framework.
+
+LANGUAGE: markdown
+CODE:
+- Integrate input rules and paste rules into the core ([#1997](https://github.com/ueberdosis/tiptap/issues/1997)) ([723b955](https://github.com/ueberdosis/tiptap/commit/723b955cecc5c92c8aad897ce16c60fb62976571))
+
+----------------------------------------
+
+TITLE: Bug fix for adding checkboxes to TaskItem HTML output
+DESCRIPTION: Adds proper checkboxes to the TaskItem HTML output (issue #2037).
+
+LANGUAGE: markdown
+CODE:
+### Bug Fixes
+
+- add checkboxes to TaskItem HTML output, fix [#2037](https://github.com/ueberdosis/tiptap/issues/2037) ([c94d2b0](https://github.com/ueberdosis/tiptap/commit/c94d2b0517e62afea84cb9dd6999874abf0bf3cd))
+
+----------------------------------------
+
+TITLE: Fixed TaskList HTML Attributes Bug
+DESCRIPTION: Commit that adds missing HTMLAttributes to task list component to fix issue #2042.
+
+LANGUAGE: markdown
+CODE:
+### Bug Fixes
+
+- add missing HTMLAttributes to task list, fix [#2042](https://github.com/ueberdosis/tiptap/issues/2042) ([7503d1b](https://github.com/ueberdosis/tiptap/commit/7503d1bed1651899ee90bc9adf76899d90ace9e7))
+
+----------------------------------------
+
+TITLE: Fixing Expose Error with Vue 3 Setup Syntax
+DESCRIPTION: A commit that fixes an expose error when using Vue 3's new setup syntax, addressing issue #1914.
+
+LANGUAGE: markdown
+CODE:
+### Bug Fixes
+
+- fix expose error when using new setup syntax (fix [#1914](https://github.com/ueberdosis/tiptap/issues/1914)) ([60e7755](https://github.com/ueberdosis/tiptap/commit/60e7755b7f7657eec448566580a57db550681ed2))
+
+----------------------------------------
+
+TITLE: Updating parseHTML Return Value Format
+DESCRIPTION: A feature update that changes parseHTML for attributes to return a value instead of an object, fixing issue #1863.
+
+LANGUAGE: markdown
+CODE:
+- parseHTML for attributes should return the value instead of an object now, fix [#1863](https://github.com/ueberdosis/tiptap/issues/1863) ([8a3b47a](https://github.com/ueberdosis/tiptap/commit/8a3b47a529d28b28b50d634c6ff69b8e5aad3080))
+
+----------------------------------------
+
+TITLE: Fixing Paste Regex Implementation
+DESCRIPTION: A bug fix that corrects the use of pasteRegex in the addPasteRules function, addressing issue #1922.
+
+LANGUAGE: markdown
+CODE:
+- Use pasteRegex in addPasteRules ([#1922](https://github.com/ueberdosis/tiptap/issues/1922)) ([047ef8c](https://github.com/ueberdosis/tiptap/commit/047ef8c8c9d9a88a763a8a09424844b1c0912562))
+
+----------------------------------------
+
+TITLE: Table CSS min-width Fix
+DESCRIPTION: Fix for setting the correct min-width for tables, addressing issue #5217.
+
+LANGUAGE: markdown
+CODE:
+- c7f5550: Set correct `min-width` for a table fixes #5217
+
+----------------------------------------
+
+TITLE: JSDoc Addition in v2.4.0
+DESCRIPTION: Added JSDoc documentation to the package, improving code documentation and developer experience.
+
+LANGUAGE: markdown
+CODE:
+- added jsdocs ([#4356](https://github.com/ueberdosis/tiptap/issues/4356)) ([b941eea](https://github.com/ueberdosis/tiptap/commit/b941eea6daba09d48a5d18ccc1b9a1d84b2249dd))
+
+----------------------------------------
+
+TITLE: Exporting TextAlign Extension Options
+DESCRIPTION: Fix to properly export text align extension options for external use.
+
+LANGUAGE: JavaScript
+CODE:
+export text align extension options
+
+----------------------------------------
+
+TITLE: Feature Addition of DeleteNode Method to Node Views
+DESCRIPTION: Code reference showing the addition of 'deleteNode' method to node views in version 2.0.0-beta.31, implemented in commit fcee5f8.
+
+LANGUAGE: markdown
+CODE:
+- add deleteNode method to node views ([fcee5f8](https://github.com/ueberdosis/tiptap/commit/fcee5f82c6a282191afe5c2cb83b9f5820af28dd))
+
+----------------------------------------
+
+TITLE: Bug fix for checkbox in Firefox
+DESCRIPTION: Fixes a checkbox rendering issue in Firefox (issue #251).
+
+LANGUAGE: markdown
+CODE:
+### Bug Fixes
+
+- fix checkbox in firefox, fix [#251](https://github.com/ueberdosis/tiptap/issues/251) ([5622dec](https://github.com/ueberdosis/tiptap/commit/5622deca30397170bae341a000b9fe4693280c9b))
+
+----------------------------------------
+
+TITLE: Removing Magic Strings Bug Fix
+DESCRIPTION: Commit showing the removal of magic strings from the code to improve maintainability.
+
+LANGUAGE: markdown
+CODE:
+### Bug Fixes
+
+- remove some magic strings ([6c34dec](https://github.com/ueberdosis/tiptap/commit/6c34dec33ac39c9f037a0a72e4525f3fc6d422bf))
+
+----------------------------------------
+
+TITLE: Adding Editor Container Props to EditorProvider
+DESCRIPTION: This patch adds the ability to specify HTML attributes for the EditorContent when using EditorProvider through the editorContainerProps property.
+
+LANGUAGE: markdown
+CODE:
+26056aa: Add editorContainerProps to EditorProvider. This allows for any HTML attributes to be added to the EditorContent when using EditorProvider
+
+----------------------------------------
+
+TITLE: Bug Fix: Add Exports to Package.json in Table Row Extension
+DESCRIPTION: A Git commit that adds exports to the package.json file. This change was part of version 2.0.0-beta.9.
+
+LANGUAGE: markdown
+CODE:
+- add exports to package.json ([1277fa4](https://github.com/ueberdosis/tiptap/commit/1277fa47151e9c039508cdb219bdd0ffe647f4ee))
+
+----------------------------------------
+
+TITLE: Bug Fix: Revert Adding Type Module in Table Row Extension
+DESCRIPTION: A Git commit that reverts the addition of type: module to the package. This change was part of version 2.0.0-beta.10.
+
+LANGUAGE: markdown
+CODE:
+- revert adding type: module ([f8d6475](https://github.com/ueberdosis/tiptap/commit/f8d6475e2151faea6f96baecdd6bd75880d50d2c))
+
+----------------------------------------
+
+TITLE: Fixing lowlight decorations for Vue 3
+DESCRIPTION: A bug fix that resolves issues with lowlight decorations when used with Vue 3.
+
+LANGUAGE: JavaScript
+CODE:
+fix lowlight decorations for vue 3
+
+----------------------------------------
+
+TITLE: Bug Fix: Revert Adding Exports in Table Row Extension
+DESCRIPTION: A Git commit that reverts the addition of exports to the package. This change was part of version 2.0.0-beta.11.
+
+LANGUAGE: markdown
+CODE:
+- revert adding exports ([bc320d0](https://github.com/ueberdosis/tiptap/commit/bc320d0b4b80b0e37a7e47a56e0f6daec6e65d98))
+
+----------------------------------------
+
+TITLE: Bug fix for HTMLAttributes in task item node view
+DESCRIPTION: Adds HTMLAttributes to the task item node view for proper HTML rendering.
+
+LANGUAGE: markdown
+CODE:
+### Bug Fixes
+
+- add HTMLAttributes to task item node view ([81d8097](https://github.com/ueberdosis/tiptap/commit/81d809795908e28b1a96ccad33147b711910b27a))
+
+----------------------------------------
+
+TITLE: Bug Fix for Editor Fast Destruction
+DESCRIPTION: Code reference showing a bug fix in version 2.0.0-beta.34 to prevent issues when the editor is destroyed very quickly, fixed in commit 939fc3d.
+
+LANGUAGE: markdown
+CODE:
+- prevent bug when editor is destroyed very fast ([939fc3d](https://github.com/ueberdosis/tiptap/commit/939fc3d93ab67d54b7fe67b64c423290b3a40df8))
+
+----------------------------------------
+
+TITLE: Removing Magic Strings from Codebase
+DESCRIPTION: A bug fix commit that removes magic strings from the codebase to improve maintainability and readability.
+
+LANGUAGE: markdown
+CODE:
+- remove some magic strings ([6c34dec](https://github.com/ueberdosis/tiptap/commit/6c34dec33ac39c9f037a0a72e4525f3fc6d422bf))
+
+----------------------------------------
+
+TITLE: Package Bundling Improvement in v2.8.0
+DESCRIPTION: This minor change improved the bundling process by excluding tiptap dependency type definitions from the package bundle.
+
+LANGUAGE: markdown
+CODE:
+- 6834a7f: Bundling of packages no longer includes tiptap dependency type definitions
+
+----------------------------------------
+
+TITLE: Feature Addition of TippyOptions Prop
+DESCRIPTION: Code reference showing the addition of 'tippyOptions' prop in version 2.0.0-beta.18, implemented in commit 9a56f66.
+
+LANGUAGE: markdown
+CODE:
+- add tippyOptions prop ([9a56f66](https://github.com/ueberdosis/tiptap/commit/9a56f666a118ca7c59a6f1f67f40e6490e20d3b8))
+
+----------------------------------------
+
+TITLE: Bug fix for preventing checkbox changes in non-editable mode
+DESCRIPTION: Prevents checkbox state changes when the editor is not editable (issue #1386).
+
+LANGUAGE: markdown
+CODE:
+### Bug Fixes
+
+- prevent checkbox change when editor isn't editable, fix [#1386](https://github.com/ueberdosis/tiptap/issues/1386) ([c58a753](https://github.com/ueberdosis/tiptap/commit/c58a753e9442c1766050a1a4733e56d553d2e8c5))
+
+----------------------------------------
+
+TITLE: Adding Exports to Package.json in Tiptap Paragraph Extension
+DESCRIPTION: A modification to the package.json file that adds exports configuration, improving module resolution and compatibility with different import systems.
+
+LANGUAGE: markdown
+CODE:
+### Bug Fixes
+
+- add exports to package.json ([1277fa4](https://github.com/ueberdosis/tiptap/commit/1277fa47151e9c039508cdb219bdd0ffe647f4ee))
+
+----------------------------------------
+
+TITLE: Renaming ESM Modules for Better Compatibility
+DESCRIPTION: A bug fix that renames ESM modules to include .js extension for better compatibility and module resolution.
+
+LANGUAGE: markdown
+CODE:
+### Bug Fixes
+
+- **core:** rename esm modules to esm.js ([c1a0c3a](https://github.com/ueberdosis/tiptap/commit/c1a0c3ae43baac9dd5ed90903d3a0d4eaeea7702))
+
+----------------------------------------
+
+TITLE: Reverting Exports Addition in tiptap Table Cell Extension
+DESCRIPTION: A code change that reverts a previous addition of exports in the package configuration.
+
+LANGUAGE: markdown
+CODE:
+- revert adding exports ([bc320d0](https://github.com/ueberdosis/tiptap/commit/bc320d0b4b80b0e37a7e47a56e0f6daec6e65d98))
+
+----------------------------------------
+
+TITLE: Reverting Export Addition
+DESCRIPTION: Commit that reverts the addition of exports, likely to address compatibility issues.
+
+LANGUAGE: markdown
+CODE:
+### Bug Fixes
+
+- revert adding exports ([bc320d0](https://github.com/ueberdosis/tiptap/commit/bc320d0b4b80b0e37a7e47a56e0f6daec6e65d98))
+
+----------------------------------------
+
+TITLE: Bug Fix for Font Family Type Export
+DESCRIPTION: Export type FontFamilyOptions to fix issue #2345, ensuring proper TypeScript support for the extension configuration options.
+
+LANGUAGE: markdown
+CODE:
+### Bug Fixes
+
+- Export type FontFamilyOptions ([#2345](https://github.com/ueberdosis/tiptap/issues/2345)) ([909d444](https://github.com/ueberdosis/tiptap/commit/909d44459ce3751f10fcd332fee677da2708c115))
+
+----------------------------------------
+
+TITLE: CJS Bundling Fix in Version 2.5.4
+DESCRIPTION: Documents a fix for an issue with CommonJS bundling of packages and default exports, providing a more legacy-compatible resolution approach.
+
+LANGUAGE: markdown
+CODE:
+- dd7f9ac: There was an issue with the cjs bundling of packages and default exports, now we resolve default exports in legacy compatible way
+
+----------------------------------------
+
+TITLE: Dependency Updates in Version 2.7.0-pre.0
+DESCRIPTION: Lists updated dependencies with their respective commit hashes for the pre-release version 2.7.0-pre.0.
+
+LANGUAGE: markdown
+CODE:
+- Updated dependencies [97ea55f]
+- Updated dependencies [bd34793]
+- Updated dependencies [9e18d24]
+- Updated dependencies [f805333]
+- Updated dependencies [07fa49d]
+- Updated dependencies [7f24a66]
+- Updated dependencies [97ea55f]
+- Updated dependencies [a22767e]
+  - @tiptap/core@2.7.0-pre.0
+  - @tiptap/pm@2.7.0-pre.0
+
+----------------------------------------
+
+TITLE: Improvement of Types for Vue 2
+DESCRIPTION: Code reference showing the improvement of TypeScript types for Vue 2 in version 2.0.0-beta.22, implemented in commit 23a152a.
+
+LANGUAGE: markdown
+CODE:
+- better types for Vue 2 ([23a152a](https://github.com/ueberdosis/tiptap/commit/23a152a8dfe35964d8ee39d1c6877550cdc4ce6a))
+
+----------------------------------------
+
+TITLE: Feature addition for task item prefixes
+DESCRIPTION: Allows [] as a prefix for task items in the extension.
+
+LANGUAGE: markdown
+CODE:
+### Bug Fixes
+
+- allow [] as a prefix for task items ([06fd7fb](https://github.com/ueberdosis/tiptap/commit/06fd7fb4299195646200836dd8158238279c3a7a))
+
+----------------------------------------
+
+TITLE: Reverting Module Type Addition
+DESCRIPTION: Commit that reverts adding type:module to package configuration.
+
+LANGUAGE: markdown
+CODE:
+### Bug Fixes
+
+- revert adding type: module ([f8d6475](https://github.com/ueberdosis/tiptap/commit/f8d6475e2151faea6f96baecdd6bd75880d50d2c))
+
+----------------------------------------
+
+TITLE: CJS Bundling Fix in v2.5.4
+DESCRIPTION: This patch fixed an issue with CommonJS bundling of packages and default exports, resolving default exports in a legacy-compatible way.
+
+LANGUAGE: markdown
+CODE:
+- dd7f9ac: There was an issue with the cjs bundling of packages and default exports, now we resolve default exports in legacy compatible way
+
+----------------------------------------
+
+TITLE: Fixing Peer Dependencies in Tiptap Focus Extension
+DESCRIPTION: Bug fix in version 2.1.0-rc.0 that updates peer dependencies to resolve issues with Lerna version tasks.
+
+LANGUAGE: markdown
+CODE:
+### Bug Fixes
+
+- Update peerDependencies to fix lerna version tasks ([#3914](https://github.com/ueberdosis/tiptap/issues/3914)) ([0c1bba3](https://github.com/ueberdosis/tiptap/commit/0c1bba3137b535776bcef95ff3c55e13f5a2db46))
+
+----------------------------------------
+
+TITLE: Patch Changes in v2.5.9
+DESCRIPTION: A changelog entry for version 2.5.9 that fixes syncing problems in y-prosemirror and improves the extension collaboration's respect for the onFirstRender option.
+
+LANGUAGE: markdown
+CODE:
+### Patch Changes
+
+- 174aefe: This updates y-prosemirror to a version that no longer has syncing problems and extension collaboration now respects the onFirstRender option
+- Updated dependencies [84ebd51]
+- Updated dependencies [0ec0af6]
+- Updated dependencies [ae0254d]
+- Updated dependencies [efb27fa]
+  - @tiptap/core@2.5.9
+
+----------------------------------------
+
+TITLE: Bug Fix for Empty Text Check in Tiptap Placeholder Extension
+DESCRIPTION: Fix for issue #1292 that implements a check for empty text in the placeholder extension.
+
+LANGUAGE: markdown
+CODE:
+- check for empty text, fix [#1292](https://github.com/ueberdosis/tiptap/issues/1292) ([456f2b7](https://github.com/ueberdosis/tiptap/commit/456f2b702b146cc3f4a156a71cba8354990c02e0))
+
+----------------------------------------
+
+TITLE: Bug Fix for Updating Node Views
+DESCRIPTION: Code reference showing a bug fix in version 2.0.0-beta.42 for updating node views, resolved in commit d7f6e0c, addressing issue #1656.
+
+LANGUAGE: markdown
+CODE:
+- fix updating node views, fix [#1656](https://github.com/ueberdosis/tiptap/issues/1656) ([d7f6e0c](https://github.com/ueberdosis/tiptap/commit/d7f6e0ce3f99381d3822cde5ab1c484ed13a4c20))
+
+----------------------------------------
+
+TITLE: Adding Exports to Package.json
+DESCRIPTION: A bug fix that adds exports field to the package.json file.
+
+LANGUAGE: markdown
+CODE:
+### Bug Fixes
+
+- add exports to package.json ([1277fa4](https://github.com/ueberdosis/tiptap/commit/1277fa47151e9c039508cdb219bdd0ffe647f4ee))
+
+----------------------------------------
+
+TITLE: Fixing StarterKit Export in TipTap
+DESCRIPTION: This code snippet shows a bug fix commit that improves the export for StarterKitOptions. The commit is referenced in the changelog for version 2.0.0-beta.90.
+
+LANGUAGE: markdown
+CODE:
+### Bug Fixes
+
+- improve export for StarterKitOptions ([8fcc80d](https://github.com/ueberdosis/tiptap/commit/8fcc80d68ec9471523ec0a8108035afef4d0f9f3))
+
+----------------------------------------
+
+TITLE: Adding JSDoc Documentation
+DESCRIPTION: Feature enhancement adding JSDoc documentation to the codebase for better developer experience.
+
+LANGUAGE: markdown
+CODE:
+- added jsdocs ([#4356](https://github.com/ueberdosis/tiptap/issues/4356)) ([b941eea](https://github.com/ueberdosis/tiptap/commit/b941eea6daba09d48a5d18ccc1b9a1d84b2249dd))
+
+----------------------------------------
+
+TITLE: Adding Package.json Exports for Collaboration Extension
+DESCRIPTION: A bugfix that adds exports to the package.json file, improving module compatibility and import capabilities for the collaboration extension.
+
+LANGUAGE: markdown
+CODE:
+### Bug Fixes
+
+- add exports to package.json ([1277fa4](https://github.com/ueberdosis/tiptap/commit/1277fa47151e9c039508cdb219bdd0ffe647f4ee))
+
+----------------------------------------
+
+TITLE: Adding parseHTML Function for Attribute Handling in tiptap Table Cell Extension
+DESCRIPTION: A code change that modifies the parseHTML function to return the value directly instead of an object, resolving issue #1863.
+
+LANGUAGE: markdown
+CODE:
+- parseHTML for attributes should return the value instead of an object now, fix [#1863](https://github.com/ueberdosis/tiptap/issues/1863) ([8a3b47a](https://github.com/ueberdosis/tiptap/commit/8a3b47a529d28b28b50d634c6ff69b8e5aad3080))
+
+----------------------------------------
+
+TITLE: Line Break Rendering in Plain Text Format
+DESCRIPTION: A bug fix from version 2.0.0-beta.16 that renders line breaks in text/plain format for hard breaks, addressing issue #1842.
+
+LANGUAGE: markdown
+CODE:
+### Bug Fixes
+
+- render line break in text/plain format for hard breaks, fix [#1842](https://github.com/ueberdosis/tiptap/issues/1842) ([787d784](https://github.com/ueberdosis/tiptap/commit/787d7848cdca3f198e727a4a35d83793e8ff9e11))
+
+----------------------------------------
+
+TITLE: Fixing Peer Dependencies in Tiptap Extension Mention
+DESCRIPTION: Bug fix for updating peer dependencies to resolve issues with lerna version tasks in the tiptap extension-mention package.
+
+LANGUAGE: markdown
+CODE:
+### Bug Fixes
+
+- Update peerDependencies to fix lerna version tasks ([#3914](https://github.com/ueberdosis/tiptap/issues/3914)) ([0c1bba3](https://github.com/ueberdosis/tiptap/commit/0c1bba3137b535776bcef95ff3c55e13f5a2db46))
+
+----------------------------------------
+
+TITLE: Adding Exports to Package.json in Tiptap Placeholder Extension
+DESCRIPTION: A fix that adds exports configuration to the package.json file to support modern module import systems.
+
+LANGUAGE: markdown
+CODE:
+- add exports to package.json ([1277fa4](https://github.com/ueberdosis/tiptap/commit/1277fa47151e9c039508cdb219bdd0ffe647f4ee))
+
+----------------------------------------
+
+TITLE: Removing Magic Strings in TipTap Paragraph Extension
+DESCRIPTION: Bug fix commit that removes magic strings from the paragraph extension codebase for improved maintainability.
+
+LANGUAGE: markdown
+CODE:
+### Bug Fixes
+
+- remove some magic strings ([6c34dec](https://github.com/ueberdosis/tiptap/commit/6c34dec33ac39c9f037a0a72e4525f3fc6d422bf))
+
+----------------------------------------
+
+TITLE: Reverting Module Type Addition
+DESCRIPTION: A bug fix that reverts a previous change that added the type: module property.
+
+LANGUAGE: markdown
+CODE:
+### Bug Fixes
+
+- revert adding type: module ([f8d6475](https://github.com/ueberdosis/tiptap/commit/f8d6475e2151faea6f96baecdd6bd75880d50d2c))
+
+----------------------------------------
+
+TITLE: Bundling Change for Type Definitions
+DESCRIPTION: Changes how packages are bundled in version 2.8.0, specifically excluding tiptap dependency type definitions from the bundling process.
+
+LANGUAGE: markdown
+CODE:
+- 6834a7f: Bundling of packages no longer includes tiptap dependency type definitions
+
+----------------------------------------
+
+TITLE: Fixing Vue Dependency
+DESCRIPTION: A bug fix that addresses an issue with the Vue dependency in the package.
+
+LANGUAGE: markdown
+CODE:
+### Bug Fixes
+
+- fix vue dependency ([73650c1](https://github.com/ueberdosis/tiptap/commit/73650c12e0cc7be13705775a02c031e5e36ee4d1))
+
+----------------------------------------
+
+TITLE: Bug Fix for Package.json Exports in TipTap
+DESCRIPTION: Bug fix commit that adds exports to package.json for the TipTap starter kit, improving module compatibility and import functionality.
+
+LANGUAGE: markdown
+CODE:
+### Bug Fixes
+
+- add exports to package.json ([1277fa4](https://github.com/ueberdosis/tiptap/commit/1277fa47151e9c039508cdb219bdd0ffe647f4ee))
+
+----------------------------------------
+
+TITLE: Feature Update for parseHTML Attributes
+DESCRIPTION: Modifies the parseHTML behavior for attributes to return the value directly rather than an object, addressing issue #1863 for better HTML parsing functionality.
+
+LANGUAGE: markdown
+CODE:
+### Features
+
+- parseHTML for attributes should return the value instead of an object now, fix [#1863](https://github.com/ueberdosis/tiptap/issues/1863) ([8a3b47a](https://github.com/ueberdosis/tiptap/commit/8a3b47a529d28b28b50d634c6ff69b8e5aad3080))
+
+----------------------------------------
+
+TITLE: Adding DeleteNode Method to Node Views
+DESCRIPTION: A commit that adds a deleteNode method to node views in the TipTap Vue 3 integration.
+
+LANGUAGE: markdown
+CODE:
+### Features
+
+- add deleteNode method to node views ([fcee5f8](https://github.com/ueberdosis/tiptap/commit/fcee5f82c6a282191afe5c2cb83b9f5820af28dd))
+
+----------------------------------------
+
+TITLE: Patch Changes in v2.5.4
+DESCRIPTION: A changelog entry for version 2.5.4 that fixes an issue with the CommonJS bundling of packages and default exports.
+
+LANGUAGE: markdown
+CODE:
+### Patch Changes
+
+- dd7f9ac: There was an issue with the cjs bundling of packages and default exports, now we resolve default exports in legacy compatible way
+- Updated dependencies [dd7f9ac]
+  - @tiptap/core@2.5.4
+
+----------------------------------------
+
+TITLE: Bug Fix for Exports in Package.json
+DESCRIPTION: Commit that adds exports to the package.json file for the list-item extension, likely to improve module compatibility.
+
+LANGUAGE: markdown
+CODE:
+- add exports to package.json ([1277fa4](https://github.com/ueberdosis/tiptap/commit/1277fa47151e9c039508cdb219bdd0ffe647f4ee))
+
+----------------------------------------
+
+TITLE: Fixing peerDependencies for Lerna Version Tasks
+DESCRIPTION: A bug fix commit that updates peerDependencies to fix Lerna version tasks, referenced in issue #3914.
+
+LANGUAGE: markdown
+CODE:
+### Bug Fixes
+
+- Update peerDependencies to fix lerna version tasks ([#3914](https://github.com/ueberdosis/tiptap/issues/3914)) ([0c1bba3](https://github.com/ueberdosis/tiptap/commit/0c1bba3137b535776bcef95ff3c55e13f5a2db46))
+
+----------------------------------------
+
+TITLE: Bug Fix to Revert Type Module Addition
+DESCRIPTION: Commit that reverts the addition of 'type: module' to the package configuration, likely to address compatibility issues.
+
+LANGUAGE: markdown
+CODE:
+- revert adding type: module ([f8d6475](https://github.com/ueberdosis/tiptap/commit/f8d6475e2151faea6f96baecdd6bd75880d50d2c))
+
+----------------------------------------
+
+TITLE: Adding Exports to Package.json
+DESCRIPTION: Commit that adds exports field to package.json to support modern ES module resolution.
+
+LANGUAGE: markdown
+CODE:
+### Bug Fixes
+
+- add exports to package.json ([1277fa4](https://github.com/ueberdosis/tiptap/commit/1277fa47151e9c039508cdb219bdd0ffe647f4ee))
+
+----------------------------------------
+
+TITLE: Adding Extension Storage Feature to TipTap
+DESCRIPTION: A commit that adds extension storage functionality to TipTap, referenced as issue #2069.
+
+LANGUAGE: markdown
+CODE:
+### Features
+
+- Add extension storage ([#2069](https://github.com/ueberdosis/tiptap/issues/2069)) ([7ffabf2](https://github.com/ueberdosis/tiptap/commit/7ffabf251c408a652eec1931cc78a8bd43cccb67))
+
+----------------------------------------
+
+TITLE: CommonJS Bundle Fix for Default Exports
+DESCRIPTION: Bugfix addressing an issue with CommonJS bundling and default exports, resolving them in a legacy compatible way.
+
+LANGUAGE: markdown
+CODE:
+- dd7f9ac: There was an issue with the cjs bundling of packages and default exports, now we resolve default exports in legacy compatible way
+
+----------------------------------------
+
+TITLE: Adding Tippy Options and Removing keepInBounds
+DESCRIPTION: Feature addition that introduces a tippyOptions prop and removes the keepInBounds property.
+
+LANGUAGE: markdown
+CODE:
+### Features
+
+- add tippyOptions prop ([9a56f66](https://github.com/ueberdosis/tiptap/commit/9a56f666a118ca7c59a6f1f67f40e6490e20d3b8))
+- remove keepInBounds ([d7282f1](https://github.com/ueberdosis/tiptap/commit/d7282f168bc6cfae4e1630d14bb8462bc135b254))
+
+----------------------------------------
+
+TITLE: Fixing CJS Bundling Issues with Default Exports
+DESCRIPTION: Version 2.5.4 addresses an issue with CommonJS bundling of packages and default exports, implementing a legacy-compatible resolution approach for default exports.
+
+LANGUAGE: markdown
+CODE:
+- dd7f9ac: There was an issue with the cjs bundling of packages and default exports, now we resolve default exports in legacy compatible way
+
+----------------------------------------
+
+TITLE: Renaming ESM Modules in Tiptap Core
+DESCRIPTION: Bug fix for renaming ESM modules to have the .esm.js extension for better module identification and compatibility.
+
+LANGUAGE: markdown
+CODE:
+### Bug Fixes
+
+- **core:** rename esm modules to esm.js ([c1a0c3a](https://github.com/ueberdosis/tiptap/commit/c1a0c3ae43baac9dd5ed90903d3a0d4eaeea7702))
+
+----------------------------------------
+
+TITLE: Reverting Type Module Addition in TipTap
+DESCRIPTION: Bug fix commit that reverts the addition of 'type: module' in the package configuration, likely to maintain compatibility with various module systems.
+
+LANGUAGE: markdown
+CODE:
+### Bug Fixes
+
+- revert adding type: module ([f8d6475](https://github.com/ueberdosis/tiptap/commit/f8d6475e2151faea6f96baecdd6bd75880d50d2c))
+
+----------------------------------------
+
+TITLE: Revert: Global Namespace Change in Tiptap Collaboration Cursor
+DESCRIPTION: A revert of a previous change that attempted to use global namespace in the collaboration cursor extension.
+
+LANGUAGE: markdown
+CODE:
+- Revert "use global namespace" ([0c9ce26](https://github.com/ueberdosis/tiptap/commit/0c9ce26c02c07d88a757c01b0a9d7f9e2b0b7502))
+
+----------------------------------------
+
+TITLE: Fixing Editor Type for VueRenderer
+DESCRIPTION: A bug fix that addresses the editor type issue for VueRenderer, resolving GitHub issue #281.
+
+LANGUAGE: markdown
+CODE:
+### Bug Fixes
+
+- fix editor type for VueRenderer, fix [#281](https://github.com/ueberdosis/tiptap/issues/281) ([f6d8776](https://github.com/ueberdosis/tiptap/commit/f6d8776ca086bf1f2edc6dc099e33a1f00fdd4c7))
+
+----------------------------------------
+
+TITLE: Package.json Exports Configuration
+DESCRIPTION: Adds exports field to package.json for better module resolution in modern JavaScript environments, improving compatibility with bundlers.
+
+LANGUAGE: markdown
+CODE:
+### Bug Fixes
+
+- add exports to package.json ([1277fa4](https://github.com/ueberdosis/tiptap/commit/1277fa47151e9c039508cdb219bdd0ffe647f4ee))
+
+----------------------------------------
+
+TITLE: Package.json Exports Addition
+DESCRIPTION: A bug fix from version 2.0.0-beta.9 that adds exports to package.json to improve module compatibility.
+
+LANGUAGE: markdown
+CODE:
+### Bug Fixes
+
+- add exports to package.json ([1277fa4](https://github.com/ueberdosis/tiptap/commit/1277fa47151e9c039508cdb219bdd0ffe647f4ee))
+
+----------------------------------------
+
+TITLE: Bug Fix for Magic Strings in tiptap list-item Extension
+DESCRIPTION: Commit that removes some magic strings from the codebase, improving maintainability. This change is referenced in the changelog with a commit hash.
+
+LANGUAGE: markdown
+CODE:
+- remove some magic strings ([6c34dec](https://github.com/ueberdosis/tiptap/commit/6c34dec33ac39c9f037a0a72e4525f3fc6d422bf))
+
+----------------------------------------
+
+TITLE: Adding Back Deprecated considerAsAny Type
+DESCRIPTION: Version 2.5.9 adds back the considerAsAny type but marks it as deprecated, maintaining backward compatibility while encouraging migration to newer API patterns.
+
+LANGUAGE: markdown
+CODE:
+- c1ff1b0: add back `considerAsAny` type but mark it deprecated
+
+----------------------------------------
+
+TITLE: Preventing Hard Breaks in Isolated Nodes Fix
+DESCRIPTION: A bug fix from version 2.0.0-beta.27 that prevents adding hard breaks in isolated nodes.
+
+LANGUAGE: markdown
+CODE:
+### Bug Fixes
+
+- prevent adding hard breaks in isolated nodes ([9247fcb](https://github.com/ueberdosis/tiptap/commit/9247fcb6cf20493d021664ddce95ad1c23c5a152))
+
+----------------------------------------
+
+TITLE: Bug Fix for Subscript Extension in tiptap
+DESCRIPTION: This commit reverts a change that excluded superscript from subscript to prevent errors when both extensions aren't used together.
+
+LANGUAGE: Markdown
+CODE:
+revert excluding superscript from subscript, and vice versa to prevent error if not both extensions are used ([123f206](https://github.com/ueberdosis/tiptap/commit/123f2067e5ccc15f1fceee164e8bc461193cf8a0))
+
+----------------------------------------
+
+TITLE: Bundling Change for Type Definitions
+DESCRIPTION: Minor change that excludes tiptap dependency type definitions from the bundled packages.
+
+LANGUAGE: markdown
+CODE:
+- 6834a7f: Bundling of packages no longer includes tiptap dependency type definitions
+
+----------------------------------------
+
+TITLE: Setting Improved parseHTML Method for TextAlign Extension
+DESCRIPTION: Change in the parseHTML method for attributes to return the value directly instead of an object, fixing issue #1863.
+
+LANGUAGE: JavaScript
+CODE:
+parseHTML for attributes should return the value instead of an object now, fix #1863
+
+----------------------------------------
+
+TITLE: Revert of Global Namespace
+DESCRIPTION: Commit that reverts the implementation of a global namespace, reverting back to an earlier implementation approach.
+
+LANGUAGE: markdown
+CODE:
+- Revert "use global namespace" ([0c9ce26](https://github.com/ueberdosis/tiptap/commit/0c9ce26c02c07d88a757c01b0a9d7f9e2b0b7502))
+
+----------------------------------------
+
+TITLE: Reverting Exports Addition
+DESCRIPTION: A bug fix that reverts a previous change that added exports to the package.
+
+LANGUAGE: markdown
+CODE:
+### Bug Fixes
+
+- revert adding exports ([bc320d0](https://github.com/ueberdosis/tiptap/commit/bc320d0b4b80b0e37a7e47a56e0f6daec6e65d98))
+
+----------------------------------------
+
+TITLE: Patch Changes in v2.7.0-pre.0
+DESCRIPTION: A changelog entry listing dependency updates for the pre-release version 2.7.0-pre.0.
+
+LANGUAGE: markdown
+CODE:
+### Patch Changes
+
+- Updated dependencies [97ea55f]
+- Updated dependencies [9e18d24]
+- Updated dependencies [f805333]
+- Updated dependencies [07fa49d]
+- Updated dependencies [7f24a66]
+- Updated dependencies [97ea55f]
+- Updated dependencies [a22767e]
+  - @tiptap/core@2.7.0-pre.0
+
+----------------------------------------
+
+TITLE: Prosemirror Package Addition for Dependency Management
+DESCRIPTION: Feature addition for creating a new prosemirror package to improve dependency resolution in the tiptap ecosystem.
+
+LANGUAGE: markdown
+CODE:
+### Features
+
+- **pm:** new prosemirror package for dependency resolving ([f387ad3](https://github.com/ueberdosis/tiptap/commit/f387ad3dd4c2b30eaea33fb0ba0b42e0cd39263b))
+
+----------------------------------------
+
+TITLE: Fixing Exports Configuration in tiptap Table Cell Extension
+DESCRIPTION: A code change that adds exports to the package.json file to improve module compatibility.
+
+LANGUAGE: markdown
+CODE:
+- add exports to package.json ([1277fa4](https://github.com/ueberdosis/tiptap/commit/1277fa47151e9c039508cdb219bdd0ffe647f4ee))
+
+----------------------------------------
+
+TITLE: Fixing Prosemirror Build Inclusions
+DESCRIPTION: Bug fix addressing issues with builds that include prosemirror dependencies in the tiptap ecosystem.
+
+LANGUAGE: markdown
+CODE:
+### Bug Fixes
+
+- fix builds including prosemirror ([a380ec4](https://github.com/ueberdosis/tiptap/commit/a380ec41d198ebacc80cea9e79b0a8aa3092618a))
+
+----------------------------------------
+
+TITLE: Updating PeerDependencies in TipTap Paragraph Extension
+DESCRIPTION: Bug fix commit that updates peerDependencies to fix lerna version tasks in TipTap extension-paragraph package.
+
+LANGUAGE: markdown
+CODE:
+- Update peerDependencies to fix lerna version tasks ([#3914](https://github.com/ueberdosis/tiptap/issues/3914)) ([0c1bba3](https://github.com/ueberdosis/tiptap/commit/0c1bba3137b535776bcef95ff3c55e13f5a2db46))
+
+----------------------------------------
+
+TITLE: Minor Changes in v2.8.0
+DESCRIPTION: A changelog entry documenting that bundling of packages no longer includes tiptap dependency type definitions in version 2.8.0.
+
+LANGUAGE: markdown
+CODE:
+### Minor Changes
+
+- 6834a7f: Bundling of packages no longer includes tiptap dependency type definitions
+
+----------------------------------------
+
+TITLE: Creating New ProseMirror Package in TipTap
+DESCRIPTION: Feature commit that introduces a new ProseMirror package for dependency resolving in the TipTap ecosystem.
+
+LANGUAGE: markdown
+CODE:
+### Features
+
+- **pm:** new prosemirror package for dependency resolving ([f387ad3](https://github.com/ueberdosis/tiptap/commit/f387ad3dd4c2b30eaea33fb0ba0b42e0cd39263b))
+
+----------------------------------------
+
+TITLE: Renaming ESM Modules in TipTap Core
+DESCRIPTION: Bug fix commit that renames ESM modules to use .esm.js extension in the TipTap core package.
+
+LANGUAGE: markdown
+CODE:
+### Bug Fixes
+
+- **core:** rename esm modules to esm.js ([c1a0c3a](https://github.com/ueberdosis/tiptap/commit/c1a0c3ae43baac9dd5ed90903d3a0d4eaeea7702))
+
+----------------------------------------
+
+TITLE: ESM Module Renaming in Tiptap Core
+DESCRIPTION: Bug fix that renames ESM modules to include the .js extension for better compatibility and module resolution.
+
+LANGUAGE: markdown
+CODE:
+- **core:** rename esm modules to esm.js ([c1a0c3a](https://github.com/ueberdosis/tiptap/commit/c1a0c3ae43baac9dd5ed90903d3a0d4eaeea7702))
+
+----------------------------------------
+
+TITLE: Fixing Builds Including ProseMirror in TipTap
+DESCRIPTION: Bug fix commit that addresses build issues related to ProseMirror integration in TipTap.
+
+LANGUAGE: markdown
+CODE:
+### Bug Fixes
+
+- fix builds including prosemirror ([a380ec4](https://github.com/ueberdosis/tiptap/commit/a380ec41d198ebacc80cea9e79b0a8aa3092618a))
+
+----------------------------------------
+
+TITLE: Update to PeerDependencies in Tiptap Extension
+DESCRIPTION: Bug fix commit that updates peerDependencies to resolve issues with lerna version tasks in the Tiptap project.
+
+LANGUAGE: markdown
+CODE:
+- Update peerDependencies to fix lerna version tasks ([#3914](https://github.com/ueberdosis/tiptap/issues/3914)) ([0c1bba3](https://github.com/ueberdosis/tiptap/commit/0c1bba3137b535776bcef95ff3c55e13f5a2db46))
+
+----------------------------------------
+
+TITLE: Reverting Module Type Configuration in tiptap Table Cell Extension
+DESCRIPTION: A code change that reverts the addition of 'type: module' in the package configuration.
+
+LANGUAGE: markdown
+CODE:
+- revert adding type: module ([f8d6475](https://github.com/ueberdosis/tiptap/commit/f8d6475e2151faea6f96baecdd6bd75880d50d2c))
+
+----------------------------------------
+
+TITLE: Prosemirror Package Addition for Dependency Resolution
+DESCRIPTION: Feature commit introducing a new prosemirror package to improve dependency resolution in the Tiptap editor framework.
+
+LANGUAGE: markdown
+CODE:
+- **pm:** new prosemirror package for dependency resolving ([f387ad3](https://github.com/ueberdosis/tiptap/commit/f387ad3dd4c2b30eaea33fb0ba0b42e0cd39263b))
+
+----------------------------------------
+
+TITLE: Fix for Builds Including Prosemirror
+DESCRIPTION: Bug fix addressing build issues related to Prosemirror integration in the Tiptap framework.
+
+LANGUAGE: markdown
+CODE:
+- fix builds including prosemirror ([a380ec4](https://github.com/ueberdosis/tiptap/commit/a380ec41d198ebacc80cea9e79b0a8aa3092618a))
+
+----------------------------------------
+
+TITLE: Bug Fix for Drag Handles in TipTap Vue 3
+DESCRIPTION: A commit that fixes a bug related to using drag handles in the TipTap Vue 3 integration.
+
+LANGUAGE: markdown
+CODE:
+### Bug Fixes
+
+- fix a bug when using drag handles ([8f8b83a](https://github.com/ueberdosis/tiptap/commit/8f8b83afe47085a86caef00b48ad64c87a64af89))
+
+----------------------------------------
+
+TITLE: Bug Fix: Removing State Usage in KeyboardShortcutCommand
+DESCRIPTION: A bug fix commit that removes the use of state in KeyboardShortcutCommand. This change was part of version 2.0.0-beta.6 release.
+
+LANGUAGE: markdown
+CODE:
+don't use state in KeyboardShortcutCommand anymore ([92ced9f](https://github.com/ueberdosis/tiptap/commit/92ced9f9987d59ac672da65b2a685d296307c6b0))
+
+----------------------------------------
+
+TITLE: Revert: Global Namespace Usage
+DESCRIPTION: A revert of a previous change that had implemented global namespace usage. This revert was part of the initial 1.0.0-alpha.1 release of the package.
+
+LANGUAGE: markdown
+CODE:
+Revert "use global namespace" ([0c9ce26](https://github.com/ueberdosis/tiptap/commit/0c9ce26c02c07d88a757c01b0a9d7f9e2b0b7502))
+
+----------------------------------------
+
+TITLE: Reverting Exports Addition in Tiptap Placeholder Extension
+DESCRIPTION: A bugfix that reverts adding exports configuration that was causing issues in the package.
+
+LANGUAGE: markdown
+CODE:
+- revert adding exports ([bc320d0](https://github.com/ueberdosis/tiptap/commit/bc320d0b4b80b0e37a7e47a56e0f6daec6e65d98))
+
+----------------------------------------
+
+TITLE: Introducing New ProseMirror Package in Tiptap
+DESCRIPTION: This code snippet shows a Git commit that introduces a new prosemirror package (@tiptap/pm) specifically designed for dependency resolving. The feature was added in version 2.0.0-beta.210.
+
+LANGUAGE: markdown
+CODE:
+### Features
+
+- **pm:** new prosemirror package for dependency resolving ([f387ad3](https://github.com/ueberdosis/tiptap/commit/f387ad3dd4c2b30eaea33fb0ba0b42e0cd39263b))
+
+----------------------------------------
+
+TITLE: Preserving Editable Option Across Re-renders
+DESCRIPTION: This patch ensures the editable option is preserved when the editor is re-rendered.
+
+LANGUAGE: markdown
+CODE:
+304eedb: preserve editable option across re-renders #5547
+
+----------------------------------------
+
+TITLE: Bug Fix to Revert Adding Exports
+DESCRIPTION: Commit that reverts previously added exports, possibly due to compatibility issues or unexpected behavior.
+
+LANGUAGE: markdown
+CODE:
+- revert adding exports ([bc320d0](https://github.com/ueberdosis/tiptap/commit/bc320d0b4b80b0e37a7e47a56e0f6daec6e65d98))
+
+----------------------------------------
+
+TITLE: Bundling Improvement for TipTap Dependencies
+DESCRIPTION: This minor change modifies the bundling process to exclude TipTap dependency type definitions.
+
+LANGUAGE: markdown
+CODE:
+6834a7f: Bundling of packages no longer includes tiptap dependency type definitions
+
+----------------------------------------
+
+TITLE: NodeView TypeScript Type Updates
+DESCRIPTION: This patch updates the TypeScript types for NodeViews to better match their actual implementation.
+
+LANGUAGE: markdown
+CODE:
+7f24a66: Update the Typescript types for NodeViews, bringing them inline with there actual implementation
+
+----------------------------------------
+
+TITLE: Bug Fix in Renaming Key to PluginKey for Menus
+DESCRIPTION: Code reference showing a bug fix in version 2.0.0-beta.45 where the 'key' property was renamed to 'pluginKey' for menus, fixed in commit 89d26f7.
+
+LANGUAGE: markdown
+CODE:
+- rename key to pluginKey for menus ([89d26f7](https://github.com/ueberdosis/tiptap/commit/89d26f7cba2a115aa342f0ee621f0b65c840dfb8))
+
+----------------------------------------
+
+TITLE: useEditor React StrictMode Cleanup Fix
+DESCRIPTION: This patch resolves a bug where the useEditor hook might not properly clean up an editor instance when running in React's StrictMode.
+
+LANGUAGE: markdown
+CODE:
+6a0f4f3: Resolves a bug where `useEditor` may not properly cleanup an instance created when in React's StrictMode #5492
+
+----------------------------------------
+
+TITLE: TypeScript null Value Fix
+DESCRIPTION: This patch corrects a bug where null could no longer be used as a valid value due to type changes.
+
+LANGUAGE: markdown
+CODE:
+d4d99e8: When changing the types, a bug was introduced where null could no longer be a valid value
+
+----------------------------------------
+
+TITLE: Removal of KeepInBounds Feature
+DESCRIPTION: Code reference showing the removal of 'keepInBounds' feature in version 2.0.0-beta.18, implemented in commit d7282f1.
+
+LANGUAGE: markdown
+CODE:
+- remove keepInBounds ([d7282f1](https://github.com/ueberdosis/tiptap/commit/d7282f168bc6cfae4e1630d14bb8462bc135b254))
+
+----------------------------------------
+
+TITLE: useEditor Event Handler Duplication Fix
+DESCRIPTION: This patch resolves a bug where event handlers in useEditor were being called twice for what should have been a single registration.
+
+LANGUAGE: markdown
+CODE:
+8ea34e4: This resolves a bug with `useEditor` where event handlers were being called 2x for what should have been a single registration
+
+----------------------------------------
+
+TITLE: Feature Addition of Key and ShouldShow Options to Menus
+DESCRIPTION: Code reference showing the addition of 'key' and 'shouldShow' options to menus in version 2.0.0-beta.43, fixing multiple issues (#1480, #1043, #1268, #1503).
+
+LANGUAGE: markdown
+CODE:
+- add key option and shouldShow option to menus (fix [#1480](https://github.com/ueberdosis/tiptap/issues/1480), fix [#1043](https://github.com/ueberdosis/tiptap/issues/1043), fix [#1268](https://github.com/ueberdosis/tiptap/issues/1268), fix [#1503](https://github.com/ueberdosis/tiptap/issues/1503)) ([9ba61c1](https://github.com/ueberdosis/tiptap/commit/9ba61c1582cee838f2214d00285773ace2fb229e))
+
+----------------------------------------
+
+TITLE: Removal of Magic Strings in Tiptap Extensions
+DESCRIPTION: Bug fix that eliminates magic strings from the codebase to improve code quality and maintainability.
+
+LANGUAGE: markdown
+CODE:
+- remove some magic strings ([6c34dec](https://github.com/ueberdosis/tiptap/commit/6c34dec33ac39c9f037a0a72e4525f3fc6d422bf))
+
+----------------------------------------
+
+TITLE: Fixing Types for BubbleMenu and FloatingMenu Props
+DESCRIPTION: A commit that fixes TypeScript types for BubbleMenu and FloatingMenu props in the Vue 3 integration.
+
+LANGUAGE: markdown
+CODE:
+### Bug Fixes
+
+- fix types for BubbleMenu and FloatingMenu props ([d3242c9](https://github.com/ueberdosis/tiptap/commit/d3242c9a0728ea0d164571a6e1eee20fb528f2d8))
+
+----------------------------------------
+
+TITLE: Bug Fix for Superscript Extension Compatibility with Subscript
+DESCRIPTION: A fix that reverted the exclusion of superscript from subscript (and vice versa) to prevent errors when both extensions aren't used together.
+
+LANGUAGE: markdown
+CODE:
+revert excluding superscript from subscript, and vice versa to prevent error if not both extensions are used ([123f206](https://github.com/ueberdosis/tiptap/commit/123f2067e5ccc15f1fceee164e8bc461193cf8a0))
+
+----------------------------------------
+
+TITLE: Bug Fix for EditorContent Child Nodes
+DESCRIPTION: Code reference showing a bug fix in version 2.0.0-beta.31 to move all child nodes within EditorContent, fixed in commit 0f299d2.
+
+LANGUAGE: markdown
+CODE:
+- move all child nodes within EditorContent ([0f299d2](https://github.com/ueberdosis/tiptap/commit/0f299d228eb4075d24e1c0fb5b39febc6bc77de6))
+
+----------------------------------------
+
+TITLE: Renaming Key Property to PluginKey for Menus
+DESCRIPTION: A commit that renames the 'key' property to 'pluginKey' for menus in the TipTap Vue 3 integration.
+
+LANGUAGE: markdown
+CODE:
+### Bug Fixes
+
+- rename key to pluginKey for menus ([89d26f7](https://github.com/ueberdosis/tiptap/commit/89d26f7cba2a115aa342f0ee621f0b65c840dfb8))
+
+----------------------------------------
+
+TITLE: Bundling Change in Version 2.8.0
+DESCRIPTION: A minor change that modifies how the package is bundled, specifically removing tiptap dependency type definitions from the bundled output.
+
+LANGUAGE: markdown
+CODE:
+- 6834a7f: Bundling of packages no longer includes tiptap dependency type definitions
+
+----------------------------------------
+
+TITLE: Preventing Bug When Editor is Destroyed Quickly
+DESCRIPTION: A commit that prevents a bug that occurs when the editor is destroyed very rapidly.
+
+LANGUAGE: markdown
+CODE:
+### Bug Fixes
+
+- prevent bug when editor is destroyed very fast ([939fc3d](https://github.com/ueberdosis/tiptap/commit/939fc3d93ab67d54b7fe67b64c423290b3a40df8))
+
+----------------------------------------
+
+TITLE: Moving Child Nodes Within EditorContent
+DESCRIPTION: A commit that addresses node movement within the EditorContent component in the Vue 3 integration.
+
+LANGUAGE: markdown
+CODE:
+### Bug Fixes
+
+- move all child nodes within EditorContent ([0f299d2](https://github.com/ueberdosis/tiptap/commit/0f299d228eb4075d24e1c0fb5b39febc6bc77de6))
+
+----------------------------------------
+
+TITLE: JSDoc Feature Addition in Version 2.4.0
+DESCRIPTION: Documents the addition of JSDoc documentation to the codebase with a reference to the related pull request.
+
+LANGUAGE: markdown
+CODE:
+- added jsdocs ([#4356](https://github.com/ueberdosis/tiptap/issues/4356)) ([b941eea](https://github.com/ueberdosis/tiptap/commit/b941eea6daba09d48a5d18ccc1b9a1d84b2249dd))
