@@ -15,9 +15,10 @@ const fetchData = async (
   return await (await fetch(`https://context7.com/${input}`))[responseType]();
 };
 
-const projects = sort(await fetchData("api/projects")).asc(
-  ({ settings }) => settings.title
-);
+const projects = sort(await fetchData("api/projects")).asc(({ settings }) => [
+  settings.project,
+  settings.title,
+]);
 
 fs.writeFileSync(
   "readme.md",
@@ -38,6 +39,12 @@ fs.writeFileSync(
             finalized: "icons/completed-icon.svg",
             initial: "icons/processing-icon.svg",
             error: "icons/error-icon.svg",
+            get parsed() {
+              return this.initial;
+            },
+            get delete() {
+              return this.error;
+            },
           }[version.state]
         }'/>`,
       ]),
@@ -52,14 +59,25 @@ fs.rmSync(dataPath, {
 
 fs.mkdirSync(dataPath);
 
-for (const { settings, version } of projects)
+for (const { settings, version } of projects) {
+  settings.project
+    .split("/")
+    .filter(Boolean)
+    .forEach((projectPath, index, { length }) => {
+      if (index !== length - 1)
+        fs.mkdirSync(`${dataPath}/${projectPath}`, {
+          recursive: true,
+        });
+    });
+
   fs.writeFileSync(
     `${dataPath}/${settings.project}.txt`,
     await fetchData(
-      `${settings.project}/llm.txt?tokens=${version.totalTokens}`,
+      `${settings.project}/llms.txt?tokens=${version.totalTokens}`,
       {
         responseType: "text",
         delayMs: 30000,
       }
     )
   );
+}
