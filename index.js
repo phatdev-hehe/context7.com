@@ -52,7 +52,7 @@ fs.rmSync(dataPath, {
 
 fs.mkdirSync(dataPath);
 
-for (const { settings } of projects)
+for (const { settings, version } of projects)
   fs.writeFileSync(
     `${dataPath}/${settings.project}.txt`,
     await fetchData(
