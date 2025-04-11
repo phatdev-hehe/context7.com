@@ -24,10 +24,11 @@ fs.writeFileSync(
   json2md({
     img: { source: "favicon.ico" },
     table: {
-      headers: ["#", "NAME", "TOKENS", "SNIPPETS", "UPDATE", "STATE"],
+      headers: ["#", "NAME", "REPO", "TOKENS", "SNIPPETS", "UPDATE", "STATE"],
       rows: projects.map(({ settings, version }, index) => [
         index + 1,
         `<a href='${dataPath}/${settings.project}.txt'>${settings.title}</a>`,
+        `<a href='${settings.docsRepoUrl}'>${settings.project}</a>`,
         formatNumber(version.totalTokens),
         formatNumber(version.totalSnippets),
         version.lastUpdate,
@@ -47,13 +48,15 @@ fs.writeFileSync(
 fs.rmSync(dataPath, {
   recursive: true,
   force: true,
-}) || fs.mkdirSync(dataPath);
+});
+
+fs.mkdirSync(dataPath);
 
 for (const { settings } of projects)
   fs.writeFileSync(
     `${dataPath}/${settings.project}.txt`,
     await fetchData(
-      `${settings.project}/llm.txt?tokens=999999999999999999999999999999999`,
+      `${settings.project}/llm.txt?tokens=${version.totalTokens}`,
       {
         responseType: "text",
         delayMs: 30000,
